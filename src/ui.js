@@ -13,7 +13,7 @@ const el = function (tag, attrs, kids) {
 };
 
 /* حالة التصميم المفتوح: d النصوص، hide المخفي، ov الألوان المخصصة */
-const S = { track: null, type: 'all', tpl: null, size: null, variant: null, k: 1, d: {}, hide: {}, ov: {}, pos: {}, layers: [], bgfx: null, sel: null, hijriAdj: 0, tab: 'content', q: '', mine: null, mineName: '', mineKey: '', curKey: '' };
+const S = { track: null, type: 'all', tpl: null, size: null, variant: null, k: 1, d: {}, hide: {}, ov: {}, pos: {}, gs: {}, layers: [], bgfx: null, sel: null, hijriAdj: 0, tab: 'content', q: '', mine: null, mineName: '', mineKey: '', curKey: '' };
 const UP = {};          // الصور المرفوعة: النص ← عنصر الصورة
 function store(key, val) { try { if (val === undefined) return JSON.parse(localStorage.getItem(key) || 'null'); localStorage.setItem(key, JSON.stringify(val)); } catch (e) { return null; } }
 
@@ -227,13 +227,13 @@ function loadState(T, tpl, key) {
   return {
     d: d, size: tpl.sizes.indexOf(saved.size) >= 0 ? saved.size : tpl.sizes[0],
     variant: tpl.variants.some(function (v) { return v.id === saved.variant; }) ? saved.variant : tpl.variants[0].id,
-    k: saved.k || 1, hide: saved.hide || {}, ov: saved.ov || {}, pos: saved.pos || {}, layers: saved.layers || [], bgfx: saved.bgfx || null
+    k: saved.k || 1, hide: saved.hide || {}, ov: saved.ov || {}, pos: saved.pos || {}, gs: saved.gs || {}, layers: saved.layers || [], bgfx: saved.bgfx || null
   };
 }
 function snap() {
   const d = {}; Object.keys(S.d).forEach(function (k) { const x = S.d[k]; d[k] = x && typeof x === 'object' ? Object.assign({}, x) : x; });
   return { d: d, size: S.size, variant: S.variant, k: S.k, hide: Object.assign({}, S.hide), ov: Object.assign({}, S.ov),
-    pos: JSON.parse(JSON.stringify(S.pos || {})), layers: (S.layers || []).map(function (L) { return Object.assign({}, L); }), bgfx: S.bgfx ? Object.assign({}, S.bgfx) : null };
+    pos: JSON.parse(JSON.stringify(S.pos || {})), gs: JSON.parse(JSON.stringify(S.gs || {})), layers: (S.layers || []).map(function (L) { return Object.assign({}, L); }), bgfx: S.bgfx ? Object.assign({}, S.bgfx) : null };
 }
 let saveT = 0;
 function saveState() {
@@ -262,7 +262,7 @@ function pushUndo() {
   lastSnap = { s: cur, js: js }; updUndo();
 }
 function restore(s) {
-  S.d = s.d; S.size = s.size; S.variant = s.variant; S.k = s.k; S.hide = s.hide; S.ov = s.ov; S.pos = s.pos || {}; S.layers = s.layers || []; S.bgfx = s.bgfx || null; S.sel = null;
+  S.d = s.d; S.size = s.size; S.variant = s.variant; S.k = s.k; S.hide = s.hide; S.ov = s.ov; S.pos = s.pos || {}; S.gs = s.gs || {}; S.layers = s.layers || []; S.bgfx = s.bgfx || null; S.sel = null;
   lastSnap = { s: snap(), js: JSON.stringify(snap()) };
   try { localStorage.setItem(S.curKey || skey(S.track, S.tpl), JSON.stringify(snap())); } catch (e) {}
   buildEditor(); schedule();
@@ -303,18 +303,31 @@ function renderTo(canvas, tpl, sizeKey, st, T, scale, collect) {
   OFF = (st.pos && st.pos[sizeKey]) || {};
   GHIDE = {}; Object.keys(hide).forEach(function (k) { if (k.slice(0, 2) === 'g_' && hide[k]) GHIDE[k.slice(2)] = 1; });
   BGFX = st.bgfx ? { p: st.bgfx.p, im: st.bgfx.src ? (photoOf({ src: st.bgfx.src, z: 1 }) || {}).im : null } : null;
-  if (collect) GBOX = {};
   const P = {};
   tpl.fields.forEach(function (f) { if (f.kind === 'image') P[f.k] = photoOf(d[f.k]); });
+  // تنسيق كل عنصر وحده. والعنصر المكبَّر يُكبَّر حول مركزه، فنقيس المراكز أولاً برسم سريع بلا تكبير
+  const gs = st.gs || {}; PIV = {};
+  if (Object.keys(gs).some(function (g) { return gs[g] && gs[g].s && gs[g].s !== 1; })) {
+    GST = {}; Object.keys(gs).forEach(function (g) { GST[g] = Object.assign({}, gs[g], { s: 1 }); });
+    const mc = document.createElement('canvas'); mc.width = 8; mc.height = 8; const mx = mc.getContext('2d'); mx.scale(8 / sz.w, 8 / sz.h);
+    GBOX = {};
+    try { tpl.draw(mx, sz.w, sz.h, d, T2, st.variant, st.k || 1, P); } catch (e) {}
+    G(mx, null);
+    Object.keys(GBOX).forEach(function (g) { const b = GBOX[g], o = OFF[g] || {}; PIV[g] = { x: (b.x0 + b.x1) / 2 - (o.dx || 0), y: (b.y0 + b.y1) / 2 - (o.dy || 0) }; });
+    GBOX = null;
+  }
+  GST = gs;
+  if (collect) { GBOX = {}; GTXT = {}; }
   try { tpl.draw(ctx, sz.w, sz.h, d, T2, st.variant, st.k || 1, P); G(ctx, null); drawLayers(ctx, sz.w, sz.h, st.layers, T2); }
   catch (e) { console.error(e); G(ctx, null); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#b00'; ctx.font = '20px sans-serif'; ctx.fillText('خطأ في القالب: ' + e.message, 10, 30); }
   const gb = GBOX;
-  HIDE = {}; OV = {}; OFF = {}; GHIDE = {}; BGFX = null; GBOX = null; CUR_G = null; CUR_O = null;
+  if (collect) LASTT = GTXT || {};
+  HIDE = {}; OV = {}; OFF = {}; GHIDE = {}; GST = {}; PIV = {}; GTXT = null; BGFX = null; GBOX = null; CUR_G = null; CUR_O = null; CUR_S = null;
   return gb;
 }
 
 /* ---------- الصفحة الثالثة: التحرير ---------- */
-let pv = null, raf = 0;
+let pv = null, raf = 0, LASTT = {};
 function schedule() { if (raf) return; raf = requestAnimationFrame(function () { raf = 0; if (pv && S.tpl) { LASTG = renderTo(pv, S.tpl, S.size, snap(), S.track, 1, true) || {}; drawOverlay(); } }); }
 // لوحة رسم جديدة عند تغيير المقاس، فلا تبقى بقايا رسم قديم في بعض المتصفحات
 function newPv() {
@@ -333,7 +346,7 @@ function showEditor(tpl) {
   S.tpl = tpl; S.type = tpl.type; S.sel = null;
   const st = loadState(T, tpl, S.curKey);
   if (S.prefSize && tpl.sizes.indexOf(S.prefSize) >= 0 && !store(S.curKey)) st.size = S.prefSize;
-  S.d = st.d; S.size = st.size; S.variant = st.variant; S.k = st.k; S.hide = st.hide; S.ov = st.ov; S.pos = st.pos; S.layers = st.layers; S.bgfx = st.bgfx;
+  S.d = st.d; S.size = st.size; S.variant = st.variant; S.k = st.k; S.hide = st.hide; S.ov = st.ov; S.pos = st.pos; S.gs = st.gs || {}; S.layers = st.layers; S.bgfx = st.bgfx;
   lastSnap = { s: snap(), js: JSON.stringify(snap()) };
   document.title = tpl.name + ' — ' + T.name;
   const ty = TYPES.find(function (t) { return t.id === tpl.type; }) || { id: 'all', name: S.mine ? 'قوالبي' : 'المصمم المساعد' };
@@ -450,7 +463,7 @@ function buildContent(body) {
     try { localStorage.removeItem(S.curKey); } catch (e) {}
     const st = loadState(S.track, tpl, S.curKey);
     UNDO.push(snap()); REDO = [];
-    S.d = st.d; S.size = st.size; S.variant = st.variant; S.k = st.k; S.hide = {}; S.ov = {}; S.pos = {}; S.layers = []; S.bgfx = null; S.sel = null;
+    S.d = st.d; S.size = st.size; S.variant = st.variant; S.k = st.k; S.hide = {}; S.ov = {}; S.pos = {}; S.gs = {}; S.layers = []; S.bgfx = null; S.sel = null;
     lastSnap = { s: snap(), js: JSON.stringify(snap()) };
     buildEditor(); schedule(); updUndo();
   } })]));
@@ -722,17 +735,24 @@ function exportImg(fmt) {
   c.toBlob(function (blob) {
     const url = URL.createObjectURL(blob);
     const a = el('a', { href: url, download: name }); document.body.appendChild(a); a.click(); a.remove();
-    showSaved(url, sz, sc, blob.size);
+    showSaved(url, sz, sc, blob.size, blob, name);
   }, fmt === 'png' ? 'image/png' : 'image/jpeg', 0.93);
 }
-function showSaved(url, sz, sc, bytes) {
+// المشاركة المباشرة من الجوال (واتساب، تليجرام…) إن كان المتصفح يدعمها
+function shareBtn(blob, name) {
+  if (!blob || !navigator.canShare) return null;
+  let file; try { file = new File([blob], name, { type: blob.type }); } catch (e) { return null; }
+  if (!navigator.canShare({ files: [file] })) return null;
+  return el('button', { type: 'button', class: 'btn main', text: 'مشاركة', onclick: function () { navigator.share({ files: [file], title: name }).catch(function () {}); } });
+}
+function showSaved(url, sz, sc, bytes, blob, name) {
   const old = $('.saved'); if (old) old.remove();
   const dlg = el('div', { class: 'saved', role: 'dialog', 'aria-label': 'تم التحميل' }, [
     el('div', { class: 'sv' }, [
       el('b', { text: 'بدأ التحميل' }),
       el('p', { text: 'المقاس ' + sz.w * sc + ' × ' + sz.h * sc + '، والحجم ' + (bytes / 1048576).toFixed(1) + ' ميغابايت. على الجوال: إن لم يظهر الملف، اضغط على الصورة مطولاً واختر حفظ.' }),
       el('img', { src: url, alt: 'التصميم' }),
-      el('button', { type: 'button', class: 'btn', text: 'إغلاق', onclick: function () { dlg.remove(); } })
+      el('div', { class: 'sbrow' }, [shareBtn(blob, name), el('button', { type: 'button', class: 'btn', text: 'إغلاق', onclick: function () { dlg.remove(); } })])
     ])
   ]);
   dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.remove(); });
@@ -745,7 +765,7 @@ function resetAll() {
   UNDO.push(snap()); REDO = [];
   try { localStorage.removeItem(S.curKey); } catch (e) {}
   S.d = defaults(S.tpl, S.track); S.size = S.tpl.sizes[0]; S.variant = S.tpl.variants[0].id; S.k = 1;
-  S.hide = {}; S.ov = {}; S.pos = {}; S.layers = []; S.bgfx = null; S.sel = null;
+  S.hide = {}; S.ov = {}; S.pos = {}; S.gs = {}; S.layers = []; S.bgfx = null; S.sel = null;
   lastSnap = { s: snap(), js: JSON.stringify(snap()) };
   newPv(); buildEditor(); schedule(); updUndo(); saveState();
 }

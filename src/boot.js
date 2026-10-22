@@ -9,4 +9,5 @@
   userChip();
   route();
   if (!s || s === 'out') showWelcome();
+  setTimeout(flushFeedback, 3000);
 })();

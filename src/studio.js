@@ -207,12 +207,16 @@ function drawOverlay() {
   g.restore();
 }
 function bindStage(cv) {
-  let st = null;
+  let st = null, lastTap = { g: null, t: 0 };
   function pt(e) { const r = cv.getBoundingClientRect(), sz = SIZES[S.size]; return { x: (e.clientX - r.left) / r.width * sz.w, y: (e.clientY - r.top) / r.height * sz.h }; }
   cv.addEventListener('pointerdown', function (e) {
     const p = pt(e), g = hitTest(p.x, p.y);
-    if (g !== S.sel) { S.sel = g; buildSelBar(); drawOverlay(); }
+    if (g !== S.sel) { S.sel = g; closeInline(); buildSelBar(); drawOverlay(); }
     if (!g) return;
+    // اللمس المزدوج في الجوال يفتح تعديل النص (النقر المزدوج بالفأرة له حدثه)
+    const now = Date.now();
+    if (e.pointerType !== 'mouse' && lastTap.g === g && now - lastTap.t < 380) { lastTap = { g: null, t: 0 }; e.preventDefault(); openInline(g); return; }
+    lastTap = { g: g, t: now };
     // سحب صورة القالب داخل إطارها يبقى كما كان
     if (g === 'photo') {
       const f = S.tpl.fields.find(function (x) { return x.kind === 'image' && S.d[x.k]; });
@@ -227,7 +231,11 @@ function bindStage(cv) {
     if (st.photo) { const r = cv.getBoundingClientRect(), v = S.d[st.photo]; v.ox = Math.max(-2, Math.min(2, st.ox + (e.clientX - st.x) / r.width * 2)); v.oy = Math.max(-2, Math.min(2, st.oy + (e.clientY - st.y) / r.height * 2)); schedule(); return; }
     const p = pt(e); let dx = p.x - st.p0.x, dy = p.y - st.p0.y;
     if (Math.abs(dx) + Math.abs(dy) > 2) st.moved = true;
-    const sn = e.shiftKey ? { dx: dx, dy: dy, guides: [] } : snapDelta(st.box, dx, dy);
+    // Shift يقيّد الحركة بمحور واحد (أفقي أو رأسي حسب الاتجاه الأكبر)، وAlt يوقف الالتصاق
+    if (e.shiftKey) { if (!st.axis && Math.abs(dx) + Math.abs(dy) > 6) st.axis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y'; if (st.axis === 'x') dy = 0; else if (st.axis === 'y') dx = 0; } else st.axis = null;
+    let sn = e.altKey ? { dx: dx, dy: dy, guides: [] } : snapDelta(st.box, dx, dy);
+    if (st.axis === 'x') { sn.dy = 0; sn.guides = sn.guides.filter(function (q) { return q.x != null; }); }
+    if (st.axis === 'y') { sn.dx = 0; sn.guides = sn.guides.filter(function (q) { return q.y != null; }); }
     GUIDES = sn.guides;
     if (st.g.slice(0, 2) === 'L:') { const L = layerById(st.g.slice(2)), sz = SIZES[S.size]; L.x = st.lx + sn.dx / sz.w; L.y = st.ly + sn.dy / sz.h; }
     else { const q = posOf(st.g); q.dx = st.dx0 + sn.dx; q.dy = st.dy0 + sn.dy; }
@@ -235,7 +243,61 @@ function bindStage(cv) {
   });
   function end() { if (st) { const m = st.moved || st.photo; st = null; GUIDES = []; cv.classList.remove('drag'); if (m) { saveState(); setTimeout(buildSelBar, 30); } schedule(); } }
   cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  cv.addEventListener('dblclick', function (e) { const p = pt(e), g = hitTest(p.x, p.y); if (g) { e.preventDefault(); openInline(g); } });
 }
+
+/* ---------- تعديل النص مباشرة على التصميم (نقر مزدوج) ----------
+   نعرف خانة النص التي يرسمها العنصر بمطابقة ما رُسم فيه مع قيم الخانات */
+function plainOf(v) { return norm(String(v == null ? '' : v).replace(/\*/g, '')).replace(/\s+/g, ' ').trim(); }
+function fieldsOfGroup(g) {
+  if (g.slice(0, 2) === 'L:') { const L = layerById(g.slice(2)); return L && L.t === 'text' ? [{ layer: L }] : []; }
+  const lines = (LASTT[g] || []).map(plainOf).filter(Boolean);
+  if (!lines.length) return [];
+  const out = [];
+  S.tpl.fields.forEach(function (f) {
+    if (!f.k || (f.kind && f.kind !== 'area' && f.kind !== 'text')) return;
+    if (S.hide['f_' + f.k] || typeof S.d[f.k] !== 'string') return;
+    const v = plainOf(S.d[f.k]); if (!v) return;
+    const hit = lines.filter(function (l) { return v.indexOf(l) >= 0 || l.indexOf(v) >= 0; }).length;
+    if (hit) out.push({ f: f, hit: hit });
+  });
+  return out.sort(function (a, b) { return b.hit - a.hit; });
+}
+function closeInline() { const o = $('.ied'); if (o) { o.remove(); saveState(); } }
+function openInline(g) {
+  closeInline();
+  const list = fieldsOfGroup(g), b = LASTG[g];
+  if (!b) return;
+  if (!list.length) { toast('هذا العنصر ليس نصاً. اختره لتحريكه أو تغيير حجمه ولونه.'); return; }
+  S.sel = g; buildSelBar(); drawOverlay();
+  const stg = pv.parentNode, r = pv.getBoundingClientRect(), sr = stg.getBoundingClientRect(), sz = SIZES[S.size], k = r.width / sz.w;
+  const box = el('div', { class: 'ied', role: 'dialog', 'aria-label': 'تعديل النص' });
+  list.forEach(function (it, i) {
+    const ta = el('textarea', { rows: '1', 'aria-label': it.layer ? 'النص' : it.f.label });
+    ta.value = it.layer ? (it.layer.txt || '') : S.d[it.f.k];
+    const fit2 = function () { ta.style.height = 'auto'; ta.style.height = Math.min(220, ta.scrollHeight + 2) + 'px'; };
+    ta.addEventListener('input', function () {
+      if (it.layer) { it.layer.txt = ta.value; const lt = $('#selbar textarea'); if (lt) lt.value = ta.value; } else { S.d[it.f.k] = ta.value; const side = document.getElementById('f_' + it.f.k); if (side) side.value = ta.value; }
+      fit2(); schedule(); clearTimeout(saveT); saveT = setTimeout(saveState, 600);
+    });
+    ta.addEventListener('keydown', function (e) { if (e.key === 'Escape' || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) { e.preventDefault(); closeInline(); } });
+    if (list.length > 1) box.appendChild(el('small', { text: it.f.label }));
+    box.appendChild(ta); setTimeout(fit2, 0);
+    if (i === 0) setTimeout(function () { ta.focus(); ta.select(); }, 30);
+  });
+  box.appendChild(el('div', { class: 'iedf' }, [el('span', { text: 'ما بين *نجمتين* يظهر بلون مميز' }), el('button', { type: 'button', class: 'mini accent', text: 'تم', onclick: closeInline })]));
+  const narrow = window.matchMedia('(max-width: 900px)').matches;
+  (narrow ? document.body : stg).appendChild(box);
+  if (narrow) { box.style.top = Math.round(Math.max(56, stg.getBoundingClientRect().bottom + 8)) + 'px'; return; }   // في الجوال تحت المعاينة مباشرة
+  const w = Math.max(260, Math.min(sr.width - 16, (b.x1 - b.x0) * k + 24));
+  let x = r.left - sr.left + ((b.x0 + b.x1) / 2) * k - w / 2; x = Math.max(8, Math.min(sr.width - w - 8, x));
+  let y = r.top - sr.top + b.y1 * k + 10;
+  box.style.width = w + 'px'; box.style.left = x + 'px';
+  if (y + box.offsetHeight > sr.height - 8) y = Math.max(8, r.top - sr.top + b.y0 * k - box.offsetHeight - 10);
+  box.style.top = y + 'px';
+}
+document.addEventListener('pointerdown', function (e) { const o = $('.ied'); if (o && !o.contains(e.target) && e.target !== pv) closeInline(); }, true);
+
 document.addEventListener('keydown', function (e) {
   if (!S.sel || !$('.editor')) return;
   const tag = document.activeElement && document.activeElement.tagName;
@@ -285,8 +347,41 @@ function buildSelBar() {
   ]));
   const ov = overlapsOf(g);
   if (ov.length) props.appendChild(el('p', { class: 'warn', text: 'يتداخل مع: ' + ov.map(gName).join('، ') + '. اختر موضعاً أخضر من الشبكة.' }));
-  else props.appendChild(el('p', { class: 'note', text: 'اسحب العنصر في المعاينة، فيلتصق بالهوامش والمنتصف والعناصر الأخرى. الأسهم في لوحة المفاتيح تحرّكه بدقة.' }));
-  if (L) layerProps(props, L);
+  else props.appendChild(el('p', { class: 'note', text: 'اسحب العنصر في المعاينة فيلتصق بالهوامش والعناصر الأخرى. Shift أثناء السحب يقيّده أفقياً أو رأسياً، وAlt يوقف الالتصاق. وانقر نقراً مزدوجاً على النص لتعديله.' }));
+  if (L) layerProps(props, L); else groupProps(props, g);
+}
+/* تنسيق عنصر القالب وحده: حجمه ولونه وخطه، دون أن يتأثر غيره */
+function setGs(g, key, val) {
+  S.gs = S.gs || {};
+  const o = Object.assign({}, S.gs[g] || {});
+  if (val === '' || val == null || (key === 's' && Math.abs(val - 1) < 0.005)) delete o[key]; else o[key] = val;
+  if (Object.keys(o).length) S.gs[g] = o; else delete S.gs[g];
+}
+function colorPick(label, cur, on) {
+  const T = S.track;
+  return el('div', { class: 'gsrow' }, [el('small', { text: label }), el('div', { class: 'sws' }, [
+    el('button', { type: 'button', class: 'swt orig' + (cur ? '' : ' on'), title: 'كما في القالب', onclick: function () { on(''); changed(); buildSelBar(); } }, ['أصل'])
+  ].concat(T.swatches.concat(['#ffffff']).filter(function (c, i, a) { return a.indexOf(c) === i; }).map(function (c) {
+    return el('button', { type: 'button', class: 'swt' + (cur === c ? ' on' : ''), style: 'background:' + c, title: c, 'aria-label': c, onclick: function () { on(c); changed(); buildSelBar(); } });
+  })).concat([el('label', { class: 'swt more', title: 'لون آخر' }, ['+', el('input', { type: 'color', value: /^#/.test(cur || '') ? cur : '#467839', 'aria-label': 'لون آخر', oninput: function (e) { on(e.target.value); schedule(); }, onchange: function () { saveState(); buildSelBar(); } })])]))]);
+}
+function groupProps(box, g) {
+  const st = (S.gs && S.gs[g]) || {}, hasText = !!(LASTT[g] && LASTT[g].length);
+  const sc = st.s || 1;
+  const lbl = el('b', { class: 'pct', text: Math.round(sc * 100) + '٪' });
+  box.appendChild(el('div', { class: 'range' }, [el('span', { text: 'الحجم' }),
+    el('input', { type: 'range', min: '0.5', max: '2', step: '0.01', value: String(sc), 'aria-label': 'حجم العنصر', oninput: function (e) { setGs(g, 's', +e.target.value); lbl.textContent = Math.round(+e.target.value * 100) + '٪'; schedule(); }, onchange: function () { saveState(); setTimeout(buildSelBar, 30); } }),
+    lbl]));
+  if (hasText) {
+    box.appendChild(colorPick('لون النص', st.c || '', function (c) { setGs(g, 'c', c); }));
+    box.appendChild(colorPick('لون التمييز والأيقونات', st.h || '', function (c) { setGs(g, 'h', c); }));
+    box.appendChild(el('div', { class: 'gsrow' }, [el('small', { text: 'الخط' }), seg([['', 'خط القالب']].concat(Object.keys(FONTS).map(function (id) { return [id, FONTS[id].name]; })), st.f || '', function (v) { setGs(g, 'f', v); changed(); })]));
+  }
+  const fl = fieldsOfGroup(g);
+  box.appendChild(el('div', { class: 'sbrow' }, [
+    fl.length ? el('button', { type: 'button', class: 'mini accent', text: 'تعديل النص', onclick: function () { openInline(g); } }) : null,
+    Object.keys(st).length ? el('button', { type: 'button', class: 'mini', text: 'إرجاع تنسيقه', onclick: function () { delete S.gs[g]; changed(); buildSelBar(); } }) : null
+  ]));
 }
 function rangeRow(label, min, max, step, val, on) {
   return el('div', { class: 'range' }, [el('span', { text: label }), el('input', { type: 'range', min: String(min), max: String(max), step: String(step), value: String(val), 'aria-label': label, oninput: function (e) { on(+e.target.value); schedule(); }, onchange: function () { saveState(); } })]);
@@ -669,7 +764,7 @@ function thumbOf(tpl, st) {
 function saveAsTemplate(update) {
   const old = $('.saved'); if (old) old.remove();
   const nameI = el('input', { type: 'text', value: update && S.mineName ? S.mineName : (S.tpl.id === 'blank' ? 'تصميمي' : S.tpl.name + ' — نسختي'), 'aria-label': 'اسم القالب' });
-  const shareI = el('input', { type: 'checkbox' });
+  const shareI = el('input', { type: 'checkbox', checked: !!(update && S.mineShared) });
   const msg = el('p', { class: 'note' });
   const dlg = el('div', { class: 'saved', role: 'dialog', 'aria-label': 'حفظ كقالب' }, [el('div', { class: 'sv' }, [
     el('b', { text: update ? 'تحديث قالبي' : 'حفظ كقالب لي' }),
@@ -684,7 +779,7 @@ function saveAsTemplate(update) {
         const own = S.mine && S.mine.slice(0, 5) !== 'team:';
         const item = { id: update && own ? S.mine : newId() + newId(), kind: 'tpl', name: nameI.value || 'قالبي', shared: shareI.checked, tpl: S.tpl.id, track: S.track.id, st: st, thumb: thumbOf(S.tpl, st), at: Date.now() };
         msg.textContent = 'جارٍ الحفظ…';
-        try { await STORE.save(item); S.mine = item.id; S.mineName = item.name; msg.textContent = 'حُفظ. تجده في «قوالبي».'; setTimeout(function () { dlg.remove(); }, 900); }
+        try { await STORE.save(item); S.mine = item.id; S.mineName = item.name; S.mineShared = item.shared; msg.textContent = 'حُفظ. تجده في «قوالبي».'; setTimeout(function () { dlg.remove(); }, 900); }
         catch (e) { msg.textContent = e.message || String(e); }
       } }),
       el('button', { type: 'button', class: 'btn', text: 'إلغاء', onclick: function () { dlg.remove(); } })
@@ -702,17 +797,19 @@ async function showMine() {
     el('p', { class: 'note', text: STORE.remote() ? (USER ? 'محفوظة في حسابك، تجدها من أي جهاز.' : 'ادخل باسمك من أعلى الصفحة لترى قوالبك.') : 'محفوظة في هذا المتصفح. وحين يُنشر الموقع على جوجل تُحفظ في حسابك فتظهر على كل الأجهزة.' }),
     mineG, el('h2', { class: 'h', text: 'قوالب الفريق' }), el('p', { class: 'note', text: 'قوالب شاركها الزملاء. افتح أياً منها لتبدأ منه، وتعديلك لا يغيّر الأصل.' }), teamG);
   let list = [];
-  try { list = (await STORE.list()).filter(function (x) { return x.kind !== 'deck' && (!x.track || x.track === T.id); }); } catch (e) { mineG.innerHTML = ''; mineG.appendChild(el('p', { class: 'warn', text: 'تعذّر جلب القوالب: ' + (e.message || e) })); return; }
+  // كل الهويات تظهر، وقوالب الهوية المفتوحة أولاً
+  try { list = (await STORE.list()).filter(function (x) { return x.kind !== 'deck'; }).sort(function (a, b) { return ((b.track === T.id) - (a.track === T.id)) || ((b.at || 0) - (a.at || 0)); }); } catch (e) { mineG.innerHTML = ''; mineG.appendChild(el('p', { class: 'warn', text: 'تعذّر جلب القوالب: ' + (e.message || e) })); return; }
   const me = meKey();
   [[mineG, list.filter(function (x) { return !x.ownerKey || x.ownerKey === me; }), 'لا قوالب محفوظة بعد. افتح أي قالب، ثم اضغط «حفظ كقالب».', true],
-   [teamG, list.filter(function (x) { return x.ownerKey && x.ownerKey !== me && x.shared; }), (STORE.remote() && !USER) ? 'ادخل باسمك ورمزك من أعلى الصفحة لترى قوالب الفريق.' : 'لم يشارك أحد قالباً في هذه الهوية بعد.', false]].forEach(function (g) {
+   [teamG, list.filter(function (x) { return x.ownerKey && x.ownerKey !== me && x.shared; }), (STORE.remote() && !USER) ? 'ادخل باسمك ورمزك من أعلى الصفحة لترى قوالب الفريق.' : 'لم يشارك أحد قالباً بعد.', false]].forEach(function (g) {
     g[0].innerHTML = '';
     if (!g[1].length) { g[0].appendChild(el('p', { class: 'empty', text: g[2] })); return; }
     g[1].forEach(function (x) {
       const tpl = TEMPLATES.find(function (t) { return t.id === x.tpl; });
+      const XT = (x.track && TRACKS[x.track]) ? trackOf(x.track) : T;
       g[0].appendChild(el('div', { class: 'tcard' }, [
-        el('a', { href: '#/' + T.id + '/m/' + x.id, class: 'thumb' }, [el('img', { src: x.thumb || '', alt: x.name })]),
-        el('div', { class: 'tmeta' }, [el('b', { text: x.name }), el('span', { text: [tpl ? tpl.name : '', g[3] ? (x.shared ? 'مشارك مع الفريق' : '') : x.owner].filter(Boolean).join(' · ') }),
+        el('a', { href: '#/' + XT.id + '/m/' + x.id, class: 'thumb' }, [el('img', { src: x.thumb || '', alt: x.name }), x.shared ? el('span', { class: 'nbadge shb', text: 'مشارك' }) : null]),
+        el('div', { class: 'tmeta' }, [el('b', { text: x.name }), el('span', { text: [XT.id !== T.id ? XT.full.replace('ـ', '') : '', tpl ? tpl.name : '', g[3] ? '' : 'من ' + x.owner].filter(Boolean).join(' · ') }),
           g[3] ? el('button', { type: 'button', class: 'link small', text: 'حذف', onclick: async function () { if (!confirmInline(this)) return; await STORE.del(x.id); showMine(); } }) : null])
       ]));
     });
@@ -727,7 +824,7 @@ async function openMine(id) {
   const tpl = TEMPLATES.find(function (t) { return t.id === item.tpl; });
   if (!tpl) { location.hash = '#/' + T.id + '/mine'; return; }
   if (!store(wkey)) { try { localStorage.setItem(wkey, JSON.stringify(item.st)); } catch (e) {} }
-  S.mine = (!item.ownerKey || item.ownerKey === meKey()) ? id : 'team:' + id; S.mineName = item.name; S.mineKey = wkey;
+  S.mine = (!item.ownerKey || item.ownerKey === meKey()) ? id : 'team:' + id; S.mineName = item.name; S.mineKey = wkey; S.mineShared = !!item.shared;
   showEditor(tpl);
 }
 

@@ -19,21 +19,28 @@ let HLC = '';              // لون التمييز الافتراضي لما ب
 let BGFX = null;           // خلفية من المكتبة: {p: نقش, img: صورة}
 /* المجموعات: كل قسم من التصميم مجموعة يمكن تحريكها. OFF إزاحاتها، GBOX حدودها بعد الرسم */
 let OFF = {}, GBOX = null, CUR_G = null, CUR_O = null, GHIDE = {};
+/* تنسيق كل عنصر وحده: GST[المجموعة] = {s: تكبير، c: لون النص، h: لون التمييز والأيقونات، f: الخط}
+   PIV مراكز العناصر قبل التكبير (يُكبَّر العنصر حول مركزه)، GTXT النصوص المرسومة في كل عنصر */
+let GST = {}, PIV = {}, CUR_S = null, GTXT = null;
 const FAR = { dx: -100000, dy: -100000 };
 function G(ctx, name) {
   if (CUR_G) ctx.restore();
-  CUR_G = name || null; CUR_O = null;
+  CUR_G = name || null; CUR_O = null; CUR_S = null;
   if (CUR_G) {
     ctx.save();
     if (GHIDE[CUR_G]) { ctx.translate(FAR.dx, FAR.dy); CUR_O = FAR; return; }   // عنصر أُخفي أو استُبدل
     const o = OFF[CUR_G]; if (o && (o.dx || o.dy)) { ctx.translate(o.dx || 0, o.dy || 0); CUR_O = o; }
+    const st = GST[CUR_G], pv = PIV[CUR_G];
+    if (st && st.s && st.s !== 1 && pv) { ctx.translate(pv.x, pv.y); ctx.scale(st.s, st.s); ctx.translate(-pv.x, -pv.y); CUR_S = { s: st.s, x: pv.x, y: pv.y }; }
   }
 }
+function gStyle() { return CUR_G && GST[CUR_G] ? GST[CUR_G] : null; }
 
 function wkOf(bold) { return !bold ? 'r' : bold <= 0.45 ? 'm' : bold <= 0.92 ? 'b' : 'k'; }
 // الخط والوزن والحدّ لنص معيّن
 function fontOf(role, bold) {
-  const set = FONTS[FS[role === 'title' ? 'title' : 'body']] || FONTS.tajarib;
+  const gs = gStyle();
+  const set = (gs && gs.f && FONTS[gs.f]) || FONTS[FS[role === 'title' ? 'title' : 'body']] || FONTS.tajarib;
   let wk = wkOf(bold);
   if (role === 'title' && FS.tw) wk = FS.tw;
   const fake = set.fake ? ({ l: 0, r: 0, m: 0.25, b: 0.6, k: 1 }[wk]) : 0;
@@ -80,6 +87,7 @@ function area(x0, y0, x1, y1) { box('area', x0, y0, x1, y1, 'area'); }
 function quiet(fn) { const s = BOXES, g = GBOX; BOXES = null; GBOX = null; try { fn(); } finally { BOXES = s; GBOX = g; } }
 function box(kind, x0, y0, x1, y1, t) {
   const dx = CUR_O ? CUR_O.dx || 0 : 0, dy = CUR_O ? CUR_O.dy || 0 : 0;
+  if (CUR_S) { const q = CUR_S; x0 = q.x + (x0 - q.x) * q.s; x1 = q.x + (x1 - q.x) * q.s; y0 = q.y + (y0 - q.y) * q.s; y1 = q.y + (y1 - q.y) * q.s; }
   const b = { k: kind, x0: Math.min(x0, x1) + dx, y0: Math.min(y0, y1) + dy, x1: Math.max(x0, x1) + dx, y1: Math.max(y0, y1) + dy, t: t || '', g: CUR_G };
   if (BOXES) BOXES.push(b);
   if (GBOX && CUR_G) { const r = GBOX[CUR_G]; if (!r) GBOX[CUR_G] = { x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y1 }; else { r.x0 = Math.min(r.x0, b.x0); r.y0 = Math.min(r.y0, b.y0); r.x1 = Math.max(r.x1, b.x1); r.y1 = Math.max(r.y1, b.y1); } }
@@ -229,11 +237,13 @@ function drawFit(ctx, f, x, y, o) {
     if (o.align === 'center') xr = x + l.w / 2;
     else if (o.align === 'left') xr = x + l.w;
     if (BOXES || GBOX) { const tx = runsOf(l.words).map(function (r) { return r.t; }).join(' '), m = ctx.measureText(tx);
-      box('text', xr - l.w, yc - (m.actualBoundingBoxAscent || f.size * 0.5), xr, yc + (m.actualBoundingBoxDescent || f.size * 0.5), tx); }
+      box('text', xr - l.w, yc - (m.actualBoundingBoxAscent || f.size * 0.5), xr, yc + (m.actualBoundingBoxDescent || f.size * 0.5), tx);
+      if (GTXT && CUR_G) (GTXT[CUR_G] = GTXT[CUR_G] || []).push(tx); }
     ctx.textAlign = 'right';
+    const gs = gStyle();
     runsOf(l.words).forEach(function (r) {
       if (r.sp) xr -= sp;
-      const col = r.hl ? (o.hl || hlFor(o.color)) : o.color;
+      const col = r.hl ? ((gs && gs.h) || o.hl || hlFor(o.color)) : ((gs && gs.c) || o.color);
       ctx.fillStyle = col;
       if (f.stroke) { ctx.strokeStyle = col; ctx.lineWidth = f.size * 0.045 * f.stroke; ctx.lineJoin = 'round'; ctx.strokeText(r.t, xr, yc); }
       ctx.fillText(r.t, xr, yc);
@@ -400,6 +410,7 @@ const ICONS = {
   none: function () {}
 };
 function icon(ctx, name, cx, cy, s, color) {
+  const gs = gStyle(); if (gs && (gs.h || gs.c)) color = gs.h || gs.c;
   if (name && name !== 'none') box('icon', cx - s / 2, cy - s / 2, cx + s / 2, cy + s / 2, name);
   ctx.save(); ctx.translate(cx, cy); (ICONS[name] || ICONS.none)(ctx, s, color); ctx.restore();
 }

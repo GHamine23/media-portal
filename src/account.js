@@ -124,6 +124,7 @@ async function restoreSession() {
 function userChip() {
   const box = $('#userbox'); if (!box) return;
   box.innerHTML = '';
+  box.appendChild(el('button', { type: 'button', class: 'tbtn', title: 'أبلغ عن مشكلة أو اقترح فكرة', onclick: showFeedback }, [el('span', { class: 'q', text: '!' }), el('span', { class: 'lg', text: 'ملاحظة' })]));
   box.appendChild(el('button', { type: 'button', class: 'tbtn', title: 'جولة تعريفية بالموقع', onclick: function () { startTour(pageKind(), true); } }, [el('span', { class: 'q', text: '؟' }), el('span', { class: 'lg', text: 'جولة' })]));
   if (USER) box.appendChild(el('button', { type: 'button', class: 'tbtn user', title: 'حسابك', onclick: accountMenu }, [el('span', { class: 'av', text: USER.name.trim().slice(0, 1) }), el('span', { class: 'lg', text: USER.name })]));
   else box.appendChild(el('button', { type: 'button', class: 'tbtn', onclick: function () { showWelcome(true); } }, [el('span', { text: 'دخول' })]));
@@ -280,4 +281,54 @@ function themesBlock(body, onApply) {
       if (!USER) toast('حُفظت في هذا المتصفح. ادخل باسمك لتجدها على كل أجهزتك.');
     } })]));
   }
+}
+
+/* ---------- البلاغات والاقتراحات ----------
+   يُرفق تلقائياً: الصفحة، والجهاز، وآخر الأخطاء التقنية، وصورة مصغّرة من التصميم المفتوح */
+const ERRS = [];
+window.addEventListener('error', function (e) { ERRS.push(String(e.message || e.error || 'error').slice(0, 300) + ' @' + (e.filename || '').split('/').pop() + ':' + (e.lineno || '')); if (ERRS.length > 12) ERRS.shift(); });
+window.addEventListener('unhandledrejection', function (e) { ERRS.push('promise: ' + String((e.reason && e.reason.message) || e.reason).slice(0, 300)); if (ERRS.length > 12) ERRS.shift(); });
+function showFeedback() {
+  const old = $('.saved'); if (old) old.remove();
+  let kind = 'bug';
+  const ta = el('textarea', { rows: '5', placeholder: 'اكتب ما حدث أو فكرتك باختصار…', 'aria-label': 'نص الملاحظة' });
+  const shotOn = !!(pv && S.tpl && $('.editor'));
+  const shotI = el('input', { type: 'checkbox', checked: shotOn });
+  const msg = el('p', { class: 'note', role: 'status' });
+  const send = el('button', { type: 'button', class: 'btn main', text: 'إرسال' });
+  send.addEventListener('click', async function () {
+    if (ta.value.trim().length < 4) { msg.textContent = 'اكتب ملاحظتك أولاً.'; ta.focus(); return; }
+    send.disabled = true; msg.textContent = 'جارٍ الإرسال…';
+    let shot = '';
+    if (shotI.checked && pv) { try { const c = document.createElement('canvas'); renderTo(c, S.tpl, S.size, snap(), S.track, Math.min(0.5, 700 / SIZES[S.size].w)); shot = c.toDataURL('image/jpeg', 0.8); } catch (e) {} }
+    const item = { kind: kind, text: ta.value.trim().slice(0, 4000), page: location.hash || '#/', tpl: S.tpl ? S.tpl.id : '', track: S.track ? S.track.id : '',
+      ua: navigator.userAgent, vw: window.innerWidth + '×' + window.innerHeight, errors: ERRS.slice(-8), shot: shot, v: 5, at: Date.now() };
+    try {
+      await API.probe();
+      if (!STORE.remote()) throw new Error('local');
+      await API.call('api_feedback', USER ? USER.token : '', JSON.stringify(item));
+      msg.textContent = 'وصلت ملاحظتك، شكراً لك. نراجع الملاحظات كل أسبوع.';
+      setTimeout(function () { dlg.remove(); }, 1600);
+    } catch (e) {
+      const q = store('jz1.fbqueue') || []; item.shot = ''; q.push(item); store('jz1.fbqueue', q.slice(-20));
+      msg.textContent = /local|غير معروف/.test(e.message || '') ? 'حُفظت ملاحظتك في هذا المتصفح، وتُرسل تلقائياً حين تتفعّل خدمة البلاغات.' : 'تعذّر الإرسال: ' + (e.message || e);
+      send.disabled = false;
+    }
+  });
+  const dlg = el('div', { class: 'saved', role: 'dialog', 'aria-label': 'ملاحظة' }, [el('div', { class: 'sv' }, [
+    el('b', { text: 'أبلغ عن مشكلة أو اقترح فكرة' }),
+    seg([['bug', 'مشكلة'], ['idea', 'اقتراح'], ['q', 'سؤال']], kind, function (v) { kind = v; }),
+    ta,
+    shotOn ? el('label', { class: 'fld tog' }, [shotI, el('i'), el('span', { text: 'أرفق صورة التصميم المفتوح' })]) : null,
+    el('p', { class: 'note', text: 'يُرفق تلقائياً اسم الصفحة ونوع الجهاز، لنفهم المشكلة دون أسئلة كثيرة.' }),
+    msg,
+    el('div', { class: 'sbrow' }, [send, el('button', { type: 'button', class: 'btn', text: 'إلغاء', onclick: function () { dlg.remove(); } })])
+  ])]);
+  dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.remove(); });
+  document.body.appendChild(dlg); setTimeout(function () { ta.focus(); }, 50);
+}
+// ما حُفظ محلياً يُرسل حين تتوفر الخدمة
+async function flushFeedback() {
+  const q = store('jz1.fbqueue'); if (!q || !q.length) return;
+  try { await API.probe(); if (!STORE.remote()) return; for (const it of q) await API.call('api_feedback', USER ? USER.token : '', JSON.stringify(it)); store('jz1.fbqueue', []); } catch (e) {}
 }

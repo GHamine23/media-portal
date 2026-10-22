@@ -64,6 +64,20 @@ for m in re.findall(r'<!--FILE:([\w.-]+)-->', shell):
 html = html.replace('<!--PACKS-->', '')
 (DOCS / 'index.html').write_text(html)
 (DOCS / '.nojekyll').write_text('')
+# تطبيق على الشاشة الرئيسية ومعاينة الرابط
+import json
+PWA = ROOT / 'assets/pwa'
+(DOCS / 'icons').mkdir(exist_ok=True)
+for n in ['icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'favicon-64.png']:
+    if (PWA / n).exists(): shutil.copy(PWA / n, DOCS / 'icons' / n)
+if (PWA / 'og.png').exists(): shutil.copy(PWA / 'og.png', DOCS / 'og.png')
+(DOCS / 'manifest.webmanifest').write_text(json.dumps({
+    'name': 'البوابة الإعلامية للبرامج الإلكترونية', 'short_name': 'البوابة الإعلامية', 'lang': 'ar', 'dir': 'rtl',
+    'start_url': './', 'scope': './', 'display': 'standalone', 'background_color': '#f3f1ed', 'theme_color': '#2d4d24',
+    'icons': [{'src': 'icons/icon-192.png', 'sizes': '192x192', 'type': 'image/png', 'purpose': 'any'},
+              {'src': 'icons/icon-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'any'},
+              {'src': 'icons/icon-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'}]
+}, ensure_ascii=False, indent=1))
 
 # ٢) ملف واحد للتجربة المحلية
 one = shell.replace('<!--FILE:assets.js-->', "<script>\nconst API_URL = '';\n</script>\n<!--FILE:assets.js-->")   # التجربة المحلية لا تتصل بالخادم
