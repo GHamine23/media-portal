@@ -38,7 +38,9 @@ W = max(w1[3] - w1[1], cap[3] - cap[1]) + 2 * pad
 b1 = pad - w1[2]; bc = b1 + w1[4] + 18 - cap[2]
 save('logo_b.svg', W, bc + cap[4] + pad, place(w1, W - pad - w1[3], b1) + place(cap, W - pad - cap[3], bc, '#5e5e5e'))
 # ج) دائرة سوداء فيها «أثر» صغيرة، ثم الكلمة
-mk = text(D('Black'), 'أثر', 44); word = text(D('Bold'), 'الأثـــر الإعلامي', 64)
+mk = text(D('Black'), 'أثـــر', 40)
+mk = text(D('Black'), 'أثـــر', 40 * 64 / (mk[3] - mk[1]))   # «أثـــر» كما في الخيار ب، بعرض يناسب الدائرة
+word = text(D('Bold'), 'الأثـــر الإعلامي', 64)
 R = 46; gap = 18
 wordW = word[3] - word[1]; W = wordW + gap + 2 * R + 2 * pad
 H = max(2 * R, word[4] - word[2]) + 2 * pad

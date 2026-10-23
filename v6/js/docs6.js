@@ -66,10 +66,22 @@ async function openItem(id) {
   const doc = docFromItem(item);
   const T = trackOf(doc.track) || tracksOf()[0]; if (!T) return go('#/');
   S.track = T;
-  if (!item.mine) { doc.id = null; doc.name = item.name + ' — نسختي'; doc.shared = false; doc.from = item.id; }
+  if (!item.mine) { doc.id = null; doc.name = item.name + ' — نسختي'; doc.shared = false; doc.model = false; doc.arc = null; doc.from = item.id; }
   const draft = doc.id ? ls('draft.i.' + doc.id) : null;
   showEditor6(draft && draft.pages && (draft.at || 0) > (item.at || 0) ? draft : doc, false);
   track('open', { tpl: doc.pages[0].tpl });
+}
+// فتح تصميم من الأرشيف (للمشرف): نسخة جديدة بجودته الأصلية، لا تمسّ الأصل
+async function openArc(m, id) {
+  view(el('div', { class: 'boot' }, [el('span', { class: 'spin' }), el('p', { class: 'muted', text: 'نفتح التصميم من الأرشيف…' })]));
+  let r;
+  try { r = await API6.me('arc_get', m, id); } catch (e) { toast(e.message); return go('#/admin/archive'); }
+  const st = JSON.parse(r.state || '{}'), meta = r.meta;
+  if (!st.pages || !st.pages.length) { toast('هذا التصميم بلا محتوى محفوظ'); return go('#/admin/archive'); }
+  if (meta.program && meta.program !== V6.prog.id && V6.bundle.programs.some(function (p) { return p.id === meta.program; })) await useProgram(meta.program, true);
+  const T = trackOf(meta.track) || tracksOf()[0]; if (!T) return go('#/');
+  S.track = T;
+  showEditor6({ kind: meta.kind === 'deck' ? 'deck' : 'design', name: (meta.name || 'تصميم') + ' — من الأرشيف', track: T.id, program: meta.program, shared: false, pages: st.pages, fromArc: id }, false);
 }
 function openDeckNew(tid, slides, name) {
   const T = trackOf(tid); S.track = T;
@@ -169,9 +181,9 @@ function saveDraft(silent) {
   try { localStorage.setItem('mp6.' + draftKey(), JSON.stringify(d)); if (!silent && !ED.doc.id) { const sv = $('#e_saved'); if (sv) sv.textContent = 'محفوظ مسودةً في هذا الجهاز'; } }
   catch (e) { const sv = $('#e_saved'); if (sv) sv.textContent = 'المسودة أكبر من ذاكرة المتصفح — احفظها في حسابك'; }
 }
-function thumbOfDoc() {
+function thumbOfDoc(w) {
   const p = ED.doc.pages[0], tpl = TEMPLATES.find(function (t) { return t.id === p.tpl; }), c = document.createElement('canvas');
-  const sz = SIZES[p.size], sc = 320 / sz.w;
+  const sz = SIZES[p.size], sc = (w || 320) / sz.w;
   renderTo(c, tpl, p.size, p, S.track, sc);
   return c.toDataURL('image/jpeg', 0.8);
 }
@@ -179,26 +191,43 @@ async function saveRemote(quiet) {
   commitPage();
   const d = ED.doc;
   if (!d.id) d.id = newId() + newId();
-  const item = { id: d.id, kind: d.kind, name: d.name || 'تصميمي', shared: !!d.shared, tpl: d.pages[0].tpl, track: d.track, program: d.program || V6.prog.id, pages: d.pages, thumb: thumbOfDoc() };
+  const item = { id: d.id, kind: d.kind, name: d.name || 'تصميمي', shared: !!d.shared, tpl: d.pages[0].tpl, track: d.track, program: d.program || V6.prog.id, pages: d.pages, arc: d.arc || null, thumb: thumbOfDoc() };
   const sv = $('#e_saved'); if (sv) sv.textContent = 'جارٍ الحفظ…';
   try {
     await API6.me('item_save', JSON.stringify(item));
     ED.dirty = false; if (sv) sv.textContent = 'محفوظ في حسابك';
     const sb = $('#e_save span'); if (sb) sb.textContent = 'محفوظ';
     try { localStorage.removeItem('mp6.draft.' + d.track + '.' + d.pages[0].tpl); } catch (e) {}
-    if (!quiet) { toast('حُفظ في «تصاميمي»'); track('save', { tpl: item.tpl }); }
+    if (!quiet) { toast('حُفظ في «تصاميمي»'); track('save', { tpl: item.tpl }); archive6('save'); }
     return true;
   } catch (e) { if (sv) sv.textContent = 'تعذّر الحفظ: ' + e.message; if (!quiet) toast(e.message); return false; }
 }
+// أرشيف التصاميم: نسخة من كل تصميم يُنزَّل أو يُشارَك أو يُحفظ تصل إلى مدير المنصة ومشرف البرنامج (تعمل في الخلفية ولا تؤخر المستخدم)
+async function archive6(via) {
+  try {
+    if (ED.doc.fromArc) return;   // المشرف يعيد تنزيل تصميم من الأرشيف: لا يُكرَّر
+    commitPage();
+    const d = ED.doc, p0 = d.pages[0], tpl = TEMPLATES.find(function (t) { return t.id === p0.tpl; }) || {};
+    const meta = { id: (d.arc && d.arc.id) || '', m: (d.arc && d.arc.m) || '', name: d.name || tpl.name || 'تصميم', kind: d.kind, tpl: p0.tpl, tplName: tpl.name || '', track: d.track,
+      trackName: S.track ? S.track.full.replace('ـ', '') : '', program: d.program || V6.prog.id, size: p0.size, pages: d.pages.length, via: via, item: d.id || '' };
+    const r = await API6.me('arc_put', JSON.stringify(meta), JSON.stringify({ pages: d.pages }), thumbOfDoc(480));
+    if (ED.doc === d) { d.arc = { id: r.id, m: r.m }; saveDraft(true); }
+  } catch (e) { console.warn('archive', e); }
+}
+function canAdminProg(pid) { return V6.me && (V6.me.role === 'super' || (V6.me.role === 'sup' && (V6.me.programs || []).indexOf(pid) >= 0)); }
 function saveDialog() {
   const d = ED.doc;
   const nameI = el('input', { type: 'text', id: 'sv_name', value: d.name || '' });
   const shareI = el('input', { type: 'checkbox', checked: !!d.shared });
+  const pid = d.program || V6.prog.id, isAdm = canAdminProg(pid);
+  const modelI = isAdm ? el('input', { type: 'checkbox', checked: !!d.model }) : null;
   modal({ title: d.id ? 'حفظ التصميم' : 'احفظه في حسابك', body: [
     el('div', { class: 'fld' }, [el('label', { for: 'sv_name', text: 'الاسم' }), nameI]),
     el('label', { class: 'tog' }, [shareI, el('span', { text: 'شاركه مع فريق ' + (V6.prog ? V6.prog.name : 'برنامجك') + ' (يظهر لهم في «تصاميم الفريق»)' })]),
+    modelI ? el('label', { class: 'tog' }, [modelI, el('span', { text: 'اجعله نموذجاً للبرنامج (يظهر لكل المستخدمين في الرئيسية والمعرض، ويبدؤون منه بنسخة لهم)' })]) : null,
     el('p', { class: 'tiny', text: 'بعد الحفظ يُحفظ كل تعديل تلقائياً، وتجده من أي جهاز.' })
-  ], acts: [{ t: 'حفظ', cls: 'dark', fn: async function () { d.name = nameI.value.trim() || 'تصميمي'; d.shared = shareI.checked; const n = $('.e-name'); if (n) n.value = d.name; await saveRemote(); } }, { t: 'إلغاء' }] });
+  ], acts: [{ t: 'حفظ', cls: 'dark', fn: async function () { d.name = nameI.value.trim() || 'تصميمي'; d.shared = shareI.checked; const n = $('.e-name'); if (n) n.value = d.name; const okSave = await saveRemote();
+    if (okSave && modelI && modelI.checked !== !!d.model) { try { await API6.me('item_model', d.id, modelI.checked); d.model = modelI.checked; toast(d.model ? 'صار نموذجاً لكل مستخدمي البرنامج' : 'أُزيل من النماذج'); } catch (e) { toast(e.message); } } } }, { t: 'إلغاء' }] });
 }
 
 /* ---------- التراجع ---------- */
@@ -239,7 +268,7 @@ async function exportImg6(fmt, share) {
   if (fmt === 'jpg') { const g = c.getContext('2d'); g.globalCompositeOperation = 'destination-over'; g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); }
   const name = fileName6(fmt === 'png' ? 'png' : 'jpg');
   c.toBlob(function (blob) {
-    track('export', { tpl: S.tpl.id });
+    track('export', { tpl: S.tpl.id }); archive6(share ? 'share' : fmt);
     if (share && navigator.canShare) { const f = new File([blob], name, { type: blob.type }); if (navigator.canShare({ files: [f] })) { navigator.share({ files: [f], title: ED.doc.name }).catch(function () {}); return; } }
     const url = URL.createObjectURL(blob), a = el('a', { href: url, download: name }); document.body.appendChild(a); a.click(); a.remove();
     const sz = SIZES[S.size];
@@ -262,7 +291,7 @@ async function exportPdf6() {
   }
   const blob = buildPdf(pages, 960, 540), url = URL.createObjectURL(blob);
   const a = el('a', { href: url, download: fileName6('pdf') }); document.body.appendChild(a); a.click(); a.remove();
-  track('export', { tpl: 'deck' }); toast('بدأ تنزيل العرض (' + pages.length + ' شرائح)');
+  track('export', { tpl: 'deck' }); archive6('pdf'); toast('بدأ تنزيل العرض (' + pages.length + ' شرائح)');
 }
 function present6() {
   commitPage();

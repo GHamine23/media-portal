@@ -18,6 +18,7 @@ route6(/^\/g\/([^/]+)(?:\/([^/]+))?$/, showGallery6, { page: 'home' });
 route6(/^\/e\/([^/]+)\/([^/]+)$/, openNew, { page: 'editor', noVT: true });
 route6(/^\/d\/([^/?]+)$/, openItem, { page: 'editor', noVT: true });
 route6(/^\/s\/([^/]+)$/, showSlides6, { page: 'home' });
+route6(/^\/arc\/(\d{4}-\d{2})\/([a-z0-9]+)$/, openArc, { page: 'editor', noVT: true });
 route6(/^\/make$/, showMake6, { page: 'make' });
 route6(/^\/mine$/, showMine6, { page: 'mine' });
 route6(/^\/account$/, showAccount, { page: 'account' });

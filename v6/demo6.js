@@ -26,7 +26,7 @@
       return new Promise(function (ok, bad) {
         setTimeout(function () {
           const out = JSON.parse(srv.doPost({ postData: { contents: JSON.stringify({ fn: fn, args: args }) } }).getContent());
-          if (/^(auth_|acc_|prog_|asset_put|asset_del|asset_meta|item_save|item_del|fb_|bc_|cl_|set_|prefs_)/.test(fn)) { try { localStorage.setItem('demo.gas', GAS._dump()); } catch (e) {} }
+          if (/^(auth_|acc_|prog_|asset_put|asset_del|asset_meta|item_save|item_del|item_model|arc_put|pack_put|pack_toggle|fb_|bc_|cl_|set_|prefs_)/.test(fn)) { try { localStorage.setItem('demo.gas', GAS._dump()); } catch (e) {} }
           if (out.error) { if (/انتهت الجلسة|موقوف/.test(out.error) && fn !== 'auth_login' && typeof sessionLost === 'function') sessionLost(out.error); bad(new Error(out.error)); } else ok(out.result);
         }, 20);
       });

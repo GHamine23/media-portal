@@ -3,7 +3,8 @@ async function showMine6() {
   document.title = 'تصاميمي';
   let tab = ls('mineTab') || 'mine', q = '';
   const grid = el('div', { class: 'mgrid' }, [1, 2, 3, 4].map(function () { return el('div', { class: 'skel', style: 'aspect-ratio:4/5' }); }));
-  const tabs = segOf([['mine', 'تصاميمي'], ['team', 'تصاميم الفريق']], tab, function (v) { tab = v; ls('mineTab', v); fill(); });
+  if (['mine', 'team', 'models'].indexOf(tab) < 0) tab = 'mine';
+  const tabs = segOf([['mine', 'تصاميمي'], ['team', 'تصاميم الفريق'], ['models', 'النماذج']], tab, function (v) { tab = v; ls('mineTab', v); fill(); });
   const search = el('input', { type: 'search', class: 'inp', placeholder: 'ابحث بالاسم…', 'aria-label': 'بحث', oninput: function (e) { q = norm(e.target.value); fill(); } });
   view(el('div', { class: 'wrap page' }, [
     el('div', { class: 'phead' }, [H('h1', 'تصاميمي'), el('p', { class: 'muted rv', text: 'ما حفظته يبقى في حسابك وتجده من أي جهاز، وما شاركه فريق ' + (V6.prog ? V6.prog.name : 'برنامجك') + ' تبدأ منه بنسخة لك.' })]),
@@ -13,17 +14,19 @@ async function showMine6() {
   try { list = await API6.me('item_list'); } catch (e) { grid.innerHTML = ''; grid.appendChild(el('p', { class: 'err', text: e.message })); return; }
   function fill() {
     grid.innerHTML = '';
-    const items = list.filter(function (x) { return (tab === 'mine' ? x.mine : !x.mine) && (!q || norm(x.name).indexOf(q) >= 0); })
+    const items = list.filter(function (x) { return (tab === 'models' ? x.model : tab === 'mine' ? x.mine : (!x.mine && x.shared)) && (!q || norm(x.name).indexOf(q) >= 0); })
       .sort(function (a, b) { return ((b.program === V6.prog.id) - (a.program === V6.prog.id)) || (b.at || 0) - (a.at || 0); });
-    if (!items.length) { grid.appendChild(el('p', { class: 'empty', text: tab === 'mine' ? 'لم تحفظ تصميماً بعد. افتح أي قالب ثم اضغط «حفظ».' : 'لم يشارك أحد من فريقك تصميماً بعد.' })); return; }
+    if (!items.length) { grid.appendChild(el('p', { class: 'empty', text: tab === 'mine' ? 'لم تحفظ تصميماً بعد. افتح أي قالب ثم اضغط «حفظ».' : tab === 'models' ? 'لا نماذج في برنامجك بعد. النماذج تصاميم جاهزة يختارها المشرف لتبدأ منها.' : 'لم يشارك أحد من فريقك تصميماً بعد.' })); return; }
     items.forEach(function (x, i) {
       const T = TRACKS[x.track], prog = V6.bundle.programs.find(function (p) { return p.id === x.program; });
       const card = el('div', { class: 'mcard hover-lift rv', style: '--d:' + (i % 8) }, [
-        el('a', { href: '#/d/' + x.id, class: 'mthumb' }, [el('img', { src: x.thumb || '', alt: '', loading: 'lazy' }), x.shared ? el('span', { class: 'pill bl mshare', text: 'مشارك' }) : null, x.kind === 'deck' ? el('span', { class: 'pill mdeck', text: 'عرض' }) : null]),
+        el('a', { href: '#/d/' + x.id, class: 'mthumb' }, [el('img', { src: x.thumb || '', alt: '', loading: 'lazy' }), x.shared ? el('span', { class: 'pill bl mshare', text: 'مشارك' }) : null, x.model ? el('span', { class: 'pill or mmodel', text: 'نموذج' }) : null, x.kind === 'deck' ? el('span', { class: 'pill mdeck', text: 'عرض' }) : null]),
         el('div', { class: 'mmeta' }, [el('b', { text: x.name }), el('span', { class: 'tiny', text: [T ? T.name : (prog ? prog.name : ''), x.mine ? '' : 'من ' + x.owner, ago(x.at || 0)].filter(Boolean).join(' · ') })]),
-        x.mine ? el('button', { type: 'button', class: 'ib sm mmore', 'aria-label': 'خيارات', onclick: function (e) {
+        (x.mine || canAdminProg(x.program)) ? el('button', { type: 'button', class: 'ib sm mmore', 'aria-label': 'خيارات', onclick: function (e) {
+          const modelIt = canAdminProg(x.program) ? { t: x.model ? 'إزالة من النماذج' : 'اجعله نموذجاً للبرنامج', ic: 'model', fn: async function () { try { await API6.me('item_model', x.id, !x.model); x.model = !x.model; fill(); toast(x.model ? 'صار نموذجاً يظهر لكل مستخدمي البرنامج' : 'أُزيل من النماذج'); } catch (er) { toast(er.message); } } } : null;
+          if (!x.mine) { popMenu(e.currentTarget, [{ t: 'فتح نسخة لي', ic: 'grid', href: '#/d/' + x.id }, modelIt]); return; }
           popMenu(e.currentTarget, [
-            { t: 'فتح', ic: 'grid', href: '#/d/' + x.id },
+            { t: 'فتح', ic: 'grid', href: '#/d/' + x.id }, modelIt,
             { t: x.shared ? 'إلغاء المشاركة' : 'مشاركة مع الفريق', ic: 'users', fn: async function () { try { const it = await API6.me('item_get', x.id); it.shared = !x.shared; delete it.mine; await API6.me('item_save', JSON.stringify(it)); x.shared = it.shared; fill(); toast(x.shared ? 'صار ظاهراً لفريقك' : 'لم يعد مشاركاً'); } catch (er) { toast(er.message); } } },
             '-', { t: 'حذف', ic: 'trash', fn: async function () { if (!(await ask('حذف التصميم', '«' + x.name + '» سيُحذف من حسابك.', 'حذف', true))) return; try { await API6.me('item_del', x.id); list = list.filter(function (y) { return y.id !== x.id; }); fill(); } catch (er) { toast(er.message); } } }
           ]);

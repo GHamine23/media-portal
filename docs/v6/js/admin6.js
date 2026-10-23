@@ -1,7 +1,7 @@
 /* ================= لوحة الإدارة: للمدير العام كل شيء، ولمشرف البرنامج ما يخص برنامجه ================= */
 const ADMIN_TABS = [
-  ['overview', 'نظرة عامة', 'chart', 0], ['accounts', 'الحسابات', 'users', 0], ['programs', 'البرامج والهويات', 'prog', 0], ['assets', 'الشعارات والصور', 'image', 0],
-  ['fonts', 'الخطوط', 'font', 0], ['feedback', 'البلاغات', 'flag', 0], ['broadcasts', 'رسائل للمستخدمين', 'megaphone', 0],
+  ['overview', 'نظرة عامة', 'chart', 0], ['archive', 'أرشيف التصاميم', 'archive', 0], ['accounts', 'الحسابات', 'users', 0], ['programs', 'البرامج والهويات', 'prog', 0],
+  ['assets', 'الشعارات والصور', 'image', 0], ['fonts', 'الخطوط', 'font', 0], ['models', 'النماذج والقوالب', 'model', 0], ['feedback', 'البلاغات', 'flag', 0], ['broadcasts', 'رسائل للمستخدمين', 'megaphone', 0],
   ['changelog', 'سجل التحديثات', 'history', 1], ['settings', 'الإعدادات', 'gear', 1], ['audit', 'سجل النشاط', 'shield', 1]
 ];
 function myAdminProgs() { return V6.bundle.programs.filter(function (p) { return isSuper() || (V6.me.role === 'sup' && V6.me.programs.indexOf(p.id) >= 0); }); }
@@ -19,7 +19,7 @@ function showAdmin(tab) {
       body
     ])
   ]));
-  ({ overview: aOverview, accounts: aAccounts, programs: aPrograms, assets: aAssets, fonts: aFonts, feedback: aFeedback, broadcasts: aBroadcasts, changelog: aChangelog, settings: aSettings, audit: aAudit }[tab])(body);
+  ({ overview: aOverview, archive: aArchive, models: aModels, accounts: aAccounts, programs: aPrograms, assets: aAssets, fonts: aFonts, feedback: aFeedback, broadcasts: aBroadcasts, changelog: aChangelog, settings: aSettings, audit: aAudit }[tab])(body);
 }
 function aHead(body, title, note, acts) { body.appendChild(el('div', { class: 'ahead' }, [el('div', {}, [el('h2', { text: title }), note ? el('p', { class: 'muted small', text: note }) : null]), el('div', { class: 'row wrapr' }, acts || [])])); }
 function loading(body) { const s = el('div', { class: 'skel', style: 'height:180px' }); body.appendChild(s); return s; }
@@ -415,4 +415,116 @@ async function aAudit(body) {
   let list; try { list = await API6.me('audit_list'); } catch (e) { sk.remove(); body.appendChild(el('p', { class: 'err', text: e.message })); return; }
   sk.remove();
   body.appendChild(el('div', { class: 'atable' }, list.map(function (x) { return el('div', { class: 'arow slim' }, [el('span', { class: 'tiny', text: fmtDate(x.at) + ' ' + new Date(x.at).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' }) }), el('b', { text: x.name }), el('span', { text: x.what }), el('span', { class: 'tiny', text: x.d })]); })));
+}
+
+/* ---------- أرشيف التصاميم: كل ما نُزّل أو شورك أو حُفظ، مع صاحبه ووقته ومساره ---------- */
+const ARC_PV = {};
+const VIA_NAME = { png: 'PNG', jpg: 'JPG', pdf: 'PDF', share: 'مشاركة', save: 'حفظ' };
+async function aArchive(body) {
+  let m = '', prog = '', q = '', trk = '', data = null;
+  const monthSel = el('select', { class: 'inp sm', 'aria-label': 'الشهر', onchange: function (e) { m = e.target.value; load(); } });
+  const trkSel = el('select', { class: 'inp sm', 'aria-label': 'الهوية', onchange: function (e) { trk = e.target.value; fill(); } });
+  const search = el('input', { type: 'search', class: 'inp sm', placeholder: 'اسم التصميم أو صاحبه…', 'aria-label': 'بحث', oninput: function (e) { q = norm(e.target.value); fill(); } });
+  aHead(body, 'أرشيف التصاميم', 'كل تصميم نُزّل أو شورك أو حُفظ في ' + (isSuper() ? 'المنصة' : 'برامجك') + '، مع صاحبه ووقته ومساره. يُفتح نسخةً بجودته الأصلية في المحرر، ولا يتغير الأصل.', [monthSel, progSelect('', true, function (v) { prog = v; load(); }), trkSel, search]);
+  const sum = el('p', { class: 'muted small arcsum' }); body.appendChild(sum);
+  const grid = el('div', { class: 'mgrid arcgrid' }); body.appendChild(grid);
+  async function load() {
+    grid.innerHTML = ''; sum.textContent = ''; const sk = loading(grid);
+    try { data = await API6.me('arc_list', m, prog); } catch (e) { sk.remove(); grid.appendChild(el('p', { class: 'err', text: e.message })); return; }
+    sk.remove(); m = data.m;
+    monthSel.innerHTML = '';
+    (data.months.length ? data.months : [data.m]).forEach(function (k) { monthSel.appendChild(el('option', { value: k, text: monthName(k), selected: k === m })); });
+    const tr = {}; data.list.forEach(function (x) { if (x.track) tr[x.track] = x.trackName || x.track; });
+    trkSel.innerHTML = ''; trkSel.appendChild(el('option', { value: '', text: 'كل الهويات' }));
+    Object.keys(tr).forEach(function (k) { trkSel.appendChild(el('option', { value: k, text: tr[k], selected: k === trk })); });
+    if (!tr[trk]) trk = '';
+    fill();
+  }
+  function fill() {
+    grid.innerHTML = '';
+    const list = data.list.filter(function (x) { return (!trk || x.track === trk) && (!q || norm([x.name, x.uname, x.tplName].join(' ')).indexOf(q) >= 0); });
+    const users = {}; list.forEach(function (x) { users[x.uid] = 1; });
+    sum.textContent = list.length ? list.length + ' تصميماً من ' + Object.keys(users).length + ' مستخدماً في ' + monthName(m) + '.' : '';
+    if (!list.length) { grid.appendChild(el('p', { class: 'empty', text: data.list.length ? 'لا تصميم يطابق البحث.' : 'لم يُنزَّل تصميم في هذا الشهر بعد.' })); return; }
+    const need = [];
+    list.forEach(function (x, i) {
+      const img = el('img', { alt: '', loading: 'lazy' });
+      const key = m + x.id; if (ARC_PV[key]) img.src = ARC_PV[key]; else if (x.pv) need.push([x.id, img]);
+      grid.appendChild(el('button', { type: 'button', class: 'mcard hover-lift arccard', style: '--d:' + (i % 8), onclick: function () { arcDetail(m, x, img.src); } }, [
+        el('span', { class: 'mthumb' }, [img, x.kind === 'deck' ? el('span', { class: 'pill mdeck', text: (x.pages || 1) + ' شرائح' }) : null, el('span', { class: 'pill mshare', text: VIA_NAME[x.via] || x.via })]),
+        el('span', { class: 'mmeta' }, [el('b', { text: x.name }), el('span', { class: 'tiny', text: [x.uname, x.trackName].filter(Boolean).join(' · ') }), el('span', { class: 'tiny', text: fmtTime(x.upd || x.at) + (x.n > 1 ? ' · ' + x.n + ' مرات' : '') })])
+      ]));
+    });
+    loadPv(need);
+  }
+  async function loadPv(need) {
+    for (let i = 0; i < need.length; i += 24) {
+      const part = need.slice(i, i + 24);
+      let r = {}; try { r = await API6.me('arc_thumbs', m, part.map(function (p) { return p[0]; })); } catch (e) { return; }
+      part.forEach(function (p) { if (!r[p[0]]) return; const url = URL.createObjectURL(b64ToBlob(r[p[0]], 'image/jpeg')); ARC_PV[m + p[0]] = url; p[1].src = url; });
+    }
+  }
+  load();
+}
+function monthName(k) { try { const p = k.split('-'); return new Intl.DateTimeFormat('ar', { month: 'long', year: 'numeric' }).format(new Date(+p[0], +p[1] - 1, 1)); } catch (e) { return k; } }
+function arcDetail(m, x, src) {
+  const prog = V6.bundle.programs.find(function (p) { return p.id === x.program; });
+  const rows = [['صمّمه', x.uname], ['البرنامج', prog ? prog.name : x.program], ['الهوية', x.trackName || x.track], ['القالب', x.tplName || x.tpl], ['المقاس', (SIZES[x.size] || {}).name || x.size],
+    ['أول مرة', fmtTime(x.at)], ['آخر مرة', fmtTime(x.upd || x.at)], ['ما جرى عليه', Object.keys(x.vias || {}).map(function (k) { return (VIA_NAME[k] || k) + ' ×' + x.vias[k]; }).join('، ')]];
+  if (x.kind === 'deck') rows.push(['الشرائح', String(x.pages || 1)]);
+  modal({ title: x.name, wide: true, body: [
+    el('div', { class: 'arcdet' }, [
+      src ? el('img', { src: src, alt: x.name, class: 'arcbig' }) : el('div', { class: 'arcbig empty', text: 'بلا معاينة' }),
+      el('dl', { class: 'arcdl' }, rows.reduce(function (o, r) { o.push(el('dt', { text: r[0] }), el('dd', { text: r[1] || '—' })); return o; }, []))
+    ])
+  ], acts: [{ t: 'افتحه في المحرر', cls: 'dark', fn: function () { go('#/arc/' + m + '/' + x.id); } }, { t: 'إغلاق' }] });
+}
+
+/* ---------- النماذج والقوالب ---------- */
+async function aModels(body) {
+  aHead(body, 'النماذج والقوالب', 'النموذج تصميم جاهز يختاره المشرف، فيظهر لكل مستخدمي البرنامج في الرئيسية والمعرض ويبدؤون منه بنسخة لهم.');
+  body.appendChild(el('div', { class: 'card note' }, [el('p', { class: 'small', text: 'لتجعل تصميماً نموذجاً: افتحه من «تصاميمي» أو «تصاميم الفريق» واختر «اجعله نموذجاً» من قائمته، أو فعّل الخيار عند حفظه. ويمكنك فتح أي تصميم من الأرشيف، وحفظه، ثم جعله نموذجاً.' })]));
+  const grid = el('div', { class: 'mgrid' }); body.appendChild(grid);
+  async function loadModels() {
+    grid.innerHTML = ''; const sk = loading(grid);
+    let list = [];
+    try { list = (await API6.me('item_list')).filter(function (x) { return x.model && canAdminProg(x.program); }); } catch (e) { sk.remove(); grid.appendChild(el('p', { class: 'err', text: e.message })); return; }
+    sk.remove();
+    if (!list.length) { grid.appendChild(el('p', { class: 'empty', text: 'لا نماذج بعد.' })); return; }
+    list.forEach(function (x) {
+      const T = TRACKS[x.track], prog = V6.bundle.programs.find(function (p) { return p.id === x.program; });
+      grid.appendChild(el('div', { class: 'mcard' }, [
+        el('a', { href: '#/d/' + x.id, class: 'mthumb' }, [el('img', { src: x.thumb || '', alt: '', loading: 'lazy' })]),
+        el('div', { class: 'mmeta' }, [el('b', { text: x.name }), el('span', { class: 'tiny', text: [prog ? prog.name : '', T ? T.name : '', x.owner].filter(Boolean).join(' · ') })]),
+        el('button', { type: 'button', class: 'btn sm line', style: 'margin:0 14px 14px', text: 'أزله من النماذج', onclick: async function () { try { await API6.me('item_model', x.id, false); toast('أُزيل'); loadModels(); } catch (e) { toast(e.message); } } })
+      ]));
+    });
+  }
+  loadModels();
+  if (!isSuper()) return;
+  // حزم القوالب: ملفات برمجية تضيف قوالب وهويات للجميع (المدير العام وحده، لأنها تعمل في متصفح كل مستخدم)
+  body.appendChild(el('div', { class: 'ahead', style: 'margin-top:36px' }, [el('div', {}, [el('h2', { text: 'حزم القوالب' }), el('p', { class: 'muted small', text: 'كل حزمة ملف يضيف قوالب (وقد يضيف هويات). تُحمَّل لكل المستخدمين عند فتحهم المنصة. المهمة الأسبوعية تضيف حزمها هنا، ولك أن ترفع حزمة أو توقف أخرى دون حذفها.' })])]));
+  const file = el('input', { type: 'file', accept: '.js,text/javascript', hidden: true, onchange: async function (e) {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    const code = await f.text();
+    if (!/PACK\s*\(/.test(code)) { toast('هذا ليس ملف حزمة قوالب'); return; }
+    try { new Function(code); } catch (er) { modal({ title: 'في الحزمة خطأ', body: [el('p', { class: 'muted', text: 'لم تُرفع، لأن فيها خطأ برمجياً يمنع عملها:' }), el('pre', { class: 'code', text: String(er.message) })], acts: [{ t: 'حسناً', cls: 'dark' }] }); return; }
+    if (!(await ask('رفع الحزمة', '«' + f.name + '» ستظهر قوالبها لكل المستخدمين عند فتحهم المنصة القادم.', 'ارفعها'))) return;
+    try { await API6.me('pack_put', f.name, code); toast('رُفعت الحزمة'); loadPacks(); } catch (er) { toast(er.message); }
+  } });
+  const table = el('div', { class: 'plist' });
+  body.appendChild(el('div', { class: 'row wrapr', style: 'margin-bottom:14px' }, [file, el('button', { type: 'button', class: 'btn dark', onclick: function () { file.click(); } }, [ico('upload'), 'ارفع حزمة'])]));
+  body.appendChild(table);
+  async function loadPacks() {
+    table.innerHTML = ''; const sk = loading(table);
+    let list = [];
+    try { list = await API6.me('pack_list'); } catch (e) { sk.remove(); table.appendChild(el('p', { class: 'err', text: e.message })); return; }
+    sk.remove();
+    if (!list.length) { table.appendChild(el('p', { class: 'empty', text: 'لا حزم بعد.' })); return; }
+    list.slice().reverse().forEach(function (p) {
+      const tg = el('input', { type: 'checkbox', checked: p.on, onchange: async function (e) { try { await API6.me('pack_toggle', p.name, e.target.checked); toast(e.target.checked ? 'تعمل الحزمة' : 'أُوقفت الحزمة (لم تُحذف)'); } catch (er) { toast(er.message); e.target.checked = !e.target.checked; } } });
+      table.appendChild(el('div', { class: 'prow card' }, [el('span', { class: 'icon-tile t-or' }, [ico('pack')]), el('div', { class: 'pm' }, [el('b', { text: p.name, dir: 'ltr' }), el('span', { class: 'tiny', text: fmtDate(p.at) + ' · ' + Math.max(1, Math.round(p.size / 1024)) + ' ك.ب' })]), el('label', { class: 'tog' }, [tg, el('span', { text: 'تعمل' })])]));
+    });
+  }
+  loadPacks();
 }

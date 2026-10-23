@@ -15,7 +15,7 @@ const API6 = {
       .then(function (r) { if (!r.ok) throw new Error('تعذّر الاتصال بالخادم (' + r.status + ')'); return r.json(); })
       .then(function (j) { if (j.error) { if (/انتهت الجلسة|موقوف/.test(j.error) && fn !== 'auth_login') sessionLost(j.error); throw new Error(j.error); } return j.result; });
   },
-  json: function () { return API6.call.apply(null, arguments).then(function (t) { return typeof t === 'string' ? JSON.parse(t) : t; }); },
+  json: function () { return API6.call.apply(null, arguments).then(function (t) { if (typeof t !== 'string') return t; try { return JSON.parse(t); } catch (e) { return t; } }); },   // بعض الطلبات تعيد «ok» نصاً
   // بالجلسة الحالية
   me: function (fn) { const a = Array.prototype.slice.call(arguments, 1); return API6.json.apply(null, [fn, V6.token].concat(a)); }
 };
@@ -108,6 +108,7 @@ function ask(title, text, okText, danger) {
 }
 function popMenu(anchor, items) {
   $$('.menu').forEach(function (m) { m.remove(); });
+  items = items.filter(Boolean);
   const m = el('div', { class: 'menu', role: 'menu' }, items.map(function (it) {
     if (it === '-') return el('hr');
     if (it.hd) return el('div', { class: 'hd', text: it.hd });
@@ -130,6 +131,7 @@ function segOf(items, cur, on) {
   }));
 }
 function fmtDate(t) { try { return new Intl.DateTimeFormat('ar', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(t)); } catch (e) { return ''; } }
+function fmtTime(t) { try { return new Intl.DateTimeFormat('ar', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(t)); } catch (e) { return ''; } }
 function ago(t) { const s = (Date.now() - t) / 1000; if (s < 60) return 'الآن'; if (s < 3600) return 'قبل ' + Math.round(s / 60) + ' دقيقة'; if (s < 86400) return 'قبل ' + Math.round(s / 3600) + ' ساعة'; if (s < 86400 * 30) return 'قبل ' + Math.round(s / 86400) + ' يوم'; return fmtDate(t); }
 function uid6() { return Math.random().toString(36).slice(2, 9) + Math.random().toString(36).slice(2, 9); }
 
@@ -170,6 +172,9 @@ const IC = {
   wand: '<path d="m4 20 11-11 2 2L6 22zM14 4l1 2 2 1-2 1-1 2-1-2-2-1 2-1zM19 9l.6 1.4L21 11l-1.4.6L19 13l-.6-1.4L17 11l1.4-.6z"/>', reset: '<path d="M4 12a8 8 0 1 0 2.3-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/>',
   phone: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>', globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
   shield: '<path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6z"/>', sparkles: '<path d="M9 4l1.5 4L15 9.5l-4.5 1.5L9 15l-1.5-4L3 9.5 7.5 8zM18 13l.8 2.2L21 16l-2.2.8L18 19l-.8-2.2L15 16l2.2-.8z"/>',
+  archive: '<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/>',
+  model: '<path d="M6 3h12v18l-6-4-6 4z"/>',
+  pack: '<path d="M12 3 3 7.5v9L12 21l9-4.5v-9z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>', play: '<path d="M7 4v16l13-8z"/>'
 };
 function ico(name, cls) {

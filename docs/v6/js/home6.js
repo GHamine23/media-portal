@@ -43,6 +43,7 @@ function showHome() {
     el('p', { class: 'muted', text: isAdmin() ? 'أضف ألوان البرنامج وشعاره من لوحة الإدارة، فتظهر كل القوالب بهويته.' : 'يجهّز المشرف هوية البرنامج، وتظهر القوالب هنا قريباً.' }),
     isAdmin() ? el('a', { class: 'btn dark', href: '#/admin/programs', text: 'أضف الهوية' }) : null])];
   const recent = el('div', { class: 'strip', id: 'recent' });
+  const models = el('div', { class: 'strip models-strip', id: 'models' });
   const newOnes = visibleTpls().filter(function (t) { return t.isNew || t.pack; }).slice(0, 10);
   view(
     el('section', { class: 'hero wrap' }, [
@@ -51,7 +52,7 @@ function showHome() {
       el('div', { class: 'searchrow rv', style: '--d:2' }, [ico('search'), search]),
       el('div', { class: 'quick' }, quick)
     ]),
-    el('div', { class: 'wrap' }, idSections.concat([
+    el('div', { class: 'wrap' }, [el('section', { class: 'hsec', id: 'modelsec', hidden: true }, [el('div', { class: 'shead' }, [H('h2', 'نماذج جاهزة'), el('a', { class: 'btn sm line', href: '#/mine', onclick: function () { ls('mineTab', 'models'); }, text: 'كل النماذج' })]), models])].concat(idSections).concat([
       el('section', { class: 'hsec', id: 'recentsec', hidden: true }, [el('div', { class: 'shead' }, [H('h2', 'آخر تصاميمك'), el('a', { class: 'btn sm line', href: '#/mine', text: 'كل تصاميمي' })]), recent]),
       newOnes.length && first ? el('section', { class: 'hsec' }, [el('div', { class: 'shead' }, [H('h2', 'جديد القوالب')]),
         el('div', { class: 'strip' }, newOnes.map(function (tpl, i) { const T = tracks[i % tracks.length]; const szk = sizesFor(tpl)[0]; return el('a', { class: 'scard hover-lift', href: '#/e/' + T.id + '/' + tpl.id }, [tplThumb(tpl, T, szk, 220), el('b', { text: tpl.name })]); }))]) : null
@@ -69,9 +70,17 @@ function idCard6(t, i) {
     el('div', { class: 'idmeta' }, [el('b', { text: t.full.replace('ـ', '') }), el('div', { class: 'sw' }, ['pd', 'p', 'pl', 's', 'a'].map(function (k) { return el('i', { style: 'background:' + t.c[k] }); }))])
   ]);
 }
+// النماذج: تصاميم جاهزة اختارها المشرف لكل مستخدمي البرنامج (تُفتح نسخة لهم)
+function modelCard(x) {
+  const T = TRACKS[x.track];
+  return el('a', { class: 'scard hover-lift', href: '#/d/' + x.id }, [el('img', { src: x.thumb || '', alt: '', loading: 'lazy' }), el('b', { text: x.name }), el('span', { class: 'tiny', text: T ? T.name : '' })]);
+}
 async function loadRecent(box) {
   try {
-    const list = (await API6.me('item_list')).filter(function (x) { return x.mine && x.program === V6.prog.id; }).slice(0, 8);
+    const all = await API6.me('item_list');
+    const ms = all.filter(function (x) { return x.model && x.program === V6.prog.id && TRACKS[x.track]; }).slice(0, 12), mb = $('#models');
+    if (ms.length && mb) { $('#modelsec').hidden = false; ms.forEach(function (x) { mb.appendChild(modelCard(x)); }); }
+    const list = all.filter(function (x) { return x.mine && x.program === V6.prog.id; }).slice(0, 8);
     if (!list.length) return;
     $('#recentsec').hidden = false;
     list.forEach(function (x) { box.appendChild(el('a', { class: 'scard hover-lift', href: '#/d/' + x.id }, [el('img', { src: x.thumb || '', alt: '', loading: 'lazy' }), el('b', { text: x.name }), el('span', { class: 'tiny', text: ago(x.at) })])); });
@@ -119,8 +128,13 @@ function showGallery6(tid, type) {
       el('span', { class: 'sp' }),
       el('a', { class: 'btn dark', href: '#/e/' + T.id + '/blank' }, [ico('plus'), 'صفحة بيضاء'])
     ]),
+    el('section', { class: 'hsec', id: 'gmodels', hidden: true }, [el('div', { class: 'shead' }, [H('h2', 'نماذج جاهزة لهذه الهوية')]), el('div', { class: 'strip models-strip', id: 'gmstrip' })]),
     el('div', { class: 'gbar' }, [chips, search]),
     grid, empty
   ]));
   fill();
+  API6.me('item_list').then(function (all) {
+    const ms = all.filter(function (x) { return x.model && x.track === T.id; }), box = $('#gmstrip');
+    if (!ms.length || !box) return; $('#gmodels').hidden = false; ms.forEach(function (x) { box.appendChild(modelCard(x)); });
+  }).catch(function () {});
 }

@@ -107,7 +107,8 @@ function apiFns_() {
     prog_list: prog_list, prog_save: prog_save, prog_del: prog_del, bundle: bundle,
     asset_put: asset_put, asset_get: asset_get, asset_batch: asset_batch, asset_list: asset_list, asset_meta: asset_meta, asset_del: asset_del,
     ui_fonts: ui_fonts, ui_font_get: ui_font_get,
-    item_list: item_list, item_get: item_get, item_save: item_save, item_del: item_del,
+    item_list: item_list, item_get: item_get, item_save: item_save, item_del: item_del, item_model: item_model,
+    arc_put: arc_put, arc_list: arc_list, arc_get: arc_get, arc_thumbs: arc_thumbs, pack_list: pack_list, pack_put: pack_put, pack_toggle: pack_toggle,
     fb_send: fb_send, fb_list: fb_list, fb_update: fb_update, fb_mine: fb_mine, fb_shot: fb_shot,
     stat_track: stat_track, stat_summary: stat_summary,
     bc_list: bc_list, bc_all: bc_all, bc_save: bc_save, bc_del: bc_del,
@@ -442,13 +443,22 @@ function assetPub_(x) {
   return o;
 }
 function regName_(scope, uid) { return scope === 'user' ? 'ua_' + uid + '.json' : 'assets.json'; }
+// أصول المستخدم معرّفها «<معرّف صاحبها>_<عشوائي>»، فيُعرف سجلها من المعرّف نفسه
 function findAsset_(id, a) {
+  id = String(id || '');
+  var own = id.indexOf('_') > 0 ? id.split('_')[0] : '';
+  if (own && /^[a-f0-9]{8,32}$/.test(own)) {
+    var r = 'ua_' + own + '.json', m0 = readJson_(r, []);
+    for (var k = 0; k < m0.length; k++) if (m0[k].id === id) return { x: m0[k], reg: r };
+    return null;
+  }
   var g = readJson_('assets.json', []);
   for (var i = 0; i < g.length; i++) if (g[i].id === id) return { x: g[i], reg: 'assets.json' };
   if (a) { var m = readJson_('ua_' + a.uid + '.json', []); for (var j = 0; j < m.length; j++) if (m[j].id === id) return { x: m[j], reg: 'ua_' + a.uid + '.json' }; }
   return null;
 }
-function canReadAsset_(a, x) { return x.scope === 'global' || (x.scope === 'program' && inProg_(a, x.program)) || (x.scope === 'user' && x.owner === a.uid); }
+// صور المستخدم تُقرأ لمن يعرف معرّفها (يصله من تصميم مشترك أو نموذج أو الأرشيف)، والمعرّف عشوائي لا يُخمَّن. وخطوطه الشخصية له وحده
+function canReadAsset_(a, x) { return x.scope === 'global' || (x.scope === 'program' && inProg_(a, x.program)) || (x.scope === 'user' && (x.owner === a.uid || x.kind !== 'font')); }
 function canWriteScope_(a, scope, program) {
   if (scope === 'global') return isSuper_(a);
   if (scope === 'program') return adminOf_(a, program);
@@ -478,7 +488,7 @@ function asset_put(token, metaJson, b64) {
     var reg = regName_(scope, a.uid), list = readJson_(reg, []), old = null;
     if (m.id) list.forEach(function (x) { if (x.id === m.id) old = x; });
     if (old && old.owner !== a.uid && !(scope !== 'user' && canWriteScope_(a, old.scope, old.program))) throw new Error('هذا الأصل ليس لك');
-    var x = old || { id: uid_(), at: now_(), owner: a.uid, ownerName: a.name, ver: 0 };
+    var x = old || { id: scope === 'user' ? a.uid + '_' + uid_() : uid_(), at: now_(), owner: a.uid, ownerName: a.name, ver: 0 };
     if (old && fileId && old.fileId) { try { DriveApp.getFileById(old.fileId).setTrashed(true); } catch (e) {} }
     x.kind = m.kind; x.name = clip_(m.name, 120); x.mime = clip_(m.mime, 80); x.scope = scope; x.program = scope === 'program' ? m.program : '';
     if (fileId) { x.fileId = fileId; x.size = size; }
@@ -559,15 +569,15 @@ function item_list(token, kind) {
   var list = readJson_('index.json', []).filter(function (x) {
     if (kind && (x.kind || 'tpl') !== kind) return false;
     if (mine.indexOf(x.ownerKey) >= 0) return true;
-    return x.shared && inProg_(a, itemProg_(x));
-  }).map(function (x) { var o = Object.assign({}, x); o.mine = mine.indexOf(x.ownerKey) >= 0; o.program = itemProg_(x); return o; });
+    return (x.shared || x.model) && inProg_(a, itemProg_(x));
+  }).map(function (x) { var o = Object.assign({}, x); o.mine = mine.indexOf(x.ownerKey) >= 0; o.program = itemProg_(x); delete o.ownerKey; return o; });
   return JSON.stringify(list);
 }
 function item_get(token, id) {
   var a = auth_(token); id = safeId_(id);
   var f = itemFile_(id); if (!f) return 'null';
   var item = JSON.parse(text_(f)), mine = keysOf_(a).indexOf(item.ownerKey) >= 0;
-  if (!mine && !(item.shared && inProg_(a, itemProg_(item))) && !adminOf_(a, itemProg_(item))) throw new Error('هذا التصميم ليس لك');
+  if (!mine && !((item.shared || item.model) && inProg_(a, itemProg_(item))) && !adminOf_(a, itemProg_(item))) throw new Error('هذا التصميم ليس لك');
   item.mine = mine;
   return JSON.stringify(item);
 }
@@ -580,13 +590,28 @@ function item_save(token, json) {
     var old = itemFile_(id), mine = keysOf_(a);
     if (old) { var prev = JSON.parse(text_(old)); if (prev.ownerKey && mine.indexOf(prev.ownerKey) < 0) throw new Error('لا يمكنك تعديل تصميم زميلك؛ احفظه نسخة لك'); }
     item.owner = a.name; item.ownerKey = 'a:' + a.uid; item.at = now_(); delete item.mine;
+    item.model = !!(prev0_(old) || {}).model;   // النموذج يغيّره المشرف من «اجعله نموذجاً» فقط
     var s = JSON.stringify(item);
     if (old) old.setContent(s); else dataFolder_().createFile('i_' + id + '.json', s, 'application/json');
     var list = readJson_('index.json', []).filter(function (x) { return x.id !== id; });
-    list.unshift({ id: id, kind: item.kind || 'tpl', name: clip_(item.name, 80), owner: item.owner, ownerKey: item.ownerKey, shared: !!item.shared,
+    list.unshift({ id: id, kind: item.kind || 'tpl', name: clip_(item.name, 80), owner: item.owner, ownerKey: item.ownerKey, shared: !!item.shared, model: item.model,
                    tpl: item.tpl, track: item.track, program: item.program, thumb: item.thumb, at: item.at });
     writeJson_('index.json', list);
     return JSON.stringify({ id: id });
+  });
+}
+function prev0_(f) { if (!f) return null; try { return JSON.parse(text_(f)); } catch (e) { return null; } }
+// نموذج البرنامج: تصميم يختاره المشرف فيظهر لكل مستخدمي البرنامج نقطةَ بداية (يفتحونه نسخة لهم)
+function item_model(token, id, on) {
+  var a = auth_(token); id = safeId_(id);
+  return withLock_(function () {
+    var f = itemFile_(id); if (!f) throw new Error('التصميم غير موجود');
+    var item = JSON.parse(text_(f));
+    if (!adminOf_(a, itemProg_(item))) throw new Error('النماذج لمشرف البرنامج والمدير');
+    item.model = !!on; f.setContent(JSON.stringify(item));
+    writeJson_('index.json', readJson_('index.json', []).map(function (x) { if (x.id === id) x.model = !!on; return x; }));
+    audit_(a, on ? 'جعل تصميماً نموذجاً' : 'أزال نموذجاً', clip_(item.name, 80) + ' · ' + itemProg_(item));
+    return 'ok';
   });
 }
 function item_del(token, id) {
@@ -595,6 +620,100 @@ function item_del(token, id) {
     var f = itemFile_(id), mine = keysOf_(a);
     if (f) { var item = JSON.parse(text_(f)); if (mine.indexOf(item.ownerKey) < 0 && !adminOf_(a, itemProg_(item))) throw new Error('هذا التصميم ليس لك'); f.setTrashed(true); }
     writeJson_('index.json', readJson_('index.json', []).filter(function (x) { return x.id !== id; }));
+    return 'ok';
+  });
+}
+
+/* ================= أرشيف التصاميم: كل تصميم يُنزَّل أو يُشارَك أو يُحفظ =================
+   arc_YYYY-MM.json: [{id, name, kind, tpl, tplName, track, trackName, program, size, pages, uid, uname, at, upd, n, via, vias, item, sf, tf}]
+   sf ملف حالة التصميم كاملة (يُفتح بها في المحرر بجودته الأصلية)، و tf معاينة للتصفح. الملفات في المجلد الفرعي archive */
+var ARC_VIA = { png: 'PNG', jpg: 'JPG', pdf: 'PDF', share: 'مشاركة', save: 'حفظ' };
+function arcName_(m) { return 'arc_' + m + '.json'; }
+function arc_put(token, metaJson, stateJson, thumb) {
+  var a = auth_(token), m = JSON.parse(metaJson), prog = m.program || 'academy';
+  if (!inProg_(a, prog)) throw new Error('لست في هذا البرنامج');
+  if (String(stateJson).length > 40 * 1024 * 1024) throw new Error('التصميم أكبر من المسموح');
+  var mk = /^\d{4}-\d{2}$/.test(m.m || '') ? m.m : monthKey_(now_());
+  var dir = sub_('archive'), sf = dir.createFile('ar_' + now_() + '.json', String(stateJson), 'application/json').getId(), tf = '';
+  var tm = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/.exec(thumb || '');
+  if (tm) tf = dir.createFile(Utilities.newBlob(Utilities.base64Decode(tm[2]), tm[1], 'pv_' + now_() + '.jpg')).getId();
+  var trash = [];
+  var res = withLock_(function () {
+    var name = arcName_(mk), list = readJson_(name, []), x = null;
+    if (m.id) list.forEach(function (y) { if (y.id === m.id && y.uid === a.uid) x = y; });
+    if (!x) {
+      x = { id: uid_(), uid: a.uid, at: now_(), n: 0, vias: {} }; list.unshift(x);
+      var months = readJson_('arc_months.json', []); if (months.indexOf(mk) < 0) { months.unshift(mk); months.sort().reverse(); writeJson_('arc_months.json', months); }
+    }
+    if (x.sf) trash.push(x.sf); if (x.tf && tf) trash.push(x.tf);
+    function set(k, n) { if (m[k] != null && m[k] !== '') x[k] = clip_(m[k], n); else if (x[k] == null) x[k] = ''; }
+    x.uname = a.name; set('name', 80); set('tpl', 60); set('tplName', 80); set('track', 40); set('trackName', 60); set('size', 20); set('item', 40);
+    if (m.kind) x.kind = m.kind === 'deck' ? 'deck' : 'design'; else x.kind = x.kind || 'design';
+    x.program = prog; if (m.pages) x.pages = +m.pages || 1; else x.pages = x.pages || 1; x.sf = sf; if (tf) x.tf = tf; x.upd = now_(); x.n = (x.n || 0) + 1;
+    var v = ARC_VIA[m.via] ? m.via : 'png'; x.via = v; x.vias = x.vias || {}; x.vias[v] = (x.vias[v] || 0) + 1;
+    writeJson_(name, list);
+    return { id: x.id, m: mk };
+  });
+  trash.forEach(function (fid) { try { DriveApp.getFileById(fid).setTrashed(true); } catch (e) {} });   // النسخة الأقدم من نفس التصميم (تُستعاد من سلة درايف)
+  return JSON.stringify(res);
+}
+function arcVisible_(a, x) { return adminOf_(a, x.program); }
+function arc_list(token, m, program) {
+  var a = auth_(token); needAdmin_(a);
+  var months = readJson_('arc_months.json', []);
+  m = /^\d{4}-\d{2}$/.test(m || '') ? m : (months[0] || monthKey_(now_()));
+  var list = readJson_(arcName_(m), []).filter(function (x) { return arcVisible_(a, x) && (!program || x.program === program); })
+    .map(function (x) { var o = Object.assign({}, x); delete o.sf; delete o.tf; o.pv = !!x.tf; return o; });
+  return JSON.stringify({ m: m, months: months, list: list });
+}
+function arcFind_(a, m, id) {
+  if (!/^\d{4}-\d{2}$/.test(m || '')) throw new Error('شهر غير صحيح');
+  var x = readJson_(arcName_(m), []).filter(function (y) { return y.id === id; })[0];
+  if (!x || !(arcVisible_(a, x) || x.uid === a.uid)) throw new Error('غير موجود في الأرشيف');
+  return x;
+}
+function arc_get(token, m, id) {
+  var a = auth_(token), x = arcFind_(a, m, id);
+  var o = Object.assign({}, x); delete o.sf; delete o.tf;
+  return JSON.stringify({ meta: o, state: text_(DriveApp.getFileById(x.sf)) });
+}
+function arc_thumbs(token, m, ids) {
+  var a = auth_(token); needAdmin_(a);
+  var list = readJson_(arcName_(m), []), out = {};
+  (ids || []).slice(0, 40).forEach(function (id) {
+    var x = list.filter(function (y) { return y.id === id; })[0];
+    if (!x || !x.tf || !arcVisible_(a, x)) return;
+    try { out[id] = Utilities.base64Encode(DriveApp.getFileById(x.tf).getBlob().getBytes()); } catch (e) {}
+  });
+  return JSON.stringify(out);
+}
+
+/* ================= حزم القوالب: يرفعها المدير العام من اللوحة، أو المهمة الأسبوعية إلى درايف ================= */
+function packsOff_() { return settings_().packsOff || []; }
+function pack_list(token) {
+  var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
+  var pf = filesIn_(IDS.packs), off = packsOff_();
+  return JSON.stringify(Object.keys(pf).filter(function (n) { return /\.js$/i.test(n); }).sort().map(function (n) {
+    return { name: n, at: pf[n].getLastUpdated().getTime(), size: pf[n].getSize(), on: off.indexOf(n) < 0 };
+  }));
+}
+function pack_put(token, name, code) {
+  var a = auth_(token); if (!isSuper_(a)) throw new Error('رفع حزم القوالب للمدير العام');
+  name = String(name || '').trim().replace(/[^\w\-. ]/g, '_');
+  if (!/\.js$/i.test(name)) name += '.js';
+  if (String(code).length > 15 * 1024 * 1024) throw new Error('الحزمة أكبر من المسموح');
+  if (!/PACK\s*\(/.test(code)) throw new Error('هذا ليس ملف حزمة قوالب (لا يحوي PACK)');
+  DriveApp.getFolderById(IDS.packs).createFile(name, String(code), 'text/javascript');   // اسم موجود ← نسخة أحدث، والقديمة تبقى في المجلد
+  withLock_(function () { audit_(a, 'رفع حزمة قوالب', name); });
+  return 'ok';
+}
+function pack_toggle(token, name, on) {
+  var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
+  return withLock_(function () {
+    var st = readJson_('settings.json', {}), off = (st.packsOff || []).filter(function (n) { return n !== name; });
+    if (!on) off.push(clip_(name, 120));
+    st.packsOff = off; writeJson_('settings.json', st);
+    audit_(a, on ? 'شغّل حزمة' : 'أوقف حزمة', name);
     return 'ok';
   });
 }
@@ -816,7 +935,8 @@ function ai_make(token, json) {
 function api_ping() { return 'ok'; }
 function api_packs() {
   var pf = filesIn_(IDS.packs);
-  return JSON.stringify(Object.keys(pf).filter(function (n) { return /\.js$/i.test(n); }).sort().map(function (n) {
+  var off = packsOff_();
+  return JSON.stringify(Object.keys(pf).filter(function (n) { return /\.js$/i.test(n) && off.indexOf(n) < 0; }).sort().map(function (n) {
     return { name: n, at: pf[n].getLastUpdated().getTime(), code: text_(pf[n]) };
   }));
 }

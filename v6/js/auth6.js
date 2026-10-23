@@ -156,7 +156,8 @@ async function showAccount() {
         el('dl', { class: 'kv' }, [el('dt', { text: 'اسم المستخدم' }), el('dd', { dir: 'auto', text: me.username }), el('dt', { text: 'البرامج' }), el('dd', { text: (me.programsInfo || []).map(function (p) { return p.name; }).join('، ') || '—' }),
           el('dt', { text: 'الصلاحيات' }), el('dd', { text: permsText(me) })]),
         el('div', { class: 'row' }, [el('a', { class: 'btn dark', href: '#/password', text: 'تغيير كلمة المرور' })])]),
-      el('div', { class: 'card rv', style: '--d:1' }, [el('h3', { text: 'الحركة في الواجهة' }), el('p', { class: 'muted small', text: 'اختر شدة الحركة التي تريحك.' }), motion])
+      el('div', { class: 'card rv', style: '--d:1' }, [el('h3', { text: 'الحركة في الواجهة' }), el('p', { class: 'muted small', text: 'اختر شدة الحركة التي تريحك.' }), motion]),
+      el('div', { class: 'card rv', style: '--d:2' }, [el('h3', { text: 'أين تذهب تصاميمك' }), el('p', { class: 'muted small', text: 'ما تحفظه يبقى في حسابك، ولا يراه فريقك إلا إن شاركته. وكل تصميم تنزّله أو تشاركه تُحفظ نسخة منه في أرشيف البرنامج، يطّلع عليها مشرف البرنامج ومدير المنصة.' })])
     ]),
     el('h2', { class: 'sh rv', text: 'ملاحظاتي وبلاغاتي' }), fbList
   ]));
