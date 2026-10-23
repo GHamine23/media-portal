@@ -64,6 +64,7 @@
   File.prototype.getLastUpdated = function () { return new Date(this.r.upd); };
   File.prototype.setDescription = function (d) { this.r.desc = d; return this; };
   File.prototype.getThumbnail = function () { return this.getBlob(); };
+  File.prototype.makeCopy = function (folder) { const rec = Object.assign({}, this.r, { id: nid('f'), bytes: this.r.bytes.slice(), parent: folder ? folder.r.id : this.r.parent, upd: Date.now() }); ST.files[rec.id] = rec; return new File(rec); };
   function Folder(rec) { this.r = rec; }
   Folder.prototype.getId = function () { return this.r.id; };
   Folder.prototype.getName = function () { return this.r.name; };
@@ -113,6 +114,7 @@
     computeDigest: function (alg, v) { return signed(sha256(typeof v === 'string' ? utf8(v) : v)); },
     computeHmacSha256Signature: function (v, k) { return signed(hmac(typeof v === 'string' ? utf8(v) : v, typeof k === 'string' ? utf8(k) : k)); },
     base64Encode: function (v) { return b64enc(typeof v === 'string' ? utf8(v) : v); },
+    base64EncodeWebSafe: function (v) { return b64enc(typeof v === 'string' ? utf8(v) : v).replace(/\+/g, '-').replace(/\//g, '_'); },
     base64Decode: b64dec,
     newBlob: function (data, mime, name) { return new Blob(typeof data === 'string' ? utf8(data) : (data || []).slice(), mime, name); },
     formatDate: function (d, tz, fmt) { const x = new Date(d.getTime() + 3 * 3600000); return fmt.replace('yyyy', x.getUTCFullYear()).replace('MM', pad(x.getUTCMonth() + 1)).replace('dd', pad(x.getUTCDate())); },

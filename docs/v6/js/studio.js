@@ -26,7 +26,7 @@ function gName(g) {
   if (g && g.slice(0, 2) === 'L:') { const L = layerById(g.slice(2)); return L ? (LIB_LABEL[L.t] || 'عنصر') + (L.t === 'text' ? ': ' + String(L.txt || '').slice(0, 16) : '') : 'عنصر'; }
   return GROUP_NAMES[g] || g;
 }
-const LIB_LABEL = { sticker: 'زخرفة', icon: 'أيقونة', logo: 'شعار', img: 'صورة', text: 'نص', video: 'فيديو', yt: 'يوتيوب', audio: 'صوت' };
+const LIB_LABEL = { ticon: 'أيقونة', qr: 'رمز QR', sticker: 'زخرفة', icon: 'أيقونة', logo: 'شعار', img: 'صورة', text: 'نص', video: 'فيديو', yt: 'يوتيوب', audio: 'صوت' };
 
 /* ---------- الطبقات: عناصر مضافة من المكتبة ---------- */
 // x, y نسبة من العرض والارتفاع (المركز). w نسبة من العرض. rot بالدرجات
@@ -95,6 +95,8 @@ function drawLayer(ctx, W, H, L, T) {
     const save = BOXES; BOXES = null; const gb = GBOX; GBOX = null;
     if (L.t === 'sticker' && STICKERS[L.ref]) STICKERS[L.ref].draw(ctx, w, L.c || T.c.p);
     else if (L.t === 'icon') icon(ctx, L.ref, 0, 0, w, L.c || T.c.p);
+    else if (L.t === 'ticon') drawTIcon(ctx, L.ref, w, L.c || T.c.p, L.lw);
+    else if (L.t === 'qr') drawQR(ctx, L.url || '', w, L.c || T.c.ink, L.bg === 'none' ? '' : (L.bg || '#ffffff'));
     else if (L.t === 'yt' || L.t === 'video') {   // بطاقة وسائط: ملصق الفيديو أو بطاقة يوتيوب، وزر تشغيل يعمل في العرض الحي
       ctx.save(); rrect(ctx, -w / 2, -h / 2, w, h, Math.min(w, h) * 0.06); ctx.clip();
       if (src) ctx.drawImage(src, -w / 2, -h / 2, w, h); else { ctx.fillStyle = L.t === 'yt' ? '#1a1a1a' : '#2a2a2a'; ctx.fillRect(-w / 2, -h / 2, w, h); }
@@ -115,6 +117,27 @@ function drawLayer(ctx, W, H, L, T) {
     BOXES = save; GBOX = gb;
   }
   ctx.restore();
+}
+// أيقونة من مجموعة Tabler: مسارات 24×24 تُرسم بالخط
+function drawTIcon(ctx, name, w, color, lw) {
+  const it = typeof TICONS !== 'undefined' && TICONS[name]; if (!it) return;
+  ctx.save(); ctx.translate(-w / 2, -w / 2); ctx.scale(w / 24, w / 24);
+  ctx.strokeStyle = color; ctx.lineWidth = lw || 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.stroke(new Path2D(it[1])); ctx.restore();
+}
+// رمز QR: يُولَّد محلياً (مكتبة qrcode-generator) ويُرسم مربعات حادة بلا تنعيم
+const QR_CACHE = {};
+function qrModules(text) {
+  if (typeof qrcode === 'undefined') return null;
+  if (QR_CACHE[text]) return QR_CACHE[text];
+  try { const q = qrcode(0, 'M'); q.addData(text); q.make(); QR_CACHE[text] = q; return q; } catch (e) { return null; }
+}
+function drawQR(ctx, text, w, color, bg) {
+  const q = qrModules(text || 'https:\u002f\u002f'); if (!q) return;
+  const n = q.getModuleCount(), quiet = 2, cell = w / (n + quiet * 2);
+  if (bg) { ctx.fillStyle = bg; ctx.fillRect(-w / 2, -w / 2, w, w); }
+  ctx.fillStyle = color;
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) ctx.fillRect(-w / 2 + (c + quiet) * cell, -w / 2 + (r + quiet) * cell, cell + 0.2, cell + 0.2);
 }
 function drawLayers(ctx, W, H, layers, T) {
   (layers || []).forEach(function (L) { G(ctx, 'L:' + L.id); drawLayer(ctx, W, H, L, T); });

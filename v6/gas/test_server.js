@@ -21,6 +21,15 @@ GAS._fetch.handler = function (url, opt) {
     GAS._lastAi = { url: url, opt: opt };
     return { code: 200, body: JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"designs":[{"tpl":"ann_panel"}]}' }] } }] }) };
   }
+  if (url.indexOf('api.pexels.com') >= 0) {
+    if (!opt.headers || opt.headers.Authorization !== 'PXKEY') return { code: 401, body: '' };
+    return { code: 200, body: JSON.stringify({ total_results: 2, page: 1, photos: [{ id: 1, width: 4000, height: 6000, src: { medium: 'https://images.pexels.com/m1.jpg', large2x: 'https://images.pexels.com/l1.jpg', original: 'https://images.pexels.com/o1.jpg' }, photographer: 'سمير', photographer_url: 'https://www.pexels.com/@samir', url: 'https://www.pexels.com/photo/1/', alt: 'مسجد', avg_color: '#777' }] }) };
+  }
+  if (url.indexOf('images.pexels.com/o1.jpg') >= 0) return { code: 200, body: [255, 216, 255, 1, 2, 3], mime: 'image/jpeg' };
+  if (url.indexOf('api.alquran.cloud/v1/surah') >= 0) return { code: 200, body: JSON.stringify({ data: [{ number: 1, name: 'سُورَةُ ٱلْفَاتِحَةِ' }, { number: 17, name: 'سُورَةُ الإِسۡرَاءِ' }] }) };
+  if (url.indexOf('api.alquran.cloud/v1/ayah/17:23') >= 0) return { code: 200, body: JSON.stringify({ data: { text: 'وَقَضَىٰ رَبُّكَ أَلَّا تَعْبُدُوا إِلَّا إِيَّاهُ وَبِالْوَالِدَيْنِ إِحْسَانًا', surah: { number: 17, name: 'سُورَةُ الإِسۡرَاءِ' }, numberInSurah: 23 } }) };
+  if (url.indexOf('api.alquran.cloud/v1/search/') >= 0) return { code: 200, body: JSON.stringify({ data: { count: 1, matches: [{ text: 'وَوَصَّيْنَا الْإِنسَانَ بِوَالِدَيْهِ حُسْنًا', surah: { number: 29, name: 'سُورَةُ العَنكَبُوتِ' }, numberInSurah: 8 }] } }) };
+  if (url.indexOf('dorar.net/dorar_api.json') >= 0) return { code: 200, body: JSON.stringify({ ahadith: { result: '<div class="hadith" style="text-align:justify;">إنَّ اللهَ يُحِبُّ إذا <span class="search-keys">عَمِلَ</span> أحدُكُم عملًا أن يُتقِنَه</div><div class="hadith-info"><span class="info-subtitle">الراوي:</span> عائشة أم المؤمنين <span class="info-subtitle">المحدث:</span> الألباني <span class="info-subtitle">المصدر:</span> صحيح الجامع <span class="info-subtitle">الصفحة أو الرقم:</span> 1880 <span class="info-subtitle">خلاصة حكم المحدث:</span> <span >حسن</span></div>--------------<br/><div class="hadith" style="text-align:justify;">نص ضعيف</div><div class="hadith-info"><span class="info-subtitle">الراوي:</span> فلان <span class="info-subtitle">المحدث:</span> الألباني <span class="info-subtitle">المصدر:</span> ضعيف الجامع <span class="info-subtitle">الصفحة أو الرقم:</span> 12 <span class="info-subtitle">خلاصة حكم المحدث:</span> <span >ضعيف</span></div><a href="x">المزيد</a>' } }) };
   return { code: 404, body: '' };
 };
 function call(fn) { const args = Array.prototype.slice.call(arguments, 1); const out = JSON.parse(ctx.doPost({ postData: { contents: JSON.stringify({ fn: fn, args: args }) } }).getContent()); if (out.error) throw new Error(out.error); return out.result; }
@@ -198,6 +207,25 @@ ok(GAS._lastAi.opt.headers['x-goog-api-key'] === 'k-test' && /gemini-3\.8-flash:
 ok(J('ai_status', ut).used === 1, 'ai usage counted');
 J('set_save', adm, JSON.stringify({ ai: { enabled: true, model: 'gemini-3.8-flash', perDay: 1 } }));
 fails('ai_make', /حد اليوم/, ut, JSON.stringify({ prompt: 'p', system: 's', schema: {} }));
+// صور مجانية وآيات وأحاديث
+fails('img_search', /مفتاح/, ut, 'mosque');
+call('set_save', adm, JSON.stringify({ pexelsKey: 'PXKEY' }));
+ok(J('set_get', adm).pexelsOn === true, 'pexels key saved');
+const px = J('img_search', ut, 'mosque', 1, 'portrait');
+ok(px.photos.length === 1 && px.photos[0].orig.indexOf('images.pexels.com') > 0 && px.photos[0].by === 'سمير', 'pexels search mapped');
+fails('img_pick', /رابط غير مقبول/, ut, JSON.stringify({ orig: 'https://evil.example/x.jpg' }));
+const pick = J('img_pick', ut, JSON.stringify({ orig: px.photos[0].orig, name: 'مسجد', by: 'سمير', byUrl: px.photos[0].byUrl, url: px.photos[0].url, thumb: px.photos[0].thumb, program: 'academy', suggest: true }));
+ok(pick.asset.scope === 'user' && pick.asset.kind === 'image' && pick.asset.credit.by === 'سمير' && pick.request && pick.request.status === 'new', 'picked into user library + request');
+ok(JSON.parse(call('asset_list', ut, 'user')).some(function (x) { return x.id === pick.asset.id; }), 'asset listed for user');
+fails('img_requests', /لمدير/, ut);
+const reqs = J('img_requests', adm, 'academy'); ok(reqs.length === 1 && reqs[0].asset === pick.asset.id, 'admin sees request');
+const dec = J('img_decide', adm, reqs[0].id, true); ok(dec.status === 'ok', 'request approved');
+ok(JSON.parse(call('asset_list', ut, 'program', 'academy')).some(function (x) { return x.name === 'مسجد' && x.scope === 'program' && x.credit; }), 'approved image copied into program library');
+const adminPick = J('img_pick', adm, JSON.stringify({ orig: px.photos[0].orig, name: 'مباشر', by: 'سمير', program: 'academy' }));
+ok(adminPick.asset.scope === 'program' && !adminPick.request, 'admin picks straight into program library');
+const ay = J('quran_find', ut, 'الإسراء 23'); ok(ay.length === 1 && ay[0].sn === 17 && ay[0].n === 23 && /وَبِالْوَالِدَيْنِ/.test(ay[0].text), 'ayah by reference');
+const ay2 = J('quran_find', ut, 'بوالديه'); ok(ay2.length === 1 && ay2[0].sn === 29, 'ayah by words');
+const hd = J('hadith_find', ut, 'يحب إذا عمل'); ok(hd.length === 2 && hd[0].sahih && hd[0].grade === 'حسن' && hd[0].source === 'صحيح الجامع' && hd[0].page === '1880' && !hd[1].sahih, 'hadith parsed with grade: ' + JSON.stringify(hd[0]));
 // lockout and disable
 for (let i = 0; i < 8; i++) { try { call('auth_login', 'ahmad', 'wrong' + i); } catch (e) {} }
 fails('auth_login', /محاولات كثيرة/, 'ahmad', 'AhmadPass99');

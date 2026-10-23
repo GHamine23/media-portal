@@ -114,7 +114,8 @@ function apiFns_() {
     bc_list: bc_list, bc_all: bc_all, bc_save: bc_save, bc_del: bc_del,
     cl_list: cl_list, cl_save: cl_save, set_get: set_get, set_save: set_save, audit_list: audit_list,
     ai_make: ai_make, ai_status: ai_status, ai_log: ai_log,
-    tg_test: tg_test, tg_send: tg_send, tg_queue: tg_queue, tg_cancel: tg_cancel, me_profile: me_profile, font_family: font_family
+    tg_test: tg_test, tg_send: tg_send, tg_queue: tg_queue, tg_cancel: tg_cancel, me_profile: me_profile, font_family: font_family,
+    img_search: img_search, img_pick: img_pick, img_requests: img_requests, img_decide: img_decide, quran_find: quran_find, hadith_find: hadith_find
   };
 }
 function doPost(e) {
@@ -471,6 +472,7 @@ function assetPub_(x) {
   if (x.family) { o.family = x.family; o.weight = x.weight || '400'; o.style = x.style || 'normal'; o.ui = !!x.ui; o.label = x.label || x.family; o.wrange = x.wrange || ''; }
   if (x.thumb) o.thumb = x.thumb;
   if (x.data) o.data = x.data;
+  if (x.credit) o.credit = x.credit;
   if (x.tags) o.tags = x.tags;
   return o;
 }
@@ -938,8 +940,8 @@ function cl_save(token, json) {
 }
 var DEFAULT_SETTINGS = { ai: { enabled: true, model: 'gemini-3.8-flash', perDay: 20 }, uploadsNeedPerm: false, maxUploadMb: 20 };
 function settings_() { var s = readJson_('settings.json', {}); var o = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)); Object.keys(s).forEach(function (k) { o[k] = s[k]; }); return o; }
-function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: !!props_().getProperty('GEMINI_KEY') }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN') }; }
-function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.aiKey = !!props_().getProperty('GEMINI_KEY'); s.tgOn = !!props_().getProperty('TG_TOKEN'); return JSON.stringify(s); }
+function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: !!props_().getProperty('GEMINI_KEY') }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN'), pexels: !!props_().getProperty('PEXELS_KEY') }; }
+function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.aiKey = !!props_().getProperty('GEMINI_KEY'); s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); return JSON.stringify(s); }
 function set_save(token, json) {
   var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
   var s = JSON.parse(json);
@@ -950,6 +952,7 @@ function set_save(token, json) {
     if (s.maxUploadMb != null) cur.maxUploadMb = Math.max(1, Math.min(20, +s.maxUploadMb || 20));
     if (s.tgToken != null) { var tk = String(s.tgToken).trim(); if (tk) { if (!/^\d+:[\w-]{30,}$/.test(tk)) throw new Error('رمز البوت غير صحيح'); props_().setProperty('TG_TOKEN', tk); } else props_().deleteProperty('TG_TOKEN'); }
     if (s.sendNeedsApproval != null) cur.sendNeedsApproval = !!s.sendNeedsApproval;
+    if (s.pexelsKey != null) { var pk = String(s.pexelsKey).trim(); if (pk) props_().setProperty('PEXELS_KEY', pk); else props_().deleteProperty('PEXELS_KEY'); }
     writeJson_('settings.json', cur); audit_(a, 'غيّر الإعدادات', ''); return JSON.stringify(cur);
   });
 }
@@ -1319,4 +1322,122 @@ function resetPin() {
     u.reset = true; writeJson_('users.json', users);
     console.log('مُسح رمز ' + u.name + '. أول رمز يدخل به سيُعتمد.');
   });
+}
+
+/* ================= صور مجانية (Pexels) وآيات وأحاديث موثقة ================= */
+// مفتاح Pexels في خصائص السكربت PEXELS_KEY. البحث للمستخدمين، والصورة تُحفظ بأصلها كاملاً في مكتبة المستخدم،
+// ومن أراد إضافتها لمكتبة البرنامج يطلب، فيوافق مشرف البرنامج.
+function pexelsKey_() { var k = props_().getProperty('PEXELS_KEY'); if (!k) throw new Error('لم يُضبط مفتاح الصور المجانية بعد (الإعدادات)'); return k; }
+function img_search(token, q, page, orient) {
+  var a = auth_(token); q = clip_(q, 100).trim(); if (!q) throw new Error('اكتب ما تبحث عنه');
+  var key = pexelsKey_(), c = CacheService.getScriptCache(), ck = 'px:' + Utilities.base64EncodeWebSafe(q + '|' + (page || 1) + '|' + (orient || '')).slice(0, 200), hit = c.get(ck);
+  if (hit) return hit;
+  var url = 'https://api.pexels.com/v1/search?query=' + encodeURIComponent(q) + '&per_page=24&page=' + (Math.max(1, +page || 1)) + (orient ? '&orientation=' + encodeURIComponent(orient) : '') + (/[؀-ۿ]/.test(q) ? '&locale=ar-SA' : '');
+  var res = UrlFetchApp.fetch(url, { headers: { Authorization: key }, muteHttpExceptions: true });
+  if (res.getResponseCode() === 429) throw new Error('بلغنا حد البحث هذه الساعة؛ جرّب بعد قليل');
+  if (res.getResponseCode() !== 200) throw new Error('تعذّر البحث عن الصور (' + res.getResponseCode() + ')');
+  var j = JSON.parse(res.getContentText());
+  var out = { total: j.total_results || 0, page: j.page || 1, photos: (j.photos || []).map(function (p) {
+    return { id: p.id, w: p.width, h: p.height, thumb: p.src.medium, big: p.src.large2x, orig: p.src.original, by: p.photographer, byUrl: p.photographer_url, url: p.url, alt: clip_(p.alt, 160), color: p.avg_color };
+  }) };
+  var txt = JSON.stringify(out); if (txt.length < 90000) c.put(ck, txt, 3600);
+  return txt;
+}
+// حفظ صورة بأصلها الكامل في مكتبة المستخدم (أو البرنامج إن كان مشرفه)، واختيارياً طلب إضافتها لمكتبة البرنامج
+function img_pick(token, json) {
+  var a = auth_(token), m = JSON.parse(json);
+  if (!/^https:\/\/images\.pexels\.com\//.test(m.orig || '')) throw new Error('رابط غير مقبول');
+  if (!perm_(a, 'upload') && readJson_('settings.json', {}).uploadsNeedPerm) throw new Error('إضافة الصور تحتاج صلاحية من المشرف');
+  var res = UrlFetchApp.fetch(m.orig, { muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) throw new Error('تعذّر تنزيل الصورة');
+  var blob = res.getBlob(); var bytes = blob.getBytes(); if (bytes.length > 27 * 1024 * 1024) throw new Error('الصورة أكبر من المسموح');
+  var mime = blob.getContentType() || '', name = clip_(m.name || m.alt || 'صورة من Pexels', 120);
+  if (!/^image\//.test(mime)) mime = /\.png(\?|$)/i.test(m.orig) ? 'image/png' : /\.webp(\?|$)/i.test(m.orig) ? 'image/webp' : 'image/jpeg';
+  var toProg = !!m.program && adminOf_(a, m.program), scope = toProg ? 'program' : 'user';
+  var fileId = sub_('assets').createFile(Utilities.newBlob(bytes, mime, name + (mime === 'image/png' ? '.png' : '.jpg'))).getId();
+  var x = withLock_(function () {
+    var reg = regName_(scope, a.uid), list = readJson_(reg, []);
+    var it = { id: scope === 'user' ? a.uid + '_' + uid_() : uid_(), at: now_(), owner: a.uid, ownerName: a.name, ver: 1, upd: now_(), kind: 'image', name: name, mime: mime, scope: scope, program: toProg ? m.program : '', fileId: fileId, size: bytes.length, key: '', thumb: /^https:\/\/images\.pexels\.com\//.test(m.thumb || '') ? clip_(m.thumb, 300) : '', data: null,
+      tags: clip_('pexels ' + (m.by || ''), 120), credit: { by: clip_(m.by, 80), byUrl: clip_(m.byUrl, 200), url: clip_(m.url, 200), src: 'Pexels' } };
+    list.unshift(it); writeJson_(reg, list); return it;
+  });
+  var req = null;
+  if (!toProg && m.program && m.suggest && inProg_(a, m.program)) {
+    req = withLock_(function () {
+      var l = readJson_('imgreq.json', []);
+      var r = { id: uid_(), at: now_(), uid: a.uid, name: a.name, program: m.program, asset: x.id, title: name, thumb: clip_(m.thumb, 300), by: clip_(m.by, 80), url: clip_(m.url, 200), status: 'new' };
+      l.unshift(r); if (l.length > 500) l.length = 500; writeJson_('imgreq.json', l); return r;
+    });
+  }
+  return JSON.stringify({ asset: assetPub_(x), request: req });
+}
+function img_requests(token, program) {
+  var a = auth_(token); needAdmin_(a);
+  return JSON.stringify(readJson_('imgreq.json', []).filter(function (r) { return adminOf_(a, r.program) && (!program || r.program === program); }));
+}
+// موافقة المشرف: تُنسخ الصورة من مكتبة المستخدم إلى مكتبة البرنامج (الملف نفسه، بلا تنزيل جديد)
+function img_decide(token, id, ok) {
+  var a = auth_(token);
+  return withLock_(function () {
+    var l = readJson_('imgreq.json', []), r = null; l.forEach(function (x) { if (x.id === id) r = x; });
+    if (!r) throw new Error('الطلب غير موجود'); if (!adminOf_(a, r.program)) throw new Error('ليس من برامجك');
+    if (ok) {
+      var ua = readJson_('ua_' + r.uid + '.json', []), src = null; ua.forEach(function (x) { if (x.id === r.asset) src = x; });
+      if (!src || !src.fileId) throw new Error('صورة الطلب لم تعد موجودة');
+      var copy = DriveApp.getFileById(src.fileId).makeCopy(sub_('assets'));
+      var reg = readJson_('assets.json', []);
+      reg.unshift({ id: uid_(), at: now_(), owner: a.uid, ownerName: a.name, ver: 1, upd: now_(), kind: 'image', name: src.name, mime: src.mime, scope: 'program', program: r.program, fileId: copy.getId(), size: src.size, key: '', thumb: '', data: null, tags: src.tags || '', credit: src.credit || null, from: r.name });
+      writeJson_('assets.json', reg);
+      audit_(a, 'أضاف صورة مقترحة للبرنامج', src.name + ' · ' + r.program);
+    }
+    r.status = ok ? 'ok' : 'no'; r.by2 = a.name; r.at2 = now_();
+    writeJson_('imgreq.json', l); return JSON.stringify(r);
+  });
+}
+// آيات بنص موثّق من alquran.cloud (رواية حفص، رسم إملائي مشكول يناسب خطوط التصميم)، وأحاديث من الدرر السنية بحكم المحدث
+function quran_find(token, q) {
+  auth_(token); q = clip_(q, 120).trim(); if (!q) throw new Error('اكتب كلمة من الآية أو اسم السورة ورقم الآية');
+  var c = CacheService.getScriptCache(), ck = 'qr:' + Utilities.base64EncodeWebSafe(q).slice(0, 200), hit = c.get(ck); if (hit) return hit;
+  var out = [], m = q.match(/^(.+?)\s+(\d{1,3})(?:\s*[-–:]\s*(\d{1,3}))?$/);
+  if (m) {
+    var norm = function (t) { return String(t).replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, '').replace(/[\u0623\u0625\u0622\u0671]/g, '\u0627').replace(/^\u0633\u0648\u0631\u0629\s*/, '').replace(/^\u0627\u0644/, '').replace(/\s+/g, ''); };
+    var surahs = quranSurahs_(), name = norm(m[1]), sn = 0;
+    surahs.forEach(function (s) { if (!sn && norm(s.name) === name) sn = s.number; });
+    if (sn) {
+      var a1 = +m[2], a2 = m[3] ? +m[3] : a1; if (a2 < a1) a2 = a1; if (a2 - a1 > 9) a2 = a1 + 9;
+      for (var n = a1; n <= a2; n++) {
+        var r = UrlFetchApp.fetch('https://api.alquran.cloud/v1/ayah/' + sn + ':' + n + '/quran-simple', { muteHttpExceptions: true });
+        if (r.getResponseCode() === 200) { var d = JSON.parse(r.getContentText()).data; out.push({ text: d.text, surah: surahLabel_(d.surah.name), sn: d.surah.number, n: d.numberInSurah }); }
+      }
+    }
+  }
+  if (!out.length) {
+    var r2 = UrlFetchApp.fetch('https://api.alquran.cloud/v1/search/' + encodeURIComponent(q) + '/all/quran-simple', { muteHttpExceptions: true });
+    if (r2.getResponseCode() === 200) { var dd = JSON.parse(r2.getContentText()).data; (dd.matches || []).slice(0, 30).forEach(function (x) { out.push({ text: x.text, surah: surahLabel_(x.surah.name), sn: x.surah.number, n: x.numberInSurah }); }); }
+  }
+  var txt = JSON.stringify(out); c.put(ck, txt, 21600); return txt;
+}
+function surahLabel_(n) { return String(n || '').replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, '').replace(/^سورة\s*/, '').trim(); }
+function quranSurahs_() {
+  var c = CacheService.getScriptCache(), hit = c.get('qsurahs'); if (hit) return JSON.parse(hit);
+  var r = UrlFetchApp.fetch('https://api.alquran.cloud/v1/surah', { muteHttpExceptions: true });
+  if (r.getResponseCode() !== 200) throw new Error('تعذّر الوصول إلى مصدر القرآن');
+  var l = JSON.parse(r.getContentText()).data.map(function (s) { return { number: s.number, name: s.name }; });
+  c.put('qsurahs', JSON.stringify(l), 21600); return l;
+}
+function hadith_find(token, q) {
+  auth_(token); q = clip_(q, 120).trim(); if (!q) throw new Error('اكتب كلمات من الحديث');
+  var c = CacheService.getScriptCache(), ck = 'hd:' + Utilities.base64EncodeWebSafe(q).slice(0, 200), hit = c.get(ck); if (hit) return hit;
+  var r = UrlFetchApp.fetch('https://dorar.net/dorar_api.json?skey=' + encodeURIComponent(q), { muteHttpExceptions: true });
+  if (r.getResponseCode() !== 200) throw new Error('تعذّر الوصول إلى الدرر السنية');
+  var html = ''; try { html = JSON.parse(r.getContentText()).ahadith.result || ''; } catch (e) { throw new Error('رد غير مفهوم من الدرر السنية'); }
+  var out = [], re = /<div class="hadith"[^>]*>([\s\S]*?)<\/div>\s*<div class="hadith-info"[^>]*>([\s\S]*?)<\/div>/g, m;
+  var strip = function (h) { return h.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim(); };
+  var fields = function (info) { var o = {}, re2 = /(خلاصة حكم المحدث|الصفحة أو الرقم|الراوي|المحدث|المصدر|التخريج)\s*:/g, hits = [], h; while ((h = re2.exec(info))) hits.push({ k: h[1], s: h.index, e: h.index + h[0].length }); hits.forEach(function (x, idx) { o[x.k] = info.slice(x.e, idx + 1 < hits.length ? hits[idx + 1].s : info.length).replace(/[|•]/g, ' ').trim(); }); return o; };
+  while ((m = re.exec(html)) && out.length < 20) {
+    var text = strip(m[1]), f = fields(strip(m[2]));
+    var grade = f['خلاصة حكم المحدث'] || '';
+    out.push({ text: text, rawi: f['الراوي'] || '', muhaddith: f['المحدث'] || '', source: f['المصدر'] || '', page: f['الصفحة أو الرقم'] || '', grade: grade, sahih: /صحيح|حسن|ثابت|إسناده جيد/.test(grade) && !/ضعيف|موضوع|منكر|لا يصح|باطل|لا أصل/.test(grade) });
+  }
+  var txt = JSON.stringify(out); if (txt.length < 90000) c.put(ck, txt, 21600); return txt;
 }

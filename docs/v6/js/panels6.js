@@ -33,6 +33,7 @@ function buildPanel() {
 function pContent(b) {
   const tpl = S.tpl, pg = ED.doc.pages[ED.cur], ph = pg.ph || {};
   b.appendChild(panelHead('المحتوى', 'اكتب نصوصك، وما تتركه فارغاً لا يظهر.'));
+  b.appendChild(el('div', { class: 'row wrapr ctools' }, [el('button', { type: 'button', class: 'btn sm line', title: 'آية بنصها من المصحف أو حديث بحكم المحدث', onclick: function () { verifiedTextDialog(insertVerified); } }, [ico('book'), 'آية أو حديث موثّق']), aiReady() ? el('button', { type: 'button', class: 'btn sm line', title: 'يصحح الإملاء ويشكّل النصوص بالذكاء', onclick: spellDialog }, [ico('ai'), 'تصحيح وتشكيل']) : null]));
   if (tpl.id === 'blank') { b.appendChild(el('p', { class: 'muted small', text: 'هذه صفحة بيضاء: أضف النصوص والعناصر من الأدوات، أو اختر قالباً.' })); b.appendChild(el('button', { type: 'button', class: 'btn dark', text: 'ابدأ بالمساعد', onclick: function () { ED.mode = 'full'; openTab('assist'); } })); return; }
   const form = el('div', { class: 'pform' });
   tpl.fields.forEach(function (f) {
@@ -181,6 +182,7 @@ function pEls(b) {
   const g4 = sec('عناصري المحفوظة');
   if (!mine.length) g4.appendChild(el('p', { class: 'tiny', text: 'اختر طبقة أضفتها، ثم «احفظها عنصراً» من لوحة الطبقات لتجدها هنا في كل تصاميمك.' }));
   mine.forEach(function (a) { const bt = el('button', { type: 'button', class: 'libb', title: a.name, onclick: function () { a.data.layers.forEach(function (L) { const c = JSON.parse(JSON.stringify(L)); addLayer6(c); }); } }); if (a.thumb) bt.style.backgroundImage = 'url(' + a.thumb + ')'; else bt.textContent = a.name; g4.appendChild(bt); });
+  ticonSection(b); qrSection(b);
   if (typeof mediaPanelSection === 'function') mediaPanelSection(b);
 }
 
@@ -197,6 +199,7 @@ function pImgs(b) {
     if (a.thumb) bt.style.backgroundImage = 'url(' + a.thumb + ')';
     g.appendChild(bt);
   });
+  freeImagesSection(b);
   b.appendChild(el('h4', { class: 'psh', text: 'مكتبة البرنامج' }));
   const g2 = el('div', { class: 'imgrid' }); b.appendChild(g2);
   DATE_LIB.forEach(function (n) { const bt = el('button', { type: 'button', class: 'imb', title: LIB_NAMES[n] || '', onclick: function () { addLayer6({ t: 'img', ref: 'lib:' + n, w: 0.55 }); } }); bt.style.backgroundImage = 'url(' + ASSETS[n] + ')'; g2.appendChild(bt); });
@@ -451,6 +454,12 @@ function pEl(b) {
     else b.appendChild(slider('الحجم', L.w, 0.02, 1.6, 0.01, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { L.w = v; }));
     b.appendChild(slider('الشفافية', L.o == null ? 1 : L.o, 0.1, 1, 0.01, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { L.o = v; }));
     if (L.t === 'img') b.appendChild(slider('استدارة الحواف', L.r || 0, 0, 0.5, 0.02, function (v) { return Math.round(v * 200) + '٪'; }, function (v) { L.r = v; }));
+    if (L.t === 'qr') {
+      b.appendChild(el('div', { class: 'fld' }, [el('label', { text: 'الرابط' }), el('input', { type: 'url', class: 'inp sm', dir: 'ltr', value: L.url || '', onchange: function (e) { const v = e.target.value.trim(); if (!/^https?:\/\/\S+$/.test(v)) { toast('رابط غير صالح'); return; } L.url = v; changed6(); } })]));
+      b.appendChild(segMini([['#ffffff', 'خلفية بيضاء'], ['none', 'بلا خلفية']], L.bg === 'none' ? 'none' : '#ffffff', function (v) { L.bg = v; changed6(); }));
+      b.appendChild(el('p', { class: 'tiny', text: 'اختبر الرمز بهاتفك قبل النشر. الخلفية البيضاء أضمن للمسح.' }));
+    }
+    if (L.t === 'ticon') b.appendChild(slider('سُمك الخط', L.lw || 2, 1, 3.5, 0.25, function (v) { return v.toFixed(2); }, function (v) { L.lw = v; }));
     if (L.t === 'yt' || L.t === 'video' || L.t === 'audio') {
       b.appendChild(el('div', { class: 'fld' }, [el('label', { text: 'العنوان على البطاقة' }), el('input', { type: 'text', class: 'inp sm', value: L.title || '', oninput: function (e) { L.title = e.target.value; changed6(); } })]));
       if (L.t === 'yt') b.appendChild(el('div', { class: 'fld' }, [el('label', { text: 'رابط يوتيوب' }), el('input', { type: 'url', class: 'inp sm', dir: 'ltr', value: L.url || '', onchange: function (e) { const id = ytId(e.target.value); if (!id) { toast('الرابط ليس رابط يوتيوب'); return; } L.url = 'https://www.youtube.com/watch?v=' + id; changed6(); } })]));

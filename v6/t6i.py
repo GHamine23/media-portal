@@ -1,0 +1,106 @@
+"""اختبار الإضافات: رمز QR، وأيقونات Tabler، والزخارف الهندسية، والصور المجانية مع موافقة المشرف، والآيات والأحاديث الموثقة، والتصحيح والتشكيل."""
+import asyncio, sys, json
+sys.path.insert(0, '/home/claude/media-portal/v6')
+from t6 import setup, URL, OUT
+from playwright.async_api import async_playwright
+def ok(c, m): print(('✓ ' if c else '✗ ') + m)
+async def clean(pg):
+    for _ in range(3):
+        if await pg.query_selector('.coach'): await pg.evaluate("document.querySelector('.coach').remove()")
+        if await pg.query_selector('.modal'): await pg.keyboard.press('Escape'); await pg.wait_for_timeout(250)
+MOCK = r'''window.DEMO_AI = function (body) {
+  const b = JSON.parse(body); const sys = b.systemInstruction.parts[0].text, user = b.contents[0].parts[0].text;
+  if (/كلمات بحث إنجليزية/.test(sys)) return JSON.stringify({ queries: ['mosque sunrise', 'open book', 'desert dunes', 'green garden'] });
+  if (/مدقق لغوي/.test(sys)) { const items = JSON.parse(user); return JSON.stringify({ items: items.map(function (it) { return { id: it.id, text: it.text.replace('انشاء', 'إنشاء').replace('الطلبه', 'الطلبة'), note: 'همزة وتاء مربوطة' }; }) }); }
+  return '{}';
+};'''
+async def main():
+    async with async_playwright() as p:
+        b = await p.chromium.launch(); pg = await b.new_page(viewport={'width': 1440, 'height': 900})
+        errs = await setup(pg)
+        await pg.evaluate("GAS._props.GEMINI_KEY='k'; " + MOCK + "; void 0"); await pg.evaluate("refreshBundle()"); await pg.wait_for_timeout(1200)
+        # الإعدادات: مفتاح Pexels
+        await pg.goto(URL + '#/admin/settings'); await pg.wait_for_timeout(1500)
+        await pg.fill('input[aria-label="مفتاح Pexels"]', 'PXDEMOKEY'); await pg.click('#abody > .btn.dark'); await pg.wait_for_timeout(1800)
+        ok('مفتاح Pexels مضبوط' in await pg.inner_text('#abody'), 'pexels key saved')
+        # المحرر: العناصر — QR وأيقونات
+        await pg.goto(URL + '#/e/ithmar/ann_cards'); await pg.wait_for_timeout(2500); await clean(pg)
+        await pg.evaluate("openTab('els'); void 0"); await pg.wait_for_timeout(600)
+        pt = await pg.inner_text('#e_panel')
+        ok('رمز QR' in pt and 'أيقونات أكثر' in pt, 'elements panel has QR + Tabler sections')
+        await pg.fill('#e_panel input[aria-label="رابط الرمز"]', 'https://t.me/jeel_demo'); await pg.click('#e_panel button:has-text("أضف")'); await pg.wait_for_timeout(500)
+        q = await pg.evaluate("(S.layers||[]).filter(l=>l.t==='qr')")
+        ok(len(q) == 1 and q[0]['url'] == 'https://t.me/jeel_demo', 'qr layer added')
+        dark = await pg.evaluate("(function(){const c=document.createElement('canvas');c.width=200;c.height=200;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,200,200);g.translate(100,100);drawQR(g,'https://t.me/jeel_demo',180,'#000','#fff');const d=g.getImageData(0,0,200,200).data;let n=0;for(let i=0;i<d.length;i+=4)if(d[i]<128)n++;return n;})()")
+        ok(dark > 3000, 'qr renders dark modules: %d' % dark)
+        await pg.fill('#e_panel input[aria-label="بحث عن أيقونة"]', 'مسجد'); await pg.wait_for_timeout(300)
+        ok(await pg.evaluate("document.querySelectorAll('#e_panel .libb[aria-label=\"مسجد\"]').length") == 1, 'icon search finds مسجد')
+        await pg.click('#e_panel .libb[aria-label="مسجد"]'); await pg.wait_for_timeout(400)
+        ok(await pg.evaluate("(S.layers||[]).some(l=>l.t==='ticon'&&l.ref==='building-mosque')"), 'tabler icon layer added')
+        await pg.screenshot(path=OUT + 'o1_qr_icon.png')
+        # الزخارف الهندسية
+        await pg.evaluate("openTab('imgs'); void 0"); await pg.wait_for_timeout(600)
+        ok(await pg.query_selector('#e_panel .libb[title="نجمة ثمانية"]') is not None and await pg.query_selector('#e_panel .libb[title="زليج"]') is not None, 'geometric patterns offered')
+        await pg.click('#e_panel .libb[title="نجمة ثمانية"]'); await pg.wait_for_timeout(500)
+        ok(await pg.evaluate("S.bgfx && S.bgfx.p") == 'star8', 'star8 background applied')
+        await pg.screenshot(path=OUT + 'o2_geo.png')
+        # الصور المجانية
+        pt = await pg.inner_text('#e_panel')
+        ok('صور مجانية' in pt and 'Pexels' in pt, 'free images section with attribution')
+        await pg.click('#e_panel button:has-text("اقترح")'); await pg.wait_for_timeout(1500)
+        ok(await pg.evaluate("document.querySelector('#e_panel input[aria-label=\"بحث عن صورة\"]').value") == 'mosque sunrise' and await pg.evaluate("document.querySelectorAll('#e_panel .pxb').length") == 3, 'AI suggested query + results')
+        await pg.check('#px_sug'); await pg.click('#e_panel .pxb'); await pg.wait_for_timeout(2500)
+        L = await pg.evaluate("(S.layers||[]).filter(l=>l.t==='img'&&/^asset:/.test(l.ref))")
+        ok(len(L) == 1, 'picked image added as asset layer')
+        aid = L[0]['ref'][6:]
+        meta = await pg.evaluate("V6.assets[%s]" % json.dumps(aid))
+        ok(meta and meta.get('credit', {}).get('by') == 'مصوّر تجريبي' and meta['scope'] == 'program', 'admin pick: asset carries credit, straight into program library')
+        await pg.screenshot(path=OUT + 'o3_pexels.png')
+        # آية وحديث
+        await pg.evaluate("openTab('content'); void 0"); await pg.wait_for_timeout(500)
+        await pg.click('#e_panel button:has-text("آية أو حديث موثّق")'); await pg.wait_for_timeout(500)
+        await pg.fill('.modal input[aria-label="بحث"]', 'الإسراء ٢٣'); await pg.keyboard.press('Enter'); await pg.wait_for_timeout(1200)
+        vt = await pg.inner_text('.modal .vlist')
+        ok('وَبِالْوَالِدَيْنِ' in vt and 'الإسراء' in vt, 'ayah found by reference')
+        await pg.screenshot(path=OUT + 'o4_ayah.png')
+        await pg.evaluate("select('title'); void 0"); await pg.click('.modal .vrow .btn.dark'); await pg.wait_for_timeout(600)
+        ttl = await pg.evaluate("S.d.title"); ok(ttl.startswith('﴿'), 'ayah inserted into the selected field: ' + ttl)
+        await clean(pg)
+        await pg.evaluate("select(null); void 0"); await pg.click('#e_panel button:has-text("آية أو حديث موثّق")'); await pg.wait_for_timeout(400)
+        await pg.click('.modal .seg button:has-text("حديث")'); await pg.fill('.modal input[aria-label="بحث"]', 'يحب إذا عمل'); await pg.keyboard.press('Enter'); await pg.wait_for_timeout(1200)
+        rows = await pg.evaluate("document.querySelectorAll('.modal .vrow').length")
+        ok(rows == 1 and 'حسن' in await pg.inner_text('.modal .vlist'), 'hadith: only sahih/hasan shown by default')
+        await pg.check('.modal .tog input[type=checkbox]'); await pg.wait_for_timeout(200)
+        ok(await pg.evaluate("document.querySelectorAll('.modal .vrow').length") == 2, 'weak shown on request')
+        await pg.click('.modal .vrow .btn.dark'); await pg.wait_for_timeout(500)
+        ok(await pg.evaluate("(S.layers||[]).some(l=>l.t==='text'&&/يُتقِنَه/.test(l.txt)&&/صحيح الجامع/.test(l.txt))"), 'hadith inserted as text layer with source')
+        await clean(pg)
+        # التصحيح والتشكيل
+        await pg.evaluate("S.d.sub = 'انشاء الطلبه'; changed6(); buildPanel(); void 0"); await pg.wait_for_timeout(300)
+        await pg.click('#e_panel button:has-text("تصحيح وتشكيل")'); await pg.wait_for_timeout(400)
+        await pg.click('.modal button:has-text("راجع")'); await pg.wait_for_timeout(1500)
+        ok(await pg.evaluate("document.querySelectorAll('.modal .sprow ins').length") >= 1 and 'إنشاء الطلبة' in await pg.inner_text('.modal .spout'), 'spell preview shows diff')
+        await pg.screenshot(path=OUT + 'o5_spell.png')
+        await pg.click('.modal .acts .btn.dark'); await pg.wait_for_timeout(500)
+        ok(await pg.evaluate("S.d.sub") == 'إنشاء الطلبة', 'spell fix applied')
+        # مستخدم عادي يقترح صورة للمكتبة، والمشرف يوافق
+        await pg.evaluate("logout()"); await pg.wait_for_timeout(800)
+        await pg.fill('#lg_id', 'ahmad'); await pg.fill('#lg_pw', 'Ahmad#2026'); await pg.click('.lgform button[type=submit]'); await pg.wait_for_selector('#top:not([hidden])', timeout=60000); await pg.wait_for_timeout(1500); await clean(pg)
+        await pg.goto(URL + '#/e/ithmar/ann_cards'); await pg.wait_for_timeout(2500); await clean(pg)
+        await pg.evaluate("openTab('imgs'); void 0"); await pg.wait_for_timeout(500)
+        await pg.fill('#e_panel input[aria-label="بحث عن صورة"]', 'garden'); await pg.keyboard.press('Enter'); await pg.wait_for_timeout(1200)
+        await pg.check('#px_sug'); await pg.click('#e_panel .pxb'); await pg.wait_for_timeout(2500)
+        L2 = await pg.evaluate("(S.layers||[]).filter(l=>l.t==='img'&&/^asset:/.test(l.ref)).map(l=>V6.assets[l.ref.slice(6)]).slice(-1)")
+        ok(len(L2) == 1 and L2[0]['scope'] == 'user' and L2[0].get('credit'), 'user pick lands in own library with credit')
+        await pg.evaluate("logout()"); await pg.wait_for_timeout(800)
+        await pg.fill('#lg_id', 'ADMIN'); await pg.fill('#lg_pw', 'Admin#2026'); await pg.click('.lgform button[type=submit]'); await pg.wait_for_selector('#top:not([hidden])', timeout=60000); await pg.wait_for_timeout(1500); await clean(pg)
+        await pg.goto(URL + '#/admin/assets'); await pg.wait_for_timeout(2500)
+        ok('صور اقترحها الفريق' in await pg.inner_text('#abody') and await pg.query_selector('.imgreq') is not None, 'admin sees image request')
+        await pg.screenshot(path=OUT + 'o6_request.png')
+        before = await pg.evaluate("(async()=>{const l=await API6.me('asset_list','program','academy');return l.filter(a=>a.kind==='image'&&a.credit).length;})()")
+        await pg.click('.imgreq .btn.dark'); await pg.wait_for_timeout(2500)
+        lib = await pg.evaluate("(async()=>{const l=await API6.me('asset_list','program','academy');return l.filter(a=>a.kind==='image'&&a.credit).length;})()")
+        ok(lib == before + 1, 'approved image copied into program library (%d → %d)' % (before, lib))
+        print('ERRORS', [e for e in errs if '404' not in e][:8])
+        await b.close()
+asyncio.run(main())

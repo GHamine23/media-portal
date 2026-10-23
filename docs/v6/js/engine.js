@@ -522,8 +522,35 @@ let CUR_T = null;
 /* ---------- الخلفيات ---------- */
 const BG_PATTERNS = [
   ['plain', 'سادة'], ['grad', 'تدرّج'], ['dots', 'دوائر'], ['grid', 'شبكة'], ['rays', 'أشعة'],
-  ['streaks', 'إضاءة'], ['petals', 'زهور'], ['waves', 'أمواج'], ['ring', 'حلقات'], ['photo', 'صورة']
+  ['streaks', 'إضاءة'], ['petals', 'زهور'], ['waves', 'أمواج'], ['ring', 'حلقات'],
+  ['star8', 'نجمة ثمانية'], ['girih', 'سداسيات'], ['zellij', 'زليج'], ['photo', 'صورة']
 ];
+// زخارف هندسية إسلامية مولَّدة بالكود (بلا صور): نجمة ثمانية (خاتم)، وشبكة سداسية، وزليج ثُمانيات ومربعات
+// سُمك الخط لا ينزل عن بكسل ونصف على الشاشة حتى تظهر الزخرفة في المصغّرات
+function geoLw(ctx, u) { let k = 1; try { k = ctx.getTransform().a || 1; } catch (e) {} return Math.max(2 * u, 1.5 / k); }
+function geoStar8(ctx, W, H, color, u) {
+  const s = 160 * u, lw = geoLw(ctx, u); ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineJoin = 'round';
+  const star = function (cx, cy, r) {
+    ctx.beginPath();
+    for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8 - Math.PI / 2, rr = i % 2 ? r * 0.72 : r; const x = cx + rr * Math.cos(a), y = cy + rr * Math.sin(a); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
+    ctx.closePath(); ctx.stroke();
+    ctx.beginPath(); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + Math.PI / 8, x = cx + r * 0.4 * Math.cos(a), y = cy + r * 0.4 * Math.sin(a); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); } ctx.closePath(); ctx.stroke();
+  };
+  for (let y = 0; y <= H + s; y += s) for (let x = 0; x <= W + s; x += s) { star(x, y, s * 0.5); ctx.beginPath(); ctx.rect(x + s * 0.5 - s * 0.14, y + s * 0.5 - s * 0.14, s * 0.28, s * 0.28); ctx.stroke(); }
+}
+function geoGirih(ctx, W, H, color, u) {
+  const r = 70 * u, h = r * Math.sqrt(3) / 2; ctx.strokeStyle = color; ctx.lineWidth = geoLw(ctx, u); ctx.lineJoin = 'round';
+  const hex = function (cx, cy, rr) { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3, x = cx + rr * Math.cos(a), y = cy + rr * Math.sin(a); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); } ctx.closePath(); ctx.stroke(); };
+  let row = 0;
+  for (let y = -h; y <= H + h; y += h, row++) { const off = row % 2 ? r * 1.5 : 0; for (let x = -r + off; x <= W + r; x += r * 3) { hex(x, y, r); hex(x, y, r * 0.55); const sx = x + r * 1.5, sy = y; ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + Math.PI / 6, x2 = sx + r * 0.5 * Math.cos(a), y2 = sy + r * 0.5 * Math.sin(a); if (i) ctx.lineTo(x2, y2); else ctx.moveTo(x2, y2); } ctx.closePath(); ctx.stroke(); } }
+}
+function geoZellij(ctx, W, H, color, u) {
+  const s = 120 * u, k = s * 0.2929; ctx.strokeStyle = color; ctx.lineWidth = geoLw(ctx, u); ctx.lineJoin = 'round';
+  for (let y = 0; y <= H + s; y += s) for (let x = 0; x <= W + s; x += s) {
+    ctx.beginPath(); ctx.moveTo(x + k, y); ctx.lineTo(x + s - k, y); ctx.lineTo(x + s, y + k); ctx.lineTo(x + s, y + s - k); ctx.lineTo(x + s - k, y + s); ctx.lineTo(x + k, y + s); ctx.lineTo(x, y + s - k); ctx.lineTo(x, y + k); ctx.closePath(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + s / 2, y + s * 0.3); ctx.lineTo(x + s * 0.7, y + s / 2); ctx.lineTo(x + s / 2, y + s * 0.7); ctx.lineTo(x + s * 0.3, y + s / 2); ctx.closePath(); ctx.stroke();
+  }
+}
 // يرسم الخلفية الأساسية للقالب، ومعها النقش الذي اختاره المستخدم من المكتبة
 function paintBg(ctx, W, H, base) {
   ctx.fillStyle = base; ctx.fillRect(0, 0, W, H);
@@ -555,6 +582,9 @@ function paintBg(ctx, W, H, base) {
   } else if (p === 'ring') {
     ctx.strokeStyle = alpha(ink, 0.07); ctx.lineWidth = 3 * u;
     for (let r = 120; r < 1400; r += 90) { ctx.beginPath(); ctx.arc(W * 0.92, H * 0.08, r * u, 0, Math.PI * 2); ctx.stroke(); }
+  } else if (p === 'star8') { geoStar8(ctx, W, H, alpha(ink, dark ? 0.1 : 0.07), u);
+  } else if (p === 'girih') { geoGirih(ctx, W, H, alpha(ink, dark ? 0.1 : 0.07), u);
+  } else if (p === 'zellij') { geoZellij(ctx, W, H, alpha(ink, dark ? 0.1 : 0.07), u);
   } else if (p === 'photo' && BGFX.im) {
     drawPhoto(ctx, BGFX.im, 0, 0, W, H, {});
     ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = lighten(base, 0.25); ctx.fillRect(0, 0, W, H);

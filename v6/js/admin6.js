@@ -265,6 +265,7 @@ async function aAssets(body) {
     let list; try { list = await API6.me('asset_list', 'program', prog); } catch (e) { sk.remove(); box.appendChild(el('p', { class: 'err', text: e.message })); return; }
     sk.remove();
     const own = list.filter(function (a) { return a.program === prog && a.kind !== 'font'; });
+    await imgRequestsCard(box, prog);
     const up = function (kind, label, key) {
       const f = el('input', { type: 'file', accept: 'image/png,image/webp,image/jpeg,image/svg+xml', hidden: true, multiple: !key, onchange: async function (e) {
         const files = Array.from(e.target.files); e.target.value = '';
@@ -439,6 +440,7 @@ async function aSettings(body) {
   let s; try { s = await API6.me('set_get'); } catch (e) { body.appendChild(el('p', { class: 'err', text: e.message })); return; }
   const aiOn = el('input', { type: 'checkbox', checked: !!s.ai.enabled }), model = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.model, 'aria-label': 'النموذج' }), perDay = el('input', { type: 'number', class: 'inp', min: '0', max: '500', value: String(s.ai.perDay), 'aria-label': 'الحد اليومي' });
   const tgTok = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.tgOn ? '•••••••• (اترك فارغاً لإبقائه)' : '123456789:AAF…', 'aria-label': 'رمز البوت' });
+  const pxKey = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.pexelsOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'مفتاح Pexels', 'aria-label': 'مفتاح Pexels' });
   const upPerm = el('input', { type: 'checkbox', checked: !!s.uploadsNeedPerm }), maxMb = el('input', { type: 'number', class: 'inp', min: '1', max: '20', value: String(s.maxUploadMb || 20), 'aria-label': 'أقصى حجم' });
   body.appendChild(el('div', { class: 'grid two' }, [
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-pu' }, [ico('ai')]), el('h3', { text: 'اصنع إعلانك بالذكاء' }),
@@ -453,10 +455,14 @@ async function aSettings(body) {
       el('div', { class: 'row' }, [el('button', { type: 'button', class: 'btn sm line', text: 'اختبر البوت', onclick: async function () { try { const r = await API6.me('tg_test'); toast('البوت يعمل: @' + r.username); } catch (e) { toast(e.message); } } })])]),
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-bl' }, [ico('upload')]), el('h3', { text: 'الرفع' }),
       el('label', { class: 'tog' }, [upPerm, el('span', { text: 'رفع الصور يحتاج صلاحية' })]),
-      el('div', { class: 'fld' }, [el('label', { text: 'أقصى حجم للملف (ميغابايت)' }), maxMb])])
+      el('div', { class: 'fld' }, [el('label', { text: 'أقصى حجم للملف (ميغابايت)' }), maxMb])]),
+    el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-or' }, [ico('image')]), el('h3', { text: 'صور مجانية (Pexels)' }),
+      el('p', { class: 'small ' + (s.pexelsOn ? 'ok' : 'err'), text: s.pexelsOn ? 'مفتاح Pexels مضبوط: الفريق يبحث عن صور مجانية من المحرر.' : 'بلا مفتاح: أنشئ مفتاحاً مجانياً من pexels.com/api ثم ألصقه هنا.' }),
+      el('div', { class: 'fld' }, [el('label', { text: 'مفتاح Pexels (يُحفظ في الخادم ولا يُعرض)' }), pxKey]),
+      el('p', { class: 'tiny', text: 'الحد المجاني ٢٠٠ بحث في الساعة. الصورة التي يختارها المستخدم تُحفظ بأصلها كاملاً في مكتبته، ويقترحها للبرنامج فتوافق أنت من «الشعارات والصور».' })])
   ]));
   body.appendChild(el('button', { type: 'button', class: 'btn dark', text: 'حفظ الإعدادات', onclick: async function () {
-    const o = { ai: { enabled: aiOn.checked, model: model.value.trim(), perDay: +perDay.value }, uploadsNeedPerm: upPerm.checked, maxUploadMb: +maxMb.value }; if (tgTok.value.trim()) o.tgToken = tgTok.value.trim();
+    const o = { ai: { enabled: aiOn.checked, model: model.value.trim(), perDay: +perDay.value }, uploadsNeedPerm: upPerm.checked, maxUploadMb: +maxMb.value }; if (tgTok.value.trim()) o.tgToken = tgTok.value.trim(); if (pxKey.value.trim()) o.pexelsKey = pxKey.value.trim();
     try { await API6.me('set_save', JSON.stringify(o)); toast('حُفظت'); await refreshBundle(); showAdmin('settings'); } catch (e) { toast(e.message); }
   } }));
 }
@@ -583,7 +589,7 @@ async function aModels(body) {
 }
 
 /* ---------- الذكاء الاصطناعي: ماذا يفعل، وكم استُعمل، ومن، وهل نجح ---------- */
-const AI_KIND_N = { intake: 'فهم الفكرة', design: 'اقتراح تصاميم', creative: 'دعه يبدع', caption: 'نص مصاحب', outline: 'مخطط عرض', slides: 'بناء شرائح', spell: 'تصحيح وتشكيل', weekly: 'المهمة الأسبوعية', test: 'تجربة' };
+const AI_KIND_N = { intake: 'فهم الفكرة', design: 'اقتراح تصاميم', creative: 'دعه يبدع', caption: 'نص مصاحب', outline: 'مخطط عرض', slides: 'بناء شرائح', spell: 'تصحيح وتشكيل', imgq: 'كلمات بحث صور', weekly: 'المهمة الأسبوعية', test: 'تجربة' };
 async function aAI(body) {
   let m = '', prog = '', data = null;
   const monthSel = el('select', { class: 'inp sm', 'aria-label': 'الشهر', onchange: function (e) { m = e.target.value; load(); } });
