@@ -146,6 +146,8 @@ function showEditor6(doc, fromDraft) {
     ]),
     el('button', { type: 'button', class: 'ib', id: 'e_share', title: 'شارك بالرابط مع فريقك', 'aria-label': 'مشاركة بالرابط', onclick: function () { shareDialog(); } }, [ico('share')]),
     doc.kind !== 'deck' ? el('button', { type: 'button', class: 'btn line e-cap', id: 'e_cap', title: 'النص المصاحب للإعلان، والإرسال إلى قناة تليجرام', onclick: function () { captionDialog(); } }, [ico('send'), el('span', { class: 'hide-s', text: 'النص والقناة' })]) : null,
+    el('button', { type: 'button', class: 'btn line e-rv', id: 'e_rv', title: 'مراجعة التصميم بالمصمّم الذكي أو من إدارة أثر، والتعليقات', onclick: function (e) { reviewMenu(e.currentTarget); } }, [ico('review'), el('span', { class: 'hide-s', text: 'مراجعة' })]),
+    el('button', { type: 'button', class: 'ib cmb', id: 'e_cm', title: 'التعليقات', 'aria-label': 'التعليقات', onclick: function () { commentsDialog(); } }, [ico('comment'), el('b', {})]),
     el('button', { type: 'button', class: 'ib', title: 'ملاحظة للفريق', 'aria-label': 'ملاحظة', onclick: function () { showFeedback6(); } }, [ico('chat')]),
     el('button', { type: 'button', class: 'btn line', id: 'e_save', onclick: function () { saveDialog(); } }, [ico('heart'), el('span', { class: 'hide-s', text: doc.id ? 'محفوظ' : 'حفظ' })]),
     el('button', { type: 'button', class: 'btn dark', id: 'e_dl', onclick: function (e) { dlMenu(e.currentTarget); } }, [ico('download'), el('span', { class: 'hide-s', text: 'تنزيل' })])
@@ -178,6 +180,7 @@ function showEditor6(doc, fromDraft) {
   requestAnimationFrame(function () { refit(); });
   LEAVE.push(leaveEditor);
   setTimeout(function () { maybeTour('editor'); }, 1200);
+  setTimeout(loadCmCount, 900);
 }
 // مقبض بين اللوحة والتصميم: يُسحب لتوسيع اللوحة أو تضييقها، ونقر مزدوج يعيدها لعرضها الأصلي
 function panelResizer() {

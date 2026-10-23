@@ -106,6 +106,7 @@ function PACK(p) {
       tpl.pack = p.id || 'pack';
       if (i >= 0) TEMPLATES[i] = tpl; else TEMPLATES.push(tpl);
     });
-    PACKS.push({ id: p.id, note: p.note || '', n: (p.templates || []).length });
+    if (p.tips && typeof addTips === 'function') addTips(p.tips, 'pk' + String(p.id || 'pack').replace(/[^\w]/g, ''));
+    PACKS.push({ id: p.id, note: p.note || '', n: (p.templates || []).length, tips: (p.tips || []).length });
   } catch (e) { console.error('pack', p && p.id, e); }
 }

@@ -27,6 +27,9 @@ route6(/^\/arc\/(\d{4}-\d{2})\/([a-z0-9]+)$/, openArc, { page: 'editor', noVT: t
 route6(/^\/make(?:\?.*)?$/, showMake6, { page: 'make' });
 route6(/^\/mine$/, showMine6, { page: 'mine' });
 route6(/^\/account$/, showAccount, { page: 'account' });
+route6(/^\/tips(?:\/([a-z]+))?$/, showTips6, { page: 'tips' });
+route6(/^\/week$/, showWeek6, { page: 'account' });
+route6(/^\/reviews$/, showReviews6, { page: 'account' });
 route6(/^\/admin(?:\/([a-z]+))?$/, showAdmin, { page: 'admin' });
 route6(/.*/, showHome, { page: 'home' });
 window.addEventListener('hashchange', function () { setTimeout(markNav, 0); });

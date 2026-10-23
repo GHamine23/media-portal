@@ -1,7 +1,7 @@
 /* ================= لوحة الإدارة: للمدير العام كل شيء، ولمشرف البرنامج ما يخص برنامجه ================= */
 const ADMIN_TABS = [
   ['overview', 'نظرة عامة', 'chart', 0], ['archive', 'أرشيف التصاميم', 'archive', 0], ['accounts', 'الحسابات', 'users', 0], ['programs', 'البرامج والهويات', 'prog', 0],
-  ['assets', 'الشعارات والصور', 'image', 0], ['fonts', 'الخطوط', 'font', 0], ['models', 'النماذج والقوالب', 'model', 0], ['ai', 'الذكاء الاصطناعي', 'sparkles', 0], ['tg', 'منشورات القناة', 'send', 0], ['feedback', 'البلاغات', 'flag', 0], ['broadcasts', 'رسائل للمستخدمين', 'megaphone', 0],
+  ['assets', 'الشعارات والصور', 'image', 0], ['fonts', 'الخطوط', 'font', 0], ['models', 'النماذج والقوالب', 'model', 0], ['reviews', 'مراجعة التصاميم', 'review', 0], ['week', 'أسبوع الفريق', 'chart', 0], ['ai', 'الذكاء الاصطناعي', 'sparkles', 0], ['tg', 'منشورات القناة', 'send', 0], ['feedback', 'البلاغات', 'flag', 0], ['broadcasts', 'رسائل للمستخدمين', 'megaphone', 0],
   ['changelog', 'سجل التحديثات', 'history', 1], ['settings', 'الإعدادات', 'gear', 1], ['audit', 'سجل النشاط', 'shield', 1]
 ];
 function myAdminProgs() { return V6.bundle.programs.filter(function (p) { return isSuper() || (V6.me.role === 'sup' && V6.me.programs.indexOf(p.id) >= 0); }); }
@@ -19,7 +19,7 @@ function showAdmin(tab) {
       body
     ])
   ]));
-  ({ overview: aOverview, archive: aArchive, models: aModels, ai: aAI, tg: aTg, accounts: aAccounts, programs: aPrograms, assets: aAssets, fonts: aFonts, feedback: aFeedback, broadcasts: aBroadcasts, changelog: aChangelog, settings: aSettings, audit: aAudit }[tab])(body);
+  ({ reviews: aReviews, week: aWeek, overview: aOverview, archive: aArchive, models: aModels, ai: aAI, tg: aTg, accounts: aAccounts, programs: aPrograms, assets: aAssets, fonts: aFonts, feedback: aFeedback, broadcasts: aBroadcasts, changelog: aChangelog, settings: aSettings, audit: aAudit }[tab])(body);
 }
 function aHead(body, title, note, acts) { body.appendChild(el('div', { class: 'ahead' }, [el('div', {}, [el('h2', { text: title }), note ? el('p', { class: 'muted small', text: note }) : null]), el('div', { class: 'row wrapr' }, acts || [])])); }
 function loading(body) { const s = el('div', { class: 'skel ldbox', style: 'height:180px' }, [loader6('', true)]); body.appendChild(s); return s; }
@@ -380,6 +380,7 @@ async function aFeedback(body) {
         el('details', {}, [el('summary', { class: 'tiny', text: 'التفاصيل التقنية' }), el('dl', { class: 'kv tiny' }, [
           el('dt', { text: 'الصفحة' }), el('dd', { dir: 'ltr', text: x.page || '—' }), el('dt', { text: 'القالب' }), el('dd', { text: x.tpl || '—' }), el('dt', { text: 'الجهاز' }), el('dd', { dir: 'ltr', text: (x.vw || '') + ' · ' + (x.ua || '') }),
           el('dt', { text: 'الأخطاء' }), el('dd', { dir: 'ltr', class: 'mono', text: (x.errors || []).join('\n') || 'لا شيء' }), el('dt', { text: 'الإصدار' }), el('dd', { text: String(x.v || '') })])]),
+        (x.imgs || []).length ? el('div', { class: 'row wrapr' }, x.imgs.map(function (_, k) { return el('button', { type: 'button', class: 'btn sm line', text: 'الصورة ' + (k + 1), onclick: async function (e) { e.currentTarget.disabled = true; try { const u = await API6.call('fb_shot', V6.token, x.id, k); shot.appendChild(el('img', { src: u, alt: 'صورة مرفقة' })); } catch (er) { toast(er.message); } } }); })) : null,
         x.shot ? el('button', { type: 'button', class: 'btn sm line', text: 'صورة التصميم', onclick: async function (e) { e.currentTarget.disabled = true; try { const u = await API6.call('fb_shot', V6.token, x.id); shot.appendChild(el('img', { src: u, alt: 'صورة من البلاغ' })); } catch (er) { toast(er.message); } } }) : null, shot,
         el('div', { class: 'row wrapr' }, [stSel, el('div', { style: 'flex:1;min-width:200px' }, [reply]), el('button', { type: 'button', class: 'btn sm dark', text: 'حفظ', onclick: async function () { try { await API6.me('fb_update', x.id, stSel.value, reply.value); x.status = stSel.value; x.reply = reply.value; toast('حُفظ'); } catch (e) { toast(e.message); } } })])
       ]));
@@ -589,7 +590,7 @@ async function aModels(body) {
 }
 
 /* ---------- الذكاء الاصطناعي: ماذا يفعل، وكم استُعمل، ومن، وهل نجح ---------- */
-const AI_KIND_N = { intake: 'فهم الفكرة', design: 'اقتراح تصاميم', creative: 'دعه يبدع', caption: 'نص مصاحب', outline: 'مخطط عرض', slides: 'بناء شرائح', spell: 'تصحيح وتشكيل', imgq: 'كلمات بحث صور', weekly: 'المهمة الأسبوعية', test: 'تجربة' };
+const AI_KIND_N = { intake: 'فهم الفكرة', design: 'اقتراح تصاميم', creative: 'دعه يبدع', caption: 'نص مصاحب', outline: 'مخطط عرض', slides: 'بناء شرائح', spell: 'تصحيح وتشكيل', imgq: 'كلمات بحث صور', review: 'مراجعة تصميم', week: 'تقرير الأسبوع', weekly: 'المهمة الأسبوعية', test: 'تجربة' };
 async function aAI(body) {
   let m = '', prog = '', data = null;
   const monthSel = el('select', { class: 'inp sm', 'aria-label': 'الشهر', onchange: function (e) { m = e.target.value; load(); } });
@@ -599,7 +600,10 @@ async function aAI(body) {
     el('li', { text: 'اقتراح التصاميم: يختار قوالب من المكتبة ويكتب نصوصها، ويصمم تخطيطات حرة جديدة من ألوان الهوية. لا يولّد صوراً.' }),
     el('li', { text: 'النص المصاحب: يصوغ رسالة تليجرام من معلومات التصميم على نماذج رسائل البرنامج.' }),
     el('li', { text: 'الشرائح: يحوّل نصاً أو ملفاً إلى مخطط عرض يراجعه المستخدم ثم إلى شرائح.' }),
+    el('li', { text: 'مراجعة التصميم: يرى صورة التصميم ويقيّمه من ١٠٠ بمبادئ التصميم، ويقترح إصلاحات مرتبطة بنصائح المنصة.' }),
+    el('li', { text: 'أسبوعك في أثر: كل سبت يكتب لكل عضو تقييماً تحفيزياً من أرقامه، وتحدياً للأسبوع القادم.' }),
     el('li', { text: 'الحدود: نموذج Gemini المجاني، بحد يومي لكل مستخدم، ويعمل عبر الخادم فلا يرى أحد المفتاح. لا تُرسل بيانات الطلاب الشخصية.' })])]));
+  await aiSkillsCard(body);
   const box = el('div'); body.appendChild(box);
   async function load() {
     box.innerHTML = ''; const sk = loading(box);

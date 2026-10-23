@@ -7,6 +7,7 @@ async function loadNews() {
   } catch (e) { return false; }
   const seenV = ls('seenV'), latest = NEWS.log[0];
   const bell = $('#bell'); if (bell) bell.classList.toggle('dot-badge', !!latest && seenV !== latest.v);
+  if (typeof loadNotifs === 'function') loadNotifs();
   // الإصدار الكبير يُعرض مرة في نافذة، والصغير يكتفي بالنقطة على الجرس
   let shown = false;
   if (latest && latest.major && seenV !== latest.v && ls('seenMajor') !== latest.v) { ls('seenMajor', latest.v); shown = true; setTimeout(function () { if (!$('.coach')) showNews(true); }, 600); }
@@ -29,7 +30,9 @@ function showNews(auto) {
   if (latest) ls('seenV', latest.v);
   const bell = $('#bell'); if (bell) bell.classList.remove('dot-badge');
   const tips = NEWS.bc.filter(function (b) { return b.kind === 'tip'; });
-  modal({ title: 'ما الجديد', wide: true, body: [
+  const nb = typeof notifsBlock === 'function' ? notifsBlock() : null;
+  modal({ title: nb ? 'الإشعارات وما الجديد' : 'ما الجديد', wide: true, body: [
+    nb,
     el('div', { class: 'news' }, NEWS.log.slice(0, 6).map(function (v, i) {
       return el('article', { class: 'nitem' + (i === 0 ? ' first' : '') }, [
         el('div', { class: 'row' }, [el('span', { class: 'pill ' + (v.major ? 'pu' : ''), text: 'الإصدار ' + v.v }), el('span', { class: 'tiny', text: v.date || '' })]),
@@ -48,10 +51,24 @@ function showFeedback6(preset) {
   const hasDesign = !!(window.ED && ED.open);
   const shotI = el('input', { type: 'checkbox', checked: hasDesign });
   const msg = el('p', { class: 'muted small', role: 'status' });
+  const imgs = [], thumbs = el('div', { class: 'fbthumbs' });
+  const fileI = el('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true, onchange: async function (e) {
+    const fs = Array.from(e.target.files); e.target.value = '';
+    for (const f of fs) {
+      if (imgs.length >= 4) { toast('أربع صور كحد أقصى'); break; }
+      if (f.size > 10 * 1048576) { toast(f.name + ' أكبر من ١٠ ميغابايت'); continue; }
+      const u = await new Promise(function (ok) { const r = new FileReader(); r.onload = function () { ok(r.result); }; r.readAsDataURL(f); });
+      imgs.push(u);
+      const t = el('div', { class: 'fbthumb', style: 'background-image:url(' + u + ')' }, [el('button', { type: 'button', class: 'x', 'aria-label': 'إزالة', onclick: function () { const i = imgs.indexOf(u); if (i >= 0) imgs.splice(i, 1); t.remove(); } }, [ico('close')])]);
+      thumbs.appendChild(t);
+    }
+  } });
+  const imgPick = el('div', { class: 'fbimgs' }, [fileI, el('button', { type: 'button', class: 'btn sm line', onclick: function () { fileI.click(); } }, [ico('image'), 'أرفق صوراً من جهازك']), el('span', { class: 'tiny', text: 'حتى أربع صور بجودتها' }), thumbs]);
   const m = modal({ title: 'ملاحظة للفريق', body: [
     segOf([['bug', 'مشكلة'], ['idea', 'اقتراح'], ['q', 'سؤال']], kind, function (v) { kind = v; }),
     el('div', { class: 'fld' }, [el('label', { for: 'fb_text', text: 'ملاحظتك' }), ta]),
     hasDesign ? el('label', { class: 'tog' }, [shotI, el('span', { text: 'أرفق صورة التصميم المفتوح' })]) : null,
+    imgPick,
     el('p', { class: 'tiny', text: 'يُرفق تلقائياً اسم الصفحة ونوع الجهاز وآخر الأخطاء التقنية، لنفهم المشكلة دون أسئلة كثيرة. وتتابع حالتها من «حسابي».' }),
     msg
   ], acts: [{ t: 'إرسال', cls: 'dark', keep: true, fn: async function (close) {
@@ -60,7 +77,7 @@ function showFeedback6(preset) {
     let shot = '';
     if (shotI.checked && hasDesign) { try { shot = ED.snapshot(700); } catch (e) {} }
     const it = { kind: kind, text: ta.value.trim(), page: location.hash, tpl: hasDesign ? ED.tplId() : '', track: S.track ? S.track.id : '', program: V6.prog ? V6.prog.id : '',
-      ua: navigator.userAgent, vw: innerWidth + '×' + innerHeight, errors: ERRS6.slice(-8), shot: shot, v: 6 };
+      ua: navigator.userAgent, vw: innerWidth + '×' + innerHeight, errors: ERRS6.slice(-8), shot: shot, imgs: imgs, v: 6 };
     try { await API6.call('fb_send', V6.token, JSON.stringify(it)); toast('وصلت ملاحظتك، شكراً لك'); close(); track('feedback'); }
     catch (e) { msg.textContent = 'تعذّر الإرسال: ' + e.message; }
   } }, { t: 'إلغاء' }] });

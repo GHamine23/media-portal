@@ -40,6 +40,7 @@ function showHome() {
   const models = el('div', { class: 'strip models-strip', id: 'models' });
   const newOnes = visibleTpls().filter(function (t) { return t.isNew || t.pack; }).slice(0, 10);
   const nm = firstName(me.name);
+  const wkSlot = el('div', { class: 'wkslot' }); weekMiniCard().then(function (c) { wkSlot.appendChild(c); });
   const msg = el('h1', { class: 'rotmsg', text: 'ماذا ستصمّم اليوم يا ' + nm + '؟' }), src = el('span', { class: 'rotsrc' });
   view(
     el('section', { class: 'hero hero2 wrap' }, [
@@ -51,6 +52,7 @@ function showHome() {
       clockCard(),
       aiDesignerBox()
     ]),
+    el('div', { class: 'wrap hgrid2' }, [tipOfDayCard(), wkSlot]),
     el('div', { class: 'wrap' }, [el('section', { class: 'hsec', id: 'modelsec', hidden: true }, [el('div', { class: 'shead' }, [H('h2', 'نماذج جاهزة'), el('a', { class: 'btn sm line', href: '#/mine', onclick: function () { ls('mineTab', 'models'); }, text: 'كل النماذج' })]), stripNav(models)])].concat(idSections).concat([
       el('section', { class: 'hsec', id: 'recentsec', hidden: true }, [el('div', { class: 'shead' }, [H('h2', 'آخر تصاميمك'), el('a', { class: 'btn sm line', href: '#/mine', text: 'كل تصاميمي' })]), stripNav(recent)]),
       newOnes.length && first ? el('section', { class: 'hsec' }, [el('div', { class: 'shead' }, [H('h2', 'جديد القوالب')]),

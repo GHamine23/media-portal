@@ -115,7 +115,10 @@ function apiFns_() {
     cl_list: cl_list, cl_save: cl_save, set_get: set_get, set_save: set_save, audit_list: audit_list,
     ai_make: ai_make, ai_status: ai_status, ai_log: ai_log,
     tg_test: tg_test, tg_send: tg_send, tg_queue: tg_queue, tg_cancel: tg_cancel, me_profile: me_profile, font_family: font_family,
-    img_search: img_search, img_pick: img_pick, img_requests: img_requests, img_decide: img_decide, quran_find: quran_find, hadith_find: hadith_find
+    img_search: img_search, img_pick: img_pick,
+    cm_list: cm_list, cm_add: cm_add, cm_del: cm_del, cm_counts: cm_counts, nt_list: nt_list, nt_seen: nt_seen,
+    rv_request: rv_request, rv_list: rv_list, rv_mine: rv_mine, rv_img: rv_img, rv_reply: rv_reply,
+    me_week: me_week, wk_admin: wk_admin, ai_skills: ai_skills, ai_skill_save: ai_skill_save, ai_skill_reset: ai_skill_reset, img_requests: img_requests, img_decide: img_decide, quran_find: quran_find, hadith_find: hadith_find
   };
 }
 function doPost(e) {
@@ -779,18 +782,18 @@ function pack_toggle(token, name, on) {
 var FB_STATUS = { 'new': 'وصل', work: 'قيد العمل', done: 'تم', wont: 'لن يُنفّذ' };
 function saveShot_(dataUrl) {
   if (!dataUrl || String(dataUrl).slice(0, 11) !== 'data:image/') return '';
-  var m = String(dataUrl).match(/^data:(image\/\w+);base64,(.*)$/); if (!m || m[2].length > 4 * 1024 * 1024) return '';
+  var m = String(dataUrl).match(/^data:(image\/\w+);base64,(.*)$/); if (!m || m[2].length > 14 * 1024 * 1024) return '';
   return sub_('shots').createFile(Utilities.newBlob(Utilities.base64Decode(m[2]), m[1], 'shot_' + now_() + '.jpg')).getId();
 }
 function fb_store_(a, it) {
-  var shot = saveShot_(it.shot);
+  var shot = saveShot_(it.shot), imgs = (it.imgs || []).slice(0, 4).map(saveShot_).filter(Boolean);
   return withLock_(function () {
     var list = readJson_('feedback.json', []);
     var today = list.filter(function (x) { return x.at > now_() - 864e5; }).length;
     if (today > 300) throw new Error('بلاغات كثيرة اليوم، حاول غداً');
     var x = { id: uid_(), kind: ({ bug: 1, idea: 1, q: 1 })[it.kind] ? it.kind : 'bug', text: clip_(it.text, 4000), page: clip_(it.page, 200), tpl: clip_(it.tpl, 60),
       track: clip_(it.track, 40), program: clip_(it.program || (a && a.programs && a.programs[0]) || '', 40), ua: clip_(it.ua, 300), vw: clip_(it.vw, 20),
-      errors: (it.errors || []).slice(0, 10).map(function (e) { return clip_(e, 400); }), shot: shot, v: it.v || 6,
+      errors: (it.errors || []).slice(0, 10).map(function (e) { return clip_(e, 400); }), shot: shot, imgs: imgs, v: it.v || 6,
       uid: a ? a.uid : '', name: a ? a.name : clip_(it.name || 'زائر', 60), status: 'new', reply: '', at: now_(), upd: now_() };
     list.unshift(x); if (list.length > 3000) list.length = 3000;
     writeJson_('feedback.json', list);
@@ -829,12 +832,15 @@ function fb_update(token, id, status, reply) {
     return JSON.stringify(hit);
   });
 }
-function fb_shot(token, id) {
-  var a = auth_(token); needAdmin_(a);
+function fb_shot(token, id, i) {
+  var a = auth_(token);
   var x = readJson_('feedback.json', []).filter(function (y) { return y.id === id; })[0];
-  if (!x || !x.shot) return '';
-  return 'data:image/jpeg;base64,' + Utilities.base64Encode(DriveApp.getFileById(x.shot).getBlob().getBytes());
+  if (!x) return '';
+  if (x.uid !== a.uid) { needAdmin_(a); if (!isSuper_(a) && !(x.program && adminOf_(a, x.program))) throw new Error('لا تملك صلاحية'); }
+  var fid = i == null || i === '' ? x.shot : (x.imgs || [])[+i];
+  return fid ? fileDataUrl_(fid) : '';
 }
+function fileDataUrl_(fid) { var b = DriveApp.getFileById(fid).getBlob(); return 'data:' + (b.getContentType() || 'image/jpeg') + ';base64,' + Utilities.base64Encode(b.getBytes()); }
 
 /* ================= الإحصاءات =================
    stats_YYYY-MM.json: { days: { 'YYYY-MM-DD': { برنامج: {ev: {}, tpl: {}, tool: {}, users: {uid: n}} } } }
@@ -853,6 +859,7 @@ function stat_track(token, json) {
       if (p !== 'none' && !inProg_(a, p)) return;
       var d = day[p] = day[p] || { ev: {}, tpl: {}, tool: {}, users: {} };
       bump_(d.ev, e.e); if (e.tpl) bump_(d.tpl, e.tpl); if (e.tool) bump_(d.tool, e.tool); bump_(d.users, a.uid);
+      var ue = (d.uev = d.uev || {})[a.uid] = (d.uev || {})[a.uid] || {}; bump_(ue, e.e); if (e.tool) bump_(ue, 't:' + e.tool); if (e.tpl) bump_(ue, 'p:' + e.tpl);
     });
     writeJson_(name, st);
     return 'ok';
@@ -966,14 +973,10 @@ function ai_status(token) {
   var used = +(CacheService.getScriptCache().get('ai:' + a.uid + ':' + dayKey_(now_())) || 0);
   return JSON.stringify({ enabled: !!s.ai.enabled && !!props_().getProperty('GEMINI_KEY') && perm_(a, 'ai'), perDay: s.ai.perDay, used: used, allowed: perm_(a, 'ai') });
 }
-function ai_make(token, json) {
-  var a = auth_(token), s = settings_();
-  if (!s.ai.enabled) throw new Error('المساعد متوقف الآن');
-  if (!perm_(a, 'ai')) throw new Error('المساعد يحتاج صلاحية من مشرف البرنامج');
-  var key = props_().getProperty('GEMINI_KEY'); if (!key) throw new Error('لم يُضبط مفتاح المساعد بعد');
-  var c = CacheService.getScriptCache(), ck = 'ai:' + a.uid + ':' + dayKey_(now_()), used = +(c.get(ck) || 0);
-  if (!isSuper_(a) && used >= s.ai.perDay) throw new Error('بلغت حد اليوم (' + s.ai.perDay + ' طلباً). جرّب غداً.');
-  var req = JSON.parse(json);   // {kind, system, prompt, schema, temperature, files: [{mime, b64}]}
+
+// نداء Gemini الأساسي (يستعمله ai_make والتقارير الأسبوعية). يسجّل كل طلب في ailog
+function geminiCall_(req, who) {
+  var s = settings_(), key = props_().getProperty('GEMINI_KEY'); if (!key) throw new Error('لم يُضبط مفتاح المساعد بعد');
   var parts = [{ text: clip_(req.prompt, 60000) }];
   (req.files || []).slice(0, 3).forEach(function (f) { if (f && f.b64 && /^(application\/pdf|image\/(png|jpeg|webp)|text\/plain)$/.test(f.mime || '') && f.b64.length < 28 * 1024 * 1024) parts.push({ inlineData: { mimeType: f.mime, data: f.b64 } }); });
   var body = { contents: [{ role: 'user', parts: parts }],
@@ -981,7 +984,7 @@ function ai_make(token, json) {
     generationConfig: { temperature: req.temperature != null ? +req.temperature : 0.9 } };
   if (req.schema) { body.generationConfig.responseMimeType = 'application/json'; body.generationConfig.responseSchema = req.schema; }
   var model = String(s.ai.model || 'gemini-3.8-flash').replace(/[^\w.\-]/g, '');
-  var t0 = now_(), log = { t: t0, uid: a.uid, name: a.name, program: clip_(req.program || '', 30), kind: clip_(req.kind || 'design', 20), inChars: parts[0].text.length, files: parts.length - 1, model: model, ok: false, ms: 0, outChars: 0, err: '', q: clip_(String(req.prompt || '').replace(/\s+/g, ' '), 90) };
+  var t0 = now_(), log = { t: t0, uid: who.uid, name: who.name, program: clip_(req.program || '', 30), kind: clip_(req.kind || 'design', 20), inChars: parts[0].text.length, files: parts.length - 1, model: model, ok: false, ms: 0, outChars: 0, err: '', q: clip_(String(req.prompt || '').replace(/\s+/g, ' '), 90) };
   var out = '';
   try {
     var res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
@@ -997,6 +1000,18 @@ function ai_make(token, json) {
   log.ms = now_() - t0;
   aiLog_(log);
   if (!log.ok) throw new Error(log.err);
+  return out;
+}
+function ai_make(token, json) {
+  var a = auth_(token), s = settings_();
+  if (!s.ai.enabled) throw new Error('المساعد متوقف الآن');
+  if (!perm_(a, 'ai')) throw new Error('المساعد يحتاج صلاحية من مشرف البرنامج');
+  var key = props_().getProperty('GEMINI_KEY'); if (!key) throw new Error('لم يُضبط مفتاح المساعد بعد');
+  var c = CacheService.getScriptCache(), ck = 'ai:' + a.uid + ':' + dayKey_(now_()), used = +(c.get(ck) || 0);
+  if (!isSuper_(a) && used >= s.ai.perDay) throw new Error('بلغت حد اليوم (' + s.ai.perDay + ' طلباً). جرّب غداً.');
+  var req = JSON.parse(json);   // {kind, system, prompt, schema, temperature, files: [{mime, b64}]}
+  req.system = String(req.system || '') + skillsFor_(req.kind || 'design');
+  var out = geminiCall_(req, { uid: a.uid, name: a.name });
   c.put(ck, String(used + 1), 90000);
   return out;
 }
@@ -1087,7 +1102,250 @@ function ensureTriggers_(log) {
   try {
     var has = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'tgTick'; });
     if (!has) { ScriptApp.newTrigger('tgTick').timeBased().everyMinutes(10).create(); if (log) log.push('أُنشئ مؤقّت المنشورات المجدولة (كل ١٠ دقائق).'); }
+    var hasW = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'weeklyUserStats'; });
+    if (!hasW) { ScriptApp.newTrigger('weeklyUserStats').timeBased().onWeekDay(ScriptApp.WeekDay.SATURDAY).atHour(7).create(); if (log) log.push('أُنشئ مؤقّت تقارير الأسبوع للمستخدمين (كل سبت صباحاً).'); }
   } catch (e) { if (log) log.push('تعذّر إنشاء المؤقّت: ' + e); }
+}
+
+/* ================= الإشعارات ================= */
+// notifs.json: { uid: [{id, kind, text, link, at, seen}] } — آخر ٤٠ لكل مستخدم
+function ntPush_(uid, kind, text, link) {
+  if (!uid) return;
+  try { withLock_(function () { var all = readJson_('notifs.json', {}), l = all[uid] = all[uid] || []; l.unshift({ id: uid_(), kind: kind, text: clip_(text, 300), link: clip_(link || '', 200), at: now_(), seen: false }); if (l.length > 40) l.length = 40; writeJson_('notifs.json', all); }); } catch (e) {}
+}
+function nt_list(token) { var a = auth_(token); return JSON.stringify(readJson_('notifs.json', {})[a.uid] || []); }
+function nt_seen(token) { var a = auth_(token); return withLock_(function () { var all = readJson_('notifs.json', {}); (all[a.uid] || []).forEach(function (x) { x.seen = true; }); writeJson_('notifs.json', all); return 'ok'; }); }
+
+/* ================= التعليقات على القوالب والتصاميم والنماذج ================= */
+// comments.json: [{id, target: 'tpl:<id>' | 'item:<id>', program, uid, name, text, at}]
+function cmTarget_(a, target, program) {
+  var m = /^(tpl|item):([\w-]{1,80})$/.exec(String(target || '')); if (!m) throw new Error('هدف غير صالح');
+  if (m[1] === 'item') {
+    var f = itemFile_(safeId_(m[2])); if (!f) throw new Error('التصميم غير موجود');
+    var it = JSON.parse(text_(f)), pid = itemProg_(it), mine = keysOf_(a).indexOf(it.ownerKey) >= 0;
+    if (!mine && !((it.shared || it.model) && inProg_(a, pid)) && !adminOf_(a, pid)) throw new Error('هذا التصميم ليس مشتركاً');
+    return { program: pid, owner: it.ownerKey, name: it.name };
+  }
+  program = clip_(program, 40); if (!program || !inProg_(a, program)) throw new Error('لست في هذا البرنامج');
+  return { program: program, owner: '', name: m[2] };
+}
+function cm_list(token, target, program) {
+  var a = auth_(token), t = cmTarget_(a, target, program);
+  return JSON.stringify(readJson_('comments.json', []).filter(function (x) { return x.target === target && x.program === t.program; }).slice(0, 300).map(function (x) {
+    return { id: x.id, name: x.name, text: x.text, at: x.at, mine: x.uid === a.uid, canDel: x.uid === a.uid || adminOf_(a, x.program) };
+  }).reverse());
+}
+function cm_add(token, json) {
+  var a = auth_(token), m = JSON.parse(json), t = cmTarget_(a, m.target, m.program), text = clip_(String(m.text || '').trim(), 1500);
+  if (text.length < 2) throw new Error('اكتب تعليقك');
+  var x = withLock_(function () {
+    var l = readJson_('comments.json', []);
+    if (l.filter(function (y) { return y.uid === a.uid && y.at > now_() - 864e5; }).length > 200) throw new Error('تعليقات كثيرة اليوم');
+    var c = { id: uid_(), target: m.target, program: t.program, uid: a.uid, name: a.name, text: text, at: now_() };
+    l.push(c); if (l.length > 20000) l.splice(0, l.length - 20000); writeJson_('comments.json', l); return c;
+  });
+  if (t.owner && t.owner !== 'a:' + a.uid) ntPush_(String(t.owner).replace(/^a:/, ''), 'comment', a.name + ' علّق على «' + t.name + '»: ' + text.slice(0, 80), '#/d/' + m.target.slice(5));
+  return JSON.stringify({ id: x.id, name: x.name, text: x.text, at: x.at, mine: true, canDel: true });
+}
+function cm_del(token, id) {
+  var a = auth_(token);
+  return withLock_(function () {
+    var l = readJson_('comments.json', []), i = -1; l.forEach(function (x, k) { if (x.id === id) i = k; });
+    if (i < 0) throw new Error('غير موجود'); if (l[i].uid !== a.uid && !adminOf_(a, l[i].program)) throw new Error('لا تملك صلاحية');
+    l.splice(i, 1); writeJson_('comments.json', l); return 'ok';
+  });
+}
+function cm_counts(token, targets) {
+  var a = auth_(token), want = {}; (targets || []).slice(0, 200).forEach(function (t) { want[t] = 0; });
+  readJson_('comments.json', []).forEach(function (x) { if (x.target in want && inProg_(a, x.program)) want[x.target]++; });
+  return JSON.stringify(want);
+}
+
+/* ================= طلب مراجعة تصميم من إدارة المنصة ================= */
+// reviews.json: [{id, uid, name, program, track, tpl, item, note, img, ai: {score, summary}, status: new|done, reply: {score, notes, points[], by, at}, at}]
+function rv_request(token, json) {
+  var a = auth_(token), m = JSON.parse(json), pid = clip_(m.program, 40);
+  if (!pid || !inProg_(a, pid)) throw new Error('لست في هذا البرنامج');
+  var img = saveShot_(m.img); if (!img) throw new Error('صورة التصميم مطلوبة');
+  var r = withLock_(function () {
+    var l = readJson_('reviews.json', []);
+    if (l.filter(function (y) { return y.uid === a.uid && y.status === 'new'; }).length >= 10) throw new Error('لديك عشرة طلبات تنتظر المراجعة');
+    var x = { id: uid_(), uid: a.uid, name: a.name, program: pid, track: clip_(m.track, 40), tpl: clip_(m.tpl, 60), item: clip_(m.item, 60), note: clip_(m.note, 1500), img: img,
+      ai: m.ai ? { score: Math.max(0, Math.min(100, +m.ai.score || 0)), summary: clip_(m.ai.summary, 600) } : null, status: 'new', reply: null, at: now_() };
+    l.unshift(x); if (l.length > 3000) l.length = 3000; writeJson_('reviews.json', l); return x;
+  });
+  return JSON.stringify({ id: r.id });
+}
+function rvPub_(x) { var o = Object.assign({}, x); delete o.img; return o; }
+function rv_list(token, status) {
+  var a = auth_(token); needAdmin_(a);
+  return JSON.stringify(readJson_('reviews.json', []).filter(function (x) { return (!status || x.status === status) && adminOf_(a, x.program); }).slice(0, 300).map(rvPub_));
+}
+function rv_mine(token) { var a = auth_(token); return JSON.stringify(readJson_('reviews.json', []).filter(function (x) { return x.uid === a.uid; }).slice(0, 50).map(rvPub_)); }
+function rv_img(token, id) {
+  var a = auth_(token), x = readJson_('reviews.json', []).filter(function (y) { return y.id === id; })[0];
+  if (!x) throw new Error('غير موجود'); if (x.uid !== a.uid && !adminOf_(a, x.program)) throw new Error('لا تملك صلاحية');
+  return fileDataUrl_(x.img);
+}
+function rv_reply(token, id, json) {
+  var a = auth_(token), m = JSON.parse(json);
+  var x = withLock_(function () {
+    var l = readJson_('reviews.json', []), hit = null; l.forEach(function (y) { if (y.id === id) hit = y; });
+    if (!hit) throw new Error('غير موجود'); if (!adminOf_(a, hit.program)) throw new Error('لا تملك صلاحية');
+    hit.reply = { score: Math.max(0, Math.min(10, +m.score || 0)), notes: clip_(m.notes, 3000), points: (m.points || []).slice(0, 12).map(function (p) { return clip_(p, 200); }), by: a.name, at: now_() };
+    hit.status = 'done'; writeJson_('reviews.json', l); return hit;
+  });
+  ntPush_(x.uid, 'review', 'وصلت مراجعة تصميمك من ' + a.name + ' (' + x.reply.score + '/10)', '#/reviews');
+  audit_(a, 'راجع تصميماً', x.name);
+  return JSON.stringify(rvPub_(x));
+}
+
+/* ================= أسبوعك في أثر: إحصاءات كل مستخدم وتقييم تحفيزي من المساعد ================= */
+function weekStart_(t) { var d = new Date(dayKey_(t) + 'T12:00:00Z'), back = (d.getUTCDay() + 1) % 7; return dayKey_(d.getTime() - back * 864e5); }
+function userWeekRaw_(from, to) {   // {uid: {days: {}, ev: {}, tools: {}, tpls: {}}}
+  var out = {}, months = {}; for (var x = from; x <= to + 864e5; x += 864e5 * 20) months[monthKey_(x)] = 1; months[monthKey_(to)] = 1;
+  Object.keys(months).forEach(function (mk) {
+    var st = readJson_('stats_' + mk + '.json', { days: {} });
+    Object.keys(st.days).forEach(function (dk) {
+      var t = new Date(dk + 'T12:00:00Z').getTime(); if (t < from || t >= to) return;
+      Object.keys(st.days[dk]).forEach(function (p) {
+        var ue = st.days[dk][p].uev || {};
+        Object.keys(ue).forEach(function (uid) {
+          var o = out[uid] = out[uid] || { days: {}, ev: {}, tools: {}, tpls: {} }; o.days[dk] = 1;
+          Object.keys(ue[uid]).forEach(function (k) { var n = ue[uid][k]; if (k.slice(0, 2) === 't:') bump_(o.tools, k.slice(2), n); else if (k.slice(0, 2) === 'p:') bump_(o.tpls, k.slice(2), n); else bump_(o.ev, k, n); });
+        });
+      });
+    });
+  });
+  return out;
+}
+function weekNums_(o) {
+  o = o || { days: {}, ev: {}, tools: {}, tpls: {} };
+  var top = function (m, n) { return Object.keys(m).sort(function (x, y) { return m[y] - m[x]; }).slice(0, n); };
+  return { active: Object.keys(o.days).length, exports: o.ev['export'] || 0, saves: o.ev.save || 0, made: o.ev.make || 0, opens: o.ev.open || 0, sent: o.ev.tg || 0, shows: o.ev.present || 0,
+    tools: Object.keys(o.tools).length, topTools: top(o.tools, 3), topTpls: top(o.tpls, 3) };
+}
+function weekBadges_(c, p) {
+  var b = [];
+  if (c.active >= 5) b.push('حاضر كل الأسبوع'); else if (c.active >= 3) b.push('حضور منتظم');
+  if (c.exports >= 10) b.push('غزير الإنتاج'); else if (c.exports >= 3) b.push('منتج');
+  if (c.tools >= 4) b.push('مستكشف الأدوات');
+  if (c.sent) b.push('ناشر');
+  if (c.shows) b.push('عارض');
+  if (p && c.exports > p.exports && p.exports > 0) b.push('في صعود');
+  return b;
+}
+var TIP_CAT_IDS = ['contrast', 'align', 'proximity', 'repeat', 'hierarchy', 'space', 'color', 'type', 'image', 'balance', 'message', 'slides', 'brand'];
+function weekMsgLocal_(name, c, p) {
+  var first = String(name || '').split(' ')[0];
+  if (!c.active) return 'اشتقنا لتصاميمك يا ' + first + '. خصّص هذا الأسبوع نصف ساعة لتصميم واحد تعتني بتفاصيله.';
+  var up = p && c.exports > p.exports, s = 'أحسنت يا ' + first + '! ' + c.active + ' أيام نشطة و' + c.exports + ' تنزيلاً هذا الأسبوع';
+  return s + (up ? '، وأكثر من الأسبوع الماضي. ' : '. ') + 'جرّب هذا الأسبوع أداة لم تستعملها، واطلب مراجعة لتصميم تعتزّ به.';
+}
+function wkBuild_(uids, withAI) {
+  var ws = weekStart_(now_()), end = new Date(ws + 'T00:00:00Z').getTime() - 3 * 3600000, from = end - 7 * 864e5, pfrom = from - 7 * 864e5;
+  var cur = userWeekRaw_(from, end), prev = userWeekRaw_(pfrom, from), accs = readJson_('accounts.json', {});
+  var ai = {}; readJson_('ailog_' + monthKey_(end - 864e5) + '.json', []).forEach(function (x) { if (x.t >= from && x.t < end && x.ok) bump_(ai, x.uid); });
+  var key = weekStart_(end - 864e5), file = 'wk_' + key + '.json', store = readJson_(file, { week: key, from: dayKey_(from), to: dayKey_(end - 864e5), users: {} });
+  var list = (uids || Object.keys(accs)).filter(function (u) { return accs[u] && accs[u].active !== false && (uids || accs[u].role !== 'super'); });
+  var rows = list.map(function (u) { var c = weekNums_(cur[u]), p = weekNums_(prev[u]); c.ai = ai[u] || 0; return { uid: u, name: accs[u].name, c: c, p: p, badges: weekBadges_(c, p) }; })
+    .filter(function (r) { return r.c.active || r.p.active || uids; });
+  // ترتيب المستخدم في برنامجه بعدد التنزيلات
+  rows.forEach(function (r) { r.msg = weekMsgLocal_(r.name, r.c, r.p); r.focus = TIP_CAT_IDS[(r.c.exports + r.c.active) % TIP_CAT_IDS.length]; r.challenge = ''; });
+  if (withAI && props_().getProperty('GEMINI_KEY') && settings_().ai.enabled) {
+    for (var i = 0; i < rows.length; i += 20) {
+      var batch = rows.slice(i, i + 20);
+      try {
+        var out = geminiCall_({ kind: 'week', system: 'تكتب تقييماً أسبوعياً قصيراً محفّزاً لكل عضو في فريق إعلامي تربوي يصمم على منصة «أثر». لكل عضو: msg فقرة من جملتين أو ثلاث، تخاطبه باسمه الأول، تذكر رقماً حقيقياً من أرقامه وتقارنه بأسبوعه الماضي بصدق، وتختم بخطوة عملية واحدة؛ وfocus واحد من: ' + TIP_CAT_IDS.join(', ') + ' (المبدأ التصميمي الذي يفيده التركيز عليه)؛ وchallenge تحدٍّ صغير للأسبوع القادم في جملة. لا مبالغة ولا مقارنة بغيره. إن لم ينشط فشجّعه بلطف بلا لوم.' + skillsFor_('week'),
+          prompt: JSON.stringify(batch.map(function (r) { return { id: r.uid, name: String(r.name).split(' ')[0], thisWeek: r.c, lastWeek: r.p }; })),
+          schema: { type: 'OBJECT', properties: { items: { type: 'ARRAY', items: { type: 'OBJECT', properties: { id: { type: 'STRING' }, msg: { type: 'STRING' }, focus: { type: 'STRING' }, challenge: { type: 'STRING' } }, required: ['id', 'msg'] } } }, required: ['items'] }, temperature: 0.7 }, { uid: 'system', name: 'تقارير الأسبوع' });
+        JSON.parse(out).items.forEach(function (it) { batch.forEach(function (r) { if (r.uid === it.id) { r.msg = clip_(it.msg, 600); if (TIP_CAT_IDS.indexOf(it.focus) >= 0) r.focus = it.focus; r.challenge = clip_(it.challenge, 200); r.byAI = true; } }); });
+      } catch (e) {}
+    }
+  }
+  withLock_(function () { var st = readJson_(file, store); rows.forEach(function (r) { st.users[r.uid] = { c: r.c, p: r.p, badges: r.badges, msg: r.msg, focus: r.focus, challenge: r.challenge, byAI: !!r.byAI, at: now_() }; }); writeJson_(file, st); writeJson_('wk_last.json', { week: key }); });
+  return { file: file, week: key, rows: rows };
+}
+// مؤقّت أسبوعي (السبت صباحاً): تقرير لكل مستخدم نشط، وإشعار له
+function weeklyUserStats() {
+  var r = wkBuild_(null, true);
+  r.rows.forEach(function (x) { ntPush_(x.uid, 'week', 'تقرير أسبوعك في أثر جاهز: ' + x.c.exports + ' تنزيلاً و' + x.c.active + ' أيام نشطة', '#/week'); });
+  return r.rows.length;
+}
+function me_week(token, fresh) {
+  var a = auth_(token), wsT = new Date(weekStart_(now_()) + 'T00:00:00Z').getTime() - 3 * 3600000, key = weekStart_(wsT - 864e5);
+  var st = readJson_('wk_' + key + '.json', null), mine = st && st.users[a.uid];
+  if (!mine || fresh) { var r = wkBuild_([a.uid], !!fresh && perm_(a, 'ai') && settings_().ai.enabled); st = readJson_(r.file, null); mine = st && st.users[a.uid]; }
+  var live = weekNums_(userWeekRaw_(wsT, now_() + 864e5)[a.uid]);
+  var hist = []; for (var k = 4; k >= 1; k--) { var wk = weekStart_(new Date(key + 'T12:00:00Z').getTime() - k * 7 * 864e5), f = readJson_('wk_' + wk + '.json', null); hist.push({ week: wk, exports: f && f.users[a.uid] ? f.users[a.uid].c.exports : 0, active: f && f.users[a.uid] ? f.users[a.uid].c.active : 0 }); }
+  if (mine) hist.push({ week: key, exports: mine.c.exports, active: mine.c.active });
+  hist.push({ week: weekStart_(now_()), exports: live.exports, active: live.active, live: true });
+  return JSON.stringify({ week: key, from: st ? st.from : '', to: st ? st.to : '', me: mine || null, live: live, hist: hist });
+}
+function wk_admin(token, program) {
+  var a = auth_(token); needAdmin_(a);
+  var last = readJson_('wk_last.json', {}), st = last.week ? readJson_('wk_' + last.week + '.json', null) : null, accs = readJson_('accounts.json', {});
+  if (!st) return JSON.stringify({ week: '', rows: [] });
+  var rows = Object.keys(st.users).filter(function (u) { var ac = accs[u]; return ac && (ac.programs || []).some(function (p) { return (!program || p === program) && adminOf_(a, p); }); })
+    .map(function (u) { var x = st.users[u]; return { name: accs[u].name, c: x.c, p: x.p, badges: x.badges, msg: x.msg }; })
+    .sort(function (x, y) { return y.c.exports - x.c.exports; });
+  return JSON.stringify({ week: st.week, from: st.from, to: st.to, rows: rows });
+}
+
+/* ================= مهارات المساعد (Gemini Skills) =================
+   مهارة = معرفة مكتوبة تُضاف إلى تعليمات المساعد في المهام التي تخصّها. الافتراضية هنا، ويعدّلها المدير العام أو يضيف غيرها من اللوحة. */
+var AI_SKILLS = [
+  { id: 'design-eye', name: 'عين المصمّم', kinds: ['review', 'design', 'creative', 'intake', 'imgq'], text: [
+    'احكم على التصميم بالمبادئ الأربعة (التباين، والتكرار، والمحاذاة، والتقارب)، ثم التسلسل البصري، والمساحة البيضاء، والألوان، والخط، والصور، والتوازن، ووضوح الرسالة، والاتساق مع الهوية.',
+    'التصميم الجيد يُقرأ في ثلاث ثوانٍ: عنصر أول واحد واضح، ثم ثانٍ، ثم تفاصيل. إن تساوى كل شيء فلا شيء مهم.',
+    'التباين يجب أن يكون صريحاً لا خجولاً: إن اختلف عنصران فليختلفا كثيراً (حجماً أو وزناً أو لوناً).',
+    'كل عنصر يُحاذى إلى شيء آخر؛ في العربية الأصل المحاذاة إلى اليمين، والتوسيط لسطور قليلة متوازنة.',
+    'ما يرتبط معنىً يُقرَّب مكاناً؛ وما يختلف يُفصل بمسافة واضحة.',
+    'المساحة البيضاء أداة لا فراغ: هوامش سخية حول النص تُعلي قيمته.',
+    'لونان أو ثلاثة من الهوية تكفي؛ الأكثر إشباعاً لِما يجب أن يُرى أولاً.',
+    'النص فوق الصورة يحتاج طبقة تعتيم أو تدرجاً أو مساحة هادئة.',
+    'لا تقترح صوراً لطلاب ولا ما يخالف الحشمة والبيئة الإسلامية.'].join('\n') },
+  { id: 'arabic-type', name: 'الخط العربي', kinds: ['review', 'design', 'creative', 'spell', 'caption', 'outline'], text: [
+    'العنوان العربي القصير أقوى: من ثلاث إلى ست كلمات. والسطر المثالي للنص من ٨ إلى ١٢ كلمة.',
+    'تباعد الأسطر في العربية أوسع منه في اللاتينية (نحو ١٫٥ للنص و١٫١–١٫٢ للعناوين الكبيرة).',
+    'لا تمدّ الحروف (الكشيدة) إلا لحاجة تصميمية مقصودة، ولا تُميل الخط العربي، ولا تُباعد بين حروفه.',
+    'خطّان كحد أقصى في التصميم: واحد للعناوين وواحد للنص، ويُصنع التدرج بالوزن والحجم.',
+    'الأرقام نوع واحد في التصميم كله (عربية مشرقية أو غربية).',
+    'الهمزات والتاء المربوطة والألف المقصورة تُكتب صحيحة؛ والتشكيل حيث يرفع اللبس، وكاملاً في الآيات.'].join('\n') },
+  { id: 'caption-voice', name: 'صوت قناة البرنامج', kinds: ['caption'], text: [
+    'الرسالة تبدأ بسطر جاذب قصير، ثم التفاصيل في أسطر مرتبة برموز بسيطة، ثم دعوة واضحة للعمل والرابط.',
+    'لغة عربية فصيحة قريبة دافئة، بلا مبالغة ولا كثرة رموز تعبيرية (اثنان أو ثلاثة كحد أقصى).',
+    'الوسم والتوقيع في آخر الرسالة كما في قوالب البرنامج.'].join('\n') },
+  { id: 'lesson-deck', name: 'من الدرس إلى العرض', kinds: ['outline'], text: [
+    'شريحة واحدة = فكرة واحدة. العنوان جملة تحمل الفكرة لا كلمة عامة.',
+    'النقاط ثلاث إلى خمس، كل نقطة سطر واحد. الاقتباس الحرفي يُنقل كما هو مع نسبته.',
+    'ابدأ بسؤال أو مشكلة تشدّ الحاضرين، واختم بخلاصة عملية.'].join('\n') },
+  { id: 'coach', name: 'المدرّب', kinds: ['week'], text: 'أسلوبك أسلوب مدرّب صادق مشجّع: تمدح المحدد لا العام، وتقترح خطوة صغيرة قابلة للتنفيذ، وتربط التحسن بمبدأ تصميمي.' },
+  { id: 'safety', name: 'الضوابط', kinds: ['*'], text: 'لا تطلب بيانات شخصية ولا تُخرجها. لا محتوى يخالف الشريعة أو الحشمة. الآيات والأحاديث لا تُكتب من الذاكرة؛ اترك موضعها للمستخدم ليدرجها من «آية أو حديث موثّق».' }
+];
+function aiSkills_() {
+  var saved = readJson_('aiskills.json', {}), out = [];
+  AI_SKILLS.forEach(function (d) { var o = saved[d.id]; out.push(Object.assign({}, d, o || {}, { builtin: true, edited: !!o })); });
+  Object.keys(saved).forEach(function (k) { if (!AI_SKILLS.some(function (d) { return d.id === k; }) && !saved[k].deleted) out.push(Object.assign({ id: k, builtin: false }, saved[k])); });
+  return out;
+}
+function skillsFor_(kind) {
+  var l = aiSkills_().filter(function (x) { return x.on !== false && !x.deleted && ((x.kinds || []).indexOf(kind) >= 0 || (x.kinds || []).indexOf('*') >= 0); });
+  return l.length ? '\n\n' + l.map(function (x) { return '## مهارة: ' + x.name + '\n' + x.text; }).join('\n\n') : '';
+}
+function ai_skills(token) { var a = auth_(token); needAdmin_(a); return JSON.stringify(aiSkills_()); }
+function ai_skill_save(token, json) {
+  var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
+  var m = JSON.parse(json), id = m.id ? String(m.id).replace(/[^\w-]/g, '').slice(0, 40) : 'sk_' + uid_().slice(0, 8);
+  return withLock_(function () {
+    var saved = readJson_('aiskills.json', {});
+    saved[id] = { name: clip_(m.name || 'مهارة', 60), kinds: (m.kinds || []).slice(0, 12).map(function (k) { return clip_(k, 20); }), text: clip_(m.text, 6000), on: m.on !== false, deleted: !!m.deleted, by: a.name, at: now_() };
+    writeJson_('aiskills.json', saved); audit_(a, 'عدّل مهارة للمساعد', saved[id].name); return JSON.stringify(Object.assign({ id: id }, saved[id]));
+  });
+}
+function ai_skill_reset(token, id) {
+  var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
+  return withLock_(function () { var saved = readJson_('aiskills.json', {}); delete saved[id]; writeJson_('aiskills.json', saved); return 'ok'; });
 }
 
 /* ================= الإصدار الخامس (يبقى حتى يكتمل الانتقال) ================= */

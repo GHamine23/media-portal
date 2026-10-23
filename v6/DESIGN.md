@@ -29,7 +29,7 @@
 
 ## نموذج البيانات (في «٤- بيانات الموقع»)
 accounts.json, programs.json, assets.json (+ مجلد assets), fonts.json (+ مجلد fonts), feedback.json, stats_YYYY-MM.json,
-broadcasts.json, changelog.json, settings.json, audit.json, arc_YYYY-MM.json (+ مجلد archive), ailog_YYYY-MM.json (سجل المساعد)، tgq.json (طابور تليجرام)، imgreq.json (صور مقترحة للمكتبة)، packs (حزم مرفوعة).
+broadcasts.json, changelog.json, settings.json, audit.json, arc_YYYY-MM.json (+ مجلد archive), ailog_YYYY-MM.json (سجل المساعد)، tgq.json (طابور تليجرام)، imgreq.json (صور مقترحة للمكتبة)، packs (حزم مرفوعة)، comments.json، notifs.json، reviews.json، wk_*.json، aiskills.json.
 خصائص السكربت: GEMINI_KEY، TG_TOKEN، PEXELS_KEY. وتبقى users.json/index.json/i_*.json (v5) مع ربط الحسابات القديمة legacyKey.
 
 ## المراحل والتقدم
@@ -47,6 +47,7 @@ broadcasts.json, changelog.json, settings.json, audit.json, arc_YYYY-MM.json (+ 
 - [x] الشرائح (slides6): عرض حي بانتقالات وظهور تدريجي ووسائط (فيديو/صوت/يوتيوب) وسؤال وجواب ومؤقّت وملاحظات المقدّم ونافذة المقدّم؛ ومن درس (نص/PDF/Word) إلى مخطط يُراجع ثم شرائح.
 - [x] المهمة الأسبوعية صيانة شاملة (الدليل في src/lab): فحص الصحة، الحزمة، الإصلاحات في فرع weekly/… وطلب دمج، مراقبة المساعد من ailog، النص المصاحب، اقتراحات كل أسبوعين، مساعدة Gemini عبر حساب weekly_bot.txt.
 - [x] الإضافات (extras6): صور Pexels (بحث عبر الخادم، الأصل الكامل في مكتبة المستخدم، اقتراح للبرنامج يوافق عليه المشرف)، رمز QR محلي (qrcode-generator، MIT)، ٩٤ أيقونة Tabler (MIT)، آيات (alquran.cloud، رواية حفص) وأحاديث (الدرر السنية مع حكم المحدث؛ الصحيح والحسن أولاً)، زخارف هندسية مولَّدة (نجمة ثمانية، سداسيات، زليج)، تصحيح وتشكيل بالذكاء مع معاينة الفروق.
+- [x] المراجعة والمجتمع (social6 + tips6): مراجعة التصميم بالمصمّم الذكي (صورة PNG → تقييم من ١٠٠ ومشكلات مصنّفة مرتبطة بالنصائح)، وطلب مراجعة من إدارة أثر (reviews.json، تبويب «مراجعة التصاميم»، «مراجعاتي»)، والتعليقات على القوالب والتصاميم المشتركة والنماذج (comments.json)، والإشعارات (notifs.json في الجرس)، وصور مرفقة في الملاحظات (imgs)، و«أسبوعك في أثر» (عدّادات لكل مستخدم في stats + wk_YYYY-MM-DD.json يبنيه مؤقّت السبت weeklyUserStats ويكتب المساعد رسالة لكل عضو)، ومكتبة نصائح التصميم (١٠٣ نصيحة في ١٣ تصنيفاً على مراجع ويليامز وRefactoring UI وUniversal Principles وslide:ology والطباعة العربية، برسوم متحركة لكل مبدأ، ونصيحة اليوم في الرئيسية، والحزم الأسبوعية تضيف ٧ نصائح)، ومهارات المساعد (AI_SKILLS في Code.gs + aiskills.json يحررها المدير).
 - [ ] خطوات المستخدم النهائية (دفع الفرع، نشر Code.gs، bootstrap، رفع خط ثمانية، مفتاح Gemini، اعتماد الإصدار في الجذر).
 
 ## الاختبار

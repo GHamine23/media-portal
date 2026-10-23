@@ -148,6 +148,7 @@ function buildTop() {
     el('a', { href: '#/', 'data-r': 'home', text: 'الرئيسية' }),
     el('a', { href: '#/mine', 'data-r': 'mine', text: 'تصاميمي' }),
     el('a', { href: '#/make', 'data-r': 'make', text: 'اصنع إعلانك' }),
+    el('a', { href: '#/tips', 'data-r': 'tips', text: 'نصائح' }),
     isAdmin() ? el('a', { href: '#/admin', 'data-r': 'admin', text: 'الإدارة' }) : null
   ]);
   const progs = V6.bundle.programs;
@@ -161,6 +162,8 @@ function buildTop() {
     popMenu(av, [{ hd: V6.me.name + ' · ' + (V6.me.roleName || '') },
       { t: 'حسابي', ic: 'user', href: '#/account' },
       { t: 'تصاميمي', ic: 'grid', href: '#/mine' },
+      { t: 'أسبوعي في أثر', ic: 'chart', href: '#/week' },
+      { t: 'مراجعاتي', ic: 'review', href: '#/reviews' },
       isAdmin() ? { t: 'لوحة الإدارة', ic: 'gear', href: '#/admin' } : null,
       { t: 'ملاحظة للفريق', ic: 'chat', fn: function () { showFeedback6(); } },
       { t: 'جولة تعريفية', ic: 'play', fn: function () { maybeTour(document.body.dataset.page || 'home', true); } },

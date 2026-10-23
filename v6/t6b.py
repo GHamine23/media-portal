@@ -124,7 +124,7 @@ async def main():
         print('USER ERRORS', [e for e in ue if '404' not in e][:10])
         s = await b.new_page(viewport={'width': 1280, 'height': 860})
         se = await setup(s, 'mushrif', 'Mushrif#2026')
-        await s.goto(URL + '#/admin'); await s.wait_for_timeout(1500)
+        await s.goto(URL + '#/admin'); await s.wait_for_selector('.anav a', timeout=15000)
         tabs = await s.evaluate("Array.from(document.querySelectorAll('.anav a')).map(function(a){return a.textContent})")
         ok('الإعدادات' not in tabs and 'الحسابات' in tabs, 'supervisor tabs limited: ' + ','.join(tabs))
         print('SUP ERRORS', [e for e in se if '404' not in e][:10])

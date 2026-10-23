@@ -19,7 +19,7 @@ parts['konva.min.js'] = (V6 / 'vendor/konva.min.js').read_text()
 for f in ['engine.js', 'identities.js', 'templates.js', 'templates2.js', 'core5.js', 'studio.js', 'slides.js', 'qr.js', 'ticons.js']:
     parts[f] = (SRC / f).read_text()
 parts['brand6.js'] = brand_js
-ORDER6 = ['core6.js', 'freetpl6.js', 'assets6.js', 'auth6.js', 'home6.js', 'updates6.js', 'editor6.js', 'panels6.js', 'docs6.js', 'make6.js', 'caption6.js', 'slides6.js', 'extras6.js', 'mine6.js', 'admin6.js', 'app6.js']
+ORDER6 = ['core6.js', 'freetpl6.js', 'assets6.js', 'auth6.js', 'home6.js', 'updates6.js', 'editor6.js', 'panels6.js', 'docs6.js', 'make6.js', 'caption6.js', 'slides6.js', 'extras6.js', 'tips6.js', 'social6.js', 'mine6.js', 'admin6.js', 'app6.js']
 for f in ORDER6: parts[f] = (V6 / 'js' / f).read_text()
 ORDER = ['config.js', 'konva.min.js', 'engine.js', 'identities.js', 'templates.js', 'templates2.js', 'core5.js', 'studio.js', 'slides.js', 'qr.js', 'ticons.js', 'brand6.js'] + ORDER6
 

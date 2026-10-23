@@ -226,6 +226,51 @@ ok(adminPick.asset.scope === 'program' && !adminPick.request, 'admin picks strai
 const ay = J('quran_find', ut, 'الإسراء 23'); ok(ay.length === 1 && ay[0].sn === 17 && ay[0].n === 23 && /وَبِالْوَالِدَيْنِ/.test(ay[0].text), 'ayah by reference');
 const ay2 = J('quran_find', ut, 'بوالديه'); ok(ay2.length === 1 && ay2[0].sn === 29, 'ayah by words');
 const hd = J('hadith_find', ut, 'يحب إذا عمل'); ok(hd.length === 2 && hd[0].sahih && hd[0].grade === 'حسن' && hd[0].source === 'صحيح الجامع' && hd[0].page === '1880' && !hd[1].sahih, 'hadith parsed with grade: ' + JSON.stringify(hd[0]));
+// التعليقات والإشعارات
+let AT2 = null; function at2() { if (AT2) return AT2; const u2 = J('acc_save', adm, JSON.stringify({ username: 'sara', name: 'سارة', role: 'user', programs: ['academy'] })); AT2 = J('auth_login', 'sara', u2.temp).token; J('auth_password', AT2, u2.temp, 'SaraPass999'); return AT2; }
+const c1 = J('cm_add', at2(), JSON.stringify({ target: 'item:item000001', text: 'تصميم جميل، لو كبّرت العنوان قليلاً' }));
+ok(c1.mine && c1.name, 'comment added on shared item');
+ok(J('cm_list', ut, 'item:item000001').length === 1, 'owner sees comment');
+ok(J('nt_list', ut).some(function (x) { return x.kind === 'comment'; }), 'owner notified of comment');
+call('item_save', ut, JSON.stringify({ id: 'item000009', kind: 'tpl', name: 'سري', shared: false, tpl: 'ann_panel', track: 'ishraq', program: 'academy', st: {} }));
+fails('cm_add', /ليس مشتركاً/, at2(), JSON.stringify({ target: 'item:item000009', text: 'خاص' }));
+fails('cm_list', /لست في هذا البرنامج/, at, 'tpl:ann_panel', 'academy');
+J('cm_add', ut, JSON.stringify({ target: 'tpl:ann_panel', program: 'academy', text: 'قالب ممتاز للدورات' }));
+ok(J('cm_counts', ut, ['tpl:ann_panel', 'item:item000001'])['tpl:ann_panel'] === 1, 'comment counts');
+fails('cm_del', /صلاحية/, ut, c1.id);
+call('cm_del', adm, c1.id); ok(J('cm_list', ut, 'item:item000001').length === 0, 'admin deletes comment');
+call('nt_seen', ut); ok(J('nt_list', ut).every(function (x) { return x.seen; }), 'notifications seen');
+// صور في الملاحظات
+const png = 'data:image/png;base64,' + Buffer.from([137, 80, 78, 71, 1, 2]).toString('base64');
+const fbi = J('fb_send', ut, JSON.stringify({ kind: 'idea', text: 'فكرة مع صور', imgs: [png, png] }));
+ok(/^data:image\/png;base64,/.test(call('fb_shot', adm, fbi.id, 1)), 'feedback image retrievable by admin');
+ok(/^data:image\/png/.test(call('fb_shot', ut, fbi.id, 0)), 'sender can see own feedback image');
+// طلب مراجعة
+fails('rv_request', /صورة/, ut, JSON.stringify({ program: 'academy', note: 'x' }));
+const rq = J('rv_request', ut, JSON.stringify({ program: 'academy', track: 'ishraq', tpl: 'ann_panel', note: 'هل الألوان مناسبة؟', img: png, ai: { score: 72, summary: 'جيد' } }));
+ok(J('rv_mine', ut)[0].status === 'new', 'review requested');
+fails('rv_list', /لمدير/, ut);
+ok(J('rv_list', adm, 'new').some(function (x) { return x.id === rq.id && x.ai.score === 72; }), 'admin sees review request');
+ok(/^data:image\/png/.test(call('rv_img', adm, rq.id)), 'admin loads review image');
+J('rv_reply', adm, rq.id, JSON.stringify({ score: 8, notes: 'التسلسل واضح، خفّف عدد الألوان', points: ['كبّر العنوان', 'وحّد المحاذاة'] }));
+const mineRv = J('rv_mine', ut)[0]; ok(mineRv.status === 'done' && mineRv.reply.score === 8 && mineRv.reply.points.length === 2, 'reply delivered');
+ok(J('nt_list', ut).some(function (x) { return x.kind === 'review' && !x.seen; }), 'review notification');
+// أسبوعك في أثر
+call('stat_track', ut, JSON.stringify([{ e: 'export', p: 'academy', tpl: 'ann_panel' }, { e: 'export', p: 'academy' }, { e: 'tool', p: 'academy', tool: 'qr' }]));
+const wk = J('me_week', ut); ok(wk.live.exports >= 2 && wk.live.topTools.indexOf('qr') >= 0 && wk.hist.length >= 5, 'live week numbers: ' + JSON.stringify(wk.live));
+ok(wk.me && typeof wk.me.msg === 'string' && wk.me.msg.length > 10, 'weekly message (local)');
+ok(ctx.weeklyUserStats() >= 0, 'weekly trigger runs');
+ok(J('wk_admin', adm).week !== undefined, 'admin weekly view');
+// مهارات المساعد
+const sk = J('ai_skills', adm); ok(sk.length >= 6 && sk.some(function (x) { return x.id === 'design-eye' && x.builtin; }), 'default skills');
+fails('ai_skill_save', /للمدير العام/, sp, JSON.stringify({ name: 'x', text: 'y' }));
+const nsk = J('ai_skill_save', adm, JSON.stringify({ name: 'هوية عالم', kinds: ['design'], text: 'برنامج عالم يفضّل الأزرق الهادئ.' }));
+call('ai_skill_save', adm, JSON.stringify({ id: 'coach', name: 'المدرّب', kinds: ['week'], text: 'نص معدّل', on: false }));
+ok(J('ai_skills', adm).some(function (x) { return x.id === nsk.id && !x.builtin; }) && J('ai_skills', adm).some(function (x) { return x.id === 'coach' && x.edited && x.on === false; }), 'skills edited and added');
+call('ai_skill_reset', adm, 'coach'); ok(J('ai_skills', adm).some(function (x) { return x.id === 'coach' && !x.edited; }), 'skill reset');
+call('ai_make', adm, JSON.stringify({ kind: 'design', prompt: 'p', system: 'أنت مصمم', schema: { type: 'object' } }));
+const sys = JSON.parse(GAS._lastAi.opt.payload).systemInstruction.parts[0].text;
+ok(/مهارة: عين المصمّم/.test(sys) && /هوية عالم/.test(sys) && /الضوابط/.test(sys) && !/المدرّب/.test(sys), 'skills injected by kind');
 // lockout and disable
 for (let i = 0; i < 8; i++) { try { call('auth_login', 'ahmad', 'wrong' + i); } catch (e) {} }
 fails('auth_login', /محاولات كثيرة/, 'ahmad', 'AhmadPass99');
