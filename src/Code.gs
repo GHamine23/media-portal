@@ -947,18 +947,19 @@ function cl_save(token, json) {
 }
 var DEFAULT_SETTINGS = { ai: { enabled: true, model: 'gemini-3.8-flash', perDay: 20 }, uploadsNeedPerm: false, maxUploadMb: 20 };
 function settings_() { var s = readJson_('settings.json', {}); var o = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)); Object.keys(s).forEach(function (k) { o[k] = s[k]; }); return o; }
-function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: !!props_().getProperty('GEMINI_KEY') }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN'), pexels: !!props_().getProperty('PEXELS_KEY') }; }
-function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.aiKey = !!props_().getProperty('GEMINI_KEY'); s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); return JSON.stringify(s); }
+function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: !!(props_().getProperty('GEMINI_KEY') || props_().getProperty('GROQ_KEY')) }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN'), pexels: !!props_().getProperty('PEXELS_KEY') }; }
+function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.aiKey = !!props_().getProperty('GEMINI_KEY'); s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); s.groqOn = !!props_().getProperty('GROQ_KEY'); s.routeDefault = AI_ROUTE_DEFAULT; return JSON.stringify(s); }
 function set_save(token, json) {
   var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
   var s = JSON.parse(json);
   return withLock_(function () {
     var cur = settings_();
-    if (s.ai) cur.ai = { enabled: !!s.ai.enabled, model: clip_(s.ai.model || 'gemini-3.8-flash', 60), fallback: clip_(s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 120), light: clip_(s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite', 60), perDay: Math.max(0, Math.min(500, +s.ai.perDay || 0)) };
+    if (s.ai) cur.ai = { enabled: !!s.ai.enabled, model: clip_(s.ai.model || 'gemini-3.8-flash', 60), fallback: clip_(s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 120), light: clip_(s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite', 60), groqModel: clip_(s.ai.groqModel || 'openai/gpt-oss-120b', 60), route: (function (r) { var o = {}; Object.keys(r || {}).forEach(function (k) { if (r[k] === 'groq' || r[k] === 'gemini') o[clip_(k, 20)] = r[k]; }); return o; })(s.ai.route), perDay: Math.max(0, Math.min(500, +s.ai.perDay || 0)) };
     if (s.uploadsNeedPerm != null) cur.uploadsNeedPerm = !!s.uploadsNeedPerm;
     if (s.maxUploadMb != null) cur.maxUploadMb = Math.max(1, Math.min(20, +s.maxUploadMb || 20));
     if (s.tgToken != null) { var tk = String(s.tgToken).trim(); if (tk) { if (!/^\d+:[\w-]{30,}$/.test(tk)) throw new Error('رمز البوت غير صحيح'); props_().setProperty('TG_TOKEN', tk); } else props_().deleteProperty('TG_TOKEN'); }
     if (s.sendNeedsApproval != null) cur.sendNeedsApproval = !!s.sendNeedsApproval;
+    if (s.groqKey != null) { var gk = String(s.groqKey).trim(); if (gk) props_().setProperty('GROQ_KEY', gk); else props_().deleteProperty('GROQ_KEY'); }
     if (s.pexelsKey != null) { var pk = String(s.pexelsKey).trim(); if (pk) props_().setProperty('PEXELS_KEY', pk); else props_().deleteProperty('PEXELS_KEY'); }
     writeJson_('settings.json', cur); audit_(a, 'غيّر الإعدادات', ''); return JSON.stringify(cur);
   });
@@ -971,11 +972,64 @@ function audit_list(token) { var a = auth_(token); if (!isSuper_(a)) throw new E
 function ai_status(token) {
   var a = auth_(token), s = settings_();
   var used = +(CacheService.getScriptCache().get('ai:' + a.uid + ':' + dayKey_(now_())) || 0);
-  return JSON.stringify({ enabled: !!s.ai.enabled && !!props_().getProperty('GEMINI_KEY') && perm_(a, 'ai'), perDay: s.ai.perDay, used: used, allowed: perm_(a, 'ai') });
+  return JSON.stringify({ enabled: !!s.ai.enabled && !!(props_().getProperty('GEMINI_KEY') || props_().getProperty('GROQ_KEY')) && perm_(a, 'ai'), perDay: s.ai.perDay, used: used, allowed: perm_(a, 'ai') });
 }
 
 // نداء Gemini الأساسي (يستعمله ai_make والتقارير الأسبوعية). يسجّل كل طلب في ailog
+
+/* ---------- توزيع المهام بين المساعدين: Gemini (يرى الصور) وGroq (نصي، سريع، لا يدرّب على البيانات) ---------- */
+var AI_ROUTE_DEFAULT = { intake: 'groq', caption: 'groq', outline: 'groq', imgq: 'groq', week: 'groq', weekly: 'groq', design: 'gemini', creative: 'gemini', review: 'gemini', spell: 'gemini' };
+function aiRoute_(kind) { var s = settings_(), r = (s.ai && s.ai.route) || {}; return r[kind] || AI_ROUTE_DEFAULT[kind] || 'gemini'; }
 function geminiCall_(req, who) {
+  var hasGroq = !!props_().getProperty('GROQ_KEY'), hasGem = !!props_().getProperty('GEMINI_KEY');
+  var textOnly = !(req.files || []).length, useGroq = hasGroq && textOnly && (aiRoute_(req.kind) === 'groq' || !hasGem);
+  if (useGroq) {
+    try { return groqCall_(req, who); } catch (e) { if (!hasGem) throw e; }
+    return geminiOnly_(req, who);
+  }
+  try { return geminiOnly_(req, who); }
+  catch (e) { if (hasGroq && textOnly && /مزدحمة|مشغول|429|503/.test(e.message)) return groqCall_(req, who); throw e; }
+}
+// تحويل مخطط Gemini (OBJECT/STRING…) إلى JSON Schema المعتاد
+function toJsonSchema_(sc) {
+  if (!sc || typeof sc !== 'object') return sc;
+  var o = {}; Object.keys(sc).forEach(function (k) {
+    var v = sc[k];
+    if (k === 'type' && typeof v === 'string') o.type = v.toLowerCase();
+    else if (k === 'properties') { o.properties = {}; Object.keys(v).forEach(function (p) { o.properties[p] = toJsonSchema_(v[p]); }); }
+    else if (k === 'items') o.items = toJsonSchema_(v);
+    else o[k] = v;
+  });
+  return o;
+}
+function groqCall_(req, who) {
+  var key = props_().getProperty('GROQ_KEY'); if (!key) throw new Error('لم يُضبط مفتاح Groq');
+  var s = settings_(), model = String((s.ai && s.ai.groqModel) || 'openai/gpt-oss-120b').replace(/[^\w.\-\/]/g, '');
+  var body = { model: model, temperature: req.temperature != null ? +req.temperature : 0.8,
+    messages: [{ role: 'system', content: clip_(req.system, 30000) }, { role: 'user', content: clip_(req.prompt, 60000) }] };
+  if (req.schema) body.response_format = { type: 'json_schema', json_schema: { name: 'athar', strict: false, schema: toJsonSchema_(req.schema) } };
+  var t0 = now_(), log = { t: t0, uid: who.uid, name: who.name, program: clip_(req.program || '', 30), kind: clip_(req.kind || 'design', 20), inChars: String(req.prompt || '').length, files: 0, model: 'groq:' + model, ok: false, ms: 0, outChars: 0, err: '', q: clip_(String(req.prompt || '').replace(/\s+/g, ' '), 140) };
+  var out = '';
+  try {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      var res = UrlFetchApp.fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true, headers: { Authorization: 'Bearer ' + key } });
+      var code = res.getResponseCode();
+      if ((code === 429 || code >= 500) && attempt === 0) { Utilities.sleep(1500); continue; }
+      if (code >= 300) throw new Error('تعذّر الوصول إلى Groq (' + code + ')');
+      var j = JSON.parse(res.getContentText());
+      out = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content || '';
+      break;
+    }
+    if (!out) throw new Error('لم يُعد Groq نتيجة');
+    log.ok = true; log.outChars = out.length;
+  } catch (e) { log.err = clip_(String(e && e.message || e), 160); }
+  log.ms = now_() - t0; aiLog_(log);
+  if (!log.ok) throw new Error(log.err);
+  return out;
+}
+
+// نداء Gemini وحده (مع إعادة المحاولة والنماذج الاحتياطية)
+function geminiOnly_(req, who) {
   var s = settings_(), key = props_().getProperty('GEMINI_KEY'); if (!key) throw new Error('لم يُضبط مفتاح المساعد بعد');
   var parts = [{ text: clip_(req.prompt, 60000) }];
   (req.files || []).slice(0, 3).forEach(function (f) { if (f && f.b64 && /^(application\/pdf|image\/(png|jpeg|webp)|text\/plain)$/.test(f.mime || '') && f.b64.length < 28 * 1024 * 1024) parts.push({ inlineData: { mimeType: f.mime, data: f.b64 } }); });
@@ -1018,7 +1072,7 @@ function ai_make(token, json) {
   var a = auth_(token), s = settings_();
   if (!s.ai.enabled) throw new Error('المساعد متوقف الآن');
   if (!perm_(a, 'ai')) throw new Error('المساعد يحتاج صلاحية من مشرف البرنامج');
-  var key = props_().getProperty('GEMINI_KEY'); if (!key) throw new Error('لم يُضبط مفتاح المساعد بعد');
+  if (!props_().getProperty('GEMINI_KEY') && !props_().getProperty('GROQ_KEY')) throw new Error('لم يُضبط مفتاح المساعد بعد');
   var c = CacheService.getScriptCache(), ck = 'ai:' + a.uid + ':' + dayKey_(now_()), used = +(c.get(ck) || 0);
   if (!isSuper_(a) && used >= s.ai.perDay) throw new Error('بلغت حد اليوم (' + s.ai.perDay + ' طلباً). جرّب غداً.');
   var req = JSON.parse(json);   // {kind, system, prompt, schema, temperature, files: [{mime, b64}]}
@@ -1264,7 +1318,7 @@ function wkBuild_(uids, withAI) {
     .filter(function (r) { return r.c.active || r.p.active || uids; });
   // ترتيب المستخدم في برنامجه بعدد التنزيلات
   rows.forEach(function (r) { r.msg = weekMsgLocal_(r.name, r.c, r.p); r.focus = TIP_CAT_IDS[(r.c.exports + r.c.active) % TIP_CAT_IDS.length]; r.challenge = ''; });
-  if (withAI && props_().getProperty('GEMINI_KEY') && settings_().ai.enabled) {
+  if (withAI && (props_().getProperty('GEMINI_KEY') || props_().getProperty('GROQ_KEY')) && settings_().ai.enabled) {
     for (var i = 0; i < rows.length; i += 20) {
       var batch = rows.slice(i, i + 20);
       try {

@@ -440,6 +440,11 @@ async function aSettings(body) {
   aHead(body, 'الإعدادات', '', []);
   let s; try { s = await API6.me('set_get'); } catch (e) { body.appendChild(el('p', { class: 'err', text: e.message })); return; }
   const aiOn = el('input', { type: 'checkbox', checked: !!s.ai.enabled }), model = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.model, 'aria-label': 'النموذج' }), perDay = el('input', { type: 'number', class: 'inp', min: '0', max: '500', value: String(s.ai.perDay), 'aria-label': 'الحد اليومي' });
+  const groqTok = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.groqOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'gsk_…', 'aria-label': 'مفتاح Groq' });
+  const groqM = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.groqModel || 'openai/gpt-oss-120b', 'aria-label': 'نموذج Groq' });
+  const route = Object.assign({}, s.routeDefault || {}, s.ai.route || {});
+  const ROUTE_N = [['intake', 'فهم الفكرة'], ['caption', 'النص المصاحب'], ['outline', 'مخطط العرض'], ['imgq', 'كلمات الصور'], ['week', 'تقرير الأسبوع'], ['spell', 'التصحيح والتشكيل'], ['design', 'اقتراح التصاميم'], ['creative', 'دعه يبدع'], ['review', 'مراجعة التصميم']];
+  const routeBox = el('div', { class: 'routes' }, ROUTE_N.map(function (r) { return el('div', { class: 'routerow' }, [el('span', { text: r[1] }), segOf([['gemini', 'Gemini'], ['groq', 'Groq']], route[r[0]] || 'gemini', function (v) { route[r[0]] = v; })]); }));
   const lightM = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite', 'aria-label': 'نموذج المهام الخفيفة' });
   const fbm = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 'aria-label': 'النماذج الاحتياطية' });
   const tgTok = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.tgOn ? '•••••••• (اترك فارغاً لإبقائه)' : '123456789:AAF…', 'aria-label': 'رمز البوت' });
@@ -454,6 +459,11 @@ async function aSettings(body) {
       el('div', { class: 'fld' }, [el('label', { text: 'نماذج احتياطية عند ازدحام جوجل' }), fbm, el('small', { text: 'يُعيد المحاولة ثم ينتقل إليها بالترتيب. افصل بينها بفاصلة.' })]),
       el('div', { class: 'fld' }, [el('label', { text: 'حد الطلبات لكل مستخدم يومياً' }), perDay]),
       el('p', { class: 'tiny', text: 'في الخطة المجانية تستعمل جوجل الطلبات لتحسين منتجاتها، فلا تُرسل بيانات شخصية للطلاب. والمساعد لمن منحته صلاحيته.' })]),
+    el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-bl' }, [ico('ai')]), el('h3', { text: 'توزيع المهام بين المساعدين' }),
+      el('p', { class: 'small ' + (s.groqOn ? 'ok' : 'err'), text: s.groqOn ? 'مفتاح Groq مضبوط: المهام النصية تذهب إليه، وما يحتاج رؤية الصور يبقى مع Gemini.' : 'بلا مفتاح Groq: كل المهام على Gemini. المفتاح مجاني من console.groq.com/keys (ألف طلب يومياً، ولا يُدرَّب على بياناتكم).' }),
+      el('div', { class: 'fld' }, [el('label', { text: 'مفتاح Groq (يُحفظ في الخادم ولا يُعرض)' }), groqTok]),
+      el('div', { class: 'fld' }, [el('label', { text: 'نموذج Groq' }), groqM]),
+      el('p', { class: 'tiny', text: 'من يتولى كل مهمة؟ (ما فيه صور أو ملف PDF يذهب إلى Gemini دائماً، وإن تعطل أحدهما أكمل الآخر)' }), routeBox]),
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-gr' }, [ico('send')]), el('h3', { text: 'بوت تليجرام' }),
       el('p', { class: 'small ' + (s.tgOn ? 'ok' : 'err'), text: s.tgOn ? 'رمز البوت مضبوط. أضف البوت مشرفاً في قناة كل برنامج، وحدد القناة من إعدادات البرنامج.' : 'لم يُضبط رمز البوت بعد. أنشئ بوتاً من BotFather والصق رمزه هنا.' }),
       el('div', { class: 'fld' }, [el('label', { text: 'رمز البوت (يُحفظ في الخادم ولا يُعرض)' }), tgTok]),
@@ -467,7 +477,7 @@ async function aSettings(body) {
       el('p', { class: 'tiny', text: 'الحد المجاني ٢٠٠ بحث في الساعة. الصورة التي يختارها المستخدم تُحفظ بأصلها كاملاً في مكتبته، ويقترحها للبرنامج فتوافق أنت من «الشعارات والصور».' })])
   ]));
   body.appendChild(el('button', { type: 'button', class: 'btn dark', text: 'حفظ الإعدادات', onclick: async function () {
-    const o = { ai: { enabled: aiOn.checked, model: model.value.trim(), fallback: fbm.value.trim(), light: lightM.value.trim(), perDay: +perDay.value }, uploadsNeedPerm: upPerm.checked, maxUploadMb: +maxMb.value }; if (tgTok.value.trim()) o.tgToken = tgTok.value.trim(); if (pxKey.value.trim()) o.pexelsKey = pxKey.value.trim();
+    const o = { ai: { enabled: aiOn.checked, model: model.value.trim(), fallback: fbm.value.trim(), light: lightM.value.trim(), groqModel: groqM.value.trim(), route: route, perDay: +perDay.value }, uploadsNeedPerm: upPerm.checked, maxUploadMb: +maxMb.value }; if (tgTok.value.trim()) o.tgToken = tgTok.value.trim(); if (pxKey.value.trim()) o.pexelsKey = pxKey.value.trim(); if (groqTok.value.trim()) o.groqKey = groqTok.value.trim();
     try { await API6.me('set_save', JSON.stringify(o)); toast('حُفظت'); await refreshBundle(); showAdmin('settings'); } catch (e) { toast(e.message); }
   } }));
 }

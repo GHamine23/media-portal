@@ -31,6 +31,12 @@ GAS._fetch.handler = function (url, opt) {
   if (url.indexOf('api.alquran.cloud/v1/ayah/17:23') >= 0) return { code: 200, body: JSON.stringify({ data: { text: 'وَقَضَىٰ رَبُّكَ أَلَّا تَعْبُدُوا إِلَّا إِيَّاهُ وَبِالْوَالِدَيْنِ إِحْسَانًا', surah: { number: 17, name: 'سُورَةُ الإِسۡرَاءِ' }, numberInSurah: 23 } }) };
   if (url.indexOf('api.alquran.cloud/v1/search/') >= 0) return { code: 200, body: JSON.stringify({ data: { count: 1, matches: [{ text: 'وَوَصَّيْنَا الْإِنسَانَ بِوَالِدَيْهِ حُسْنًا', surah: { number: 29, name: 'سُورَةُ العَنكَبُوتِ' }, numberInSurah: 8 }] } }) };
   if (url.indexOf('dorar.net/dorar_api.json') >= 0) return { code: 200, body: JSON.stringify({ ahadith: { result: '<div class="hadith" style="text-align:justify;">إنَّ اللهَ يُحِبُّ إذا <span class="search-keys">عَمِلَ</span> أحدُكُم عملًا أن يُتقِنَه</div><div class="hadith-info"><span class="info-subtitle">الراوي:</span> عائشة أم المؤمنين <span class="info-subtitle">المحدث:</span> الألباني <span class="info-subtitle">المصدر:</span> صحيح الجامع <span class="info-subtitle">الصفحة أو الرقم:</span> 1880 <span class="info-subtitle">خلاصة حكم المحدث:</span> <span >حسن</span></div>--------------<br/><div class="hadith" style="text-align:justify;">نص ضعيف</div><div class="hadith-info"><span class="info-subtitle">الراوي:</span> فلان <span class="info-subtitle">المحدث:</span> الألباني <span class="info-subtitle">المصدر:</span> ضعيف الجامع <span class="info-subtitle">الصفحة أو الرقم:</span> 12 <span class="info-subtitle">خلاصة حكم المحدث:</span> <span >ضعيف</span></div><a href="x">المزيد</a>' } }) };
+  if (url.indexOf('api.groq.com') >= 0) {
+    GAS._lastGroq = { url: url, opt: opt };
+    if (GAS._groqDown) return { code: 500, body: '{}' };
+    const b = JSON.parse(opt.payload);
+    return { code: 200, body: JSON.stringify({ choices: [{ message: { content: b.response_format ? '{"text":"من Groq"}' : 'نص من Groq' } }] }) };
+  }
   return { code: 404, body: '' };
 };
 function call(fn) { const args = Array.prototype.slice.call(arguments, 1); const out = JSON.parse(ctx.doPost({ postData: { contents: JSON.stringify({ fn: fn, args: args }) } }).getContent()); if (out.error) throw new Error(out.error); return out.result; }
@@ -279,6 +285,18 @@ ok(JSON.parse(fb).designs && GAS._lastAi.url.indexOf('gemini-3.6-flash') >= 0, '
 GAS._busy = 'gemini-3';
 fails('ai_make', /مزدحمة/, adm, JSON.stringify({ kind: 'design', prompt: 'p', system: 's' }));
 GAS._busy = null;
+// Groq للمهام النصية
+call('set_save', adm, JSON.stringify({ groqKey: 'gsk_test' }));
+ok(J('set_get', adm).groqOn === true, 'groq key saved');
+GAS._lastGroq = null; const gq = call('ai_make', adm, JSON.stringify({ kind: 'caption', prompt: 'p', system: 's', schema: { type: 'OBJECT', properties: { text: { type: 'STRING' } } } }));
+ok(JSON.parse(gq).text === 'من Groq' && JSON.parse(GAS._lastGroq.opt.payload).response_format.json_schema.schema.properties.text.type === 'string', 'caption routed to groq with converted schema');
+GAS._lastGroq = null; call('ai_make', adm, JSON.stringify({ kind: 'review', prompt: 'p', system: 's', files: [{ mime: 'image/png', b64: 'AAAA' }] }));
+ok(!GAS._lastGroq, 'vision task stays on gemini');
+GAS._groqDown = true; GAS._lastAi = null; call('ai_make', adm, JSON.stringify({ kind: 'intake', prompt: 'p', system: 's' })); ok(!!GAS._lastAi, 'groq failure falls back to gemini'); GAS._groqDown = false;
+GAS._busy = 'gemini-3'; ok(call('ai_make', adm, JSON.stringify({ kind: 'design', prompt: 'p', system: 's' })) === 'نص من Groq', 'gemini quota exhausted → groq for text'); GAS._busy = null;
+call('set_save', adm, JSON.stringify({ ai: { enabled: true, perDay: 30, route: { caption: 'gemini' } } }));
+GAS._lastGroq = null; call('ai_make', adm, JSON.stringify({ kind: 'caption', prompt: 'p', system: 's' })); ok(!GAS._lastGroq, 'route override to gemini');
+call('set_save', adm, JSON.stringify({ groqKey: '' }));
 call('ai_make', adm, JSON.stringify({ kind: 'caption', prompt: 'p', system: 's' }));
 ok(GAS._lastAi.url.indexOf('gemini-3.5-flash-lite') >= 0, 'light tasks use the high-quota model');
 // lockout and disable

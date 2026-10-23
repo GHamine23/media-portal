@@ -773,3 +773,5 @@ svg.flip{transform:scaleX(-1)}
 @media (max-width:1500px){.e-reset span,.e-cap span{display:none}.e-top .e-reset,.e-top .e-cap,.e-top .e-rv{padding-inline:11px}}
 @media (max-width:1180px){.e-top .e-mode{display:none}}
 .e-tools{flex:none}
+
+.routes{display:grid;gap:6px}.routerow{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px}.routerow .seg{flex:none}
