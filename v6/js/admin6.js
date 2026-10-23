@@ -440,6 +440,7 @@ async function aSettings(body) {
   aHead(body, 'الإعدادات', '', []);
   let s; try { s = await API6.me('set_get'); } catch (e) { body.appendChild(el('p', { class: 'err', text: e.message })); return; }
   const aiOn = el('input', { type: 'checkbox', checked: !!s.ai.enabled }), model = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.model, 'aria-label': 'النموذج' }), perDay = el('input', { type: 'number', class: 'inp', min: '0', max: '500', value: String(s.ai.perDay), 'aria-label': 'الحد اليومي' });
+  const fbm = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 'aria-label': 'النماذج الاحتياطية' });
   const tgTok = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.tgOn ? '•••••••• (اترك فارغاً لإبقائه)' : '123456789:AAF…', 'aria-label': 'رمز البوت' });
   const pxKey = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.pexelsOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'مفتاح Pexels', 'aria-label': 'مفتاح Pexels' });
   const upPerm = el('input', { type: 'checkbox', checked: !!s.uploadsNeedPerm }), maxMb = el('input', { type: 'number', class: 'inp', min: '1', max: '20', value: String(s.maxUploadMb || 20), 'aria-label': 'أقصى حجم' });
@@ -448,6 +449,7 @@ async function aSettings(body) {
       el('p', { class: 'small ' + (s.aiKey ? 'ok' : 'err'), text: s.aiKey ? 'مفتاح Gemini مضبوط في الخادم.' : 'لم يُضبط مفتاح Gemini بعد (خطوة في محرر Apps Script).' }),
       el('label', { class: 'tog' }, [aiOn, el('span', { text: 'مفعّل' })]),
       el('div', { class: 'fld' }, [el('label', { text: 'النموذج' }), model, el('small', { text: 'أقوى نموذج مجاني الآن: gemini-3.8-flash' })]),
+      el('div', { class: 'fld' }, [el('label', { text: 'نماذج احتياطية عند ازدحام جوجل' }), fbm, el('small', { text: 'يُعيد المحاولة ثم ينتقل إليها بالترتيب. افصل بينها بفاصلة.' })]),
       el('div', { class: 'fld' }, [el('label', { text: 'حد الطلبات لكل مستخدم يومياً' }), perDay]),
       el('p', { class: 'tiny', text: 'في الخطة المجانية تستعمل جوجل الطلبات لتحسين منتجاتها، فلا تُرسل بيانات شخصية للطلاب. والمساعد لمن منحته صلاحيته.' })]),
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-gr' }, [ico('send')]), el('h3', { text: 'بوت تليجرام' }),
@@ -463,7 +465,7 @@ async function aSettings(body) {
       el('p', { class: 'tiny', text: 'الحد المجاني ٢٠٠ بحث في الساعة. الصورة التي يختارها المستخدم تُحفظ بأصلها كاملاً في مكتبته، ويقترحها للبرنامج فتوافق أنت من «الشعارات والصور».' })])
   ]));
   body.appendChild(el('button', { type: 'button', class: 'btn dark', text: 'حفظ الإعدادات', onclick: async function () {
-    const o = { ai: { enabled: aiOn.checked, model: model.value.trim(), perDay: +perDay.value }, uploadsNeedPerm: upPerm.checked, maxUploadMb: +maxMb.value }; if (tgTok.value.trim()) o.tgToken = tgTok.value.trim(); if (pxKey.value.trim()) o.pexelsKey = pxKey.value.trim();
+    const o = { ai: { enabled: aiOn.checked, model: model.value.trim(), fallback: fbm.value.trim(), perDay: +perDay.value }, uploadsNeedPerm: upPerm.checked, maxUploadMb: +maxMb.value }; if (tgTok.value.trim()) o.tgToken = tgTok.value.trim(); if (pxKey.value.trim()) o.pexelsKey = pxKey.value.trim();
     try { await API6.me('set_save', JSON.stringify(o)); toast('حُفظت'); await refreshBundle(); showAdmin('settings'); } catch (e) { toast(e.message); }
   } }));
 }

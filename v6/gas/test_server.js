@@ -19,6 +19,7 @@ GAS._fetch.handler = function (url, opt) {
   }
   if (url.indexOf('generativelanguage.googleapis.com') >= 0) {
     GAS._lastAi = { url: url, opt: opt };
+    if (GAS._busy && url.indexOf(GAS._busy) >= 0) return { code: 503, body: '{}' };
     return { code: 200, body: JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"designs":[{"tpl":"ann_panel"}]}' }] } }] }) };
   }
   if (url.indexOf('api.pexels.com') >= 0) {
@@ -271,6 +272,13 @@ call('ai_skill_reset', adm, 'coach'); ok(J('ai_skills', adm).some(function (x) {
 call('ai_make', adm, JSON.stringify({ kind: 'design', prompt: 'p', system: 'أنت مصمم', schema: { type: 'object' } }));
 const sys = JSON.parse(GAS._lastAi.opt.payload).systemInstruction.parts[0].text;
 ok(/مهارة: عين المصمّم/.test(sys) && /هوية عالم/.test(sys) && /الضوابط/.test(sys) && !/المدرّب/.test(sys), 'skills injected by kind');
+// ازدحام جوجل: إعادة المحاولة ثم النموذج الاحتياطي
+GAS._busy = 'gemini-3.8-flash';
+const fb = call('ai_make', adm, JSON.stringify({ kind: 'design', prompt: 'p', system: 's', schema: { type: 'object' } }));
+ok(JSON.parse(fb).designs && GAS._lastAi.url.indexOf('gemini-3.6-flash') >= 0, 'falls back to second model on 503');
+GAS._busy = 'gemini-3';
+fails('ai_make', /مزدحمة/, adm, JSON.stringify({ kind: 'design', prompt: 'p', system: 's' }));
+GAS._busy = null;
 // lockout and disable
 for (let i = 0; i < 8; i++) { try { call('auth_login', 'ahmad', 'wrong' + i); } catch (e) {} }
 fails('auth_login', /محاولات كثيرة/, 'ahmad', 'AhmadPass99');

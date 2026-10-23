@@ -954,7 +954,7 @@ function set_save(token, json) {
   var s = JSON.parse(json);
   return withLock_(function () {
     var cur = settings_();
-    if (s.ai) cur.ai = { enabled: !!s.ai.enabled, model: clip_(s.ai.model || 'gemini-3.8-flash', 60), perDay: Math.max(0, Math.min(500, +s.ai.perDay || 0)) };
+    if (s.ai) cur.ai = { enabled: !!s.ai.enabled, model: clip_(s.ai.model || 'gemini-3.8-flash', 60), fallback: clip_(s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 120), perDay: Math.max(0, Math.min(500, +s.ai.perDay || 0)) };
     if (s.uploadsNeedPerm != null) cur.uploadsNeedPerm = !!s.uploadsNeedPerm;
     if (s.maxUploadMb != null) cur.maxUploadMb = Math.max(1, Math.min(20, +s.maxUploadMb || 20));
     if (s.tgToken != null) { var tk = String(s.tgToken).trim(); if (tk) { if (!/^\d+:[\w-]{30,}$/.test(tk)) throw new Error('رمز البوت غير صحيح'); props_().setProperty('TG_TOKEN', tk); } else props_().deleteProperty('TG_TOKEN'); }
@@ -985,18 +985,27 @@ function geminiCall_(req, who) {
   if (req.schema) { body.generationConfig.responseMimeType = 'application/json'; body.generationConfig.responseSchema = req.schema; }
   var model = String(s.ai.model || 'gemini-3.8-flash').replace(/[^\w.\-]/g, '');
   var t0 = now_(), log = { t: t0, uid: who.uid, name: who.name, program: clip_(req.program || '', 30), kind: clip_(req.kind || 'design', 20), inChars: parts[0].text.length, files: parts.length - 1, model: model, ok: false, ms: 0, outChars: 0, err: '', q: clip_(String(req.prompt || '').replace(/\s+/g, ' '), 90) };
-  var out = '';
-  try {
-    var res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
-      method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true, headers: { 'x-goog-api-key': key } });
-    var code = res.getResponseCode(), txt = res.getContentText();
-    if (code === 429) throw new Error('المساعد مشغول الآن (حد الخطة المجانية). حاول بعد دقيقة.');
-    if (code >= 300) throw new Error('تعذّر الوصول إلى المساعد (' + code + ')');
-    var j = JSON.parse(txt), part = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
-    out = (part || []).map(function (p) { return p.text || ''; }).join('');
-    if (!out) throw new Error('لم يُعد المساعد نتيجة. أعد صياغة طلبك.');
-    log.ok = true; log.outChars = out.length;
-  } catch (e) { log.err = clip_(String(e && e.message || e), 160); }
+  // ازدحام جوجل (503/500/429) مؤقت: نعيد المحاولة مرة بعد ثانيتين، ثم ننتقل إلى نموذج احتياطي
+  var models = [model].concat(String(s.ai.fallback || 'gemini-3.6-flash,gemini-3.5-flash-lite').split(',').map(function (m) { return m.trim().replace(/[^\w.\-]/g, ''); }).filter(function (m) { return m && m !== model; }));
+  var out = '', tries = 0, lastCode = 0;
+  outer: for (var mi = 0; mi < models.length; mi++) {
+    for (var attempt = 0; attempt < (mi === 0 ? 2 : 1); attempt++) {
+      tries++;
+      try {
+        var res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + models[mi] + ':generateContent', {
+          method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true, headers: { 'x-goog-api-key': key } });
+        var code = res.getResponseCode(), txt = res.getContentText(); lastCode = code;
+        if (code === 503 || code === 500 || code === 429 || code === 504) { if (now_() - t0 > 70000) break outer; if (attempt === 0 && mi === 0) Utilities.sleep(2000); continue; }
+        if (code >= 300) { log.err = 'تعذّر الوصول إلى المساعد (' + code + ')'; if (code === 404 && mi < models.length - 1) break; break outer; }
+        var j = JSON.parse(txt), part = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
+        out = (part || []).map(function (p) { return p.text || ''; }).join('');
+        if (!out) { log.err = 'لم يُعد المساعد نتيجة. أعد صياغة طلبك.'; break outer; }
+        log.ok = true; log.outChars = out.length; log.model = models[mi]; log.err = ''; break outer;
+      } catch (e) { log.err = clip_(String(e && e.message || e), 160); }
+    }
+  }
+  if (!log.ok && !log.err) log.err = lastCode === 429 ? 'المساعد مشغول الآن (حد الخطة المجانية). حاول بعد دقيقة.' : 'خوادم جوجل مزدحمة الآن (' + lastCode + '). حاول بعد قليل.';
+  log.tries = tries;
   log.ms = now_() - t0;
   aiLog_(log);
   if (!log.ok) throw new Error(log.err);
