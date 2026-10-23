@@ -8,6 +8,7 @@ function showMake6() {
   const saved = ls('make'); if (saved) MK = Object.assign(MK, saved, { results: [] });
   const tracks = tracksOf();
   if (!tracks.length) { view(el('div', { class: 'wrap page' }, [H('h1', 'اصنع إعلانك'), el('p', { class: 'muted', text: 'أضف هوية البرنامج أولاً.' })])); return; }
+  const qs = location.hash.split('?')[1] || '', qTid = /tid=([a-z0-9_\-]+)/.exec(qs); if (qTid && TRACKS[qTid[1]]) MK.tid = qTid[1];
   if (!TRACKS[MK.tid]) MK.tid = ls('lastTrack') && TRACKS[ls('lastTrack')] ? ls('lastTrack') : tracks[0].id;
   const types = MAKE_TYPES.filter(function (t) { return t[0] !== 'social' || canSocial(); });
   if (!types.some(function (t) { return t[0] === MK.type; })) MK.type = 'ann';

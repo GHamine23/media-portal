@@ -118,6 +118,7 @@ function attachTr() {
   if (!p) { ED.tr.nodes([]); ED.layer.batchDraw(); return; }
   const L = isLayer(S.sel) ? layerById(S.sel.slice(2)) : null;
   ED.tr.nodes([p]);
+  if (ED.locked) { ED.tr.rotateEnabled(false); ED.tr.enabledAnchors([]); ED.hover.visible(false); return; }
   ED.tr.rotateEnabled(!!L);
   ED.tr.keepRatio(!(L && L.t === 'text'));
   ED.tr.enabledAnchors(L && L.t === 'text' ? ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right'] : ['top-left', 'top-right', 'bottom-left', 'bottom-right']);
@@ -265,6 +266,11 @@ function buildToolbar() {
   if (!g || !LASTG[g]) { tb.classList.remove('show'); return; }
   const L = isLayer(g) ? layerById(g.slice(2)) : null;
   const items = [el('span', { class: 'tname', text: gName(g) })];
+  if (ED.locked) {   // درجة «المحتوى فقط»: تعديل النص وحده
+    if (fieldsOfGroup(g).length) items.push(tbBtn('text', 'تعديل النص', function () { openInline6(g); }));
+    else items.push(el('span', { class: 'tiny', text: 'التعديل هنا للنصوص والصور فقط' }));
+    items.forEach(function (n) { tb.appendChild(n); }); requestAnimationFrame(placeToolbar); return;
+  }
   if (L) {
     if (L.t === 'text') {
       items.push(fontSelect(L.f || '', function (v) { L.f = v || undefined; }, true));
@@ -284,6 +290,7 @@ function buildToolbar() {
     items.push(tbBtn('front', 'للأمام', function () { const i = S.layers.indexOf(L); if (i < S.layers.length - 1) { S.layers.splice(i, 1); S.layers.splice(i + 1, 0, L); changed6(); } }));
     items.push(tbBtn('back', 'للخلف', function () { const i = S.layers.indexOf(L); if (i > 0) { S.layers.splice(i, 1); S.layers.splice(i - 1, 0, L); changed6(); } }));
     items.push(tbBtn('copy', 'تكرار (Ctrl+D)', function () { dupLayer(L); }));
+    items.push(tbBtn('pencil', 'إعدادات العنصر', function () { openElPanel(g); }));
     items.push(tbBtn('trash', 'حذف', function () { delLayer6(L.id); }, 'danger'));
   } else {
     const st = (S.gs && S.gs[g]) || {}, hasText = !!(LASTT[g] && LASTT[g].length);
@@ -295,6 +302,7 @@ function buildToolbar() {
       if (fieldsOfGroup(g).length) items.push(tbBtn('text', 'تعديل النص (نقر مزدوج)', function () { openInline6(g); }));
     }
     items.push(tbSep());
+    items.push(tbBtn('pencil', 'إعدادات العنصر', function () { openElPanel(g); }));
     items.push(tbBtn('more', 'المزيد', function (e) {
       popMenu(e.currentTarget, [
         { t: 'توسيط أفقي', ic: 'align', fn: function () { const b = LASTG[g]; moveSel(SIZES[S.size].w / 2 - (b.x0 + b.x1) / 2, 0); changed6(); } },

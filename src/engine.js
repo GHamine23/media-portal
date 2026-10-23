@@ -24,9 +24,13 @@ let OFF = {}, GBOX = null, CUR_G = null, CUR_O = null, GHIDE = {};
 let GST = {}, PIV = {}, CUR_S = null, GTXT = null;
 let PHTXT = null;   // نصوص العناوين العامة التي لم يغيّرها المستخدم بعد: تُرسم باهتة في المعاينة فقط
 const FAR = { dx: -100000, dy: -100000 };
+// SOLO: رسم عناصر بعينها فقط (لإظهار عنصر من القالب فوق غيره). كل ما عداها يُرسم بعيداً خارج اللوحة
+let SOLO = null, SOLO_OUT = false;
 function G(ctx, name) {
-  if (CUR_G) ctx.restore();
+  if (CUR_G || SOLO_OUT) ctx.restore();
+  SOLO_OUT = false;
   CUR_G = name || null; CUR_O = null; CUR_S = null;
+  if (SOLO && !(CUR_G && SOLO[CUR_G])) { ctx.save(); ctx.translate(FAR.dx, FAR.dy); CUR_O = FAR; if (!CUR_G) SOLO_OUT = true; return; }
   if (CUR_G) {
     ctx.save();
     if (GHIDE[CUR_G]) { ctx.translate(FAR.dx, FAR.dy); CUR_O = FAR; return; }   // عنصر أُخفي أو استُبدل
@@ -91,6 +95,7 @@ function srcH(s) { return s.naturalHeight || s.height; }
 function area(x0, y0, x1, y1) { box('area', x0, y0, x1, y1, 'area'); }
 function quiet(fn) { const s = BOXES, g = GBOX; BOXES = null; GBOX = null; try { fn(); } finally { BOXES = s; GBOX = g; } }
 function box(kind, x0, y0, x1, y1, t) {
+  if (CUR_O === FAR) return;   // عنصر مخفي، أو خارج الرسم المنفرد: لا حدود له
   const dx = CUR_O ? CUR_O.dx || 0 : 0, dy = CUR_O ? CUR_O.dy || 0 : 0;
   if (CUR_S) { const q = CUR_S; x0 = q.x + (x0 - q.x) * q.s; x1 = q.x + (x1 - q.x) * q.s; y0 = q.y + (y0 - q.y) * q.s; y1 = q.y + (y1 - q.y) * q.s; }
   const b = { k: kind, x0: Math.min(x0, x1) + dx, y0: Math.min(y0, y1) + dy, x1: Math.max(x0, x1) + dx, y1: Math.max(y0, y1) + dy, t: t || '', g: CUR_G };

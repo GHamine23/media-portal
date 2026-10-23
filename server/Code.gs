@@ -113,7 +113,7 @@ function apiFns_() {
     stat_track: stat_track, stat_summary: stat_summary,
     bc_list: bc_list, bc_all: bc_all, bc_save: bc_save, bc_del: bc_del,
     cl_list: cl_list, cl_save: cl_save, set_get: set_get, set_save: set_save, audit_list: audit_list,
-    ai_make: ai_make, ai_status: ai_status
+    ai_make: ai_make, ai_status: ai_status, me_profile: me_profile, font_family: font_family
   };
 }
 function doPost(e) {
@@ -179,7 +179,9 @@ function clip_(s, n) { return String(s == null ? '' : s).slice(0, n); }
                           mustChange, disabled, fails, lockUntil, created, last, legacyKey, prefs} }
    sessions.json: { token: {u, e: انتهاء, l: آخر استخدام} } */
 var ROLES = { super: 'المدير العام', sup: 'مشرف برنامج', user: 'مستخدم' };
-var PERMS = ['social', 'ai', 'upload', 'fonts', 'slides'];   // صلاحيات قابلة للمنح لكل حساب
+var PERMS = ['social', 'ai', 'upload', 'fonts', 'slides'];
+// درجة التعديل في القوالب: content المحتوى فقط، style المحتوى والمظهر، full كامل. الفارغة = درجة البرنامج
+var EDIT_LEVELS = { content: 1, style: 1, full: 1 };   // صلاحيات قابلة للمنح لكل حساب
 var SESSION_DAYS = 30;
 
 function pwHash_(salt, pw) {
@@ -196,7 +198,8 @@ function tempPass_() {
 }
 function publicAcc_(a) {
   return { uid: a.uid, username: a.username, email: a.email || '', name: a.name, role: a.role, programs: a.programs || [], perms: a.perms || {},
-    mustChange: !!a.mustChange, disabled: !!a.disabled, created: a.created, last: a.last || 0, legacy: !!a.legacyKey, note: a.note || '' };
+    mustChange: !!a.mustChange, disabled: !!a.disabled, created: a.created, last: a.last || 0, legacy: !!a.legacyKey, note: a.note || '',
+    tracks: a.tracks || [], editLevel: a.editLevel || '', hasAvatar: !!a.hasAvatar };
 }
 function findAcc_(accs, id) {
   var n = normUser_(id);
@@ -257,7 +260,25 @@ function auth_login(id, pw) {
 }
 function meOf_(a) {
   var progs = progsFor_(a).map(function (p) { return { id: p.id, name: p.name, color: p.color || '', features: p.features || {} }; });
-  return Object.assign(publicAcc_(a), { prefs: a.prefs || {}, programsInfo: progs, roleName: ROLES[a.role] || '' });
+  var av = a.hasAvatar ? (readJson_('avatars.json', {})[a.uid] || '') : '';
+  return Object.assign(publicAcc_(a), { prefs: a.prefs || {}, programsInfo: progs, roleName: ROLES[a.role] || '', avatar: av });
+}
+// المستخدم يغيّر اسمه الظاهر وصورته (صورة صغيرة تُحفظ في avatars.json)
+function me_profile(token, json) {
+  var a0 = auth_(token), o = JSON.parse(json);
+  if (o.avatar && !/^data:image\/(jpeg|png|webp);base64,/.test(o.avatar)) throw new Error('صورة غير صحيحة');
+  if (o.avatar && o.avatar.length > 120000) throw new Error('الصورة أكبر من المسموح');
+  return withLock_(function () {
+    var accs = readJson_('accounts.json', {}), a = accs[a0.uid];
+    if (o.name != null) { var n = clip_(String(o.name).trim(), 60); if (n.length < 2) throw new Error('الاسم قصير'); a.name = n; }
+    if (o.avatar != null) {
+      var av = readJson_('avatars.json', {});
+      if (o.avatar) { av[a.uid] = o.avatar; a.hasAvatar = true; } else { delete av[a.uid]; a.hasAvatar = false; }
+      writeJson_('avatars.json', av);
+    }
+    writeJson_('accounts.json', accs);
+    return JSON.stringify(meOf_(a));
+  });
 }
 function auth_me(token) { var a = auth_(token, { allowMust: true }); return JSON.stringify(meOf_(a)); }
 function auth_logout(token) {
@@ -334,6 +355,8 @@ function acc_save(token, json) {
     if (o.perms) { var pp = {}; PERMS.forEach(function (k) { if (o.perms[k]) pp[k] = true; }); a.perms = pp; }
     if (o.disabled != null && a.uid !== me.uid) a.disabled = !!o.disabled;
     if (o.note != null) a.note = clip_(o.note, 300);
+    if (o.tracks) a.tracks = o.tracks.filter(function (t) { return /^[a-z0-9_\-]{2,30}$/.test(t); }).slice(0, 60);   // فارغة = كل هويات برامجه
+    if (o.editLevel != null) a.editLevel = EDIT_LEVELS[o.editLevel] ? o.editLevel : '';
     writeJson_('accounts.json', accs);
     if (a.disabled) dropSessions_(a.uid);
     audit_(me, isNew ? 'أنشأ حساباً' : 'عدّل حساباً', a.username + ' (' + (ROLES[a.role] || a.role) + ')');
@@ -401,6 +424,11 @@ function prog_save(token, json) {
     cur.color = /^#[0-9a-f]{6}$/i.test(p.color || '') ? p.color : (cur.color || '#171717');
     if (p.features) cur.features = { social: !!p.features.social, slides: p.features.slides !== false, ai: p.features.ai !== false };
     if (p.identities) cur.identities = p.identities.slice(0, 40).map(cleanIdentity_);
+    var fam = function (x) { return /^[\w\-. ]{1,60}$/.test(x); };
+    if (p.fontsId) cur.fontsId = p.fontsId.filter(fam).slice(0, 40);   // خطوط هوية البرنامج
+    if (p.block) cur.block = { fonts: (p.block.fonts || []).filter(fam).slice(0, 200), logos: (p.block.logos || []).map(function (k) { return clip_(k, 60); }).slice(0, 200) };   // ما لا يظهر لمستخدمي البرنامج
+    if (p.editLevel != null) cur.editLevel = EDIT_LEVELS[p.editLevel] ? p.editLevel : 'full';
+    if (p.fonts) cur.fonts = { title: clip_(p.fonts.title, 60), body: clip_(p.fonts.body, 60) };
     if (isSuper_(me)) { if (p.order != null) cur.order = +p.order || 0; if (p.active != null) cur.active = !!p.active; }
     if (i >= 0) list[i] = cur; else list.push(cur);
     writeJson_('programs.json', list);
@@ -553,6 +581,21 @@ function asset_del(token, id) {
     return 'ok';
   });
 }
+// نطاق عائلة خط كاملة: لكل البرامج أو لبرنامج واحد (المدير العام)
+function font_family(token, json) {
+  var a = auth_(token), o = JSON.parse(json);
+  if (!isSuper_(a)) throw new Error('للمدير العام');
+  var scope = o.scope === 'program' ? 'program' : 'global', prog = scope === 'program' ? clip_(o.program, 30) : '';
+  if (scope === 'program' && !progs_().some(function (p) { return p.id === prog; })) throw new Error('البرنامج غير موجود');
+  return withLock_(function () {
+    var list = readJson_('assets.json', []), n = 0;
+    list.forEach(function (x) { if (x.kind === 'font' && x.family === o.family && !x.ui) { x.scope = scope; x.program = prog; x.ver = (x.ver || 1) + 1; n++; } });
+    if (!n) throw new Error('الخط غير موجود');
+    writeJson_('assets.json', list);
+    audit_(a, 'غيّر نطاق خط', o.family + ' → ' + (prog || 'كل البرامج'));
+    return 'ok';
+  });
+}
 // خطوط الواجهة: تُطلب قبل الدخول لتظهر صفحة الدخول بخط المنصة
 function ui_fonts() { return JSON.stringify(readJson_('assets.json', []).filter(function (x) { return x.kind === 'font' && x.ui; }).map(assetPub_)); }
 function ui_font_get(id) {
@@ -588,13 +631,20 @@ function item_save(token, json) {
   if (!inProg_(a, item.program)) throw new Error('لست في هذا البرنامج');
   return withLock_(function () {
     var old = itemFile_(id), mine = keysOf_(a);
-    if (old) { var prev = JSON.parse(text_(old)); if (prev.ownerKey && mine.indexOf(prev.ownerKey) < 0) throw new Error('لا يمكنك تعديل تصميم زميلك؛ احفظه نسخة لك'); }
-    item.owner = a.name; item.ownerKey = 'a:' + a.uid; item.at = now_(); delete item.mine;
-    item.model = !!(prev0_(old) || {}).model;   // النموذج يغيّره المشرف من «اجعله نموذجاً» فقط
+    var prev = old ? JSON.parse(text_(old)) : null, coedit = false;
+    if (prev && prev.ownerKey && mine.indexOf(prev.ownerKey) < 0) {
+      // زميل يعدّل تصميماً مشتركاً سمح صاحبه بتعديله: يبقى التصميم لصاحبه ويُسجَّل من عدّله
+      if (!(prev.shared && prev.coedit && inProg_(a, itemProg_(prev)))) throw new Error('لا يمكنك تعديل تصميم زميلك؛ احفظه نسخة لك');
+      coedit = true;
+    }
+    if (coedit) { item.owner = prev.owner; item.ownerKey = prev.ownerKey; item.shared = true; item.coedit = true; item.editedBy = a.name; }
+    else { item.owner = a.name; item.ownerKey = 'a:' + a.uid; item.coedit = !!item.coedit && !!item.shared; }
+    item.at = now_(); delete item.mine;
+    item.model = !!(prev || {}).model;   // النموذج يغيّره المشرف من «اجعله نموذجاً» فقط
     var s = JSON.stringify(item);
     if (old) old.setContent(s); else dataFolder_().createFile('i_' + id + '.json', s, 'application/json');
     var list = readJson_('index.json', []).filter(function (x) { return x.id !== id; });
-    list.unshift({ id: id, kind: item.kind || 'tpl', name: clip_(item.name, 80), owner: item.owner, ownerKey: item.ownerKey, shared: !!item.shared, model: item.model,
+    list.unshift({ id: id, kind: item.kind || 'tpl', name: clip_(item.name, 80), owner: item.owner, ownerKey: item.ownerKey, shared: !!item.shared, model: item.model, coedit: !!item.coedit, editedBy: item.editedBy || '',
                    tpl: item.tpl, track: item.track, program: item.program, thumb: item.thumb, at: item.at });
     writeJson_('index.json', list);
     return JSON.stringify({ id: id });

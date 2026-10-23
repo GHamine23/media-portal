@@ -83,14 +83,15 @@ function showChangePw(forced) {
 
 /* ---------- بعد الدخول ---------- */
 async function afterLogin() {
-  view(el('div', { class: 'boot' }, [brandImg('c', 'bootlogo'), el('p', { class: 'muted', text: 'نجهّز هوية برنامجك…' }), el('div', { class: 'bootbar' }, [el('i')])]));
+  view(el('div', { class: 'boot' }, [loader6('نجهّز هوية برنامجك…')]));
   try { await loadBundle(); }
   catch (e) { view(el('div', { class: 'boot' }, [el('p', { class: 'err', text: 'تعذّر تحميل المنصة: ' + e.message }), el('button', { class: 'btn dark', text: 'إعادة المحاولة', onclick: afterLogin })])); return; }
   setMotion((V6.me.prefs && V6.me.prefs.motion) || 'calm');
-  buildTop(); loadNews();
+  buildTop();
   const after = ls('after'); ls('after', null);
   go(after && after !== '/login' ? '#' + after : '#/');
-  setTimeout(function () { maybeTour('home'); }, 900);
+  // «ما الجديد» أولاً إن وُجد (وفيه زر الجولة)، وإلا الجولة. لا يظهران معاً
+  loadNews().then(function (shown) { if (!shown) setTimeout(function () { if (document.body.dataset.page === 'home') maybeTour('home'); }, 700); });
 }
 async function restore() {
   V6.token = ls('token') || '';
@@ -105,6 +106,35 @@ async function restore() {
 }
 function isAdmin() { return V6.me && (V6.me.role === 'super' || V6.me.role === 'sup'); }
 function isSuper() { return V6.me && V6.me.role === 'super'; }
+// الاسم الظاهر والصورة: يغيّرهما المستخدم بنفسه
+function profileCard() {
+  const me = V6.me, nameI = el('input', { type: 'text', id: 'pf_name', value: me.name || '', maxlength: '60' });
+  const pic = el('div', { class: 'pfpic' }); const setPic = function (src) { pic.innerHTML = ''; if (src) pic.appendChild(el('img', { src: src, alt: '' })); else pic.appendChild(el('span', { text: String(me.name || '؟').trim().slice(0, 1) })); };
+  setPic(me.avatar);
+  let newPic = null;
+  const file = el('input', { type: 'file', accept: 'image/*', hidden: true, onchange: async function (e) {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try { newPic = await squareThumb(f, 256); setPic(newPic); } catch (er) { toast('تعذّرت قراءة الصورة'); }
+  } });
+  const save = async function (o) { try { const r = await API6.me('me_profile', JSON.stringify(o)); V6.me.name = r.name; V6.me.avatar = r.avatar; V6.me.hasAvatar = r.hasAvatar; buildTop(); toast('حُفظ'); } catch (e) { toast(e.message); } };
+  return el('div', { class: 'card rv pfcard' }, [el('h3', { text: 'اسمك وصورتك' }),
+    el('div', { class: 'row pfrow' }, [pic, el('div', { class: 'col' }, [
+      el('button', { type: 'button', class: 'btn sm line', onclick: function () { file.click(); } }, [ico('upload'), 'اختر صورة']),
+      el('button', { type: 'button', class: 'btn sm ghost', text: 'بلا صورة', onclick: function () { newPic = ''; setPic(''); } }), file])]),
+    el('div', { class: 'fld' }, [el('label', { for: 'pf_name', text: 'الاسم الذي يظهر لك وللفريق' }), nameI]),
+    el('button', { type: 'button', class: 'btn dark', text: 'حفظ', onclick: function () { const o = { name: nameI.value.trim() }; if (newPic !== null) o.avatar = newPic; save(o); } })]);
+}
+// صورة مربعة مقصوصة من المنتصف (للحساب فقط)
+function squareThumb(file, n) {
+  return new Promise(function (ok, bad) {
+    const im = new Image(), url = URL.createObjectURL(file);
+    im.onload = function () { const s = Math.min(im.width, im.height), c = document.createElement('canvas'); c.width = n; c.height = n; const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(im, (im.width - s) / 2, (im.height - s) / 2, s, s, 0, 0, n, n); URL.revokeObjectURL(url); ok(c.toDataURL('image/jpeg', 0.9)); };
+    im.onerror = bad; im.src = url;
+  });
+}
+// درجة التعديل في القوالب: للمشرفين كاملة، وللمستخدم ما حدّده المشرف له أو لبرنامجه
+const EDIT_N = { content: 'المحتوى فقط', style: 'المحتوى والمظهر', full: 'كامل' };
+function editLevel() { if (!V6.me || V6.me.role !== 'user') return 'full'; return V6.me.editLevel || (V6.prog && V6.prog.editLevel) || 'full'; }
 function can(p) { return V6.me && (V6.me.role !== 'user' || !!(V6.me.perms && V6.me.perms[p])); }
 // خيار مواقع التواصل: يتاح للمشرفين ومن مُنح الصلاحية، وإن سمح به البرنامج
 function canSocial() { return can('social') && !(V6.prog && V6.prog.features && V6.prog.features.social === false); }
@@ -127,7 +157,7 @@ function buildTop() {
   } }, [el('i', { style: 'background:' + (V6.prog ? V6.prog.color : '#000') }), el('span', { text: V6.prog ? V6.prog.name : 'لا برنامج' }), progs.length > 1 ? ico('chevd') : null]);
   const bell = el('button', { type: 'button', class: 'ib', id: 'bell', title: 'ما الجديد', 'aria-label': 'ما الجديد', onclick: showNews }, [ico('bell')]);
   const fb = el('button', { type: 'button', class: 'ib', id: 'fbbtn', title: 'أبلغ عن مشكلة أو اقترح فكرة', 'aria-label': 'ملاحظة', onclick: function () { showFeedback6(); } }, [ico('chat')]);
-  const av = el('button', { type: 'button', class: 'avatar', id: 'avatar', 'aria-label': 'حسابك', text: String(V6.me.name || '؟').trim().replace(/^(أ\.|د\.|م\.)\s*/, '').slice(0, 1), onclick: function () {
+  const av = el('button', { type: 'button', class: 'avatar', id: 'avatar', 'aria-label': 'حسابك', text: V6.me.avatar ? '' : String(V6.me.name || '؟').trim().replace(/^(أ\.|د\.|م\.)\s*/, '').slice(0, 1), onclick: function () {
     popMenu(av, [{ hd: V6.me.name + ' · ' + (V6.me.roleName || '') },
       { t: 'حسابي', ic: 'user', href: '#/account' },
       { t: 'تصاميمي', ic: 'grid', href: '#/mine' },
@@ -136,6 +166,7 @@ function buildTop() {
       { t: 'جولة تعريفية', ic: 'play', fn: function () { maybeTour(document.body.dataset.page || 'home', true); } },
       '-', { t: 'خروج', ic: 'logout', fn: logout }].filter(Boolean));
   } });
+  if (V6.me.avatar) av.appendChild(el('img', { src: V6.me.avatar, alt: '' }));
   top.appendChild(el('div', { class: 'wrap in' }, [
     el('a', { href: '#/', class: 'logo', 'aria-label': 'الرئيسية' }, [brandImg('c', 'lg-full'), brandImg('mark', 'lg-mark')]), nav, el('span', { class: 'sp' }), psw, fb, bell, av
   ]));
@@ -152,6 +183,7 @@ async function showAccount() {
   view(el('div', { class: 'wrap page' }, [
     el('div', { class: 'phead' }, [H('h1', 'حسابي'), el('p', { class: 'muted rv', text: me.name + ' · ' + (me.roleName || '') + (me.email ? ' · ' + me.email : '') })]),
     el('div', { class: 'grid two' }, [
+      profileCard(),
       el('div', { class: 'card rv' }, [el('h3', { text: 'بياناتك' }),
         el('dl', { class: 'kv' }, [el('dt', { text: 'اسم المستخدم' }), el('dd', { dir: 'auto', text: me.username }), el('dt', { text: 'البرامج' }), el('dd', { text: (me.programsInfo || []).map(function (p) { return p.name; }).join('، ') || '—' }),
           el('dt', { text: 'الصلاحيات' }), el('dd', { text: permsText(me) })]),

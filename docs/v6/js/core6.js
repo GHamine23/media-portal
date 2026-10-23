@@ -52,7 +52,7 @@ function render() {
   if (!r.opt.public && !V6.token) { if (h !== '/login') ls('after', h); return go('#/login'); }
   const m = h.match(r.re) || [];
   const n = ++RENDER_N;
-  const run = function () { if (n !== RENDER_N) return; LEAVE.forEach(function (f) { try { f(); } catch (e) {} }); LEAVE.length = 0; r.fn.apply(null, m.slice(1).map(decodeURIComponent)); };
+  const run = function () { if (n !== RENDER_N) return; LEAVE.forEach(function (f) { try { f(); } catch (e) {} }); LEAVE.length = 0; r.fn.apply(null, m.slice(1).map(function (x) { return x == null ? undefined : decodeURIComponent(x); })); /* الجزء الاختياري الغائب يبقى غائباً لا «undefined» */ };
   document.body.dataset.page = r.opt.page || '';
   if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches && !r.opt.noVT && RENDER_N > 1) document.startViewTransition(run);
   else run();
@@ -172,6 +172,8 @@ const IC = {
   wand: '<path d="m4 20 11-11 2 2L6 22zM14 4l1 2 2 1-2 1-1 2-1-2-2-1 2-1zM19 9l.6 1.4L21 11l-1.4.6L19 13l-.6-1.4L17 11l1.4-.6z"/>', reset: '<path d="M4 12a8 8 0 1 0 2.3-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/>',
   phone: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>', globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
   shield: '<path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6z"/>', sparkles: '<path d="M9 4l1.5 4L15 9.5l-4.5 1.5L9 15l-1.5-4L3 9.5 7.5 8zM18 13l.8 2.2L21 16l-2.2.8L18 19l-.8-2.2L15 16l2.2-.8z"/>',
+  pencil: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+  up: '<path d="m6 15 6-6 6 6"/>', down: '<path d="m6 9 6 6 6-6"/>',
   archive: '<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/>',
   model: '<path d="M6 3h12v18l-6-4-6 4z"/>',
   pack: '<path d="M12 3 3 7.5v9L12 21l9-4.5v-9z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
@@ -196,3 +198,35 @@ document.addEventListener('visibilitychange', function () { if (document.visibil
 const ERRS6 = [];
 window.addEventListener('error', function (e) { ERRS6.push(String(e.message || 'error').slice(0, 300) + ' @' + String(e.filename || '').split('/').pop() + ':' + (e.lineno || '')); if (ERRS6.length > 12) ERRS6.shift(); });
 window.addEventListener('unhandledrejection', function (e) { ERRS6.push('promise: ' + String((e.reason && e.reason.message) || e.reason).slice(0, 300)); if (ERRS6.length > 12) ERRS6.shift(); });
+
+/* ---------- حركة الانتظار: علامة «أثـر» يدور حولها أثر يُرسم، وجمل لطيفة تتبدّل إن طال الانتظار ---------- */
+const LOAD_LINES = ['نرتّب الألوان على مقاس هويتك…', 'نوقظ الخطوط من نومها…', 'نلمّع الشعارات…', 'نصفّ القوالب صفّاً منتظماً…', 'لحظات، والجميل يستحق الانتظار…', 'نضبط المسافات بالمسطرة…'];
+function loader6(text, small) {
+  const t = el('p', { class: 'ldt', text: text || '' });
+  const node = el('div', { class: 'ld6' + (small ? ' sm' : ''), role: 'status', 'aria-live': 'polite' }, [
+    el('div', { class: 'ldm' }, [svgOf('<circle class="ldtrack" cx="50" cy="50" r="44"/><circle class="ldarc" cx="50" cy="50" r="44"/><circle class="lddot" cx="50" cy="6" r="3.2"/>'), typeof brandImg === 'function' ? brandImg('mark', 'ldmark') : null]),
+    small ? null : t
+  ]);
+  if (!small) {
+    let i = Math.floor(Math.random() * LOAD_LINES.length);
+    const tm = setInterval(function () {
+      if (!node.isConnected) { clearInterval(tm); return; }
+      t.classList.add('out'); setTimeout(function () { t.textContent = LOAD_LINES[i++ % LOAD_LINES.length]; t.classList.remove('out'); }, 260);
+    }, 2600);
+  }
+  return node;
+}
+function svgOf(inner) { const s = document.createElementNS('http:\/\/www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 100 100'); s.setAttribute('aria-hidden', 'true'); s.innerHTML = inner; return s; }
+// شريط أفقي بسهمين للتنقل (يظهران عند وجود ما يُمرَّر)
+function stripNav(strip) {
+  const prev = el('button', { type: 'button', class: 'snav prev', 'aria-label': 'السابق', onclick: function () { strip.scrollBy({ left: strip.clientWidth * 0.8, behavior: 'smooth' }); } }, [ico('chev')]);
+  const next = el('button', { type: 'button', class: 'snav next', 'aria-label': 'التالي', onclick: function () { strip.scrollBy({ left: -strip.clientWidth * 0.8, behavior: 'smooth' }); } }, [ico('chev')]);
+  const w = el('div', { class: 'stripw' }, [strip, prev, next]);
+  const upd = function () {
+    const max = strip.scrollWidth - strip.clientWidth, x = Math.abs(strip.scrollLeft);   // في الاتجاه من اليمين يكون التمرير سالباً
+    w.classList.toggle('scrollable', max > 4); prev.disabled = x < 4; next.disabled = x > max - 4;
+  };
+  strip.addEventListener('scroll', upd, { passive: true }); new ResizeObserver(upd).observe(strip);
+  new MutationObserver(upd).observe(strip, { childList: true }); setTimeout(upd, 50);
+  return w;
+}

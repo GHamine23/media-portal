@@ -65,7 +65,8 @@ async function loadBundle() {
   b.mine.forEach(function (a) { V6.assets[a.id] = a; });
   // سجل الخطوط: العامة وخطوط البرامج وخطوط المستخدم
   Object.keys(FONT_REG).forEach(function (k) { delete FONT_REG[k]; });
-  b.assets.concat(b.mine).filter(function (a) { return a.kind === 'font'; }).forEach(function (a) {
+  // خطوط واجهة المنصة (ثمانية) للواجهة فقط، لا للتصاميم
+  b.assets.concat(b.mine).filter(function (a) { return a.kind === 'font' && !a.ui; }).forEach(function (a) {
     const r = FONT_REG[a.family] = FONT_REG[a.family] || { family: a.family, label: a.label || a.family, scope: a.scope, program: a.program, files: [] };
     r.files.push(a);
   });
@@ -82,8 +83,11 @@ async function useProgram(id, silent) {
   Object.keys(TRACKS).forEach(function (k) { delete TRACKS[k]; });
   (p.identities || []).forEach(function (t) { TRACKS[t.id] = finishTrack(JSON.parse(JSON.stringify(t))); });
   if (id === 'academy') PACK_IDS.forEach(function (t) { if (!TRACKS[t.id]) TRACKS[t.id] = t; });   // هويات أضافتها حزم المهمة الأسبوعية
+  // حساب محصور في هويات معيّنة (إثمار فقط مثلاً): إن كان في هذا البرنامج شيء منها، تظهر وحدها
+  const only = (V6.me && V6.me.role === 'user' && V6.me.tracks) || [];
+  if (only.length && Object.keys(TRACKS).some(function (k) { return only.indexOf(k) >= 0; })) Object.keys(TRACKS).forEach(function (k) { if (only.indexOf(k) < 0) delete TRACKS[k]; });
   const mine = Object.keys(V6.assets).map(function (k) { return V6.assets[k]; }).filter(function (a) { return (a.kind === 'logo' || a.kind === 'photo') && (a.scope === 'global' || a.program === id) && a.key; });
-  if (!silent) document.body.classList.add('loading-prog');
+  if (!silent) { document.body.classList.add('loading-prog'); if (!$('#progld')) document.body.appendChild(el('div', { id: 'progld', class: 'progld' }, [loader6('ننتقل إلى ' + p.name + '…')])); }
   await prefetch(mine);
   await pool(mine, 6, async function (a) {
     const url = await assetURL(a);
@@ -99,7 +103,7 @@ async function useProgram(id, silent) {
   const pref = (p.fonts && p.fonts.title) || (FONT_REG.tajarib ? 'tajarib' : (FONT_REG.tajawal ? 'tajawal' : Object.keys(FONT_REG)[0]));
   FS.title = pref; FS.body = (p.fonts && p.fonts.body) || pref; FS.tw = '';
   await ensureFonts([FS.title, FS.body]);
-  document.body.classList.remove('loading-prog');
+  document.body.classList.remove('loading-prog'); const pl = $('#progld'); if (pl) pl.remove();
   applyProgramColor(p);
 }
 function applyProgramColor(p) {

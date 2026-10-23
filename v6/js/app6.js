@@ -11,15 +11,20 @@ function addLayer(L) { addLayer6(L); }
 function delLayer(id) { delLayer6(id); }
 function confirmInline() { return true; }
 
+// مقاسا غلاف يوتيوب (16:9) وغلاف الاستمارة (1600×400، مقاس رأس نماذج Google): أُضيفا للقوالب التي اختُبرت بهما فلم يتداخل فيها نص ولم يُقصّ
+SIZES.yt.name = 'غلاف يوتيوب'; SIZES.banner.name = 'غلاف استمارة';
+const EXTRA_SIZES = { yt: ['ann_photo', 'ann_title', 'comp_icons', 'comp_photo', 'thanks_cert', 'quote_rays', 'quote_photo', 'ann_cards', 'ann_night', 'ann_program', 'cover_schedule', 'thanks_podium', 'cover_banner', 'ann_door', 'story_cover', 'story_quote'], banner: ['story_quote'] };
+Object.keys(EXTRA_SIZES).forEach(function (sz) { EXTRA_SIZES[sz].forEach(function (id) { const t = TEMPLATES.find(function (x) { return x.id === id; }); if (t && t.sizes.indexOf(sz) < 0) t.sizes.push(sz); }); });
 route6(/^\/login$/, function () { if (V6.token && V6.me && !V6.me.mustChange) return go('#/'); showLogin(); }, { public: true, page: 'login', noVT: true });
 route6(/^\/password$/, function () { showChangePw(false); }, { page: 'account' });
 route6(/^\/$/, showHome, { page: 'home' });
 route6(/^\/g\/([^/]+)(?:\/([^/]+))?$/, showGallery6, { page: 'home' });
 route6(/^\/e\/([^/]+)\/([^/]+)$/, openNew, { page: 'editor', noVT: true });
 route6(/^\/d\/([^/?]+)$/, openItem, { page: 'editor', noVT: true });
+route6(/^\/p\/([^/?]+)$/, showPresent, { page: 'mine' });
 route6(/^\/s\/([^/]+)$/, showSlides6, { page: 'home' });
 route6(/^\/arc\/(\d{4}-\d{2})\/([a-z0-9]+)$/, openArc, { page: 'editor', noVT: true });
-route6(/^\/make$/, showMake6, { page: 'make' });
+route6(/^\/make(?:\?.*)?$/, showMake6, { page: 'make' });
 route6(/^\/mine$/, showMine6, { page: 'mine' });
 route6(/^\/account$/, showAccount, { page: 'account' });
 route6(/^\/admin(?:\/([a-z]+))?$/, showAdmin, { page: 'admin' });

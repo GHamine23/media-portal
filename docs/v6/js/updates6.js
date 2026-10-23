@@ -4,12 +4,14 @@ async function loadNews() {
   try {
     const r = await Promise.all([API6.json('cl_list'), API6.me('bc_list')]);
     NEWS.log = r[0] || []; NEWS.bc = r[1] || [];
-  } catch (e) { return; }
+  } catch (e) { return false; }
   const seenV = ls('seenV'), latest = NEWS.log[0];
   const bell = $('#bell'); if (bell) bell.classList.toggle('dot-badge', !!latest && seenV !== latest.v);
   // الإصدار الكبير يُعرض مرة في نافذة، والصغير يكتفي بالنقطة على الجرس
-  if (latest && latest.major && seenV !== latest.v && ls('seenMajor') !== latest.v) { ls('seenMajor', latest.v); setTimeout(function () { showNews(true); }, 1200); }
+  let shown = false;
+  if (latest && latest.major && seenV !== latest.v && ls('seenMajor') !== latest.v) { ls('seenMajor', latest.v); shown = true; setTimeout(function () { if (!$('.coach')) showNews(true); }, 600); }
   showBanners();
+  return shown;
 }
 function showBanners() {
   const box = $('#banner'); box.innerHTML = '';
@@ -68,7 +70,7 @@ function showFeedback6(preset) {
 /* ---------- الجولة التعريفية: تضيء الميزة وتشرحها بسطر ---------- */
 const TOURS6 = {
   home: [
-    ['[data-tour=q0]', 'اصنع إعلانك', 'اكتب فكرة الإعلان بكلماتك، فيقترح المساعد تصاميم جاهزة بهوية برنامجك.'],
+    ['[data-tour=q0]', 'المصمّم الذكي', 'اكتب فكرة الإعلان بكلماتك، أو اضغط «دعه يبدع»، فيقترح المساعد تصاميم جاهزة بهوية برنامجك.'],
     ['[data-tour=identity]', 'الهويات', 'لكل مسار أو نشاط هويته، وكل القوالب تعمل بها. اختر الهوية ثم القالب.'],
     ['#progsw', 'برامجك', 'إن كنت في أكثر من برنامج، تنتقل بينها من هنا.'],
     ['#fbbtn', 'ملاحظاتك تصلنا', 'وجدت مشكلة أو عندك فكرة؟ أرسلها من أي صفحة، وتتابع حالتها.'],
@@ -82,6 +84,8 @@ const TOURS6 = {
   ]
 };
 function maybeTour(kind, force) {
+  if ($('.coach')) return;
+  if ($('.modal') && !force) { setTimeout(function () { maybeTour(kind); }, 1500); return; }
   const steps = (TOURS6[kind] || []).filter(function (s) { const n = $(s[0]); return n && n.getBoundingClientRect().width > 0; });
   if (!steps.length) return;
   const done = (V6.me && V6.me.prefs && V6.me.prefs.tours) || {};

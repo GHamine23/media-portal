@@ -25,7 +25,7 @@ function buildPanel() {
   p.innerHTML = '';
   p.appendChild(el('div', { class: 'grab', 'aria-hidden': 'true' }));
   const body = el('div', { class: 'pbody' }); p.appendChild(body);
-  ({ content: pContent, tpls: pTpls, text: pText, els: pEls, imgs: pImgs, colors: pColors, fonts: pFonts, layers: pLayers, assist: pAssist }[ED.tab] || pContent)(body);
+  ({ content: pContent, tpls: pTpls, text: pText, els: pEls, imgs: pImgs, colors: pColors, fonts: pFonts, layers: pLayers, assist: pAssist, el: pEl }[ED.tab] || pContent)(body);
   p.scrollTop = st;
 }
 
@@ -172,7 +172,8 @@ function pEls(b) {
   const g2 = sec('أيقونات');
   ICON_LIST.forEach(function (k) { g2.appendChild(el('button', { type: 'button', class: 'libb', title: k, onclick: function () { addLayer6({ t: 'icon', ref: k, w: 0.07, c: C.s }); } }, [libCanvas(function (g, s) { ICONS[k](g, s * 0.8, C.s); }, 56, 56)])); });
   const g3 = sec('شعارات');
-  Object.keys(TRACKS).forEach(function (id) { const t = TRACKS[id]; (t.logos || [[t.logo, t.name]]).forEach(function (l) { if (!ASSETS[l[0]]) return; const bt = el('button', { type: 'button', class: 'libb wide', title: t.name, onclick: function () { addLayer6({ t: 'logo', ref: l[0], w: 0.22, c: 'color' }); } }); bt.style.backgroundImage = 'url(' + ASSETS[l[0]] + ')'; g3.appendChild(bt); }); });
+  const blockL = (V6.prog && V6.prog.block && V6.prog.block.logos) || [];
+  Object.keys(TRACKS).forEach(function (id) { const t = TRACKS[id]; (t.logos || [[t.logo, t.name]]).forEach(function (l) { if (!ASSETS[l[0]] || blockL.indexOf(l[0]) >= 0) return; const bt = el('button', { type: 'button', class: 'libb wide', title: t.name, onclick: function () { addLayer6({ t: 'logo', ref: l[0], w: 0.22, c: 'color' }); } }); bt.style.backgroundImage = 'url(' + ASSETS[l[0]] + ')'; g3.appendChild(bt); }); });
   ['academy', 'social'].forEach(function (k) { if (!IMG[k]) return; g3.appendChild(el('button', { type: 'button', class: 'libb wide', title: k === 'social' ? 'حسابات التواصل' : 'شعار البرنامج', onclick: function () { addLayer6({ t: 'logo', ref: k, w: 0.16, c: '#4a4a4a' }); } }, [libCanvas(function (g, s) { const im = tinted(k, '#4a4a4a'); if (im) { const w = s * 1.5, h = w * srcH(im) / srcW(im); g.drawImage(im, -w / 2, -h / 2, w, h); } }, 110, 50)])); });
   // عناصرك المحفوظة: مجموعة طبقات تعيد استعمالها
   const mine = V6.mine.filter(function (a) { return a.kind === 'element' && a.data && a.data.layers; });
@@ -243,22 +244,79 @@ function pColors(b) {
 }
 
 /* ---------- الخطوط ---------- */
+/* ---------- الخطوط: لكل نوع نص في التصميم قائمة تُفتح، والمرور على الخط يعاينه في التصميم مباشرة ---------- */
+// الخطوط المتاحة للاختيار: خطوط هوية البرنامج أولاً، ثم العامة، ثم خطوط المستخدم. والمحجوبة في البرنامج لا تظهر
+function fontChoices() {
+  const P = V6.prog || {}, block = (P.block && P.block.fonts) || [], idf = (P.fontsId || []).slice();
+  if (P.fonts) [P.fonts.title, P.fonts.body].forEach(function (f) { if (f && idf.indexOf(f) < 0) idf.push(f); });
+  const out = { ident: [], general: [], mine: [] };
+  Object.keys(FONTS).forEach(function (id) {
+    if (block.indexOf(id) >= 0 || id === 'tajarib' && !FONT_REG.tajarib) return;
+    const r = FONT_REG[id] || {};
+    if (r.scope === 'user') out.mine.push(id);
+    else if (idf.indexOf(id) >= 0) out.ident.push(id);
+    else out.general.push(id);
+  });
+  const by = function (a, b) { return String(FONTS[a].name).localeCompare(FONTS[b].name, 'ar'); };
+  out.ident.sort(function (a, b) { return idf.indexOf(a) - idf.indexOf(b); }); out.general.sort(by); out.mine.sort(by);
+  return out;
+}
+// أهداف الخط في التصميم الحالي: العناوين كلها، والنصوص كلها، ثم كل عنصر نصي
+function fontTargets() {
+  const t = [
+    { id: 'all_title', label: 'كل العناوين', sample: 'لقاء مفتوح', get: function () { return FS.title; }, set: function (v) { FS.title = v; FS.tw = ''; }, base: true },
+    { id: 'all_body', label: 'كل النصوص', sample: 'الخميس ٨ مساءً', get: function () { return FS.body; }, set: function (v) { FS.body = v; }, base: true }
+  ];
+  Object.keys(LASTG).filter(function (g) { return !isLayer(g) && LASTT[g] && LASTT[g].length; }).forEach(function (g) {
+    const smp = String(LASTT[g][0] || '').replace(/\*/g, '').split('\n')[0].trim() || gName(g);
+    t.push({ id: g, label: gName(g), sample: smp, get: function () { return ((S.gs || {})[g] || {}).f || ''; }, set: function (v) { setGs(g, 'f', v); }, g: g });
+  });
+  (S.layers || []).filter(function (L) { return L.t === 'text'; }).forEach(function (L) {
+    t.push({ id: 'L:' + L.id, label: gName('L:' + L.id), sample: String(L.txt || 'نص').split('\n')[0], get: function () { return L.f || ''; }, set: function (v) { L.f = v || undefined; }, g: 'L:' + L.id });
+  });
+  return t;
+}
+let FONT_IO = null;
+function fontSample(node, id, weightKey) {
+  if (!FONT_IO) FONT_IO = new IntersectionObserver(function (es) { es.forEach(function (e) { if (!e.isIntersecting) return; FONT_IO.unobserve(e.target); const f = e.target._f; if (f) f(); }); }, { rootMargin: '120px' });
+  node._f = function () { ensureFonts([id]).then(function () { const F = FONTS[id]; if (!F) return; const w = (F.w[weightKey] || F.w.r).split('|'); node.style.fontFamily = '"' + w[0] + '", sans-serif'; node.style.fontWeight = w[1] || 400; node.classList.add('ready'); }); };
+  FONT_IO.observe(node);
+}
 function pFonts(b) {
-  b.appendChild(panelHead('الخطوط', 'خط العناوين وخط النصوص لكل التصميم. ولخط عنصر واحد اختره ثم غيّر خطه من الشريط فوقه.'));
-  const pick = function (role, label, sample) {
-    b.appendChild(el('h4', { class: 'psh', text: label }));
-    const g = el('div', { class: 'fgrid6' }); b.appendChild(g);
-    Object.keys(FONTS).forEach(function (id) {
-      const F = FONTS[id], on = FS[role] === id;
-      const bt = el('button', { type: 'button', class: 'fnt6' + (on ? ' on' : ''), onclick: async function () { bt.classList.add('loading'); await ensureFonts([id]); FS[role] = id; if (role === 'title') FS.tw = ''; changed6(); buildPanel(); savePrefs6({ fonts: { title: FS.title, body: FS.body } }); } },
-        [el('span', { class: 'smp', text: sample }), el('small', { text: F.name })]);
-      g.appendChild(bt);
-      // معاينة بخطها الحقيقي متى تحمّل
-      ensureFonts([id]).then(function () { const w = F.w[role === 'title' ? 'b' : 'r'].split('|'); bt.querySelector('.smp').style.font = (w[1] || 400) + ' 22px "' + w[0] + '", sans-serif'; });
-    });
-  };
-  pick('title', 'خط العناوين', 'لقاء مفتوح');
-  pick('body', 'خط النصوص', 'الخميس ٨ مساءً');
+  b.appendChild(panelHead('الخطوط', 'اختر النص ثم خطه. مرّر الفأرة على أي خط لترى أثره في التصميم قبل أن تختاره.'));
+  const C = fontChoices(), list = el('div', { class: 'ftargets' }); b.appendChild(list);
+  fontTargets().forEach(function (t) {
+    const open = ED.fontOpen === t.id;
+    const cur = t.get(), curName = cur && FONTS[cur] ? FONTS[cur].name : (t.base ? 'تجارب' : 'خط القالب');
+    const head = el('button', { type: 'button', class: 'fth', 'aria-expanded': open ? 'true' : 'false', onclick: function () { ED.fontOpen = open ? null : t.id; if (t.g && !open) select(t.g); buildPanel(); } }, [
+      el('span', { class: 'ftl' }, [el('b', { text: t.label }), el('small', { text: curName })]), ico(open ? 'up' : 'down')]);
+    const row = el('div', { class: 'ftrow' + (open ? ' open' : '') + (t.base ? ' base' : '') }, [head]);
+    if (open) {
+      const committed = cur;
+      let previewing = false;
+      const apply = function (v, commit) {
+        t.set(v); previewing = !commit;
+        if (commit) { changed6(); if (t.base) savePrefs6({ fonts: { title: FS.title, body: FS.body } }); ED.fontOpen = null; buildPanel(); }
+        else redraw();
+      };
+      const box = el('div', { class: 'flist6', onmouseleave: function () { if (previewing) { t.set(committed); previewing = false; redraw(); } } });
+      const item = function (id) {
+        const F = FONTS[id], on = (cur || '') === id;
+        const smp = el('span', { class: 'fsmp6', text: t.sample.slice(0, 26) });
+        const bt = el('button', { type: 'button', class: 'fitem' + (on ? ' on' : ''), onmouseenter: function () { ensureFonts([id]).then(function () { if (ED.fontOpen === t.id) apply(id, false); }); }, onclick: async function () { bt.classList.add('loading'); await ensureFonts([id]); apply(id, true); } }, [smp, el('small', { text: F.name })]);
+        fontSample(smp, id, t.id === 'all_body' ? 'r' : 'b');
+        return bt;
+      };
+      if (!t.base) box.appendChild(el('button', { type: 'button', class: 'fitem tplf' + (!cur ? ' on' : ''), onmouseenter: function () { apply('', false); }, onclick: function () { apply('', true); } }, [el('span', { class: 'fsmp6', text: 'خط القالب' }), el('small', { text: 'كما صمّمه القالب' })]));
+      [['ident', 'خطوط هوية ' + (V6.prog ? V6.prog.name : 'البرنامج')], ['general', 'خطوط أخرى'], ['mine', 'خطوطي']].forEach(function (sec) {
+        if (!C[sec[0]].length) return;
+        box.appendChild(el('div', { class: 'fsec' }, [sec[1]]));
+        C[sec[0]].forEach(function (id) { box.appendChild(item(id)); });
+      });
+      row.appendChild(box);
+    }
+    list.appendChild(row);
+  });
   if (can('fonts')) {
     b.appendChild(el('h4', { class: 'psh', text: 'خطك الخاص' }));
     b.appendChild(el('p', { class: 'tiny', text: 'ارفع ملف خط (OTF أو TTF أو WOFF2) ليظهر لك في كل تصاميمك. ارفع كل وزن في ملف.' }));
@@ -286,31 +344,135 @@ function fontUploader(scope, program, onDone, ui) {
   return el('div', { class: 'row' }, [el('button', { type: 'button', class: 'btn sm line', onclick: function () { file.click(); } }, [ico('upload'), 'ارفع خطاً']), st, file]);
 }
 
-/* ---------- الطبقات ---------- */
+/* ---------- الطبقات: كل العناصر بترتيبها من الأعلى، تُسمّى وتُرتَّب وتُخفى، والقلم يفتح إعداداتها ---------- */
+// الترتيب من الأسفل للأعلى: عناصر القالب بترتيب رسمها، ثم ما نُقل منها إلى الأمام، ثم ما أضافه المستخدم
+function stackOrder() {
+  const front = (S.front || []).filter(function (g) { return LASTG[g] || S.hide['g_' + g]; });
+  const base = Object.keys(LASTG).filter(function (g) { return !isLayer(g) && front.indexOf(g) < 0; });
+  Object.keys(S.hide).forEach(function (k) { if (k.slice(0, 2) === 'g_' && S.hide[k] && base.indexOf(k.slice(2)) < 0 && front.indexOf(k.slice(2)) < 0) base.push(k.slice(2)); });
+  const layers = (S.layers || []).map(function (L) { return 'L:' + L.id; });
+  return { base: base, front: front, layers: layers, all: base.concat(front, layers) };
+}
+function moveInStack(g, dir) {   // dir: +1 للأعلى، -1 للأسفل
+  const o = stackOrder();
+  if (isLayer(g)) {
+    const i = S.layers.findIndex(function (L) { return 'L:' + L.id === g; }), j = i + dir;
+    if (j < 0) { toast('ما تضيفه يبقى فوق عناصر القالب'); return; }
+    if (j >= S.layers.length) return;
+    const L = S.layers.splice(i, 1)[0]; S.layers.splice(j, 0, L);
+  } else {
+    S.front = (S.front || []).slice();
+    const fi = S.front.indexOf(g);
+    if (fi < 0) { if (dir > 0) S.front.unshift(g); else { toast('هذا العنصر في مكانه من القالب'); return; } }
+    else if (dir > 0) { if (fi === S.front.length - 1) { toast('العناصر المضافة فوقه دائماً'); return; } S.front.splice(fi, 1); S.front.splice(fi + 1, 0, g); }
+    else { S.front.splice(fi, 1); if (fi > 0) S.front.splice(fi - 1, 0, g); }
+    void o;
+  }
+  changed6(); buildPanel();
+}
+function renameEl(g, name) { S.names = Object.assign({}, S.names || {}); const v = String(name || '').trim(); if (v) S.names[g] = v.slice(0, 40); else delete S.names[g]; changed6(true); }
+function nameEditor(g, onDone) {
+  const i = el('input', { type: 'text', class: 'lren', value: gName(g), 'aria-label': 'اسم العنصر', onkeydown: function (e) { if (e.key === 'Enter') i.blur(); if (e.key === 'Escape') { i.value = gName(g); i.blur(); } }, onblur: function () { renameEl(g, i.value === gName(g) ? (S.names || {})[g] || '' : i.value); if (onDone) onDone(); } });
+  setTimeout(function () { i.focus(); i.select(); }, 0);
+  return i;
+}
+function icoOf(g) { if (!isLayer(g)) return LASTT[g] && LASTT[g].length ? 'text' : 'layers'; const L = layerById(g.slice(2)); return !L ? 'layers' : L.t === 'text' ? 'text' : L.t === 'img' ? 'image' : L.t === 'logo' ? 'star' : 'shapes'; }
 function pLayers(b) {
-  b.appendChild(panelHead('الطبقات', 'كل عناصر التصميم. اختر عنصراً، أو أخفه، أو رتّب ما أضفته.'));
-  const list = el('div', { class: 'llist6' });
-  (S.layers || []).slice().reverse().forEach(function (L) {
-    const g = 'L:' + L.id;
-    list.appendChild(el('div', { class: 'lrow6' + (S.sel === g ? ' on' : '') }, [
-      el('button', { type: 'button', class: 'lname', onclick: function () { select(g); } }, [ico(L.t === 'text' ? 'text' : L.t === 'img' ? 'image' : 'shapes'), el('span', { text: gName(g) })]),
-      el('button', { type: 'button', class: 'ib sm', title: 'احفظه عنصراً', 'aria-label': 'احفظه عنصراً', onclick: function () { saveElement([L]); } }, [ico('star')]),
-      el('button', { type: 'button', class: 'ib sm', title: 'حذف', 'aria-label': 'حذف', onclick: function () { delLayer6(L.id); } }, [ico('trash')])
+  b.appendChild(panelHead('الطبقات', 'العناصر من الأعلى إلى الأسفل. انقر الاسم مرتين لتغييره، والقلم يفتح إعدادات العنصر.'));
+  const o = stackOrder(), list = el('div', { class: 'llist6' });
+  o.all.slice().reverse().forEach(function (g) {
+    const hidden = !isLayer(g) && S.hide['g_' + g];
+    const nm = el('span', { class: 'lnm', text: gName(g) });
+    // نقرة تحدد العنصر، ونقرتان متتاليتان تفتحان تغيير الاسم (اللوحة تُبنى من جديد بعد التحديد، فنعدّ النقرات بأنفسنا)
+    const nameBtn = ED.renaming === g ? el('div', { class: 'lname' }, [ico(icoOf(g)), nameEditor(g, function () { ED.renaming = null; buildPanel(); })]) :
+      el('button', { type: 'button', class: 'lname', title: 'انقر للتحديد، ومرتين لتغيير الاسم', onclick: function () {
+        const now = Date.now();
+        if (ED.lnc && ED.lnc.g === g && now - ED.lnc.t < 500) { ED.lnc = null; ED.renaming = g; buildPanel(); return; }
+        ED.lnc = { g: g, t: now }; if (!hidden && S.sel !== g) select(g);
+      } }, [ico(icoOf(g)), nm, o.front.indexOf(g) >= 0 ? el('span', { class: 'pill sm', text: 'للأمام' }) : null]);
+    list.appendChild(el('div', { class: 'lrow6' + (S.sel === g ? ' on' : '') + (hidden ? ' hid' : '') }, [
+      nameBtn,
+      el('button', { type: 'button', class: 'ib sm', title: 'للأعلى', 'aria-label': 'للأعلى', onclick: function () { moveInStack(g, 1); } }, [ico('up')]),
+      el('button', { type: 'button', class: 'ib sm', title: 'للأسفل', 'aria-label': 'للأسفل', onclick: function () { moveInStack(g, -1); } }, [ico('down')]),
+      isLayer(g) ? null : el('button', { type: 'button', class: 'ib sm', title: hidden ? 'إظهار' : 'إخفاء', 'aria-label': hidden ? 'إظهار' : 'إخفاء', onclick: function () { if (hidden) delete S.hide['g_' + g]; else { S.hide['g_' + g] = true; if (S.sel === g) select(null); } changed6(); buildPanel(); } }, [ico(hidden ? 'eye' : 'eyeoff')]),
+      el('button', { type: 'button', class: 'ib sm', title: 'إعدادات العنصر', 'aria-label': 'إعدادات العنصر', disabled: hidden, onclick: function () { openElPanel(g); } }, [ico('pencil')])
     ]));
   });
-  if (S.layers && S.layers.length) { b.appendChild(el('h4', { class: 'psh', text: 'ما أضفته' })); b.appendChild(list); if (S.layers.length > 1) b.appendChild(el('button', { type: 'button', class: 'btn sm line', text: 'احفظ كل ما أضفته عنصراً واحداً', onclick: function () { saveElement(S.layers); } })); }
-  b.appendChild(el('h4', { class: 'psh', text: 'عناصر القالب' }));
-  const l2 = el('div', { class: 'llist6' });
-  Object.keys(LASTG).filter(function (k) { return !isLayer(k); }).forEach(function (g) {
-    l2.appendChild(el('div', { class: 'lrow6' + (S.sel === g ? ' on' : '') }, [el('button', { type: 'button', class: 'lname', onclick: function () { select(g); } }, [ico('layers'), el('span', { text: gName(g) })]),
-      el('button', { type: 'button', class: 'ib sm', title: 'إخفاء', 'aria-label': 'إخفاء', onclick: function () { S.hide['g_' + g] = true; select(null); changed6(); } }, [ico('eyeoff')])]));
-  });
-  Object.keys(S.hide).filter(function (k) { return k.slice(0, 2) === 'g_' && S.hide[k]; }).forEach(function (k) {
-    l2.appendChild(el('div', { class: 'lrow6 hid' }, [el('span', { class: 'lname' }, [ico('eyeoff'), el('span', { text: gName(k.slice(2)) })]), el('button', { type: 'button', class: 'ib sm', title: 'إظهار', 'aria-label': 'إظهار', onclick: function () { delete S.hide[k]; changed6(); } }, [ico('eye')])]));
-  });
-  b.appendChild(l2);
-  b.appendChild(el('div', { class: 'psec' }, [el('button', { type: 'button', class: 'btn sm ghost', onclick: function () { if (S.pos) delete S.pos[S.size]; S.gs = {}; select(null); changed6(); } }, [ico('reset'), 'إرجاع كل العناصر إلى مواضعها وأحجامها'])]));
+  b.appendChild(list);
+  if (S.layers && S.layers.length > 1) b.appendChild(el('button', { type: 'button', class: 'btn sm line', text: 'احفظ كل ما أضفته عنصراً واحداً', onclick: function () { saveElement(S.layers); } }));
+  b.appendChild(el('div', { class: 'psec' }, [el('button', { type: 'button', class: 'btn sm ghost', onclick: function () { if (S.pos) delete S.pos[S.size]; S.gs = {}; S.front = []; select(null); changed6(); buildPanel(); } }, [ico('reset'), 'إرجاع كل العناصر إلى مواضعها وأحجامها وترتيبها'])]));
 }
+
+/* ---------- إعدادات عنصر واحد (يفتحها القلم) ---------- */
+function openElPanel(g) {
+  ED.elG = g; ED.prevTab = ED.tab === 'el' ? ED.prevTab : ED.tab; ED.tab = 'el';
+  if (S.sel !== g) select(g);
+  buildRail(); buildPanel();
+  if (window.innerWidth <= 860) document.body.classList.add('sheet-open');
+}
+function slider(label, val, min, max, step, fmt, on) {
+  const out = el('b', { text: fmt(val) });
+  return el('label', { class: 'sld6' }, [el('span', { class: 'sl' }, [label, out]), el('input', { type: 'range', min: String(min), max: String(max), step: String(step), value: String(val),
+    oninput: function (e) { out.textContent = fmt(+e.target.value); on(+e.target.value); redraw(); }, onchange: function () { changed6(); } })]);
+}
+function pEl(b) {
+  const g = ED.elG;
+  if (!g || !(LASTG[g] || (isLayer(g) && layerById(g.slice(2))))) { ED.tab = ED.prevTab || 'layers'; buildRail(); return buildPanel(); }
+  const L = isLayer(g) ? layerById(g.slice(2)) : null, st = (S.gs || {})[g] || {}, texts = fieldsOfGroup(g);
+  const order = stackOrder().all.filter(function (x) { return LASTG[x] || isLayer(x); }), idx = order.indexOf(g);
+  const jump = function (k) { const t = order[idx + k]; if (t) openElPanel(t); };
+  b.appendChild(el('div', { class: 'phd elhd' }, [
+    el('button', { type: 'button', class: 'btn sm ghost elback', onclick: function () { ED.tab = ED.prevTab || 'layers'; buildRail(); buildPanel(); } }, [ico('chev'), 'رجوع']),
+    el('div', { class: 'row elnav' }, [
+      el('button', { type: 'button', class: 'ib sm', title: 'العنصر السابق', 'aria-label': 'العنصر السابق', disabled: idx <= 0, onclick: function () { jump(-1); } }, [ico('chev')]),
+      el('h3', { text: 'إعدادات العنصر' }),
+      el('button', { type: 'button', class: 'ib sm nx', title: 'العنصر التالي', 'aria-label': 'العنصر التالي', disabled: idx >= order.length - 1, onclick: function () { jump(1); } }, [ico('chev')])
+    ])]));
+  b.appendChild(el('div', { class: 'fld' }, [el('label', { text: 'اسمه' }), el('input', { type: 'text', value: gName(g), oninput: function (e) { renameEl(g, e.target.value); const t = $('.tname'); if (t) t.textContent = gName(g); } })]));
+  // النصوص
+  texts.forEach(function (it) {
+    const ph = !it.layer && ED.doc.pages[ED.cur].ph && ED.doc.pages[ED.cur].ph[it.f.k];
+    const ta = el('textarea', { rows: '2', dir: 'auto', placeholder: ph || '' });
+    ta.value = it.layer ? (it.layer.txt || '') : (ph && S.d[it.f.k] === ph ? '' : S.d[it.f.k]);
+    ta.addEventListener('input', function () { if (it.layer) it.layer.txt = ta.value; else S.d[it.f.k] = ta.value === '' && ph ? ph : ta.value; redraw(); clearTimeout(ED.inT); ED.inT = setTimeout(function () { changed6(true); }, 600); });
+    b.appendChild(el('div', { class: 'fld' }, [el('label', { text: it.layer ? 'النص' : it.f.label }), ta]));
+  });
+  // الخط
+  if (texts.length) {
+    const cur = L ? (L.f || '') : (st.f || '');
+    b.appendChild(el('button', { type: 'button', class: 'btn line elfont' }, [ico('font'), el('span', { text: 'الخط: ' + (cur && FONTS[cur] ? FONTS[cur].name : 'خط القالب') })]));
+    $$('.elfont', b).forEach(function (x) { x.onclick = function () { ED.fontOpen = g; ED.tab = 'fonts'; buildRail(); buildPanel(); }; });
+  }
+  // الحجم
+  if (L) {
+    if (L.t === 'text') b.appendChild(slider('حجم الخط', L.sz || 0.06, 0.01, 0.3, 0.002, function (v) { return Math.round(v * 1000); }, function (v) { L.sz = v; }));
+    else b.appendChild(slider('الحجم', L.w, 0.02, 1.6, 0.01, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { L.w = v; }));
+    b.appendChild(slider('الشفافية', L.o == null ? 1 : L.o, 0.1, 1, 0.01, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { L.o = v; }));
+    if (L.t === 'img') b.appendChild(slider('استدارة الحواف', L.r || 0, 0, 0.5, 0.02, function (v) { return Math.round(v * 200) + '٪'; }, function (v) { L.r = v; }));
+    if (L.t === 'text') b.appendChild(el('div', { class: 'row wrapr' }, [segMini([['0', 'عادي'], ['0.6', 'عريض'], ['1', 'أعرض']], String(L.b >= 0.9 ? 1 : L.b >= 0.5 ? 0.6 : 0), function (v) { L.b = +v; changed6(); }),
+      segMini([['right', 'يمين'], ['center', 'وسط'], ['left', 'يسار']], L.al || 'center', function (v) { L.al = v; changed6(); })]));
+  } else b.appendChild(slider('الحجم', st.s || 1, 0.3, 4, 0.01, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { setGs(g, 's', v); }));
+  // الألوان
+  const cols = el('div', { class: 'row wrapr elcols' });
+  if (L && L.t === 'text') { cols.appendChild(el('span', { class: 'tiny', text: 'لون النص' })); cols.appendChild(colorBtn(L.c || '', 'لون النص', function (c) { L.c = c; redraw(); }, { orig: true, origLabel: 'تلقائي' })); cols.appendChild(el('span', { class: 'tiny', text: 'التمييز' })); cols.appendChild(colorBtn(L.hc || '', 'لون التمييز', function (c) { L.hc = c; redraw(); }, { orig: true, origLabel: 'تلقائي' })); }
+  else if (L && L.t !== 'img') { cols.appendChild(el('span', { class: 'tiny', text: 'اللون' })); cols.appendChild(colorBtn(L.c === 'color' ? '' : (L.c || ''), 'اللون', function (c) { L.c = c || (L.t === 'logo' ? 'color' : ''); redraw(); }, { orig: L.t === 'logo', origLabel: 'الأصلي' })); }
+  else if (!L && texts.length) { cols.appendChild(el('span', { class: 'tiny', text: 'لون النص' })); cols.appendChild(colorBtn(st.c || '', 'لون النص', function (c) { setGs(g, 'c', c); redraw(); }, { orig: true })); cols.appendChild(el('span', { class: 'tiny', text: 'التمييز والأيقونات' })); cols.appendChild(colorBtn(st.h || '', 'لون التمييز والأيقونات', function (c) { setGs(g, 'h', c); redraw(); }, { orig: true })); }
+  if (cols.children.length) b.appendChild(cols);
+  // الترتيب والموضع
+  b.appendChild(el('h4', { class: 'psh', text: 'الترتيب والموضع' }));
+  b.appendChild(el('div', { class: 'row wrapr' }, [
+    el('button', { type: 'button', class: 'btn sm line', onclick: function () { moveInStack(g, 1); } }, [ico('up'), 'للأعلى']),
+    el('button', { type: 'button', class: 'btn sm line', onclick: function () { moveInStack(g, -1); } }, [ico('down'), 'للأسفل']),
+    el('button', { type: 'button', class: 'btn sm line', onclick: function () { const bx = LASTG[g]; S.sel = g; moveSel(SIZES[S.size].w / 2 - (bx.x0 + bx.x1) / 2, 0); changed6(); } }, ['توسيط أفقي']),
+    L ? null : el('button', { type: 'button', class: 'btn sm line', onclick: function () { const q = posOf(g); q.dx = 0; q.dy = 0; delete S.gs[g]; S.front = (S.front || []).filter(function (x) { return x !== g; }); changed6(); buildPanel(); } }, [ico('reset'), 'كما في القالب'])
+  ]));
+  b.appendChild(el('div', { class: 'row wrapr', style: 'margin-top:8px' }, L ? [
+    el('button', { type: 'button', class: 'btn sm line', onclick: function () { dupLayer(L); } }, [ico('copy'), 'تكرار']),
+    el('button', { type: 'button', class: 'btn sm line', onclick: function () { saveElement([L]); } }, [ico('star'), 'احفظه عنصراً']),
+    el('button', { type: 'button', class: 'btn sm danger', onclick: function () { delLayer6(L.id); ED.tab = 'layers'; buildRail(); buildPanel(); } }, [ico('trash'), 'حذف'])
+  ] : [el('button', { type: 'button', class: 'btn sm line', onclick: function () { S.hide['g_' + g] = true; select(null); changed6(); ED.tab = 'layers'; buildRail(); buildPanel(); } }, [ico('eyeoff'), 'إخفاء'])]));
+}
+
 async function saveElement(layers) {
   const name = await new Promise(function (ok) { const i = el('input', { type: 'text', id: 'el_name', value: layers.length === 1 ? gName('L:' + layers[0].id) : 'عنصري' }); modal({ title: 'احفظه عنصراً', body: [el('div', { class: 'fld' }, [el('label', { for: 'el_name', text: 'الاسم' }), i]), el('p', { class: 'tiny', text: 'تجده في «العناصر» في كل تصاميمك.' })], acts: [{ t: 'حفظ', cls: 'dark', fn: function () { ok(i.value || 'عنصري'); } }, { t: 'إلغاء', fn: function () { ok(null); } }] }); });
   if (!name) return;

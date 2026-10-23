@@ -44,7 +44,8 @@ function loadState(T, tpl, key) {
 function snap() {
   const d = {}; Object.keys(S.d).forEach(function (k) { const x = S.d[k]; d[k] = x && typeof x === 'object' ? Object.assign({}, x) : x; });
   return { d: d, size: S.size, variant: S.variant, k: S.k, hide: Object.assign({}, S.hide), ov: Object.assign({}, S.ov),
-    pos: JSON.parse(JSON.stringify(S.pos || {})), gs: JSON.parse(JSON.stringify(S.gs || {})), layers: (S.layers || []).map(function (L) { return Object.assign({}, L); }), bgfx: S.bgfx ? Object.assign({}, S.bgfx) : null };
+    pos: JSON.parse(JSON.stringify(S.pos || {})), gs: JSON.parse(JSON.stringify(S.gs || {})), layers: (S.layers || []).map(function (L) { return Object.assign({}, L); }), bgfx: S.bgfx ? Object.assign({}, S.bgfx) : null,
+    names: Object.assign({}, S.names || {}), front: (S.front || []).slice() };
 }
 
 let LASTT = {};   // النصوص المرسومة في كل عنصر في آخر رسم للمعاينة
@@ -90,8 +91,24 @@ function renderTo(canvas, tpl, sizeKey, st, T, scale, collect) {
   }
   GST = gs;
   if (collect) { GBOX = {}; GTXT = {}; }
-  try { tpl.draw(ctx, sz.w, sz.h, d, T2, st.variant, st.k || 1, P); G(ctx, null); drawLayers(ctx, sz.w, sz.h, st.layers, T2); }
-  catch (e) { console.error(e); G(ctx, null); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#b00'; ctx.font = '20px sans-serif'; ctx.fillText('خطأ في القالب: ' + e.message, 10, 30); }
+  // عناصر من القالب نُقلت إلى الأمام: تُخفى في الرسم الأول، ثم يُرسم كل منها وحده فوق الباقي بترتيبه
+  const front = (st.front || []).filter(function (g) { return !GHIDE[g]; });
+  front.forEach(function (g) { GHIDE[g] = 1; });
+  try {
+    tpl.draw(ctx, sz.w, sz.h, d, T2, st.variant, st.k || 1, P); G(ctx, null);
+    if (front.length) {
+      const keepT = GTXT ? Object.assign({}, GTXT) : null;
+      if (GBOX) front.forEach(function (g) { delete GBOX[g]; });
+      front.forEach(function (g) {
+        delete GHIDE[g]; SOLO = {}; SOLO[g] = 1; if (GTXT) GTXT = {};
+        G(ctx, null);
+        try { tpl.draw(ctx, sz.w, sz.h, d, T2, st.variant, st.k || 1, P); } finally { G(ctx, null); SOLO = null; if (SOLO_OUT) { ctx.restore(); SOLO_OUT = false; } }
+        if (keepT) { keepT[g] = GTXT[g] || keepT[g]; GTXT = keepT; }
+      });
+    }
+    drawLayers(ctx, sz.w, sz.h, st.layers, T2);
+  }
+  catch (e) { console.error(e); SOLO = null; G(ctx, null); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#b00'; ctx.font = '20px sans-serif'; ctx.fillText('خطأ في القالب: ' + e.message, 10, 30); }
   const gb = GBOX;
   if (collect) LASTT = GTXT || {};
   HIDE = {}; OV = {}; OFF = {}; GHIDE = {}; GST = {}; PIV = {}; GTXT = null; BGFX = null; GBOX = null; CUR_G = null; CUR_O = null; CUR_S = null;

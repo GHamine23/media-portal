@@ -30,6 +30,7 @@ function loadPage(i) {
   if (ED.doc.kind === 'deck') d.__n = i ? String(i + 1) : '';
   S.d = d; S.variant = tpl.variants.some(function (v) { return v.id === pg.variant; }) ? pg.variant : tpl.variants[0].id; S.k = pg.k || 1;
   S.hide = pg.hide || {}; S.ov = pg.ov || {}; S.pos = pg.pos || {}; S.gs = pg.gs || {}; S.layers = pg.layers || []; S.bgfx = pg.bgfx || null; S.sel = null;
+  S.names = pg.names || {}; S.front = pg.front || [];
 }
 // تصاميم الإصدار الخامس وعروضه تُحوَّل إلى صفحات
 function docFromItem(item) {
@@ -58,7 +59,7 @@ async function openNew(tid, tplId) {
   track('open', { tpl: tpl.id });
 }
 async function openItem(id) {
-  view(el('div', { class: 'boot' }, [el('span', { class: 'spin' }), el('p', { class: 'muted', text: 'نفتح تصميمك…' })]));
+  view(el('div', { class: 'boot' }, [loader6('نفتح تصميمك…')]));
   let item;
   try { item = await API6.me('item_get', id); } catch (e) { toast(e.message); return go('#/mine'); }
   if (!item) { toast('لم نجد هذا التصميم'); return go('#/mine'); }
@@ -66,14 +67,35 @@ async function openItem(id) {
   const doc = docFromItem(item);
   const T = trackOf(doc.track) || tracksOf()[0]; if (!T) return go('#/');
   S.track = T;
-  if (!item.mine) { doc.id = null; doc.name = item.name + ' — نسختي'; doc.shared = false; doc.model = false; doc.arc = null; doc.from = item.id; }
-  const draft = doc.id ? ls('draft.i.' + doc.id) : null;
+  if (!item.mine && !(item.shared && item.coedit)) { doc.id = null; doc.name = item.name + ' — نسختي'; doc.shared = false; doc.model = false; doc.arc = null; doc.from = item.id; }
+  else if (!item.mine) { doc.coedit = true; doc.shared = true; doc.teammate = true; doc.model = false; doc.arc = null; }
+  const draft = doc.id && item.mine ? ls('draft.i.' + doc.id) : null;
   showEditor6(draft && draft.pages && (draft.at || 0) > (item.at || 0) ? draft : doc, false);
+  if (doc.coedit) setTimeout(function () { toast('تصميم مشترك من ' + item.owner + ': ما تعدّله يُحفظ للفريق كله'); }, 800);
   track('open', { tpl: doc.pages[0].tpl });
+}
+// رابط العرض: #/p/<id> يفتح التصميم أو العرض للمشاهدة فقط (لصاحبه ولفريقه إن كان مشتركاً)
+async function showPresent(id) {
+  view(el('div', { class: 'boot' }, [loader6('نفتح العرض…')]));
+  let item;
+  try { item = await API6.me('item_get', id); } catch (e) { toast(e.message); return go('#/'); }
+  if (!item) { toast('لم نجد هذا التصميم'); return go('#/'); }
+  if (item.program && item.program !== V6.prog.id && V6.bundle.programs.some(function (p) { return p.id === item.program; })) await useProgram(item.program, true);
+  const doc = docFromItem(item), T = trackOf(doc.track) || tracksOf()[0]; if (!T) return go('#/');
+  S.track = T;
+  await ensureFonts(doc.pages.reduce(function (a, p) { return a.concat(fontsOfState(p)); }, []));
+  const canEdit = item.mine || (item.shared && item.coedit);
+  const cvs = doc.pages.map(function (p, i) { const tpl = TEMPLATES.find(function (t) { return t.id === p.tpl; }), c = el('canvas', { class: 'pvcv' }); p.d.__n = i ? String(i + 1) : ''; renderTo(c, tpl, p.size, p, T, 1); return c; });
+  view(el('div', { class: 'wrap page pview' }, [
+    el('div', { class: 'phead row wrapr' }, [el('div', {}, [el('span', { class: 'eyebrow', text: (doc.kind === 'deck' ? 'عرض' : 'تصميم') + ' من ' + item.owner }), H('h1', doc.name)]), el('span', { class: 'sp' }),
+      doc.kind === 'deck' ? el('button', { type: 'button', class: 'btn dark', onclick: function () { ED.doc = doc; ED.cur = 0; S.tpl = TEMPLATES.find(function (t) { return t.id === doc.pages[0].tpl; }); present6(true); } }, [ico('play'), 'اعرض بملء الشاشة']) : null,
+      canEdit ? el('a', { class: 'btn line', href: '#/d/' + item.id }, [ico('pencil'), item.mine ? 'افتحه في المحرر' : 'عدّل مع الفريق']) : el('a', { class: 'btn line', href: '#/d/' + item.id }, [ico('copy'), 'افتح نسخة لي'])]),
+    el('div', { class: doc.kind === 'deck' ? 'pvdeck' : 'pvone' }, cvs)
+  ]));
 }
 // فتح تصميم من الأرشيف (للمشرف): نسخة جديدة بجودته الأصلية، لا تمسّ الأصل
 async function openArc(m, id) {
-  view(el('div', { class: 'boot' }, [el('span', { class: 'spin' }), el('p', { class: 'muted', text: 'نفتح التصميم من الأرشيف…' })]));
+  view(el('div', { class: 'boot' }, [loader6('نفتح التصميم من الأرشيف…')]));
   let r;
   try { r = await API6.me('arc_get', m, id); } catch (e) { toast(e.message); return go('#/admin/archive'); }
   const st = JSON.parse(r.state || '{}'), meta = r.meta;
@@ -94,7 +116,8 @@ const RAIL = [
   ['content', 'المحتوى', 'content', 1], ['tpls', 'القوالب', 'grid', 1], ['text', 'النصوص', 'text', 0], ['els', 'العناصر', 'shapes', 0],
   ['imgs', 'الصور', 'image', 1], ['colors', 'الألوان', 'palette', 1], ['fonts', 'الخطوط', 'font', 0], ['layers', 'الطبقات', 'layers', 0], ['assist', 'المساعد', 'sparkles', 0]
 ];
-function railItems() { return RAIL.filter(function (r) { return ED.mode === 'full' || r[3]; }); }
+const LEVEL_TABS = { content: ['content', 'tpls', 'imgs'], style: ['content', 'tpls', 'imgs', 'colors', 'fonts', 'layers'] };
+function railItems() { const lv = LEVEL_TABS[editLevel()]; return RAIL.filter(function (r) { return (ED.mode === 'full' || r[3] || lv) && (!lv || lv.indexOf(r[0]) >= 0); }); }
 function showEditor6(doc, fromDraft) {
   ED.open = true; ED.doc = doc; ED.cur = 0; ED.undo = []; ED.redo = []; ED.autoFit = true; ED.proxies = {}; ED.editing = null;
   ED.mode = ls('emode') || 'simple';
@@ -115,9 +138,11 @@ function showEditor6(doc, fromDraft) {
     el('div', { class: 'e-tools' }, [
       el('button', { type: 'button', class: 'ib', id: 'e_undo', title: 'تراجع (Ctrl+Z)', 'aria-label': 'تراجع', onclick: undo6, disabled: true }, [ico('undo')]),
       el('button', { type: 'button', class: 'ib', id: 'e_redo', title: 'إعادة (Ctrl+Shift+Z)', 'aria-label': 'إعادة', onclick: redo6, disabled: true }, [ico('redo')]),
+      el('button', { type: 'button', class: 'btn sm line e-reset', id: 'e_reset', title: 'إرجاع الصفحة إلى أصل القالب: النصوص والمواضع والألوان والخطوط', onclick: resetPage6 }, [ico('reset'), el('span', { class: 'hide-s', text: 'إعادة الضبط' })]),
       sizeSel,
       el('div', { class: 'e-mode', title: 'البسيط يعرض الأساسيات، والكامل يفتح كل الأدوات' }, [segOf([['simple', 'بسيط'], ['full', 'تحكم كامل']], ED.mode, function (v) { ED.mode = v; ls('emode', v); buildRail(); if (!railItems().some(function (r) { return r[0] === ED.tab; })) { ED.tab = 'content'; } buildPanel(); })])
     ]),
+    el('button', { type: 'button', class: 'ib', id: 'e_share', title: 'شارك بالرابط مع فريقك', 'aria-label': 'مشاركة بالرابط', onclick: function () { shareDialog(); } }, [ico('share')]),
     el('button', { type: 'button', class: 'ib', title: 'ملاحظة للفريق', 'aria-label': 'ملاحظة', onclick: function () { showFeedback6(); } }, [ico('chat')]),
     el('button', { type: 'button', class: 'btn line', id: 'e_save', onclick: function () { saveDialog(); } }, [ico('heart'), el('span', { class: 'hide-s', text: doc.id ? 'محفوظ' : 'حفظ' })]),
     el('button', { type: 'button', class: 'btn dark', id: 'e_dl', onclick: function (e) { dlMenu(e.currentTarget); } }, [ico('download'), el('span', { class: 'hide-s', text: 'تنزيل' })])
@@ -138,7 +163,11 @@ function showEditor6(doc, fromDraft) {
     ])
   ]);
   const mtabs = el('nav', { class: 'e-mtabs', id: 'e_mtabs', 'aria-label': 'الأدوات' });
-  const v = view(el('div', { class: 'ed6' }, [topbar, el('div', { class: 'e-main' }, [rail, panel, stage]), mtabs]));
+  ED.locked = editLevel() === 'content';   // المحتوى فقط: لا سحب ولا تكبير
+  if (editLevel() !== 'full') { const md = $('.e-mode', topbar); if (md) md.remove(); }
+  const main = el('div', { class: 'e-main' }, [rail, panel, panelResizer(), stage]);
+  const pw = +ls('pw'); if (pw >= 260 && pw <= 680) main.style.setProperty('--pw', pw + 'px');
+  const v = view(el('div', { class: 'ed6' }, [topbar, main, mtabs]));
   v.classList.add('ed-view');
   setupKonva();
   buildSizeSel(); buildRail(); buildPanel(); buildPages();
@@ -146,6 +175,19 @@ function showEditor6(doc, fromDraft) {
   requestAnimationFrame(function () { refit(); });
   LEAVE.push(leaveEditor);
   setTimeout(function () { maybeTour('editor'); }, 1200);
+}
+// مقبض بين اللوحة والتصميم: يُسحب لتوسيع اللوحة أو تضييقها، ونقر مزدوج يعيدها لعرضها الأصلي
+function panelResizer() {
+  const h = el('div', { class: 'e-resize', role: 'separator', 'aria-orientation': 'vertical', 'aria-label': 'عرض اللوحة', title: 'اسحب لتوسيع اللوحة أو تضييقها' });
+  h.addEventListener('pointerdown', function (e) {
+    e.preventDefault(); h.setPointerCapture(e.pointerId); h.classList.add('on'); document.body.classList.add('resizing');
+    const main = h.parentNode, mr = main.getBoundingClientRect(), rail = $('.e-rail').getBoundingClientRect().width;
+    function mv(ev) { const w = Math.max(260, Math.min(680, Math.round(mr.right - ev.clientX - rail))); main.style.setProperty('--pw', w + 'px'); ls('pw', w); refit(); }
+    function up() { h.classList.remove('on'); document.body.classList.remove('resizing'); h.removeEventListener('pointermove', mv); h.removeEventListener('pointerup', up); refit(); }
+    h.addEventListener('pointermove', mv); h.addEventListener('pointerup', up);
+  });
+  h.addEventListener('dblclick', function () { h.parentNode.style.removeProperty('--pw'); ls('pw', null); refit(); });
+  return h;
 }
 function leaveEditor() {
   if (!ED.open) return;
@@ -191,7 +233,7 @@ async function saveRemote(quiet) {
   commitPage();
   const d = ED.doc;
   if (!d.id) d.id = newId() + newId();
-  const item = { id: d.id, kind: d.kind, name: d.name || 'تصميمي', shared: !!d.shared, tpl: d.pages[0].tpl, track: d.track, program: d.program || V6.prog.id, pages: d.pages, arc: d.arc || null, thumb: thumbOfDoc() };
+  const item = { id: d.id, kind: d.kind, name: d.name || 'تصميمي', shared: !!d.shared, coedit: !!d.coedit, tpl: d.pages[0].tpl, track: d.track, program: d.program || V6.prog.id, pages: d.pages, arc: d.arc || null, thumb: thumbOfDoc() };
   const sv = $('#e_saved'); if (sv) sv.textContent = 'جارٍ الحفظ…';
   try {
     await API6.me('item_save', JSON.stringify(item));
@@ -214,19 +256,57 @@ async function archive6(via) {
     if (ED.doc === d) { d.arc = { id: r.id, m: r.m }; saveDraft(true); }
   } catch (e) { console.warn('archive', e); }
 }
+function shareUrl(kind, id) { return location.origin + location.pathname + '#/' + kind + '/' + id; }
+function linkRow(label, url) {
+  const i = el('input', { type: 'text', readonly: true, value: url, dir: 'ltr', class: 'inp sm', onclick: function (e) { e.target.select(); } });
+  return el('div', { class: 'linkrow' }, [el('span', { class: 'tiny', text: label }), i, el('button', { type: 'button', class: 'btn sm line', onclick: function () { copyText(url); } }, [ico('copy'), 'نسخ'])]);
+}
 function canAdminProg(pid) { return V6.me && (V6.me.role === 'super' || (V6.me.role === 'sup' && (V6.me.programs || []).indexOf(pid) >= 0)); }
+// إعادة ضبط الصفحة الحالية إلى أصل القالب مع إبقاء ما كتبه المستخدم من نصوص (يُسأل أولاً)
+async function resetPage6() {
+  const keep = await new Promise(function (ok) {
+    modal({ title: 'إعادة الضبط', body: [el('p', { class: 'muted', text: 'تعود هذه الصفحة إلى أصل القالب: المواضع والأحجام والألوان والخطوط والعناصر المضافة والترتيب.' })],
+      acts: [{ t: 'أعد الضبط واحتفظ بنصوصي', cls: 'dark', fn: function () { ok('keep'); } }, { t: 'أعد كل شيء حتى النصوص', fn: function () { ok('all'); } }, { t: 'إلغاء', fn: function () { ok(null); } }], onClose: function () { ok(null); } });
+  });
+  if (!keep) return;
+  pushUndo6();
+  const T = S.track, tpl = S.tpl, pg = ED.doc.pages[ED.cur], fresh = newPage(tpl, T, keep === 'all');
+  fresh.size = S.size;
+  if (keep === 'keep') { Object.keys(pg.d || {}).forEach(function (k) { if (typeof pg.d[k] === 'string' && k in fresh.d) fresh.d[k] = pg.d[k]; }); fresh.ph = pg.ph || {}; }
+  ED.doc.pages[ED.cur] = fresh; loadPage(ED.cur); select(null); buildPanel(); buildSizeSel(); drawNow(); markDirty(); buildPages();
+  toast('عادت الصفحة إلى أصل القالب');
+}
+// مشاركة بالرابط: تُحفظ أولاً إن لم تكن محفوظة، ثم تُعرض الروابط
+async function shareDialog() {
+  const d = ED.doc;
+  if (d.teammate && d.id) { modal({ title: 'روابط المشاركة', body: [linkRow('رابط العرض', shareUrl('p', d.id)), linkRow('رابط التعديل', shareUrl('d', d.id))], acts: [{ t: 'إغلاق', cls: 'dark' }] }); return; }
+  if (!d.id) { toast('احفظ التصميم أولاً، ثم شاركه'); saveDialog(); return; }
+  if (!d.shared) { d.shared = true; if (!(await saveRemote(true))) return; toast('صار مشاركاً مع فريقك'); }
+  const coI = el('input', { type: 'checkbox', checked: !!d.coedit, onchange: async function (e) { d.coedit = e.target.checked; await saveRemote(true); toast(d.coedit ? 'يستطيع الفريق تعديله' : 'للمشاهدة والنسخ فقط'); } });
+  modal({ title: 'شارك مع فريقك', body: [
+    el('p', { class: 'tiny', text: 'الروابط تعمل لمن في فريق ' + (V6.prog ? V6.prog.name : 'برنامجك') + ' وله حساب في المنصة.' }),
+    linkRow('رابط العرض (مشاهدة وتنزيل)', shareUrl('p', d.id)), linkRow('رابط التعديل', shareUrl('d', d.id)),
+    el('label', { class: 'tog' }, [coI, el('span', { text: 'يُسمح للفريق بتعديل التصميم نفسه (وإلا يفتح لهم نسخة)' })])
+  ], acts: [{ t: 'إغلاق', cls: 'dark' }] });
+}
 function saveDialog() {
   const d = ED.doc;
+  if (d.teammate) { saveRemote(); return; }
   const nameI = el('input', { type: 'text', id: 'sv_name', value: d.name || '' });
   const shareI = el('input', { type: 'checkbox', checked: !!d.shared });
   const pid = d.program || V6.prog.id, isAdm = canAdminProg(pid);
   const modelI = isAdm ? el('input', { type: 'checkbox', checked: !!d.model }) : null;
+  const coI = el('input', { type: 'checkbox', checked: !!d.coedit, disabled: !shareI.checked });
+  shareI.addEventListener('change', function () { coI.disabled = !shareI.checked; if (!shareI.checked) coI.checked = false; });
   modal({ title: d.id ? 'حفظ التصميم' : 'احفظه في حسابك', body: [
     el('div', { class: 'fld' }, [el('label', { for: 'sv_name', text: 'الاسم' }), nameI]),
     el('label', { class: 'tog' }, [shareI, el('span', { text: 'شاركه مع فريق ' + (V6.prog ? V6.prog.name : 'برنامجك') + ' (يظهر لهم في «تصاميم الفريق»)' })]),
+    el('label', { class: 'tog sub' }, [coI, el('span', { text: 'ويُسمح للفريق بتعديله معي (لا نسخة لهم، بل التصميم نفسه)' })]),
     modelI ? el('label', { class: 'tog' }, [modelI, el('span', { text: 'اجعله نموذجاً للبرنامج (يظهر لكل المستخدمين في الرئيسية والمعرض، ويبدؤون منه بنسخة لهم)' })]) : null,
+    d.id ? el('div', { class: 'sharebox' }, [el('b', { text: 'روابط المشاركة' }), el('p', { class: 'tiny', text: 'تعمل لمن في فريق البرنامج وله حساب في المنصة. رابط العرض للمشاهدة، ورابط التعديل يفتح المحرر.' }),
+      linkRow('رابط العرض', shareUrl('p', d.id)), linkRow('رابط التعديل', shareUrl('d', d.id))]) : el('p', { class: 'tiny', text: 'بعد الحفظ تظهر هنا روابط المشاركة مع الفريق.' }),
     el('p', { class: 'tiny', text: 'بعد الحفظ يُحفظ كل تعديل تلقائياً، وتجده من أي جهاز.' })
-  ], acts: [{ t: 'حفظ', cls: 'dark', fn: async function () { d.name = nameI.value.trim() || 'تصميمي'; d.shared = shareI.checked; const n = $('.e-name'); if (n) n.value = d.name; const okSave = await saveRemote();
+  ], acts: [{ t: 'حفظ', cls: 'dark', fn: async function () { d.name = nameI.value.trim() || 'تصميمي'; d.shared = shareI.checked; d.coedit = shareI.checked && coI.checked; const n = $('.e-name'); if (n) n.value = d.name; const okSave = await saveRemote();
     if (okSave && modelI && modelI.checked !== !!d.model) { try { await API6.me('item_model', d.id, modelI.checked); d.model = modelI.checked; toast(d.model ? 'صار نموذجاً لكل مستخدمي البرنامج' : 'أُزيل من النماذج'); } catch (e) { toast(e.message); } } } }, { t: 'إلغاء' }] });
 }
 
@@ -293,9 +373,9 @@ async function exportPdf6() {
   const a = el('a', { href: url, download: fileName6('pdf') }); document.body.appendChild(a); a.click(); a.remove();
   track('export', { tpl: 'deck' }); archive6('pdf'); toast('بدأ تنزيل العرض (' + pages.length + ' شرائح)');
 }
-function present6() {
-  commitPage();
-  let i = ED.cur; const pages = ED.doc.pages;
+function present6(fromView) {
+  if (!fromView) commitPage();
+  let i = fromView ? 0 : ED.cur; const pages = ED.doc.pages;
   const c = el('canvas', { class: 'pcv' });
   const ov = el('div', { class: 'present6', tabindex: '0' }, [c, el('div', { class: 'phint', text: 'الأسهم للتنقل · Esc للخروج' })]);
   function draw() { const p = pages[i], tpl = TEMPLATES.find(function (t) { return t.id === p.tpl; }); p.d.__n = i ? String(i + 1) : ''; renderTo(c, tpl, p.size, p, S.track, 1); c.animate([{ opacity: 0.4, filter: 'blur(4px)' }, { opacity: 1, filter: 'none' }], { duration: 380, easing: 'cubic-bezier(.22,1,.36,1)' }); }

@@ -20,13 +20,14 @@ async function showMine6() {
     items.forEach(function (x, i) {
       const T = TRACKS[x.track], prog = V6.bundle.programs.find(function (p) { return p.id === x.program; });
       const card = el('div', { class: 'mcard hover-lift rv', style: '--d:' + (i % 8) }, [
-        el('a', { href: '#/d/' + x.id, class: 'mthumb' }, [el('img', { src: x.thumb || '', alt: '', loading: 'lazy' }), x.shared ? el('span', { class: 'pill bl mshare', text: 'مشارك' }) : null, x.model ? el('span', { class: 'pill or mmodel', text: 'نموذج' }) : null, x.kind === 'deck' ? el('span', { class: 'pill mdeck', text: 'عرض' }) : null]),
+        el('a', { href: '#/d/' + x.id, class: 'mthumb' }, [el('img', { src: x.thumb || '', alt: '', loading: 'lazy' }), x.shared ? el('span', { class: 'pill bl mshare', text: x.coedit ? 'تعديل مشترك' : 'مشارك' }) : null, x.model ? el('span', { class: 'pill or mmodel', text: 'نموذج' }) : null, x.kind === 'deck' ? el('span', { class: 'pill mdeck', text: 'عرض' }) : null]),
         el('div', { class: 'mmeta' }, [el('b', { text: x.name }), el('span', { class: 'tiny', text: [T ? T.name : (prog ? prog.name : ''), x.mine ? '' : 'من ' + x.owner, ago(x.at || 0)].filter(Boolean).join(' · ') })]),
         (x.mine || canAdminProg(x.program)) ? el('button', { type: 'button', class: 'ib sm mmore', 'aria-label': 'خيارات', onclick: function (e) {
           const modelIt = canAdminProg(x.program) ? { t: x.model ? 'إزالة من النماذج' : 'اجعله نموذجاً للبرنامج', ic: 'model', fn: async function () { try { await API6.me('item_model', x.id, !x.model); x.model = !x.model; fill(); toast(x.model ? 'صار نموذجاً يظهر لكل مستخدمي البرنامج' : 'أُزيل من النماذج'); } catch (er) { toast(er.message); } } } : null;
-          if (!x.mine) { popMenu(e.currentTarget, [{ t: 'فتح نسخة لي', ic: 'grid', href: '#/d/' + x.id }, modelIt]); return; }
+          if (!x.mine) { popMenu(e.currentTarget, [{ t: x.coedit ? 'عدّل مع الفريق' : 'فتح نسخة لي', ic: x.coedit ? 'pencil' : 'grid', href: '#/d/' + x.id }, { t: 'عرض', ic: 'play', href: '#/p/' + x.id }, modelIt]); return; }
           popMenu(e.currentTarget, [
-            { t: 'فتح', ic: 'grid', href: '#/d/' + x.id }, modelIt,
+            { t: 'فتح', ic: 'grid', href: '#/d/' + x.id }, { t: 'عرض', ic: 'play', href: '#/p/' + x.id },
+            x.shared ? { t: 'روابط المشاركة', ic: 'share', fn: function () { modal({ title: x.name, body: [linkRow('رابط العرض', shareUrl('p', x.id)), linkRow('رابط التعديل', shareUrl('d', x.id))], acts: [{ t: 'إغلاق', cls: 'dark' }] }); } } : null, modelIt,
             { t: x.shared ? 'إلغاء المشاركة' : 'مشاركة مع الفريق', ic: 'users', fn: async function () { try { const it = await API6.me('item_get', x.id); it.shared = !x.shared; delete it.mine; await API6.me('item_save', JSON.stringify(it)); x.shared = it.shared; fill(); toast(x.shared ? 'صار ظاهراً لفريقك' : 'لم يعد مشاركاً'); } catch (er) { toast(er.message); } } },
             '-', { t: 'حذف', ic: 'trash', fn: async function () { if (!(await ask('حذف التصميم', '«' + x.name + '» سيُحذف من حسابك.', 'حذف', true))) return; try { await API6.me('item_del', x.id); list = list.filter(function (y) { return y.id !== x.id; }); fill(); } catch (er) { toast(er.message); } } }
           ]);

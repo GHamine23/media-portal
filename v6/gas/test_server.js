@@ -121,6 +121,18 @@ call('pack_toggle', adm, 'pack-2026-10-23.js', false);
 ok(!J('api_packs').some(function (x) { return x.name === 'pack-2026-10-23.js'; }) && !J('pack_list', adm)[0].on, 'disabled pack not served');
 call('pack_toggle', adm, 'pack-2026-10-23.js', true);
 ok(J('api_packs').some(function (x) { return x.name === 'pack-2026-10-23.js'; }), 'pack re-enabled');
+// profile, restrictions, program controls
+const prof = J('me_profile', at, JSON.stringify({ name: 'اسمي الجديد', avatar: 'data:image/jpeg;base64,' + Buffer.from([1, 2, 3]).toString('base64') }));
+ok(prof.name === 'اسمي الجديد' && /^data:image\/jpeg/.test(prof.avatar) && J('auth_me', at).avatar === prof.avatar, 'profile name and avatar');
+fails('me_profile', /صورة غير صحيحة/, at, JSON.stringify({ avatar: 'javascript:x' }));
+J('me_profile', at, JSON.stringify({ avatar: '' })); ok(!J('auth_me', at).avatar, 'avatar removed');
+const ra = J('acc_save', sp, JSON.stringify({ uid: alimUser.acc.uid, tracks: ['alim_kids', 'BAD ID'], editLevel: 'content' }));
+ok(ra.acc.tracks.length === 1 && ra.acc.editLevel === 'content', 'account identities + edit level');
+J('prog_save', sp, JSON.stringify({ id: 'alim', fontsId: ['tajawal'], block: { fonts: ['lalezar'], logos: ['lg_x'] }, editLevel: 'style' }));
+const pa = J('prog_list', sp)[0]; ok(pa.fontsId[0] === 'tajawal' && pa.block.fonts[0] === 'lalezar' && pa.editLevel === 'style', 'program font/logo controls');
+fails('font_family', /للمدير العام/, sp, JSON.stringify({ family: 'tajawal', scope: 'program', program: 'alim' }));
+call('font_family', adm, JSON.stringify({ family: 'zain', scope: 'program', program: 'alim' }));
+ok(J('bundle', at).assets.some(function (x) { return x.family === 'zain'; }) && !J('bundle', ut).assets.some(function (x) { return x.family === 'zain'; }), 'font family moved to one program');
 // legacy import
 const imp = J('acc_import', adm, 'academy');
 ok(imp.length === 1 && imp[0].name === 'أ. خالد العمر', 'legacy import');

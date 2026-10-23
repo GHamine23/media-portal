@@ -22,6 +22,7 @@ const GROUP_NAMES = { logo: 'الشعار', title: 'العنوان', sub: 'ال�
   kicker: 'السطر الأعلى', shape: 'الشكل', panel: 'اللوحة', who: 'المقدّم', intro: 'التمهيد', band: 'الشريط', quote: 'العبارة',
   list: 'القائمة', head: 'عنوان القائمة', rows: 'الصفوف', boxes: 'الصناديق', cta: 'زر الدعوة', count: 'رقم الصفحة', tag: 'الوسم', tag2: 'الوسم البارز', foot: 'نص المنصة' };
 function gName(g) {
+  if (g && S.names && S.names[g]) return S.names[g];
   if (g && g.slice(0, 2) === 'L:') { const L = layerById(g.slice(2)); return L ? (LIB_LABEL[L.t] || 'عنصر') + (L.t === 'text' ? ': ' + String(L.txt || '').slice(0, 16) : '') : 'عنصر'; }
   return GROUP_NAMES[g] || g;
 }

@@ -22,7 +22,7 @@ function showAdmin(tab) {
   ({ overview: aOverview, archive: aArchive, models: aModels, accounts: aAccounts, programs: aPrograms, assets: aAssets, fonts: aFonts, feedback: aFeedback, broadcasts: aBroadcasts, changelog: aChangelog, settings: aSettings, audit: aAudit }[tab])(body);
 }
 function aHead(body, title, note, acts) { body.appendChild(el('div', { class: 'ahead' }, [el('div', {}, [el('h2', { text: title }), note ? el('p', { class: 'muted small', text: note }) : null]), el('div', { class: 'row wrapr' }, acts || [])])); }
-function loading(body) { const s = el('div', { class: 'skel', style: 'height:180px' }); body.appendChild(s); return s; }
+function loading(body) { const s = el('div', { class: 'skel ldbox', style: 'height:180px' }, [loader6('', true)]); body.appendChild(s); return s; }
 function progSelect(cur, all, on) {
   const ps = myAdminProgs();
   return el('select', { class: 'inp sm', 'aria-label': 'البرنامج', onchange: function (e) { on(e.target.value); } }, (all ? [el('option', { value: '', text: isSuper() ? 'كل البرامج' : 'برامجي' })] : []).concat(ps.map(function (p) { return el('option', { value: p.id, text: p.name, selected: p.id === cur }); })));
@@ -141,18 +141,28 @@ function accForm(a, done) {
   const progs = el('div', { class: 'checks' }, myAdminProgs().map(function (p) { return el('label', { class: 'tog' }, [el('input', { type: 'checkbox', value: p.id, checked: a.programs.indexOf(p.id) >= 0 }), el('span', { text: p.name })]); }));
   const perms = el('div', { class: 'checks' }, Object.keys(PERM_N).map(function (k) { return el('label', { class: 'tog' }, [el('input', { type: 'checkbox', value: k, checked: !!(a.perms && a.perms[k]) }), el('span', { text: PERM_N[k] })]); }));
   const permBox = el('div', { class: 'fld' }, [el('label', { text: 'الصلاحيات (المشرفون يملكونها كلها)' }), perms]);
+  // الهويات المسموحة: لا اختيار = كل هويات برامجه
+  const trks = el('div', { class: 'checks' }, myAdminProgs().map(function (p) {
+    return el('div', { class: 'trkgrp' }, [el('small', { class: 'tiny', text: p.name }), el('div', { class: 'row wrapr' }, (p.identities || []).map(function (t) { return el('label', { class: 'tog' }, [el('input', { type: 'checkbox', value: t.id, checked: (a.tracks || []).indexOf(t.id) >= 0 }), el('span', { text: t.name })]); }))]);
+  }));
+  let lvl = a.editLevel || '';
+  const lvlBox = el('div', { class: 'fld' }, [el('label', { text: 'درجة التعديل في القوالب' }), segOf([['', 'كما في البرنامج'], ['content', EDIT_N.content], ['style', EDIT_N.style], ['full', EDIT_N.full]], lvl, function (v) { lvl = v; }),
+    el('p', { class: 'tiny', text: 'المحتوى فقط: يكتب النصوص ويغيّر الصور. المحتوى والمظهر: ويغيّر الألوان والخطوط ويحرّك العناصر ويكبّرها. كامل: ويضيف عناصر ونصوصاً جديدة.' })]);
+  const trkBox = el('div', { class: 'fld' }, [el('label', { text: 'الهويات التي يدخلها (اترك الكل فارغاً ليدخل كل الهويات)' }), trks]);
+  const userOnly = el('div', {}, [trkBox, lvlBox]);
   const msg = el('p', { class: 'err' });
   const roles = isSuper() ? [['user', 'مستخدم'], ['sup', 'مشرف برنامج'], ['super', 'المدير العام']] : [['user', 'مستخدم']];
-  permBox.hidden = role !== 'user';
+  permBox.hidden = role !== 'user'; userOnly.hidden = role !== 'user';
   modal({ title: isNew ? 'حساب جديد' : 'تعديل ' + a.name, wide: true, body: [
     el('div', { class: 'grid two' }, [el('div', { class: 'fld' }, [el('label', { for: 'ac_name', text: 'الاسم الظاهر' }), nameI]), el('div', { class: 'fld' }, [el('label', { for: 'ac_user', text: 'اسم المستخدم للدخول' }), userI])]),
     el('div', { class: 'fld' }, [el('label', { for: 'ac_mail', text: 'البريد (اختياري، ويصلح للدخول أيضاً)' }), mailI]),
-    el('div', { class: 'fld' }, [el('label', { text: 'الدور' }), segOf(roles, role, function (v) { role = v; permBox.hidden = v !== 'user'; })]),
+    el('div', { class: 'fld' }, [el('label', { text: 'الدور' }), segOf(roles, role, function (v) { role = v; permBox.hidden = v !== 'user'; userOnly.hidden = v !== 'user'; })]),
     el('div', { class: 'fld' }, [el('label', { text: 'البرامج' }), progs]),
-    permBox, msg
+    permBox, userOnly, msg
   ], acts: [{ t: isNew ? 'أنشئ الحساب' : 'حفظ', cls: 'dark', keep: true, fn: async function (close) {
     const o = { uid: a.uid, name: nameI.value.trim(), username: userI.value.trim(), email: mailI.value.trim(), role: role,
-      programs: $$('input:checked', progs).map(function (i) { return i.value; }), perms: {} };
+      programs: $$('input:checked', progs).map(function (i) { return i.value; }), perms: {},
+      tracks: role === 'user' ? $$('input:checked', trks).map(function (i) { return i.value; }) : [], editLevel: role === 'user' ? lvl : '' };
     $$('input:checked', perms).forEach(function (i) { o.perms[i.value] = true; });
     if (!o.name || !o.username) { msg.textContent = 'اكتب الاسم واسم المستخدم'; return; }
     if (role !== 'super' && !o.programs.length) { msg.textContent = 'اختر برنامجاً واحداً على الأقل'; return; }
@@ -188,17 +198,19 @@ function progForm(p) {
   const colI = el('input', { type: 'color', id: 'pg_col', value: p.color || '#171717' });
   const f = Object.assign({ social: true, slides: true, ai: true }, p.features || {});
   const tg = function (k, t) { return el('label', { class: 'tog' }, [el('input', { type: 'checkbox', checked: f[k] !== false, onchange: function (e) { f[k] = e.target.checked; } }), el('span', { text: t })]); };
-  let active = p.active !== false;
+  let active = p.active !== false, lvl = p.editLevel || 'full';
   const msg = el('p', { class: 'err' });
   modal({ title: isNew ? 'برنامج جديد' : p.name, body: [
     el('div', { class: 'grid two' }, [el('div', { class: 'fld' }, [el('label', { for: 'pg_name', text: 'الاسم' }), nameI]), el('div', { class: 'fld' }, [el('label', { for: 'pg_id', text: 'المعرّف (حروف إنجليزية)' }), idI])]),
     el('div', { class: 'fld' }, [el('label', { for: 'pg_desc', text: 'وصف قصير' }), descI]),
     el('div', { class: 'fld' }, [el('label', { for: 'pg_col', text: 'لون البرنامج في المنصة' }), colI]),
     el('div', { class: 'checks' }, [tg('social', 'قوالب مواقع التواصل (لمن له صلاحيتها)'), tg('slides', 'الشرائح'), tg('ai', 'اصنع إعلانك بالذكاء')]),
+    el('div', { class: 'fld' }, [el('label', { text: 'درجة تعديل المستخدمين في القوالب' }), segOf([['content', EDIT_N.content], ['style', EDIT_N.style], ['full', EDIT_N.full]], lvl, function (v) { lvl = v; }),
+      el('p', { class: 'tiny', text: 'تنطبق على كل مستخدمي البرنامج، إلا من حدّدت له درجة أخرى في حسابه. المشرفون يعدّلون كل شيء.' })]),
     isSuper() && !isNew ? el('label', { class: 'tog' }, [el('input', { type: 'checkbox', checked: active, onchange: function (e) { active = e.target.checked; } }), el('span', { text: 'البرنامج مفعّل' })]) : null,
     msg
   ], acts: [{ t: 'حفظ', cls: 'dark', keep: true, fn: async function (close) {
-    try { await API6.me('prog_save', JSON.stringify({ id: idI.value.trim().toLowerCase(), name: nameI.value.trim(), desc: descI.value, color: colI.value, features: f, active: active, identities: p.identities || [] })); close(); await refreshBundle(); toast('حُفظ'); showAdmin('programs'); }
+    try { await API6.me('prog_save', JSON.stringify({ id: idI.value.trim().toLowerCase(), name: nameI.value.trim(), desc: descI.value, color: colI.value, features: f, active: active, identities: p.identities || [], editLevel: lvl })); close(); await refreshBundle(); toast('حُفظ'); showAdmin('programs'); }
     catch (e) { msg.textContent = e.message; }
   } }, { t: 'إلغاء' }] });
 }
@@ -263,18 +275,24 @@ async function aAssets(body) {
       } });
       return el('span', {}, [el('button', { type: 'button', class: 'btn sm dark', onclick: function () { f.click(); } }, [ico('upload'), label]), f]);
     };
-    box.appendChild(el('div', { class: 'card' }, [el('h3', { text: 'الشعارات' }), el('p', { class: 'tiny', text: 'ارفع شعار كل هوية (يفضّل PNG أو WEBP بخلفية شفافة)، ثم اختره في إعدادات الهوية.' }), el('div', { class: 'row wrapr' }, [up('logo', 'ارفع شعارات')].concat(ASSET_KEYS.map(function (q) { return up('logo', q[1], q[0]); }))), assetGrid(own.filter(function (a) { return a.kind === 'logo'; }), fill)]));
+    box.appendChild(el('div', { class: 'card' }, [el('h3', { text: 'الشعارات' }), el('p', { class: 'tiny', text: 'ارفع شعار كل هوية (يفضّل PNG أو WEBP بخلفية شفافة)، ثم اختره في إعدادات الهوية.' }), el('div', { class: 'row wrapr' }, [up('logo', 'ارفع شعارات')].concat(ASSET_KEYS.map(function (q) { return up('logo', q[1], q[0]); }))), assetGrid(own.filter(function (a) { return a.kind === 'logo'; }), fill, function (a) {
+      const P = V6.bundle.programs.find(function (p) { return p.id === prog; }) || {}, blk = ((P.block && P.block.logos) || []).slice();
+      return el('label', { class: 'tog sm' }, [el('input', { type: 'checkbox', checked: blk.indexOf(a.key) < 0, onchange: async function (e) {
+        const i = blk.indexOf(a.key); if (!e.target.checked && i < 0) blk.push(a.key); if (e.target.checked && i >= 0) blk.splice(i, 1);
+        try { await API6.me('prog_save', JSON.stringify({ id: P.id, block: { fonts: (P.block && P.block.fonts) || [], logos: blk } })); P.block = { fonts: (P.block && P.block.fonts) || [], logos: blk }; toast(e.target.checked ? 'يظهر للمستخدمين' : 'لا يظهر للمستخدمين في العناصر'); } catch (er) { toast(er.message); e.target.checked = !e.target.checked; }
+      } }), el('span', { text: 'متاح للمستخدمين' })]);
+    })]));
     box.appendChild(el('div', { class: 'card' }, [el('h3', { text: 'صور مكتبة القوالب' }), el('p', { class: 'tiny', text: 'تظهر في خانات الصور وخلفيات القوالب لكل أعضاء البرنامج. لا صور للطلاب.' }), up('photo', 'ارفع صوراً'), assetGrid(own.filter(function (a) { return a.kind === 'photo' || a.kind === 'image'; }), fill)]));
   }
   fill();
 }
-function assetGrid(list, refresh) {
+function assetGrid(list, refresh, extra) {
   if (!list.length) return el('p', { class: 'empty', text: 'لا شيء بعد' });
   return el('div', { class: 'agrid' }, list.map(function (a) {
     const im = el('div', { class: 'athumb' });
     if (ASSETS[a.key]) im.style.backgroundImage = 'url(' + ASSETS[a.key] + ')'; else if (a.thumb) im.style.backgroundImage = 'url(' + a.thumb + ')';
     else assetURL(a).then(function (u) { im.style.backgroundImage = 'url(' + u + ')'; }).catch(function () {});
-    return el('div', { class: 'acard' }, [im, el('b', { text: a.name }), el('span', { class: 'tiny', dir: 'ltr', text: a.key }),
+    return el('div', { class: 'acard' }, [im, el('b', { text: a.name }), el('span', { class: 'tiny', dir: 'ltr', text: a.key }), extra ? extra(a) : null,
       el('div', { class: 'row' }, [
         el('button', { type: 'button', class: 'btn sm ghost', text: 'تسمية', onclick: async function () { const n = await promptText('اسم الأصل', a.name); if (n == null) return; const k = await promptText('المفتاح (لربطه بالهوية أو القوالب)', a.key); if (k == null) return; try { await API6.me('asset_meta', JSON.stringify({ id: a.id, name: n, key: k })); await refreshBundle(); refresh(); } catch (e) { toast(e.message); } } }),
         el('button', { type: 'button', class: 'ib sm', 'aria-label': 'حذف', title: 'حذف', onclick: async function () { if (!(await ask('حذف', 'حذف «' + a.name + '»؟ القوالب التي تستعمله ستظهر بلا شعار.', 'حذف', true))) return; try { await API6.me('asset_del', a.id); await refreshBundle(); refresh(); } catch (e) { toast(e.message); } } }, [ico('trash')])
@@ -286,25 +304,53 @@ function promptText(title, val) { return new Promise(function (ok) { const i = e
 /* ---------- الخطوط ---------- */
 async function aFonts(body) {
   let scope = isSuper() ? 'global' : 'program', prog = (myAdminProgs()[0] || {}).id;
-  aHead(body, 'الخطوط', 'ارفع ملفات الخطوط كما هي، كل وزن في ملف. تُعرف العائلة والوزن من اسم الملف.', []);
+  aHead(body, 'الخطوط', 'ارفع ملفات الخطوط كما هي، كل وزن في ملف. ثم حدّد لكل برنامج خطوط هويته، وما لا يظهر لمستخدميه.', []);
   const box = el('div'); body.appendChild(box);
   if (isSuper()) {
+    const uis = []; Object.keys(V6.assets).forEach(function (k) { const a = V6.assets[k]; if (a.kind === 'font' && a.ui) uis.push(a); });
     box.appendChild(el('div', { class: 'card hl' }, [el('span', { class: 'icon-tile t-pu' }, [ico('font')]), el('h3', { text: 'خطوط واجهة المنصة' }),
-      el('p', { class: 'muted small', text: 'ارفع هنا ملفات خط ثمانية (Serif Display وSerif Text وSans) لتظهر بها المنصة كلها. تُخدم من درايفك فقط، ولا تُنشر للعموم.' }),
+      el('p', { class: 'muted small', text: 'ملفات خط ثمانية (Serif Display وSerif Text) لتظهر بها المنصة كلها. تُخدم من درايفك فقط، ولا تُنشر للعموم، ولا تظهر في التصاميم.' }),
+      uis.length ? el('div', { class: 'row wrapr' }, uis.map(function (a) { return el('span', { class: 'pill' }, [a.name, el('button', { type: 'button', class: 'x', 'aria-label': 'حذف', onclick: async function () { if (!(await ask('حذف خط الواجهة', 'حذف «' + a.name + '»؟', 'حذف', true))) return; try { await API6.me('asset_del', a.id); await refreshBundle(); showAdmin('fonts'); } catch (e) { toast(e.message); } } }, [ico('close')])]); })) : el('p', { class: 'tiny', text: 'لم تُرفع بعد، فالمنصة تظهر بخط بديل.' }),
       fontUploader('global', '', function () { refreshBundle().then(function () { loadUiFonts(); showAdmin('fonts'); }); }, true)]));
   }
-  box.appendChild(el('div', { class: 'card' }, [el('h3', { text: 'خطوط للتصاميم' }), el('div', { class: 'row wrapr' }, [
+  box.appendChild(el('div', { class: 'card' }, [el('h3', { text: 'رفع خطوط للتصاميم' }), el('div', { class: 'row wrapr' }, [
     isSuper() ? segOf([['global', 'لكل البرامج'], ['program', 'لبرنامج واحد']], scope, function (v) { scope = v; }) : null,
     progSelect(prog, false, function (v) { prog = v; }),
     fontUploaderDyn(function () { return scope; }, function () { return prog; })
   ])]));
-  const fams = Object.keys(FONT_REG).map(function (k) { return FONT_REG[k]; }).sort(function (a, b) { return (a.scope > b.scope) - (a.scope < b.scope) || a.label.localeCompare(b.label, 'ar'); });
-  box.appendChild(el('div', { class: 'card' }, [el('h3', { text: 'المكتبة (' + fams.length + ' عائلة)' }), el('div', { class: 'flist' }, fams.map(function (r) {
-    const smp = el('span', { class: 'fsmp', text: 'لقاء مفتوح · ١٢٣' });
-    ensureFonts([r.family]).then(function () { const F = FONTS[r.family]; if (F) { const w = F.w.b.split('|'); smp.style.font = (w[1] || 700) + ' 24px "' + w[0] + '", sans-serif'; } }).catch(function () {});
-    return el('div', { class: 'frow' }, [el('div', {}, [smp, el('div', { class: 'tiny', text: r.label + ' · ' + (r.scope === 'global' ? 'لكل البرامج' : r.scope === 'program' ? 'برنامج ' + r.program : 'شخصي') + ' · ' + r.files.length + ' ملف' + (r.files.some(function (f) { return f.ui; }) ? ' · خط الواجهة' : '') })]),
-      (isSuper() || r.scope === 'program') ? el('button', { type: 'button', class: 'ib sm', title: 'حذف العائلة', 'aria-label': 'حذف', onclick: async function () { if (!(await ask('حذف الخط', 'حذف «' + r.label + '» بكل أوزانه؟ التصاميم التي تستعمله تعود لخط القالب.', 'حذف', true))) return; for (const f of r.files) { try { await API6.me('asset_del', f.id); } catch (e) { toast(e.message); } } await refreshBundle(); showAdmin('fonts'); } }, [ico('trash')]) : null]);
-  }))]));
+  // إعدادات الخطوط لبرنامج: خطوط الهوية، والمحجوبة
+  let cur = prog;
+  const lib = el('div'); box.appendChild(el('div', { class: 'card' }, [
+    el('div', { class: 'ahead', style: 'margin:0' }, [el('div', {}, [el('h3', { text: 'مكتبة الخطوط' }), el('p', { class: 'tiny', text: 'خطوط الهوية تظهر أولاً للمستخدم باسم «خطوط هوية البرنامج». والخط غير المتاح لا يظهر لمستخدمي البرنامج (يبقى في التصاميم القديمة).' })]),
+      el('div', { class: 'row' }, [el('span', { class: 'tiny', text: 'إعدادات برنامج:' }), progSelect(cur, false, function (v) { cur = v; fillLib(); })])]),
+    lib]));
+  function fillLib() {
+    lib.innerHTML = '';
+    const P = V6.bundle.programs.find(function (p) { return p.id === cur; }) || {};
+    const idf = (P.fontsId || []).slice(), blk = ((P.block && P.block.fonts) || []).slice();
+    const save = async function (msg) { try { await API6.me('prog_save', JSON.stringify({ id: P.id, fontsId: idf, block: { fonts: blk, logos: (P.block && P.block.logos) || [] } })); P.fontsId = idf.slice(); P.block = { fonts: blk.slice(), logos: (P.block && P.block.logos) || [] }; toast(msg); fillLib(); } catch (e) { toast(e.message); } };
+    const fams = Object.keys(FONT_REG).map(function (k) { return FONT_REG[k]; }).filter(function (r) { return r.scope !== 'user' && (r.scope === 'global' || r.program === cur); });
+    const rank = function (r) { return idf.indexOf(r.family) >= 0 ? 0 : blk.indexOf(r.family) >= 0 ? 2 : 1; };
+    fams.sort(function (a, b) { return rank(a) - rank(b) || (rank(a) === 0 ? idf.indexOf(a.family) - idf.indexOf(b.family) : a.label.localeCompare(b.label, 'ar')); });
+    let lastRank = -1;
+    fams.forEach(function (r) {
+      const rk = rank(r);
+      if (rk !== lastRank) { lib.appendChild(el('h4', { class: 'psh', text: ['خطوط هوية ' + (P.name || ''), 'خطوط أخرى متاحة', 'غير متاحة لمستخدمي البرنامج'][rk] })); lastRank = rk; }
+      const smp = el('span', { class: 'fsmp', text: 'لقاء مفتوح · ١٢٣' });
+      ensureFonts([r.family]).then(function () { const F = FONTS[r.family]; if (F) { const w = F.w.b.split('|'); smp.style.font = (w[1] || 700) + ' 24px "' + w[0] + '", sans-serif'; } }).catch(function () {});
+      const isId = idf.indexOf(r.family) >= 0, isBlk = blk.indexOf(r.family) >= 0;
+      const ctrls = el('div', { class: 'row wrapr fctl' }, [
+        el('label', { class: 'tog' }, [el('input', { type: 'checkbox', checked: isId, onchange: function (e) { const i = idf.indexOf(r.family); if (e.target.checked && i < 0) idf.push(r.family); if (!e.target.checked && i >= 0) idf.splice(i, 1); save(e.target.checked ? 'صار من خطوط الهوية' : 'لم يعد من خطوط الهوية'); } }), el('span', { text: 'من هوية البرنامج' })]),
+        el('label', { class: 'tog' }, [el('input', { type: 'checkbox', checked: !isBlk, onchange: function (e) { const i = blk.indexOf(r.family); if (!e.target.checked && i < 0) blk.push(r.family); if (e.target.checked && i >= 0) blk.splice(i, 1); save(e.target.checked ? 'صار متاحاً' : 'لم يعد يظهر للمستخدمين'); } }), el('span', { text: 'متاح للمستخدمين' })]),
+        isSuper() ? el('select', { class: 'inp sm', 'aria-label': 'نطاق الخط', onchange: async function (e) { const v = e.target.value; try { await API6.me('font_family', JSON.stringify({ family: r.family, scope: v ? 'program' : 'global', program: v })); await refreshBundle(); toast('تغيّر نطاق الخط'); showAdmin('fonts'); } catch (er) { toast(er.message); } } },
+          [el('option', { value: '', text: 'لكل البرامج', selected: r.scope === 'global' })].concat(V6.bundle.programs.map(function (p) { return el('option', { value: p.id, text: 'خاص ببرنامج ' + p.name, selected: r.scope === 'program' && r.program === p.id }); }))) : el('span', { class: 'tiny', text: r.scope === 'global' ? 'لكل البرامج' : 'خاص بالبرنامج' }),
+        (isSuper() || r.scope === 'program') ? el('button', { type: 'button', class: 'ib sm', title: 'حذف العائلة', 'aria-label': 'حذف', onclick: async function () { if (!(await ask('حذف الخط', 'حذف «' + r.label + '» بكل أوزانه؟ التصاميم التي تستعمله ستظهر بخط بديل.', 'حذف', true))) return; try { for (const f of r.files) await API6.me('asset_del', f.id); await refreshBundle(); showAdmin('fonts'); } catch (e) { toast(e.message); } } }, [ico('trash')]) : null
+      ]);
+      lib.appendChild(el('div', { class: 'frow' + (isBlk ? ' off' : '') }, [el('div', { class: 'fmeta' }, [smp, el('div', { class: 'tiny', text: r.label + ' · ' + r.files.length + ' ملف' })]), ctrls]));
+    });
+    if (!fams.length) lib.appendChild(el('p', { class: 'empty', text: 'لا خطوط بعد.' }));
+  }
+  fillLib();
 }
 function fontUploaderDyn(scopeFn, progFn) { return fontUploader(scopeFn, progFn, function () { refreshBundle().then(function () { showAdmin('fonts'); }); }); }
 
