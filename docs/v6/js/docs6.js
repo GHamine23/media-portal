@@ -18,7 +18,9 @@ function newPage(tpl, T, generic) {
 }
 function pageOfState() {
   const s = snap(); const old = ED.doc.pages[ED.cur] || {};
-  return Object.assign({ tpl: S.tpl.id, ph: old.ph || {} }, s);
+  // ما يخص الشريحة في العرض الحي (الخطوات والملاحظات والانتقال) ليس من حالة المحرر، فيبقى
+  const keep = {}; ['steps', 'notes', 'trans'].forEach(function (k) { if (old[k] !== undefined) keep[k] = old[k]; });
+  return Object.assign({ tpl: S.tpl.id, ph: old.ph || {} }, s, keep);
 }
 function commitPage() { if (ED.doc && S.tpl) ED.doc.pages[ED.cur] = pageOfState(); }
 function loadPage(i) {
@@ -234,7 +236,7 @@ async function saveRemote(quiet) {
   commitPage();
   const d = ED.doc;
   if (!d.id) d.id = newId() + newId();
-  const item = { id: d.id, kind: d.kind, name: d.name || 'تصميمي', shared: !!d.shared, coedit: !!d.coedit, tpl: d.pages[0].tpl, track: d.track, program: d.program || V6.prog.id, pages: d.pages, arc: d.arc || null, thumb: thumbOfDoc() };
+  const item = { id: d.id, kind: d.kind, name: d.name || 'تصميمي', shared: !!d.shared, coedit: !!d.coedit, tpl: d.pages[0].tpl, track: d.track, program: d.program || V6.prog.id, pages: d.pages, trans: d.trans || '', arc: d.arc || null, thumb: thumbOfDoc() };
   const sv = $('#e_saved'); if (sv) sv.textContent = 'جارٍ الحفظ…';
   try {
     await API6.me('item_save', JSON.stringify(item));
@@ -375,18 +377,7 @@ async function exportPdf6() {
   const a = el('a', { href: url, download: fileName6('pdf') }); document.body.appendChild(a); a.click(); a.remove();
   track('export', { tpl: 'deck' }); archive6('pdf'); toast('بدأ تنزيل العرض (' + pages.length + ' شرائح)');
 }
-function present6(fromView) {
-  if (!fromView) commitPage();
-  let i = fromView ? 0 : ED.cur; const pages = ED.doc.pages;
-  const c = el('canvas', { class: 'pcv' });
-  const ov = el('div', { class: 'present6', tabindex: '0' }, [c, el('div', { class: 'phint', text: 'الأسهم للتنقل · Esc للخروج' })]);
-  function draw() { const p = pages[i], tpl = TEMPLATES.find(function (t) { return t.id === p.tpl; }); p.d.__n = i ? String(i + 1) : ''; renderTo(c, tpl, p.size, p, S.track, 1); c.animate([{ opacity: 0.4, filter: 'blur(4px)' }, { opacity: 1, filter: 'none' }], { duration: 380, easing: 'cubic-bezier(.22,1,.36,1)' }); }
-  function key(e) { if (e.key === 'Escape') close(); else if (e.key === 'ArrowLeft' || e.key === ' ' || e.key === 'PageDown') { if (i < pages.length - 1) { i++; draw(); } } else if (e.key === 'ArrowRight' || e.key === 'PageUp') { if (i > 0) { i--; draw(); } } }
-  function close() { document.removeEventListener('keydown', key); ov.remove(); if (document.fullscreenElement) document.exitFullscreen().catch(function () {}); }
-  ov.addEventListener('click', function (e) { if (e.clientX < innerWidth / 2) { if (i < pages.length - 1) { i++; draw(); } } else if (i > 0) { i--; draw(); } });
-  document.addEventListener('keydown', key); document.body.appendChild(ov); draw(); ov.focus();
-  if (ov.requestFullscreen) ov.requestFullscreen().catch(function () {});
-}
+/* العرض الحي انتقل إلى slides6.js */
 
 /* ---------- شرائح العرض في الشريط السفلي ---------- */
 function pageThumb(i) {
@@ -410,6 +401,7 @@ function pageMenu(anchor, i) {
     { t: 'تكرار الشريحة', ic: 'copy', fn: function () { commitPage(); ED.doc.pages.splice(i + 1, 0, JSON.parse(JSON.stringify(ED.doc.pages[i]))); loadPage(i + 1); afterPages(); } },
     i > 0 ? { t: 'تحريكها للأمام', ic: 'chev', fn: function () { commitPage(); const p = ED.doc.pages.splice(i, 1)[0]; ED.doc.pages.splice(i - 1, 0, p); loadPage(i - 1); afterPages(); } } : null,
     i < n - 1 ? { t: 'تحريكها للخلف', ic: 'chev', fn: function () { commitPage(); const p = ED.doc.pages.splice(i, 1)[0]; ED.doc.pages.splice(i + 1, 0, p); loadPage(i + 1); afterPages(); } } : null,
+    { t: 'الظهور التدريجي والملاحظات والانتقال', ic: 'wand', fn: function () { slideSettings(i); } },
     { t: 'تطبيق ألوانها وخلفيتها على كل الشرائح', ic: 'palette', fn: function () { commitPage(); const src = ED.doc.pages[i]; ED.doc.pages.forEach(function (p) { p.variant = src.variant; p.ov = Object.assign({}, src.ov); p.bgfx = src.bgfx ? Object.assign({}, src.bgfx) : null; }); loadPage(ED.cur); afterPages(); toast('طُبّقت على ' + n + ' شرائح'); } },
     n > 1 ? '-' : null,
     n > 1 ? { t: 'حذف الشريحة', ic: 'trash', fn: function () { commitPage(); ED.doc.pages.splice(i, 1); loadPage(Math.max(0, Math.min(i, ED.doc.pages.length - 1))); afterPages(); } } : null

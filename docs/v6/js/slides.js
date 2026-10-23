@@ -151,6 +151,30 @@ const SLIDE_TPLS = [
   }
 },
 {
+  id: 'sl_quiz', type: 'slide', hidden: true, name: 'سؤال وجواب', sizes: ['slide'], variants: SL_VARS,
+  fields: [{ k: 'q', label: 'السؤال', kind: 'area', def: 'ما أول ما نزل من القرآن؟', max: 120 }, { k: 'opts', label: 'الخيارات: كل خيار في سطر', kind: 'area', def: 'سورة الفاتحة\nاقرأ باسم ربك\nسورة المدثر\nسورة العلق كاملة', max: 300 },
+    { k: 'ans', label: 'رقم الجواب الصحيح', def: '2', max: 2 }, { k: 'reveal', label: 'إظهار الجواب', kind: 'toggle', def: false }],
+  draw: function (ctx, W, H, d, T, v, k) {
+    const b = slideBase(ctx, W, H, T, v), u = b.u, xr = W - 150 * u;
+    G(ctx, 'tag'); pill(ctx, 'سؤال', xr, 96 * u, 30 * u, b.ac, onBg(b.ac), { bold: 0.7 });
+    const qf = fit(ctx, d.q, { maxW: W * 0.8, maxH: H * 0.3, size: 84 * u * k, lh: 1.3, balance: true, bold: 0.9, title: true });
+    G(ctx, 'title'); drawFit(ctx, qf, xr, 150 * u, { align: 'right', color: b.fg, hl: b.ac });
+    const it = lines(d.opts).slice(0, 6), top = 150 * u + qf.h + 60 * u, avail = H - top - 150 * u, rh = Math.min(140 * u, avail / Math.max(1, it.length)), ans = parseInt(String(d.ans || '').replace(/[٠-٩]/g, function (c) { return '٠١٢٣٤٥٦٧٨٩'.indexOf(c); }), 10);
+    const show = d.reveal === true || d.reveal === 'true';
+    G(ctx, 'body');
+    it.forEach(function (t, i) {
+      const y = top + i * rh, ok = show && i + 1 === ans, bw = W - 300 * u;
+      fillRR(ctx, xr - bw, y, bw, rh * 0.82, 22 * u, ok ? b.ac : (b.dark ? alpha('#ffffff', 0.1) : alpha(b.ac, 0.09)));
+      const nc = ok ? onBg(b.ac) : b.ac;
+      ctx.beginPath(); ctx.arc(xr - 50 * u, y + rh * 0.41, 30 * u, 0, Math.PI * 2); ctx.fillStyle = ok ? onBg(b.ac) : (b.dark ? alpha(b.ac, 0.9) : alpha(b.ac, 0.18)); ctx.fill();
+      line(ctx, 'أبجده'[i] || String(i + 1), xr - 50 * u, y + rh * 0.41, { size: 30 * u, color: ok ? b.ac : (b.dark ? onBg(b.ac) : b.ac), align: 'center', bold: 0.8 });
+      line(ctx, t, xr - 110 * u, y + rh * 0.41, { size: 46 * u, color: ok ? onBg(b.ac) : b.body, align: 'right', bold: ok ? 0.7 : 0.1, maxW: bw - 160 * u });
+      void nc;
+    });
+    slideFoot(ctx, W, H, T, b, d);
+  }
+},
+{
   id: 'sl_end', type: 'slide', hidden: true, name: 'الختام', sizes: ['slide'], variants: SL_VARS,
   fields: [{ k: 'title', label: 'العنوان', kind: 'area', def: 'شكراً لحضوركم', max: 40 }, { k: 'sub', label: 'تحته', def: 'نلتقي في اللقاء القادم بإذن الله', max: 70 }],
   draw: function (ctx, W, H, d, T, v, k) {

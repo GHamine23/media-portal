@@ -496,7 +496,7 @@ function canWriteScope_(a, scope, program) {
   if (scope === 'program') return adminOf_(a, program);
   return true;
 }
-var KINDS = { image: 1, logo: 1, element: 1, font: 1, photo: 1 };
+var KINDS = { image: 1, logo: 1, element: 1, font: 1, photo: 1, video: 1, audio: 1 };
 // meta = {id?, kind, name, mime, scope, program, key, family, weight, style, ui, thumb, data, tags}، b64 محتوى الملف (اختياري للعناصر)
 function asset_put(token, metaJson, b64) {
   var a = auth_(token), m = JSON.parse(metaJson);

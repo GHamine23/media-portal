@@ -56,7 +56,10 @@ function showSlides6(tid) {
         el('div', { class: 'slsamples' }, samples.map(function (s) {
           const first = s.slides[0], tpl = slideTpl(first.tpl), st = { d: Object.assign(defaults(tpl, T), first.d), variant: s.style || tpl.variants[0].id, k: 1 };
           return el('button', { type: 'button', class: 'slsample hover-lift', onclick: function () { openDeckNew(T.id, s.slides, s.name); } }, [tplThumb(tpl, T, 'slide', 220, st), el('b', { text: s.name }), el('small', { class: 'tiny', text: s.slides.length + ' شرائح' })]);
-        }).concat([el('button', { type: 'button', class: 'slsample blank hover-lift', onclick: function () { openDeckNew(T.id, [{ tpl: 'sl_cover', d: {} }, { tpl: 'sl_points', d: {} }], 'عرض جديد'); } }, [ico('plus'), el('b', { text: 'عرض فارغ' })])]))])
+        }).concat([el('button', { type: 'button', class: 'slsample blank hover-lift', onclick: function () { openDeckNew(T.id, [{ tpl: 'sl_cover', d: {} }, { tpl: 'sl_points', d: {} }], 'عرض جديد'); } }, [ico('plus'), el('b', { text: 'عرض فارغ' })])]))]),
+      lessonCard(T),
+      el('div', { class: 'card rv', style: '--d:3' }, [el('span', { class: 'icon-tile t-gr' }, [ico('play')]), el('h3', { text: 'في العرض الحي' }),
+        el('ul', { class: 'feat6' }, [['انتقالات بين الشرائح: تلاشٍ وانزلاق وتكبير وقلب، للعرض كله أو لشريحة بعينها.'], ['ظهور تدريجي: اختر ما يظهر بنقرة من قائمة الشريحة (زر ⋯ تحت الشرائح).'], ['فيديو وصوت من جهازك ورابط يوتيوب من لوحة «العناصر».'], ['شريحة سؤال يظهر جوابها بنقرة، ومؤقّت (T)، وملاحظات المقدّم (N) أو في نافذة ثانية.']].map(function (x) { return el('li', { text: x[0] }); }))])
     ])
   ]));
 }

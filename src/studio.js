@@ -26,7 +26,7 @@ function gName(g) {
   if (g && g.slice(0, 2) === 'L:') { const L = layerById(g.slice(2)); return L ? (LIB_LABEL[L.t] || 'عنصر') + (L.t === 'text' ? ': ' + String(L.txt || '').slice(0, 16) : '') : 'عنصر'; }
   return GROUP_NAMES[g] || g;
 }
-const LIB_LABEL = { sticker: 'زخرفة', icon: 'أيقونة', logo: 'شعار', img: 'صورة', text: 'نص' };
+const LIB_LABEL = { sticker: 'زخرفة', icon: 'أيقونة', logo: 'شعار', img: 'صورة', text: 'نص', video: 'فيديو', yt: 'يوتيوب', audio: 'صوت' };
 
 /* ---------- الطبقات: عناصر مضافة من المكتبة ---------- */
 // x, y نسبة من العرض والارتفاع (المركز). w نسبة من العرض. rot بالدرجات
@@ -86,12 +86,28 @@ function drawLayer(ctx, W, H, L, T) {
     if (L.t === 'sticker') ar = (STICKERS[L.ref] && STICKERS[L.ref].ar) || 1;
     if (L.t === 'logo') { const k = L.ref === 'track' ? T.logo : L.ref; const mask = k === 'academy' || k === 'social'; src = (!mask && (!L.c || L.c === 'color')) ? IMG[k] : tinted(k, L.c && L.c !== 'color' ? L.c : '#2b2b2b'); if (src) ar = srcH(src) / srcW(src); }
     if (L.t === 'img') { src = layerImg(L); if (src) ar = srcH(src) / srcW(src); }
+    if (L.t === 'video') { src = L.poster ? layerImg({ t: 'img', ref: L.poster }) : null; ar = src ? srcH(src) / srcW(src) : 9 / 16; }
+    if (L.t === 'yt') ar = 9 / 16;
+    if (L.t === 'audio') ar = 0.22;
     const h = w * ar;
     area(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2);
     ctx.translate(cx, cy); if (L.rot) ctx.rotate(L.rot * Math.PI / 180);
     const save = BOXES; BOXES = null; const gb = GBOX; GBOX = null;
     if (L.t === 'sticker' && STICKERS[L.ref]) STICKERS[L.ref].draw(ctx, w, L.c || T.c.p);
     else if (L.t === 'icon') icon(ctx, L.ref, 0, 0, w, L.c || T.c.p);
+    else if (L.t === 'yt' || L.t === 'video') {   // بطاقة وسائط: ملصق الفيديو أو بطاقة يوتيوب، وزر تشغيل يعمل في العرض الحي
+      ctx.save(); rrect(ctx, -w / 2, -h / 2, w, h, Math.min(w, h) * 0.06); ctx.clip();
+      if (src) ctx.drawImage(src, -w / 2, -h / 2, w, h); else { ctx.fillStyle = L.t === 'yt' ? '#1a1a1a' : '#2a2a2a'; ctx.fillRect(-w / 2, -h / 2, w, h); }
+      ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(-w / 2, -h / 2, w, h); ctx.restore();
+      const r = Math.min(w, h) * 0.17; ctx.fillStyle = L.t === 'yt' ? '#ff0000' : 'rgba(255,255,255,.92)'; rrect(ctx, -r * 1.4, -r, r * 2.8, r * 2, r * 0.45); ctx.fill();
+      ctx.fillStyle = L.t === 'yt' ? '#ffffff' : '#111111'; ctx.beginPath(); ctx.moveTo(-r * 0.35, -r * 0.5); ctx.lineTo(r * 0.55, 0); ctx.lineTo(-r * 0.35, r * 0.5); ctx.closePath(); ctx.fill();
+      if (L.title) line(ctx, L.title, 0, h / 2 - w * 0.045, { size: w * 0.036, color: '#ffffff', align: 'center', maxW: w * 0.9 });
+    }
+    else if (L.t === 'audio') {
+      ctx.fillStyle = L.c || T.c.p; rrect(ctx, -w / 2, -h / 2, w, h, h / 2); ctx.fill();
+      const r = h * 0.3; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(w / 2 - h * 0.62 - r * 0.4, -r * 0.6); ctx.lineTo(w / 2 - h * 0.62 + r * 0.6, 0); ctx.lineTo(w / 2 - h * 0.62 - r * 0.4, r * 0.6); ctx.closePath(); ctx.fill();
+      line(ctx, L.title || 'صوت', w / 2 - h * 1.1, 0, { size: h * 0.42, color: '#ffffff', align: 'right', maxW: w - h * 1.4 });
+    }
     else if (src) {
       if (L.t === 'img' && L.r) { ctx.save(); rrect(ctx, -w / 2, -h / 2, w, h, Math.min(w, h) * L.r); ctx.clip(); ctx.drawImage(src, -w / 2, -h / 2, w, h); ctx.restore(); }
       else ctx.drawImage(src, -w / 2, -h / 2, w, h);

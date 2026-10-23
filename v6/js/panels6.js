@@ -181,6 +181,7 @@ function pEls(b) {
   const g4 = sec('عناصري المحفوظة');
   if (!mine.length) g4.appendChild(el('p', { class: 'tiny', text: 'اختر طبقة أضفتها، ثم «احفظها عنصراً» من لوحة الطبقات لتجدها هنا في كل تصاميمك.' }));
   mine.forEach(function (a) { const bt = el('button', { type: 'button', class: 'libb', title: a.name, onclick: function () { a.data.layers.forEach(function (L) { const c = JSON.parse(JSON.stringify(L)); addLayer6(c); }); } }); if (a.thumb) bt.style.backgroundImage = 'url(' + a.thumb + ')'; else bt.textContent = a.name; g4.appendChild(bt); });
+  if (typeof mediaPanelSection === 'function') mediaPanelSection(b);
 }
 
 /* ---------- الصور ---------- */
@@ -450,6 +451,11 @@ function pEl(b) {
     else b.appendChild(slider('الحجم', L.w, 0.02, 1.6, 0.01, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { L.w = v; }));
     b.appendChild(slider('الشفافية', L.o == null ? 1 : L.o, 0.1, 1, 0.01, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { L.o = v; }));
     if (L.t === 'img') b.appendChild(slider('استدارة الحواف', L.r || 0, 0, 0.5, 0.02, function (v) { return Math.round(v * 200) + '٪'; }, function (v) { L.r = v; }));
+    if (L.t === 'yt' || L.t === 'video' || L.t === 'audio') {
+      b.appendChild(el('div', { class: 'fld' }, [el('label', { text: 'العنوان على البطاقة' }), el('input', { type: 'text', class: 'inp sm', value: L.title || '', oninput: function (e) { L.title = e.target.value; changed6(); } })]));
+      if (L.t === 'yt') b.appendChild(el('div', { class: 'fld' }, [el('label', { text: 'رابط يوتيوب' }), el('input', { type: 'url', class: 'inp sm', dir: 'ltr', value: L.url || '', onchange: function (e) { const id = ytId(e.target.value); if (!id) { toast('الرابط ليس رابط يوتيوب'); return; } L.url = 'https://www.youtube.com/watch?v=' + id; changed6(); } })]));
+      b.appendChild(el('p', { class: 'tiny', text: 'تعمل الوسائط في العرض بملء الشاشة؛ وفي PDF تبقى بطاقة.' }));
+    }
     if (L.t === 'text') b.appendChild(el('div', { class: 'row wrapr' }, [segMini([['0', 'عادي'], ['0.6', 'عريض'], ['1', 'أعرض']], String(L.b >= 0.9 ? 1 : L.b >= 0.5 ? 0.6 : 0), function (v) { L.b = +v; changed6(); }),
       segMini([['right', 'يمين'], ['center', 'وسط'], ['left', 'يسار']], L.al || 'center', function (v) { L.al = v; changed6(); })]));
   } else b.appendChild(slider('الحجم', st.s || 1, 0.3, 4, 0.01, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { setGs(g, 's', v); }));
