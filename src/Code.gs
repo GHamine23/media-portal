@@ -788,7 +788,7 @@ function ai_make(token, json) {
   var req = JSON.parse(json);   // {system, prompt, schema}
   var body = { contents: [{ role: 'user', parts: [{ text: clip_(req.prompt, 12000) }] }],
     systemInstruction: { parts: [{ text: clip_(req.system, 20000) }] },
-    generationConfig: { responseMimeType: 'application/json', responseJsonSchema: req.schema, temperature: req.temperature != null ? +req.temperature : 0.9 } };
+    generationConfig: { responseMimeType: 'application/json', responseSchema: req.schema, temperature: req.temperature != null ? +req.temperature : 0.9 } };
   var model = String(s.ai.model || 'gemini-3.8-flash').replace(/[^\w.\-]/g, '');
   var res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
     method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true, headers: { 'x-goog-api-key': key } });

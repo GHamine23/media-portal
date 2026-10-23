@@ -41,7 +41,7 @@ parts = {
     'assets.js': 'const ASSETS = {\n' + ',\n'.join('  %s: "%s"' % (k, v.replace('/', '\\/')) for k, v in assets.items()) + '\n};\n',
     'config.js': 'const API_URL = %s;\n' % ('"' + api_url + '"' if api_url else "''"),
 }
-ORDER = ['engine.js', 'identities.js', 'templates.js', 'templates2.js', 'studio.js', 'slides.js', 'account.js', 'ui.js', 'boot.js']
+ORDER = ['engine.js', 'identities.js', 'templates.js', 'templates2.js', 'core5.js', 'studio.js', 'slides.js', 'account.js', 'ui.js', 'boot.js']
 for f in ORDER: parts[f] = (SRC / f).read_text()
 shell = (SRC / 'shell.html').read_text()
 

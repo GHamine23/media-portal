@@ -22,6 +22,7 @@ let OFF = {}, GBOX = null, CUR_G = null, CUR_O = null, GHIDE = {};
 /* تنسيق كل عنصر وحده: GST[المجموعة] = {s: تكبير، c: لون النص، h: لون التمييز والأيقونات، f: الخط}
    PIV مراكز العناصر قبل التكبير (يُكبَّر العنصر حول مركزه)، GTXT النصوص المرسومة في كل عنصر */
 let GST = {}, PIV = {}, CUR_S = null, GTXT = null;
+let PHTXT = null;   // نصوص العناوين العامة التي لم يغيّرها المستخدم بعد: تُرسم باهتة في المعاينة فقط
 const FAR = { dx: -100000, dy: -100000 };
 function G(ctx, name) {
   if (CUR_G) ctx.restore();
@@ -46,7 +47,11 @@ function fontOf(role, bold) {
   const fake = set.fake ? ({ l: 0, r: 0, m: 0.25, b: 0.6, k: 1 }[wk]) : 0;
   return { fam: set.w[wk] || set.w.r, stroke: fake };
 }
-function F(size, fam) { return Math.round(size * 10) / 10 + 'px "' + (fam || 'tj_r') + '", ' + FALLBACK; }
+// fam اسم الخط، أو «الاسم|الوزن» للخطوط المتغيرة والعائلات متعددة الأوزان
+function F(size, fam) {
+  fam = fam || 'tj_r'; const i = fam.indexOf('|');
+  return (i > 0 ? fam.slice(i + 1) + ' ' : '') + Math.round(size * 10) / 10 + 'px "' + (i > 0 ? fam.slice(0, i) : fam) + '", ' + FALLBACK;
+}
 
 function loadImg(src) {
   return new Promise(function (ok) {
@@ -241,6 +246,9 @@ function drawFit(ctx, f, x, y, o) {
       if (GTXT && CUR_G) (GTXT[CUR_G] = GTXT[CUR_G] || []).push(tx); }
     ctx.textAlign = 'right';
     const gs = gStyle();
+    let dim = false;
+    if (PHTXT && PHTXT.length) { const lt = norm(runsOf(l.words).map(function (r) { return r.t; }).join(' ')).replace(/\s+/g, ' ').trim(); dim = !!lt && PHTXT.some(function (p) { return p.indexOf(lt) >= 0; }); }
+    if (dim) { ctx.save(); ctx.globalAlpha *= 0.38; }
     runsOf(l.words).forEach(function (r) {
       if (r.sp) xr -= sp;
       const col = r.hl ? ((gs && gs.h) || o.hl || hlFor(o.color)) : ((gs && gs.c) || o.color);
@@ -249,6 +257,7 @@ function drawFit(ctx, f, x, y, o) {
       ctx.fillText(r.t, xr, yc);
       xr -= ctx.measureText(r.t).width;
     });
+    if (dim) ctx.restore();
   });
   return y + f.h;
 }

@@ -1,0 +1,331 @@
+/* ================= المستند: الفتح والحفظ التلقائي والتراجع والتنزيل وبناء شاشة المحرر ================= */
+/* المستند صفحات، وكل صفحة حالة قالب كاملة. التصميم صفحة واحدة، والعرض عدة شرائح */
+const GENERIC = { title: 'العنوان الرئيسي', sub: 'العنوان الفرعي', kicker: 'السطر التمهيدي', top: 'السطر التمهيدي', who: 'اسم المقدّم', name: 'الاسم', body: 'النص هنا',
+  place: 'المكان', chip: 'الوسم', head: 'عنوان القائمة', intro: 'سطر التمهيد', quote: 'العبارة', foot: 'نص التذييل', src: 'المصدر', role: 'الصفة', desc: 'الوصف', cta: 'زر الدعوة', badge: 'الوسم', tag: 'الوسم' };
+const MONTHS = /(محرم|صفر|ربيع|جمادى|رجب|شعبان|رمضان|شوال|ذو القعدة|ذو الحجة|يناير|فبراير|مارس|أبريل|مايو|يونيو|يوليو|أغسطس|سبتمبر|أكتوبر|نوفمبر|ديسمبر|الأحد|الاثنين|الإثنين|الثلاثاء|الأربعاء|الخميس|الجمعة|السبت|مساء|صباح|هـ\b)/;
+// العنوان العام للحقل: الأرقام والأوقات والتواريخ تبقى أمثلة، وغيرها يصير اسم الخانة
+function genericOf(f) {
+  const def = String(f.def == null ? '' : f.def);
+  if (!def.trim() || /[0-9٠-٩]/.test(def) || MONTHS.test(def) || f.kind === 'date' || f.kind === 'image' || f.kind === 'toggle' || f.kind === 'choice') return null;
+  if (def.indexOf('|') >= 0 || def.split('\n').length > 3) return null;   // الجداول والقوائم تبقى مثالاً يوضّح الشكل
+  return GENERIC[f.k] || String(f.label || '').replace(/\s*\(.*\)\s*/, '').trim() || null;
+}
+function newPage(tpl, T, generic) {
+  const d = defaults(tpl, T), ph = {};
+  if (generic) tpl.fields.forEach(function (f) { if (!f.k || typeof d[f.k] !== 'string') return; const g = genericOf(f); if (g) { d[f.k] = g; ph[f.k] = g; } });
+  const szs = sizesFor(tpl);
+  return { tpl: tpl.id, size: szs[0], d: d, variant: tpl.variants[0].id, k: 1, hide: {}, ov: {}, pos: {}, gs: {}, layers: [], bgfx: null, ph: ph };
+}
+function pageOfState() {
+  const s = snap(); const old = ED.doc.pages[ED.cur] || {};
+  return Object.assign({ tpl: S.tpl.id, ph: old.ph || {} }, s);
+}
+function commitPage() { if (ED.doc && S.tpl) ED.doc.pages[ED.cur] = pageOfState(); }
+function loadPage(i) {
+  const pg = ED.doc.pages[i]; if (!pg) return;
+  ED.cur = i;
+  const tpl = TEMPLATES.find(function (t) { return t.id === pg.tpl; }) || TEMPLATES.find(function (t) { return t.id === 'blank'; });
+  S.tpl = tpl; S.size = tpl.sizes.indexOf(pg.size) >= 0 ? pg.size : sizesFor(tpl)[0];
+  const d = defaults(tpl, S.track); Object.keys(pg.d || {}).forEach(function (k) { if (k in d || k === '__n') d[k] = pg.d[k]; });
+  if (ED.doc.kind === 'deck') d.__n = i ? String(i + 1) : '';
+  S.d = d; S.variant = tpl.variants.some(function (v) { return v.id === pg.variant; }) ? pg.variant : tpl.variants[0].id; S.k = pg.k || 1;
+  S.hide = pg.hide || {}; S.ov = pg.ov || {}; S.pos = pg.pos || {}; S.gs = pg.gs || {}; S.layers = pg.layers || []; S.bgfx = pg.bgfx || null; S.sel = null;
+}
+// تصاميم الإصدار الخامس وعروضه تُحوَّل إلى صفحات
+function docFromItem(item) {
+  if (item.pages) return item;
+  if (item.kind === 'deck' || item.deck) {
+    const dk = item.deck || item;
+    return { id: item.id, kind: 'deck', name: item.name || dk.name, track: item.track || dk.track, program: item.program || 'academy', shared: !!item.shared,
+      pages: (dk.slides || []).map(function (s) { return { tpl: s.tpl, size: 'slide', d: s.d || {}, variant: dk.style, k: s.k || 1, hide: s.hide || {}, ov: dk.ov || {}, pos: s.pos || {}, gs: {}, layers: s.layers || [], bgfx: dk.bgfx || null, ph: {} }; }) };
+  }
+  return { id: item.id, kind: 'design', name: item.name, track: item.track, program: item.program || 'academy', shared: !!item.shared,
+    pages: [Object.assign({ tpl: item.tpl, ph: {} }, item.st || {})] };
+}
+function draftKey() { const d = ED.doc; return 'draft.' + (d.id ? 'i.' + d.id : d.track + '.' + d.pages[0].tpl + (d.kind === 'deck' ? '.deck' : '')); }
+
+/* ---------- الفتح ---------- */
+async function openNew(tid, tplId) {
+  const fromMake = /\?make/.test(tplId || ''); tplId = String(tplId || '').split('?')[0];
+  const T = trackOf(tid); if (!T) return go('#/');
+  const tpl = TEMPLATES.find(function (t) { return t.id === tplId; }); if (!tpl) return go('#/g/' + tid);
+  S.track = T; ls('lastTrack', T.id);
+  const key = 'draft.' + T.id + '.' + tpl.id, draft = ls(key), pick = fromMake ? ls('makePick') : null;
+  let doc;
+  if (pick && pick.page && pick.page.tpl === tpl.id) { ls('makePick', null); doc = { kind: 'design', name: (String(pick.page.d.title || tpl.name).replace(/[*\n]/g, ' ').trim().slice(0, 50)) || tpl.name, track: T.id, program: V6.prog.id, shared: false, pages: [pick.page] }; }
+  else doc = draft && draft.pages ? draft : { kind: 'design', name: tpl.id === 'blank' ? 'تصميم جديد' : tpl.name, track: T.id, program: V6.prog.id, shared: false, pages: [newPage(tpl, T, tpl.id !== 'blank')] };
+  showEditor6(doc, !!draft && !pick);
+  track('open', { tpl: tpl.id });
+}
+async function openItem(id) {
+  view(el('div', { class: 'boot' }, [el('span', { class: 'spin' }), el('p', { class: 'muted', text: 'نفتح تصميمك…' })]));
+  let item;
+  try { item = await API6.me('item_get', id); } catch (e) { toast(e.message); return go('#/mine'); }
+  if (!item) { toast('لم نجد هذا التصميم'); return go('#/mine'); }
+  if (item.program && item.program !== V6.prog.id && V6.bundle.programs.some(function (p) { return p.id === item.program; })) await useProgram(item.program, true);
+  const doc = docFromItem(item);
+  const T = trackOf(doc.track) || tracksOf()[0]; if (!T) return go('#/');
+  S.track = T;
+  if (!item.mine) { doc.id = null; doc.name = item.name + ' — نسختي'; doc.shared = false; doc.from = item.id; }
+  const draft = doc.id ? ls('draft.i.' + doc.id) : null;
+  showEditor6(draft && draft.pages && (draft.at || 0) > (item.at || 0) ? draft : doc, false);
+  track('open', { tpl: doc.pages[0].tpl });
+}
+function openDeckNew(tid, slides, name) {
+  const T = trackOf(tid); S.track = T;
+  const pages = slides.map(function (s) { const tpl = TEMPLATES.find(function (t) { return t.id === s.tpl; }) || slideTpl(s.tpl); const pg = newPage(tpl, T, false); Object.assign(pg.d, s.d || {}); return pg; });
+  showEditor6({ kind: 'deck', name: name || 'عرض جديد', track: T.id, program: V6.prog.id, shared: false, pages: pages }, false);
+}
+
+/* ---------- شاشة المحرر ---------- */
+const RAIL = [
+  ['content', 'المحتوى', 'content', 1], ['tpls', 'القوالب', 'grid', 1], ['text', 'النصوص', 'text', 0], ['els', 'العناصر', 'shapes', 0],
+  ['imgs', 'الصور', 'image', 1], ['colors', 'الألوان', 'palette', 1], ['fonts', 'الخطوط', 'font', 0], ['layers', 'الطبقات', 'layers', 0], ['assist', 'المساعد', 'sparkles', 0]
+];
+function railItems() { return RAIL.filter(function (r) { return ED.mode === 'full' || r[3]; }); }
+function showEditor6(doc, fromDraft) {
+  ED.open = true; ED.doc = doc; ED.cur = 0; ED.undo = []; ED.redo = []; ED.autoFit = true; ED.proxies = {}; ED.editing = null;
+  ED.mode = ls('emode') || 'simple';
+  ED.tab = doc.pages[0].tpl === 'blank' ? 'assist' : 'content';
+  if (ED.tab === 'assist') ED.mode = 'full';
+  $('#top').hidden = true; document.body.classList.add('in-editor');
+  loadPage(0);
+  document.title = doc.name + ' — المحرر';
+  EPV = el('canvas', { class: 'e-cv', 'aria-label': 'التصميم' });
+  const nameI = el('input', { type: 'text', class: 'e-name', value: doc.name, 'aria-label': 'اسم التصميم', dir: 'auto', oninput: function (e) { ED.doc.name = e.target.value; markDirty(); } });
+  const back = (TRACKS[doc.track] ? '#/g/' + doc.track : '#/');
+  const sizeSel = el('select', { class: 'e-size', 'aria-label': 'المقاس', id: 'e_size', onchange: function (e) { S.size = e.target.value; S.sel = null; changed6(); setTimeout(refit, 0); } });
+  const topbar = el('header', { class: 'e-top' }, [
+    el('a', { href: back, class: 'ib', 'aria-label': 'رجوع', title: 'رجوع', onclick: function () { leaveEditor(); } }, [ico('chev')]),
+    el('a', { href: '#/', class: 'e-logo', 'aria-label': 'الرئيسية', onclick: function () { leaveEditor(); } }, [brandImg('mark')]),
+    nameI, el('span', { class: 'e-saved tiny', id: 'e_saved', text: fromDraft ? 'استعدنا مسودتك' : '' }),
+    el('span', { class: 'sp' }),
+    el('div', { class: 'e-tools' }, [
+      el('button', { type: 'button', class: 'ib', id: 'e_undo', title: 'تراجع (Ctrl+Z)', 'aria-label': 'تراجع', onclick: undo6, disabled: true }, [ico('undo')]),
+      el('button', { type: 'button', class: 'ib', id: 'e_redo', title: 'إعادة (Ctrl+Shift+Z)', 'aria-label': 'إعادة', onclick: redo6, disabled: true }, [ico('redo')]),
+      sizeSel,
+      el('div', { class: 'e-mode', title: 'البسيط يعرض الأساسيات، والكامل يفتح كل الأدوات' }, [segOf([['simple', 'بسيط'], ['full', 'تحكم كامل']], ED.mode, function (v) { ED.mode = v; ls('emode', v); buildRail(); if (!railItems().some(function (r) { return r[0] === ED.tab; })) { ED.tab = 'content'; } buildPanel(); })])
+    ]),
+    el('button', { type: 'button', class: 'ib', title: 'ملاحظة للفريق', 'aria-label': 'ملاحظة', onclick: function () { showFeedback6(); } }, [ico('chat')]),
+    el('button', { type: 'button', class: 'btn line', id: 'e_save', onclick: function () { saveDialog(); } }, [ico('heart'), el('span', { class: 'hide-s', text: doc.id ? 'محفوظ' : 'حفظ' })]),
+    el('button', { type: 'button', class: 'btn dark', id: 'e_dl', onclick: function (e) { dlMenu(e.currentTarget); } }, [ico('download'), el('span', { class: 'hide-s', text: 'تنزيل' })])
+  ]);
+  const rail = el('nav', { class: 'e-rail', 'aria-label': 'الأدوات', id: 'e_rail' });
+  const panel = el('aside', { class: 'e-panel', id: 'e_panel' });
+  const stage = el('section', { class: 'e-stage' }, [
+    el('div', { class: 'e-scroll' }, [el('div', { class: 'e-canvas' }, [EPV, el('div', { id: 'e_konva', class: 'e-konva' })]), el('div', { class: 'e-tb', id: 'e_tb', role: 'toolbar', 'aria-label': 'خصائص العنصر' })]),
+    el('span', { class: 'e-axis', id: 'e_axis', hidden: true }),
+    el('div', { class: 'e-bottom' }, [
+      doc.kind === 'deck' ? el('div', { class: 'e-pages', id: 'e_pages' }) : el('span', { class: 'tiny e-hint', text: 'انقر عنصراً لتعديله · نقر مزدوج على النص للكتابة · Shift أثناء السحب لتقييد الاتجاه' }),
+      el('span', { class: 'sp' }),
+      el('div', { class: 'e-zoom' }, [
+        el('button', { type: 'button', class: 'ib sm', 'aria-label': 'تصغير', onclick: function () { setZoom(ED.zoom / 1.15); } }, [ico('zoomout')]),
+        el('button', { type: 'button', class: 'zl', id: 'e_zl', title: 'ملاءمة الشاشة', onclick: function () { ED.autoFit = true; refit(); } }, ['100٪']),
+        el('button', { type: 'button', class: 'ib sm', 'aria-label': 'تكبير', onclick: function () { setZoom(ED.zoom * 1.15); } }, [ico('zoomin')])
+      ])
+    ])
+  ]);
+  const mtabs = el('nav', { class: 'e-mtabs', id: 'e_mtabs', 'aria-label': 'الأدوات' });
+  const v = view(el('div', { class: 'ed6' }, [topbar, el('div', { class: 'e-main' }, [rail, panel, stage]), mtabs]));
+  v.classList.add('ed-view');
+  setupKonva();
+  buildSizeSel(); buildRail(); buildPanel(); buildPages();
+  ensureFonts(fontsOfState(snap())).then(function () { refit(); drawNow(); pushUndo6(true); });
+  requestAnimationFrame(function () { refit(); });
+  LEAVE.push(leaveEditor);
+  setTimeout(function () { maybeTour('editor'); }, 1200);
+}
+function leaveEditor() {
+  if (!ED.open) return;
+  commitPage(); saveDraft(true); if (ED.doc.id && ED.dirty) saveRemote(true);
+  ED.open = false; $('#top').hidden = false; document.body.classList.remove('in-editor');
+  if (ED.stage) { ED.stage.destroy(); ED.stage = null; }
+  $$('.cpop,.menu,.ied6').forEach(function (x) { x.remove(); });
+  EPV = null;
+}
+window.addEventListener('resize', function () { if (ED.open) { refit(); placeToolbar(); } });
+function buildSizeSel() {
+  const s = $('#e_size'); if (!s) return; s.innerHTML = '';
+  const szs = sizesFor(S.tpl);
+  szs.forEach(function (k) { s.appendChild(el('option', { value: k, text: SIZES[k].name, selected: k === S.size })); });
+  s.hidden = szs.length < 2;
+}
+
+/* ---------- التغيير والحفظ ---------- */
+function markDirty() {
+  ED.dirty = true;
+  const sv = $('#e_saved'); if (sv) sv.textContent = 'تعديلات غير محفوظة…';
+  clearTimeout(ED.saveT); ED.saveT = setTimeout(function () { commitPage(); saveDraft(); }, 900);
+  if (ED.doc.id) { clearTimeout(ED.srvT); ED.srvT = setTimeout(function () { saveRemote(true); }, 4000); }
+}
+function changed6(noUndo) {
+  if (!noUndo) pushUndo6(); else { clearTimeout(ED.uT); ED.uT = setTimeout(pushUndo6, 800); }
+  redraw(); markDirty();
+  if (ED.tab === 'layers') buildPanel();
+  if (ED.doc.kind === 'deck') { clearTimeout(ED.thT); ED.thT = setTimeout(function () { refreshPageThumb(ED.cur); }, 500); }
+}
+function saveDraft(silent) {
+  const d = Object.assign({}, ED.doc, { at: Date.now() });
+  try { localStorage.setItem('mp6.' + draftKey(), JSON.stringify(d)); if (!silent && !ED.doc.id) { const sv = $('#e_saved'); if (sv) sv.textContent = 'محفوظ مسودةً في هذا الجهاز'; } }
+  catch (e) { const sv = $('#e_saved'); if (sv) sv.textContent = 'المسودة أكبر من ذاكرة المتصفح — احفظها في حسابك'; }
+}
+function thumbOfDoc() {
+  const p = ED.doc.pages[0], tpl = TEMPLATES.find(function (t) { return t.id === p.tpl; }), c = document.createElement('canvas');
+  const sz = SIZES[p.size], sc = 320 / sz.w;
+  renderTo(c, tpl, p.size, p, S.track, sc);
+  return c.toDataURL('image/jpeg', 0.8);
+}
+async function saveRemote(quiet) {
+  commitPage();
+  const d = ED.doc;
+  if (!d.id) d.id = newId() + newId();
+  const item = { id: d.id, kind: d.kind, name: d.name || 'تصميمي', shared: !!d.shared, tpl: d.pages[0].tpl, track: d.track, program: d.program || V6.prog.id, pages: d.pages, thumb: thumbOfDoc() };
+  const sv = $('#e_saved'); if (sv) sv.textContent = 'جارٍ الحفظ…';
+  try {
+    await API6.me('item_save', JSON.stringify(item));
+    ED.dirty = false; if (sv) sv.textContent = 'محفوظ في حسابك';
+    const sb = $('#e_save span'); if (sb) sb.textContent = 'محفوظ';
+    try { localStorage.removeItem('mp6.draft.' + d.track + '.' + d.pages[0].tpl); } catch (e) {}
+    if (!quiet) { toast('حُفظ في «تصاميمي»'); track('save', { tpl: item.tpl }); }
+    return true;
+  } catch (e) { if (sv) sv.textContent = 'تعذّر الحفظ: ' + e.message; if (!quiet) toast(e.message); return false; }
+}
+function saveDialog() {
+  const d = ED.doc;
+  const nameI = el('input', { type: 'text', id: 'sv_name', value: d.name || '' });
+  const shareI = el('input', { type: 'checkbox', checked: !!d.shared });
+  modal({ title: d.id ? 'حفظ التصميم' : 'احفظه في حسابك', body: [
+    el('div', { class: 'fld' }, [el('label', { for: 'sv_name', text: 'الاسم' }), nameI]),
+    el('label', { class: 'tog' }, [shareI, el('span', { text: 'شاركه مع فريق ' + (V6.prog ? V6.prog.name : 'برنامجك') + ' (يظهر لهم في «تصاميم الفريق»)' })]),
+    el('p', { class: 'tiny', text: 'بعد الحفظ يُحفظ كل تعديل تلقائياً، وتجده من أي جهاز.' })
+  ], acts: [{ t: 'حفظ', cls: 'dark', fn: async function () { d.name = nameI.value.trim() || 'تصميمي'; d.shared = shareI.checked; const n = $('.e-name'); if (n) n.value = d.name; await saveRemote(); } }, { t: 'إلغاء' }] });
+}
+
+/* ---------- التراجع ---------- */
+function pushUndo6(init) {
+  const s = JSON.stringify({ cur: ED.cur, p: pageOfState() });
+  if (init) { ED.last = s; ED.undo = []; ED.redo = []; updUndo6(); return; }
+  if (ED.last && ED.last !== s) { ED.undo.push(ED.last); if (ED.undo.length > 80) ED.undo.shift(); ED.redo = []; }
+  ED.last = s; updUndo6();
+}
+function applySnap(s) { const o = JSON.parse(s); ED.doc.pages[o.cur] = o.p; loadPage(o.cur); ED.last = s; buildPanel(); buildSizeSel(); select(null); drawNow(); markDirty(); updUndo6(); buildPages(); }
+function undo6() { pushUndo6(); if (!ED.undo.length) return; ED.redo.push(ED.last); applySnap(ED.undo.pop()); }
+function redo6() { if (!ED.redo.length) return; ED.undo.push(ED.last); applySnap(ED.redo.pop()); }
+function updUndo6() { const u = $('#e_undo'), r = $('#e_redo'); if (u) u.disabled = !ED.undo.length; if (r) r.disabled = !ED.redo.length; }
+
+/* ---------- التنزيل والمشاركة ---------- */
+function dlMenu(btn) {
+  const items = [{ hd: 'تنزيل بجودة عالية' }, { t: 'صورة PNG (أعلى جودة)', ic: 'download', fn: function () { exportImg6('png'); } }, { t: 'صورة JPG (حجم أخف)', ic: 'download', fn: function () { exportImg6('jpg'); } }];
+  if (ED.doc.kind === 'deck') items.push({ t: 'العرض كاملاً PDF', ic: 'slides', fn: exportPdf6 }, { t: 'عرض بملء الشاشة', ic: 'play', fn: present6 });
+  if (navigator.canShare) items.push('-', { t: 'مشاركة مباشرة', ic: 'share', fn: function () { exportImg6('png', true); } });
+  popMenu(btn, items);
+}
+async function checkPlaceholders() {
+  commitPage();
+  const left = [];
+  ED.doc.pages.forEach(function (p) { Object.keys(p.ph || {}).forEach(function (k) { if (p.d[k] === p.ph[k] && !(p.hide || {})['f_' + k]) left.push(p.ph[k]); }); });
+  if (!left.length) return true;
+  return new Promise(function (ok) {
+    modal({ title: 'بقيت عناوين عامة', body: [el('p', { class: 'muted', text: 'هذه الخانات ما زالت بالنص العام ولم تكتب فيها شيئاً:' }), el('div', { class: 'row wrapr' }, left.filter(function (x, i, a) { return a.indexOf(x) === i; }).map(function (t) { return el('span', { class: 'pill or', text: t }); })), el('p', { class: 'tiny', text: 'اكتب فيها، أو أخفها من لوحة المحتوى إن لم تحتجها.' })],
+      acts: [{ t: 'أعدّلها', cls: 'dark', fn: function () { ok(false); ED.tab = 'content'; buildRail(); buildPanel(); } }, { t: 'نزّل كما هي', fn: function () { ok(true); } }], onClose: function () { ok(false); } });
+  });
+}
+function fileName6(ext) { return ((S.track ? S.track.name + ' - ' : '') + (ED.doc.name || S.tpl.name)).replace(/[\\\/:?"<>|*\n]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) + '.' + ext; }
+async function exportImg6(fmt, share) {
+  if (!(await checkPlaceholders())) return;
+  await ensureFonts(fontsOfState(snap()));
+  const c = document.createElement('canvas'); renderTo(c, S.tpl, S.size, snap(), S.track, 2);
+  if (fmt === 'jpg') { const g = c.getContext('2d'); g.globalCompositeOperation = 'destination-over'; g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); }
+  const name = fileName6(fmt === 'png' ? 'png' : 'jpg');
+  c.toBlob(function (blob) {
+    track('export', { tpl: S.tpl.id });
+    if (share && navigator.canShare) { const f = new File([blob], name, { type: blob.type }); if (navigator.canShare({ files: [f] })) { navigator.share({ files: [f], title: ED.doc.name }).catch(function () {}); return; } }
+    const url = URL.createObjectURL(blob), a = el('a', { href: url, download: name }); document.body.appendChild(a); a.click(); a.remove();
+    const sz = SIZES[S.size];
+    const fileForShare = navigator.canShare ? new File([blob], name, { type: blob.type }) : null;
+    modal({ title: 'بدأ التنزيل', body: [el('p', { class: 'muted small', text: 'المقاس ' + sz.w * 2 + ' × ' + sz.h * 2 + ' بكسل، والحجم ' + (blob.size / 1048576).toFixed(1) + ' ميغابايت. في الجوال: إن لم يظهر الملف، اضغط على الصورة مطولاً واختر الحفظ.' }), el('img', { src: url, alt: 'التصميم', class: 'dlprev' })],
+      acts: [fileForShare && navigator.canShare({ files: [fileForShare] }) ? { t: 'مشاركة', cls: 'dark', fn: function () { navigator.share({ files: [fileForShare], title: ED.doc.name }).catch(function () {}); } } : null, { t: 'إغلاق' }] });
+  }, fmt === 'png' ? 'image/png' : 'image/jpeg', 0.94);
+}
+async function exportPdf6() {
+  if (!(await checkPlaceholders())) return;
+  commitPage(); toast('نجهّز ملف PDF…');
+  const pages = [];
+  for (let i = 0; i < ED.doc.pages.length; i++) {
+    const p = ED.doc.pages[i], tpl = TEMPLATES.find(function (t) { return t.id === p.tpl; }), c = document.createElement('canvas');
+    p.d.__n = i ? String(i + 1) : '';
+    await ensureFonts(fontsOfState(p));
+    renderTo(c, tpl, p.size, p, S.track, 1);
+    pages.push({ bytes: b64bytes(c.toDataURL('image/jpeg', 0.92)), w: c.width, h: c.height });
+    await new Promise(function (r) { setTimeout(r, 0); });
+  }
+  const blob = buildPdf(pages, 960, 540), url = URL.createObjectURL(blob);
+  const a = el('a', { href: url, download: fileName6('pdf') }); document.body.appendChild(a); a.click(); a.remove();
+  track('export', { tpl: 'deck' }); toast('بدأ تنزيل العرض (' + pages.length + ' شرائح)');
+}
+function present6() {
+  commitPage();
+  let i = ED.cur; const pages = ED.doc.pages;
+  const c = el('canvas', { class: 'pcv' });
+  const ov = el('div', { class: 'present6', tabindex: '0' }, [c, el('div', { class: 'phint', text: 'الأسهم للتنقل · Esc للخروج' })]);
+  function draw() { const p = pages[i], tpl = TEMPLATES.find(function (t) { return t.id === p.tpl; }); p.d.__n = i ? String(i + 1) : ''; renderTo(c, tpl, p.size, p, S.track, 1); c.animate([{ opacity: 0.4, filter: 'blur(4px)' }, { opacity: 1, filter: 'none' }], { duration: 380, easing: 'cubic-bezier(.22,1,.36,1)' }); }
+  function key(e) { if (e.key === 'Escape') close(); else if (e.key === 'ArrowLeft' || e.key === ' ' || e.key === 'PageDown') { if (i < pages.length - 1) { i++; draw(); } } else if (e.key === 'ArrowRight' || e.key === 'PageUp') { if (i > 0) { i--; draw(); } } }
+  function close() { document.removeEventListener('keydown', key); ov.remove(); if (document.fullscreenElement) document.exitFullscreen().catch(function () {}); }
+  ov.addEventListener('click', function (e) { if (e.clientX < innerWidth / 2) { if (i < pages.length - 1) { i++; draw(); } } else if (i > 0) { i--; draw(); } });
+  document.addEventListener('keydown', key); document.body.appendChild(ov); draw(); ov.focus();
+  if (ov.requestFullscreen) ov.requestFullscreen().catch(function () {});
+}
+
+/* ---------- شرائح العرض في الشريط السفلي ---------- */
+function pageThumb(i) {
+  const p = ED.doc.pages[i], tpl = TEMPLATES.find(function (t) { return t.id === p.tpl; }), c = el('canvas');
+  setTimeout(function () { p.d.__n = i ? String(i + 1) : ''; renderTo(c, tpl, p.size, p, S.track, 0.1); }, 10 + i * 10);
+  return c;
+}
+function refreshPageThumb(i) { commitPage(); const b = $$('#e_pages .pg')[i]; if (b) { const c = b.querySelector('canvas'); const p = ED.doc.pages[i], tpl = TEMPLATES.find(function (t) { return t.id === p.tpl; }); renderTo(c, tpl, p.size, p, S.track, 0.1); } }
+function buildPages() {
+  const box = $('#e_pages'); if (!box) return; box.innerHTML = '';
+  ED.doc.pages.forEach(function (p, i) {
+    box.appendChild(el('button', { type: 'button', class: 'pg' + (i === ED.cur ? ' on' : ''), title: 'الشريحة ' + (i + 1), onclick: function () { if (i === ED.cur) return; commitPage(); loadPage(i); select(null); buildPanel(); drawNow(); buildPages(); pushUndo6(true); },
+      oncontextmenu: function (e) { e.preventDefault(); pageMenu(e.currentTarget, i); } }, [pageThumb(i), el('small', { text: String(i + 1) })]));
+  });
+  box.appendChild(el('button', { type: 'button', class: 'pg add', title: 'شريحة جديدة', onclick: function (e) { addPageMenu(e.currentTarget); } }, [ico('plus')]));
+  box.appendChild(el('button', { type: 'button', class: 'ib sm', title: 'خيارات الشريحة', 'aria-label': 'خيارات الشريحة', onclick: function (e) { pageMenu(e.currentTarget, ED.cur); } }, [ico('more')]));
+}
+function pageMenu(anchor, i) {
+  const n = ED.doc.pages.length;
+  popMenu(anchor, [
+    { t: 'تكرار الشريحة', ic: 'copy', fn: function () { commitPage(); ED.doc.pages.splice(i + 1, 0, JSON.parse(JSON.stringify(ED.doc.pages[i]))); loadPage(i + 1); afterPages(); } },
+    i > 0 ? { t: 'تحريكها للأمام', ic: 'chev', fn: function () { commitPage(); const p = ED.doc.pages.splice(i, 1)[0]; ED.doc.pages.splice(i - 1, 0, p); loadPage(i - 1); afterPages(); } } : null,
+    i < n - 1 ? { t: 'تحريكها للخلف', ic: 'chev', fn: function () { commitPage(); const p = ED.doc.pages.splice(i, 1)[0]; ED.doc.pages.splice(i + 1, 0, p); loadPage(i + 1); afterPages(); } } : null,
+    { t: 'تطبيق ألوانها وخلفيتها على كل الشرائح', ic: 'palette', fn: function () { commitPage(); const src = ED.doc.pages[i]; ED.doc.pages.forEach(function (p) { p.variant = src.variant; p.ov = Object.assign({}, src.ov); p.bgfx = src.bgfx ? Object.assign({}, src.bgfx) : null; }); loadPage(ED.cur); afterPages(); toast('طُبّقت على ' + n + ' شرائح'); } },
+    n > 1 ? '-' : null,
+    n > 1 ? { t: 'حذف الشريحة', ic: 'trash', fn: function () { commitPage(); ED.doc.pages.splice(i, 1); loadPage(Math.max(0, Math.min(i, ED.doc.pages.length - 1))); afterPages(); } } : null
+  ].filter(Boolean));
+}
+function afterPages() { select(null); buildPanel(); drawNow(); buildPages(); markDirty(); pushUndo6(true); }
+function addPageMenu(anchor) {
+  const list = SLIDE_TPLS.map(function (t) { return { t: t.name, ic: 'slides', fn: function () { commitPage(); const cur = ED.doc.pages[ED.cur]; const pg = newPage(t, S.track, false); pg.variant = cur.variant; pg.ov = Object.assign({}, cur.ov); pg.bgfx = cur.bgfx; ED.doc.pages.splice(ED.cur + 1, 0, pg); loadPage(ED.cur + 1); afterPages(); } }; });
+  popMenu(anchor, [{ hd: 'شريحة جديدة' }].concat(list));
+}
+
+/* ---------- لوحة المفاتيح ---------- */
+document.addEventListener('keydown', function (e) {
+  if (!ED.open) return;
+  const tag = document.activeElement && document.activeElement.tagName;
+  const typing = /INPUT|TEXTAREA|SELECT/.test(tag) && document.activeElement.type !== 'range';
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && (e.key === 'z' || e.key === 'Z' || e.key === 'ز') && !typing) { e.preventDefault(); if (e.shiftKey) redo6(); else undo6(); return; }
+  if (mod && (e.key === 'y' || e.key === 'غ') && !typing) { e.preventDefault(); redo6(); return; }
+  if (mod && (e.key === 's' || e.key === 'س')) { e.preventDefault(); if (ED.doc.id) saveRemote(); else saveDialog(); return; }
+  if (typing) return;
+  if (!S.sel) return;
+  const L = isLayer(S.sel) ? layerById(S.sel.slice(2)) : null;
+  const k = e.shiftKey ? 10 : 1;
+  const m = { ArrowLeft: [-k, 0], ArrowRight: [k, 0], ArrowUp: [0, -k], ArrowDown: [0, k] }[e.key];
+  if (m) { e.preventDefault(); moveSel(m[0], m[1]); changed6(true); return; }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && L) { e.preventDefault(); delLayer6(L.id); return; }
+  if (mod && (e.key === 'd' || e.key === 'ي') && L) { e.preventDefault(); dupLayer(L); return; }
+  if (e.key === 'Escape') { select(null); return; }
+  if (e.key === 'Enter' && fieldsOfGroup(S.sel).length) { e.preventDefault(); openInline6(S.sel); }
+});
