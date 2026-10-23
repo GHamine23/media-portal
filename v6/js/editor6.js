@@ -55,7 +55,11 @@ function setupKonva() {
     boundBoxFunc: function (oldB, newB) { return (Math.abs(newB.width) < 8 || Math.abs(newB.height) < 8) ? oldB : newB; }
   });
   ED.layer.add(ED.tr);
-  ED.stage.on('mousedown touchstart', function (e) { if (e.target === ED.stage) { select(null); } });
+  ED.stage.on('mousedown touchstart', function (e) {
+    // لمس التصميم ينقل التركيز إليه، فتعمل اختصارات التراجع والأسهم على التصميم لا على حقل النص
+    const ae = document.activeElement; if (ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName) && !(ae.closest && ae.closest('.ied6'))) ae.blur();
+    if (e.target === ED.stage) select(null);
+  });
   ED.stage.on('mouseleave', function () { ED.hover.visible(false); ED.guides.batchDraw(); });
 }
 function isLayer(g) { return g && g.slice(0, 2) === 'L:'; }

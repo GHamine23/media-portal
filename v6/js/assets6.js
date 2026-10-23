@@ -69,6 +69,7 @@ async function loadBundle() {
     const r = FONT_REG[a.family] = FONT_REG[a.family] || { family: a.family, label: a.label || a.family, scope: a.scope, program: a.program, files: [] };
     r.files.push(a);
   });
+  await loadPacks6();
   const want = ls('prog'), list = b.programs;
   const p = list.find(function (x) { return x.id === want; }) || list[0] || null;
   if (p) await useProgram(p.id, true);
@@ -80,8 +81,10 @@ async function useProgram(id, silent) {
   V6.prog = p; ls('prog', id);
   Object.keys(TRACKS).forEach(function (k) { delete TRACKS[k]; });
   (p.identities || []).forEach(function (t) { TRACKS[t.id] = finishTrack(JSON.parse(JSON.stringify(t))); });
+  if (id === 'academy') PACK_IDS.forEach(function (t) { if (!TRACKS[t.id]) TRACKS[t.id] = t; });   // هويات أضافتها حزم المهمة الأسبوعية
   const mine = Object.keys(V6.assets).map(function (k) { return V6.assets[k]; }).filter(function (a) { return (a.kind === 'logo' || a.kind === 'photo') && (a.scope === 'global' || a.program === id) && a.key; });
   if (!silent) document.body.classList.add('loading-prog');
+  await prefetch(mine);
   await pool(mine, 6, async function (a) {
     const url = await assetURL(a);
     ASSETS[a.key] = url;
@@ -169,4 +172,35 @@ async function uploadAsset(file, meta) {
   V6.assets[res.id] = res;
   if (res.scope === 'user') V6.mine.unshift(res);
   return res;
+}
+
+/* ---------- حزم القوالب الأسبوعية: نفس حزم الإصدار الخامس، تُحفظ في المتصفح وتتحدّث في الخلفية ---------- */
+const PACK_IDS = [];
+let PACKS_DONE = false;
+async function loadPacks6() {
+  if (PACKS_DONE) return; PACKS_DONE = true;
+  let list = ls('packs');
+  const fresh = API6.json('api_packs').then(function (l) { const old = JSON.stringify(ls('packs') || []); ls('packs', l); if (list && old !== JSON.stringify(l)) toast('أُضيفت قوالب جديدة، وتظهر عند فتح المنصة القادم.'); return l; }).catch(function () { return null; });
+  if (!list) list = (await Promise.race([fresh, new Promise(function (ok) { setTimeout(function () { ok(null); }, 9000); })])) || [];
+  const before = {}; Object.keys(TRACKS).forEach(function (k) { before[k] = 1; });
+  list.forEach(function (p) {
+    const sc = document.createElement('script');
+    sc.text = 'try {\n' + p.code + '\n} catch (e) { console.error("pack", ' + JSON.stringify(String(p.name)) + ', e); }';
+    document.head.appendChild(sc);
+  });
+  Object.keys(TRACKS).forEach(function (k) { if (!before[k]) PACK_IDS.push(TRACKS[k]); });
+  await Promise.all(Object.keys(ASSETS).filter(function (k) { return !IMG[k] && /^data:/.test(ASSETS[k]); }).map(async function (k) { IMG[k] = await loadImg(ASSETS[k]); }));
+}
+
+// أول تحميل: الملفات الصغيرة غير المحفوظة في المتصفح تُطلب دفعات في طلبات قليلة
+async function prefetch(list) {
+  const need = [];
+  for (const a of list) { if (ASSET_URL[a.id]) continue; const hit = await IDB.get('a:' + a.id + ':' + (a.ver || 1)); if (!hit && (a.size || 0) < 1500000) need.push(a); }
+  const groups = []; let g = [], sz = 0;
+  need.forEach(function (a) { if (g.length >= 10 || sz + (a.size || 0) > 6e6) { groups.push(g); g = []; sz = 0; } g.push(a); sz += a.size || 0; });
+  if (g.length) groups.push(g);
+  await pool(groups, 3, async function (grp) {
+    const r = await API6.me('asset_batch', grp.map(function (a) { return a.id; }));
+    grp.forEach(function (a) { if (r[a.id]) { const blob = b64ToBlob(r[a.id], a.mime); IDB.put('a:' + a.id + ':' + (a.ver || 1), blob); ASSET_URL[a.id] = URL.createObjectURL(blob); } });
+  });
 }

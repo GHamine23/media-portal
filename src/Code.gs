@@ -105,7 +105,7 @@ function apiFns_() {
     info: info, auth_login: auth_login, auth_me: auth_me, auth_logout: auth_logout, auth_password: auth_password, prefs_save: prefs_save,
     acc_list: acc_list, acc_save: acc_save, acc_reset: acc_reset, acc_import: acc_import,
     prog_list: prog_list, prog_save: prog_save, prog_del: prog_del, bundle: bundle,
-    asset_put: asset_put, asset_get: asset_get, asset_list: asset_list, asset_meta: asset_meta, asset_del: asset_del,
+    asset_put: asset_put, asset_get: asset_get, asset_batch: asset_batch, asset_list: asset_list, asset_meta: asset_meta, asset_del: asset_del,
     ui_fonts: ui_fonts, ui_font_get: ui_font_get,
     item_list: item_list, item_get: item_get, item_save: item_save, item_del: item_del,
     fb_send: fb_send, fb_list: fb_list, fb_update: fb_update, fb_mine: fb_mine, fb_shot: fb_shot,
@@ -497,6 +497,16 @@ function asset_get(token, id) {
   if (!f.x.fileId) return JSON.stringify({ meta: assetPub_(f.x), b64: '' });
   var blob = DriveApp.getFileById(f.x.fileId).getBlob();
   return JSON.stringify({ meta: assetPub_(f.x), b64: Utilities.base64Encode(blob.getBytes()) });
+}
+// عدة ملفات صغيرة في طلب واحد (أسرع في أول تحميل): {معرّف: محتوى}
+function asset_batch(token, ids) {
+  var a = auth_(token), out = {}, total = 0;
+  (ids || []).slice(0, 30).forEach(function (id) {
+    var f = findAsset_(id, a); if (!f || !canReadAsset_(a, f.x) || !f.x.fileId) return;
+    if (total > 20 * 1024 * 1024) return;
+    var b = Utilities.base64Encode(DriveApp.getFileById(f.x.fileId).getBlob().getBytes()); total += b.length; out[id] = b;
+  });
+  return JSON.stringify(out);
 }
 function asset_list(token, scope, program) {
   var a = auth_(token);

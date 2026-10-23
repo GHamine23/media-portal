@@ -203,6 +203,7 @@ function saveDialog() {
 
 /* ---------- التراجع ---------- */
 function pushUndo6(init) {
+  if (!init && (ED.dragging || ED.transforming)) { clearTimeout(ED.uT); ED.uT = setTimeout(pushUndo6, 300); return; }   // لا نقطة تراجع في منتصف السحب
   const s = JSON.stringify({ cur: ED.cur, p: pageOfState() });
   if (init) { ED.last = s; ED.undo = []; ED.redo = []; updUndo6(); return; }
   if (ED.last && ED.last !== s) { ED.undo.push(ED.last); if (ED.undo.length > 80) ED.undo.shift(); ED.redo = []; }
