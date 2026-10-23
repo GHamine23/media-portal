@@ -925,6 +925,29 @@ svg.flip{transform:scaleX(-1)}
 .skrow summary{display:flex;gap:10px;align-items:center;flex-wrap:wrap;cursor:pointer}
 .skform{display:grid;gap:8px;margin-top:10px}.sktext{white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.8;margin:8px 0 0}
 
+/* ===== لوحة الأدوات: عناوين وشروح أوضح وأجمل ===== */
+.phd h3{font-size:24px;letter-spacing:-.2px}
+.phd .tiny{font-size:14px;color:var(--ink2);line-height:1.8;margin-top:2px}
+.e-panel .psh{display:flex;align-items:center;gap:10px;font-family:var(--fd,var(--ft));font-weight:700;font-size:16.5px;color:var(--ink);margin:18px 0 0;padding-top:14px;border-top:1px solid var(--line)}
+.e-panel .psh::before{content:'';width:8px;height:22px;border-radius:6px;background:linear-gradient(180deg,#7a5cff,#f29e4c);flex:none;background-size:100% 200%;animation:pshbar 4s ease-in-out infinite alternate}
+@keyframes pshbar{to{background-position:0 100%}}
+.e-panel .pbody > .psh:first-of-type{border-top:0;padding-top:0}
+.e-panel .pbody p.tiny,.e-panel .pbody > .tiny,.e-panel .pbody .note{font-size:14px;color:var(--ink2);line-height:1.85}
+.e-panel .psh + p.tiny{background:var(--bg2);border-radius:12px;padding:9px 12px;margin:0;position:relative}
+.e-panel .pbody.fresh > *{animation:pchild .5s var(--ease) both;animation-delay:calc(var(--i,0)*45ms)}
+@keyframes pchild{from{opacity:0;transform:translateY(10px)}}
+@media (prefers-reduced-motion:reduce){.e-panel .pbody.fresh > *,.e-panel .psh::before{animation:none}}
+.libb.ticb{display:grid;grid-template-rows:1fr auto;gap:2px;padding:10px 4px 6px;cursor:pointer}
+.libb.ticb svg{width:56%;height:auto;justify-self:center;align-self:center;transition:transform .3s var(--spring,var(--ease))}
+.libb.ticb small{font-size:10.5px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.libb.ticb:hover svg{transform:scale(1.15) rotate(-4deg)}
+.libb:hover{background-color:var(--bg3,#ececec)}
+@media (max-width:1500px){.e-rv span{display:none}}
+.e-mode{flex:none}.e-mode .seg button{white-space:nowrap}
+@media (max-width:1500px){.e-reset span,.e-cap span{display:none}.e-top .e-reset,.e-top .e-cap,.e-top .e-rv{padding-inline:11px}}
+@media (max-width:1180px){.e-top .e-mode{display:none}}
+.e-tools{flex:none}
+
 </style>
 </head>
 <body class="app">
@@ -950,12 +973,12 @@ svg.flip{transform:scaleX(-1)}
 <script src="js/home6.js?v=fbf2ab8c98"></script>
 <script src="js/updates6.js?v=26e12a774f"></script>
 <script src="js/editor6.js?v=fe672c7981"></script>
-<script src="js/panels6.js?v=94c2049285"></script>
+<script src="js/panels6.js?v=ee97964fe5"></script>
 <script src="js/docs6.js?v=5c73435eec"></script>
 <script src="js/make6.js?v=d8abc57edf"></script>
 <script src="js/caption6.js?v=182baaa417"></script>
 <script src="js/slides6.js?v=7a976724d9"></script>
-<script src="js/extras6.js?v=42e0213c7c"></script>
+<script src="js/extras6.js?v=ba4fc63640"></script>
 <script src="js/tips6.js?v=3279b5eb25"></script>
 <script src="js/social6.js?v=9c1c8de228"></script>
 <script src="js/mine6.js?v=d17b900bf0"></script>

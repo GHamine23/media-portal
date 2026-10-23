@@ -750,3 +750,26 @@ svg.flip{transform:scaleX(-1)}
 .skrow{border:1px solid var(--line);border-radius:12px;padding:8px 12px;background:var(--card)}.skrow.off{opacity:.6}
 .skrow summary{display:flex;gap:10px;align-items:center;flex-wrap:wrap;cursor:pointer}
 .skform{display:grid;gap:8px;margin-top:10px}.sktext{white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.8;margin:8px 0 0}
+
+/* ===== لوحة الأدوات: عناوين وشروح أوضح وأجمل ===== */
+.phd h3{font-size:24px;letter-spacing:-.2px}
+.phd .tiny{font-size:14px;color:var(--ink2);line-height:1.8;margin-top:2px}
+.e-panel .psh{display:flex;align-items:center;gap:10px;font-family:var(--fd,var(--ft));font-weight:700;font-size:16.5px;color:var(--ink);margin:18px 0 0;padding-top:14px;border-top:1px solid var(--line)}
+.e-panel .psh::before{content:'';width:8px;height:22px;border-radius:6px;background:linear-gradient(180deg,#7a5cff,#f29e4c);flex:none;background-size:100% 200%;animation:pshbar 4s ease-in-out infinite alternate}
+@keyframes pshbar{to{background-position:0 100%}}
+.e-panel .pbody > .psh:first-of-type{border-top:0;padding-top:0}
+.e-panel .pbody p.tiny,.e-panel .pbody > .tiny,.e-panel .pbody .note{font-size:14px;color:var(--ink2);line-height:1.85}
+.e-panel .psh + p.tiny{background:var(--bg2);border-radius:12px;padding:9px 12px;margin:0;position:relative}
+.e-panel .pbody.fresh > *{animation:pchild .5s var(--ease) both;animation-delay:calc(var(--i,0)*45ms)}
+@keyframes pchild{from{opacity:0;transform:translateY(10px)}}
+@media (prefers-reduced-motion:reduce){.e-panel .pbody.fresh > *,.e-panel .psh::before{animation:none}}
+.libb.ticb{display:grid;grid-template-rows:1fr auto;gap:2px;padding:10px 4px 6px;cursor:pointer}
+.libb.ticb svg{width:56%;height:auto;justify-self:center;align-self:center;transition:transform .3s var(--spring,var(--ease))}
+.libb.ticb small{font-size:10.5px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.libb.ticb:hover svg{transform:scale(1.15) rotate(-4deg)}
+.libb:hover{background-color:var(--bg3,#ececec)}
+@media (max-width:1500px){.e-rv span{display:none}}
+.e-mode{flex:none}.e-mode .seg button{white-space:nowrap}
+@media (max-width:1500px){.e-reset span,.e-cap span{display:none}.e-top .e-reset,.e-top .e-cap,.e-top .e-rv{padding-inline:11px}}
+@media (max-width:1180px){.e-top .e-mode{display:none}}
+.e-tools{flex:none}

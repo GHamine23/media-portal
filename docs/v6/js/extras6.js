@@ -76,7 +76,9 @@ function ticonSection(b) {
   function fill() {
     g.innerHTML = ''; const t = q.value.trim();
     Object.keys(TICONS).filter(function (k) { return !t || TICONS[k][0].indexOf(t) >= 0 || k.indexOf(t.toLowerCase()) >= 0; }).slice(0, t ? 94 : 40).forEach(function (k) {
-      g.appendChild(el('button', { type: 'button', class: 'libb', title: TICONS[k][0], 'aria-label': TICONS[k][0], onclick: function () { addLayer6({ t: 'ticon', ref: k, w: 0.09, c: C.s, lw: 2 }); } }, [libCanvas(function (gx, s) { drawTIcon(gx, k, s * 0.8, C.s, 1.8); }, 56, 56)]));
+      const bt = el('button', { type: 'button', class: 'libb ticb', title: TICONS[k][0], 'aria-label': TICONS[k][0], onclick: function () { addLayer6({ t: 'ticon', ref: k, w: 0.09, c: C.s, lw: 2 }); } });
+      bt.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="' + C.s + '" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + TICONS[k][1] + '"/></svg><small>' + TICONS[k][0] + '</small>';
+      g.appendChild(bt);
     });
     if (!t) g.appendChild(el('p', { class: 'tiny', text: 'اكتب للبحث في ' + Object.keys(TICONS).length + ' أيقونة.' }));
   }
@@ -111,7 +113,8 @@ function verifiedTextDialog(done) {
   async function search() {
     const t = q.value.trim(); if (!t) { q.focus(); return; }
     list.innerHTML = ''; list.appendChild(el('p', { class: 'tiny', text: 'نبحث…' }));
-    try { items = await API6.me(kind === 'ayah' ? 'quran_find' : 'hadith_find', t.replace(/[٠-٩]/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'.indexOf(d); })); render(); } catch (e) { list.innerHTML = ''; list.appendChild(el('p', { class: 'err tiny', text: e.message })); }
+    const tq = t.replace(/[٠-٩]/g, function (d) { return String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)); });
+    try { items = kind === 'ayah' ? await quranFind(tq) : await hadithFind(tq); render(); } catch (e) { list.innerHTML = ''; list.appendChild(el('p', { class: 'err tiny', text: e.message })); }
   }
   q.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); search(); } });
   const seg = segOf([['ayah', 'آية'], ['hadith', 'حديث']], kind, function (v) { kind = v; items = []; list.innerHTML = ''; q.placeholder = v === 'ayah' ? 'كلمات من الآية، أو: الإسراء ٢٣' : 'كلمات من الحديث'; hint.textContent = v === 'ayah' ? 'المصدر: مصحف المدينة (رواية حفص) عبر alquran.cloud.' : 'المصدر: الموسوعة الحديثية في الدرر السنية، مع خلاصة حكم المحدث. يُعرض الصحيح والحسن أولاً.'; weak.hidden = v !== 'hadith'; });
@@ -171,4 +174,44 @@ async function imgRequestsCard(body, prog) {
       el('button', { type: 'button', class: 'btn sm line', text: 'لا', onclick: async function () { try { await API6.me('img_decide', r.id, false); row.remove(); } catch (e) { toast(e.message); } } })]);
     card.appendChild(row);
   });
+}
+
+/* ---------- البحث في القرآن من المتصفح مباشرة (alquran.cloud يسمح بذلك)، والخادم بديلاً ---------- */
+const QAPI = 'https://api.alquran.cloud/v1/';
+let Q_SURAHS = null;
+function arNorm(t) { return String(t || '').replace(/[ً-ٰٟۖ-ۭـ]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').trim(); }
+function surahLabel(n) { return String(n || '').replace(/[ً-ٰٟۖ-ۭ]/g, '').replace(/^سورة\s*/, '').trim(); }
+async function qget(path) { const r = await fetch(QAPI + path); if (!r.ok) throw new Error('q' + r.status); const j = await r.json(); if (j.code !== 200) throw new Error('q'); return j.data; }
+async function quranFind(q) {
+  try {
+    const m = /^(.+?)\s+(\d{1,3})(?:\s*[-–:]\s*(\d{1,3}))?$/.exec(q);
+    if (m) {
+      if (!Q_SURAHS) Q_SURAHS = await qget('surah');
+      const want = arNorm(m[1]).replace(/^سوره\s*/, '').replace(/^ال/, '').replace(/\s+/g, '');
+      const s = Q_SURAHS.find(function (x) { return arNorm(x.name).replace(/^سوره\s*/, '').replace(/^ال/, '').replace(/\s+/g, '') === want; });
+      if (s) {
+        const a1 = +m[2], a2 = Math.min(a1 + 9, Math.max(a1, +(m[3] || a1)));
+        const refs = []; for (let n = a1; n <= a2 && n <= s.numberOfAyahs; n++) refs.push(s.number + ':' + n);
+        const out = await Promise.all(refs.map(function (r) { return qget('ayah/' + r + '/quran-simple'); }));
+        return out.map(function (d) { return { text: d.text, surah: surahLabel(d.surah.name), sn: d.surah.number, n: d.numberInSurah }; });
+      }
+    }
+    // البحث بالكلمات في النص المجرّد من التشكيل، ثم جلب النص المشكول لكل نتيجة
+    const words = q.replace(/[ً-ٰٟ]/g, '').trim();
+    let hits = [];
+    try { hits = (await qget('search/' + encodeURIComponent(words) + '/all/quran-simple-clean')).matches || []; } catch (e) { hits = []; }
+    hits = hits.slice(0, 15);
+    const full = await Promise.all(hits.map(function (h) { return qget('ayah/' + h.number + '/quran-simple').catch(function () { return h; }); }));
+    return full.map(function (d) { return { text: d.text, surah: surahLabel(d.surah.name), sn: d.surah.number, n: d.numberInSurah }; });
+  } catch (e) {
+    return await API6.me('quran_find', q);   // إن منع المتصفح الوصول، يبحث الخادم
+  }
+}
+// الأحاديث عبر الخادم (الدرر السنية مع حكم المحدث)
+async function hadithFind(q) {
+  try { return await API6.me('hadith_find', q); }
+  catch (e) {
+    if (/غير معروف/.test(e.message)) throw new Error('بحث الأحاديث يعمل بعد نشر ملف الخادم الجديد في Apps Script (الخطوة التي نعمل عليها الآن).');
+    throw e;
+  }
 }
