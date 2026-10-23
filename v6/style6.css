@@ -101,7 +101,7 @@ body.in-editor #banner{display:none}
 .ed6{width:100%;overflow:hidden;height:100vh;height:100dvh;display:grid;grid-template-rows:56px 1fr;background:var(--bg2)}
 .e-top{display:flex;align-items:center;gap:8px;padding:0 12px;overflow:hidden;background:#fff;border-bottom:1px solid var(--line);min-width:0}
 .e-logo img{height:30px;display:block}
-.e-name{border:1px solid transparent;border-radius:10px;padding:6px 10px;font-family:var(--fd);font-size:17px;min-width:60px;max-width:260px;background:transparent;transition:border-color .2s,background .2s}
+.e-name{border:1px solid transparent;border-radius:10px;padding:6px 10px;font-family:var(--fd);font-size:17px;min-width:60px;max-width:260px;background:transparent;text-overflow:ellipsis;transition:border-color .2s,background .2s}
 .e-name:hover{background:var(--bg3)}.e-name:focus{outline:0;border-color:#000;background:#fff}
 .e-saved{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
 .e-tools{display:flex;align-items:center;gap:4px}
@@ -239,6 +239,7 @@ body.in-editor #banner{display:none}
   .ed6{grid-template-rows:52px 1fr auto}
   .e-top{gap:4px;padding:0 6px}.e-logo{display:none}.e-name{max-width:120px;font-size:15px}.e-saved{display:none}
   .e-tools .e-size{max-width:96px}
+  @media (max-width:440px){#e_redo{display:none}.e-tools .e-size{max-width:84px}.e-top .btn{padding:9px 10px}}
   .e-main{grid-template-columns:minmax(0,1fr);position:relative}
   .e-name{flex:1 1 60px;min-width:40px}
   .e-top .btn{padding:9px 12px}
