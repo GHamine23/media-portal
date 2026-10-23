@@ -113,7 +113,7 @@ function apiFns_() {
     stat_track: stat_track, stat_summary: stat_summary,
     bc_list: bc_list, bc_all: bc_all, bc_save: bc_save, bc_del: bc_del,
     cl_list: cl_list, cl_save: cl_save, set_get: set_get, set_save: set_save, audit_list: audit_list,
-    ai_make: ai_make, ai_status: ai_status, me_profile: me_profile, font_family: font_family
+    ai_make: ai_make, ai_status: ai_status, ai_log: ai_log, me_profile: me_profile, font_family: font_family
   };
 }
 function doPost(e) {
@@ -964,21 +964,45 @@ function ai_make(token, json) {
   var key = props_().getProperty('GEMINI_KEY'); if (!key) throw new Error('لم يُضبط مفتاح المساعد بعد');
   var c = CacheService.getScriptCache(), ck = 'ai:' + a.uid + ':' + dayKey_(now_()), used = +(c.get(ck) || 0);
   if (!isSuper_(a) && used >= s.ai.perDay) throw new Error('بلغت حد اليوم (' + s.ai.perDay + ' طلباً). جرّب غداً.');
-  var req = JSON.parse(json);   // {system, prompt, schema}
-  var body = { contents: [{ role: 'user', parts: [{ text: clip_(req.prompt, 12000) }] }],
-    systemInstruction: { parts: [{ text: clip_(req.system, 20000) }] },
-    generationConfig: { responseMimeType: 'application/json', responseSchema: req.schema, temperature: req.temperature != null ? +req.temperature : 0.9 } };
+  var req = JSON.parse(json);   // {kind, system, prompt, schema, temperature, files: [{mime, b64}]}
+  var parts = [{ text: clip_(req.prompt, 60000) }];
+  (req.files || []).slice(0, 3).forEach(function (f) { if (f && f.b64 && /^(application\/pdf|image\/(png|jpeg|webp)|text\/plain)$/.test(f.mime || '') && f.b64.length < 28 * 1024 * 1024) parts.push({ inlineData: { mimeType: f.mime, data: f.b64 } }); });
+  var body = { contents: [{ role: 'user', parts: parts }],
+    systemInstruction: { parts: [{ text: clip_(req.system, 30000) }] },
+    generationConfig: { temperature: req.temperature != null ? +req.temperature : 0.9 } };
+  if (req.schema) { body.generationConfig.responseMimeType = 'application/json'; body.generationConfig.responseSchema = req.schema; }
   var model = String(s.ai.model || 'gemini-3.8-flash').replace(/[^\w.\-]/g, '');
-  var res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
-    method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true, headers: { 'x-goog-api-key': key } });
-  var code = res.getResponseCode(), txt = res.getContentText();
-  if (code === 429) throw new Error('المساعد مشغول الآن (حد الخطة المجانية). حاول بعد دقيقة.');
-  if (code >= 300) throw new Error('تعذّر الوصول إلى المساعد (' + code + ')');
-  var j = JSON.parse(txt), part = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
-  var out = (part || []).map(function (p) { return p.text || ''; }).join('');
-  if (!out) throw new Error('لم يُعد المساعد نتيجة. أعد صياغة طلبك.');
+  var t0 = now_(), log = { t: t0, uid: a.uid, name: a.name, program: clip_(req.program || '', 30), kind: clip_(req.kind || 'design', 20), inChars: parts[0].text.length, files: parts.length - 1, model: model, ok: false, ms: 0, outChars: 0, err: '', q: clip_(String(req.prompt || '').replace(/\s+/g, ' '), 90) };
+  var out = '';
+  try {
+    var res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
+      method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true, headers: { 'x-goog-api-key': key } });
+    var code = res.getResponseCode(), txt = res.getContentText();
+    if (code === 429) throw new Error('المساعد مشغول الآن (حد الخطة المجانية). حاول بعد دقيقة.');
+    if (code >= 300) throw new Error('تعذّر الوصول إلى المساعد (' + code + ')');
+    var j = JSON.parse(txt), part = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
+    out = (part || []).map(function (p) { return p.text || ''; }).join('');
+    if (!out) throw new Error('لم يُعد المساعد نتيجة. أعد صياغة طلبك.');
+    log.ok = true; log.outChars = out.length;
+  } catch (e) { log.err = clip_(String(e && e.message || e), 160); }
+  log.ms = now_() - t0;
+  aiLog_(log);
+  if (!log.ok) throw new Error(log.err);
   c.put(ck, String(used + 1), 90000);
   return out;
+}
+// سجل المساعد: ما طُلب منه ومن ومتى وهل نجح (للمدير، ولمراقبة المهمة الأسبوعية). ملف شهري
+function aiLog_(x) {
+  try { withLock_(function () { var n = 'ailog_' + monthKey_(x.t) + '.json', l = readJson_(n, []); l.unshift(x); if (l.length > 3000) l.length = 3000; writeJson_(n, l); }); } catch (e) {}
+}
+function ai_log(token, m, program) {
+  var a = auth_(token); needAdmin_(a);
+  m = /^\d{4}-\d{2}$/.test(m || '') ? m : monthKey_(now_());
+  var list = readJson_('ailog_' + m + '.json', []).filter(function (x) { return (isSuper_(a) || adminOf_(a, x.program)) && (!program || x.program === program); });
+  var sum = { n: list.length, ok: 0, ms: 0, kinds: {}, users: {}, days: {}, errs: {} };
+  list.forEach(function (x) { if (x.ok) { sum.ok++; sum.ms += x.ms; } sum.kinds[x.kind] = (sum.kinds[x.kind] || 0) + 1; sum.users[x.name] = (sum.users[x.name] || 0) + 1; var d = dayKey_(x.t); sum.days[d] = (sum.days[d] || 0) + 1; if (x.err) sum.errs[x.err] = (sum.errs[x.err] || 0) + 1; });
+  sum.ms = sum.ok ? Math.round(sum.ms / sum.ok) : 0;
+  return JSON.stringify({ m: m, sum: sum, list: list.slice(0, 200).map(function (x) { var o = Object.assign({}, x); delete o.uid; return o; }), settings: settings_().ai });
 }
 
 /* ================= الإصدار الخامس (يبقى حتى يكتمل الانتقال) ================= */

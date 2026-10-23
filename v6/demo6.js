@@ -13,7 +13,7 @@
     let local = null;
     if (url.indexOf('raw.githubusercontent.com/GHamine23/media-portal/main/assets/') >= 0) local = ROOT + 'assets/' + url.split('/main/assets/')[1];
     else if (url.indexOf('raw.githubusercontent.com/google/fonts/main/ofl/') >= 0) local = '/gfonts/' + decodeURIComponent(url.split('/ofl/')[1]).replace(/[\[\],]/g, '_');
-    else if (url.indexOf('generativelanguage.googleapis.com') >= 0 && window.DEMO_AI) return { code: 200, body: JSON.stringify({ candidates: [{ content: { parts: [{ text: window.DEMO_AI(JSON.parse(opt.payload)) }] } }] }) };
+    else if (url.indexOf('generativelanguage.googleapis.com') >= 0 && window.DEMO_AI) return { code: 200, body: JSON.stringify({ candidates: [{ content: { parts: [{ text: window.DEMO_AI(opt.payload) }] } }] }) };
     if (!local) return { code: 404, body: '' };
     const b = syncGet(local, true); return b ? { code: 200, body: b } : { code: 404, body: '' };
   };

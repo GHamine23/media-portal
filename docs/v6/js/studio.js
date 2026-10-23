@@ -256,7 +256,7 @@ function fieldsOfGroup(g) {
   if (!lines.length) return [];
   const out = [];
   S.tpl.fields.forEach(function (f) {
-    if (!f.k || (f.kind && f.kind !== 'area' && f.kind !== 'text')) return;
+    if (!f.k || (f.kind && f.kind !== 'area' && f.kind !== 'text')) return;   // hidden وغيرها لا تُعدّل نصاً
     if (S.hide['f_' + f.k] || typeof S.d[f.k] !== 'string') return;
     const v = plainOf(S.d[f.k]); if (!v) return;
     const hit = lines.filter(function (l) { return v.indexOf(l) >= 0 || l.indexOf(v) >= 0; }).length;

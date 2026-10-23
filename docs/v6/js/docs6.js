@@ -6,7 +6,7 @@ const MONTHS = /(محرم|صفر|ربيع|جمادى|رجب|شعبان|رمضا�
 // العنوان العام للحقل: الأرقام والأوقات والتواريخ تبقى أمثلة، وغيرها يصير اسم الخانة
 function genericOf(f) {
   const def = String(f.def == null ? '' : f.def);
-  if (!def.trim() || /[0-9٠-٩]/.test(def) || MONTHS.test(def) || f.kind === 'date' || f.kind === 'image' || f.kind === 'toggle' || f.kind === 'choice') return null;
+  if (!def.trim() || /[0-9٠-٩]/.test(def) || MONTHS.test(def) || f.kind === 'date' || f.kind === 'image' || f.kind === 'toggle' || f.kind === 'choice' || f.kind === 'hidden') return null;
   if (def.indexOf('|') >= 0 || def.split('\n').length > 3) return null;   // الجداول والقوائم تبقى مثالاً يوضّح الشكل
   return GENERIC[f.k] || String(f.label || '').replace(/\s*\(.*\)\s*/, '').trim() || null;
 }

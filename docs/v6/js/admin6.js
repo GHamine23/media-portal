@@ -1,7 +1,7 @@
 /* ================= لوحة الإدارة: للمدير العام كل شيء، ولمشرف البرنامج ما يخص برنامجه ================= */
 const ADMIN_TABS = [
   ['overview', 'نظرة عامة', 'chart', 0], ['archive', 'أرشيف التصاميم', 'archive', 0], ['accounts', 'الحسابات', 'users', 0], ['programs', 'البرامج والهويات', 'prog', 0],
-  ['assets', 'الشعارات والصور', 'image', 0], ['fonts', 'الخطوط', 'font', 0], ['models', 'النماذج والقوالب', 'model', 0], ['feedback', 'البلاغات', 'flag', 0], ['broadcasts', 'رسائل للمستخدمين', 'megaphone', 0],
+  ['assets', 'الشعارات والصور', 'image', 0], ['fonts', 'الخطوط', 'font', 0], ['models', 'النماذج والقوالب', 'model', 0], ['ai', 'الذكاء الاصطناعي', 'sparkles', 0], ['feedback', 'البلاغات', 'flag', 0], ['broadcasts', 'رسائل للمستخدمين', 'megaphone', 0],
   ['changelog', 'سجل التحديثات', 'history', 1], ['settings', 'الإعدادات', 'gear', 1], ['audit', 'سجل النشاط', 'shield', 1]
 ];
 function myAdminProgs() { return V6.bundle.programs.filter(function (p) { return isSuper() || (V6.me.role === 'sup' && V6.me.programs.indexOf(p.id) >= 0); }); }
@@ -19,7 +19,7 @@ function showAdmin(tab) {
       body
     ])
   ]));
-  ({ overview: aOverview, archive: aArchive, models: aModels, accounts: aAccounts, programs: aPrograms, assets: aAssets, fonts: aFonts, feedback: aFeedback, broadcasts: aBroadcasts, changelog: aChangelog, settings: aSettings, audit: aAudit }[tab])(body);
+  ({ overview: aOverview, archive: aArchive, models: aModels, ai: aAI, accounts: aAccounts, programs: aPrograms, assets: aAssets, fonts: aFonts, feedback: aFeedback, broadcasts: aBroadcasts, changelog: aChangelog, settings: aSettings, audit: aAudit }[tab])(body);
 }
 function aHead(body, title, note, acts) { body.appendChild(el('div', { class: 'ahead' }, [el('div', {}, [el('h2', { text: title }), note ? el('p', { class: 'muted small', text: note }) : null]), el('div', { class: 'row wrapr' }, acts || [])])); }
 function loading(body) { const s = el('div', { class: 'skel ldbox', style: 'height:180px' }, [loader6('', true)]); body.appendChild(s); return s; }
@@ -573,4 +573,41 @@ async function aModels(body) {
     });
   }
   loadPacks();
+}
+
+/* ---------- الذكاء الاصطناعي: ماذا يفعل، وكم استُعمل، ومن، وهل نجح ---------- */
+const AI_KIND_N = { intake: 'فهم الفكرة', design: 'اقتراح تصاميم', creative: 'دعه يبدع', caption: 'نص مصاحب', outline: 'مخطط عرض', slides: 'بناء شرائح', spell: 'تصحيح وتشكيل', weekly: 'المهمة الأسبوعية', test: 'تجربة' };
+async function aAI(body) {
+  let m = '', prog = '', data = null;
+  const monthSel = el('select', { class: 'inp sm', 'aria-label': 'الشهر', onchange: function (e) { m = e.target.value; load(); } });
+  aHead(body, 'الذكاء الاصطناعي', 'كل ما يطلبه المستخدمون من المساعد يُسجَّل هنا: من، ومتى، وماذا، وهل نجح. المفتاح والنموذج في الإعدادات.', [monthSel, progSelect('', true, function (v) { prog = v; load(); })]);
+  body.appendChild(el('div', { class: 'card note' }, [el('b', { text: 'ماذا يفعل المساعد في المنصة؟' }), el('ul', { class: 'nlist small' }, [
+    el('li', { text: 'فهم الفكرة: يستخرج من كلمات المستخدم النوع والجمهور والمقدّم والوقت والمكان، ليسأل فقط عمّا نقص.' }),
+    el('li', { text: 'اقتراح التصاميم: يختار قوالب من المكتبة ويكتب نصوصها، ويصمم تخطيطات حرة جديدة من ألوان الهوية. لا يولّد صوراً.' }),
+    el('li', { text: 'النص المصاحب: يصوغ رسالة تليجرام من معلومات التصميم على نماذج رسائل البرنامج.' }),
+    el('li', { text: 'الشرائح: يحوّل نصاً أو ملفاً إلى مخطط عرض يراجعه المستخدم ثم إلى شرائح.' }),
+    el('li', { text: 'الحدود: نموذج Gemini المجاني، بحد يومي لكل مستخدم، ويعمل عبر الخادم فلا يرى أحد المفتاح. لا تُرسل بيانات الطلاب الشخصية.' })])]));
+  const box = el('div'); body.appendChild(box);
+  async function load() {
+    box.innerHTML = ''; const sk = loading(box);
+    try { data = await API6.me('ai_log', m, prog); } catch (e) { sk.remove(); box.appendChild(el('p', { class: 'err', text: e.message })); return; }
+    sk.remove(); m = data.m;
+    if (!monthSel.children.length) { for (let i = 0; i < 6; i++) { const d = new Date(); d.setMonth(d.getMonth() - i); const k = d.toISOString().slice(0, 7); monthSel.appendChild(el('option', { value: k, text: monthName(k), selected: k === m })); } }
+    const S = data.sum;
+    box.appendChild(el('div', { class: 'kpis' }, [kpi('الطلبات هذا الشهر', S.n, 'طلباً'), kpi('نجح منها', S.ok, S.n ? Math.round(S.ok / S.n * 100) + '٪' : '—'), kpi('متوسط الزمن', S.ms ? (S.ms / 1000).toFixed(1) : 0, 'ثانية'), kpi('الحد اليومي لكل مستخدم', (data.settings || {}).perDay || 0, (data.settings || {}).model || '')]));
+    const days = {}; Object.keys(S.days).forEach(function (k) { days[k] = { exports: S.days[k] }; });
+    box.appendChild(el('div', { class: 'card' }, [el('h3', { text: 'الطلبات يومياً' }), barChart(dayRows(days, 30), 'exports', 'طلباً')]));
+    box.appendChild(el('div', { class: 'grid two' }, [
+      el('div', { class: 'card' }, [el('h3', { text: 'بحسب المهمة' }), hbars(topOf(S.kinds, 8), function (k) { return AI_KIND_N[k] || k; })]),
+      el('div', { class: 'card' }, [el('h3', { text: 'أكثر المستخدمين' }), hbars(topOf(S.users, 8), function (k) { return k; })])
+    ]));
+    const errs = topOf(S.errs, 6);
+    if (errs.length) box.appendChild(el('div', { class: 'card' }, [el('h3', { text: 'الأخطاء المتكررة' }), hbars(errs, function (k) { return k; })]));
+    const tbl = el('div', { class: 'ailog' });
+    (data.list || []).slice(0, 60).forEach(function (x) {
+      tbl.appendChild(el('div', { class: 'airow' + (x.ok ? '' : ' bad') }, [el('span', { class: 'tiny', text: fmtTime(x.t) }), el('b', { text: x.name }), el('span', { class: 'pill sm', text: AI_KIND_N[x.kind] || x.kind }), el('span', { class: 'aiq', text: x.q || '' }), el('span', { class: 'tiny', text: x.ok ? (x.ms / 1000).toFixed(1) + ' ث' : x.err })]));
+    });
+    box.appendChild(el('div', { class: 'card' }, [el('h3', { text: 'آخر الطلبات' }), data.list && data.list.length ? tbl : el('p', { class: 'empty', text: 'لا طلبات بعد.' })]));
+  }
+  load();
 }

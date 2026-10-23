@@ -492,3 +492,21 @@ pre.code{direction:ltr;text-align:left;background:var(--bg2);padding:12px;border
 .pview .pvdeck{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}.pview .pvdeck canvas{width:100%;border-radius:10px;box-shadow:var(--sh1)}
 .elhd{gap:8px}.elnav{align-items:center;gap:6px}.elnav h3{font-size:19px;flex:1;text-align:center}.elnav .nx svg{transform:scaleX(-1)}
 @media (max-width:860px){.e-reset .hide-s{display:none}.e-reset{padding:9px 10px}}
+/* المصمّم الذكي: الأسئلة والنتائج */
+.mkwiz{padding:26px;display:flex;flex-direction:column;gap:14px}
+.mkwiz h2{font-size:24px}
+.mkprog{display:flex;gap:4px}.mkprog i{flex:1;height:4px;border-radius:4px;background:var(--line)}.mkprog i.on{background:#000}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1.5px solid var(--line2);background:#fff;border-radius:99px;padding:9px 16px;font:inherit;font-size:15.5px;cursor:pointer;transition:background .2s,border-color .2s,transform .25s var(--spring)}
+.chip:hover{transform:translateY(-1px);border-color:#000}.chip.on{background:#000;color:#fff;border-color:#000}
+.mkctl{align-items:center;margin-top:6px}
+.mkknown{margin-top:14px;align-items:center}
+.mkknown .pill .x{border:0;background:transparent;margin-inline-start:4px;cursor:pointer;display:inline-grid;place-items:center}.mkknown .pill .x svg{width:12px;height:12px}
+.mkres-h{align-items:center;margin-bottom:14px}.mkres-h h2{margin:0}
+.pill.pu{background:#ece9ff;color:#4a3fcf}
+.btn.lg{padding:13px 22px;font-size:17px}
+
+.ailog{display:flex;flex-direction:column;gap:4px}
+.airow{display:grid;grid-template-columns:auto auto auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 10px;border-radius:10px;background:var(--bg2);font-size:14px}
+.airow.bad{background:#fff1ef}.airow .aiq{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink2)}
+@media (max-width:700px){.airow{grid-template-columns:1fr 1fr;}.airow .aiq{grid-column:1/-1;white-space:normal}}

@@ -37,6 +37,7 @@ function pContent(b) {
   const form = el('div', { class: 'pform' });
   tpl.fields.forEach(function (f) {
     if (!f.k && f.kind !== 'date') return;
+    if (f.kind === 'hidden') return;
     if (f.kind === 'date') { form.appendChild(dateField6(f)); return; }
     if (f.kind === 'image') { form.appendChild(imageField6(f)); return; }
     if (f.kind === 'toggle') { form.appendChild(el('label', { class: 'tog' }, [el('input', { type: 'checkbox', checked: !!S.d[f.k], onchange: function (e) { S.d[f.k] = e.target.checked; changed6(); } }), el('span', { text: f.label })])); return; }
