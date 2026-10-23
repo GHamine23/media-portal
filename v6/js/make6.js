@@ -143,14 +143,31 @@ function mkInfo() {
 }
 async function mkGenerate(body) {
   const T = trackOf(MK.tid); if (!MK.type) MK.type = 'ann'; mkSave();
-  body.innerHTML = ''; body.appendChild(el('div', { class: 'boot' }, [loader6(aiReady() ? 'يصمّم المساعد عدة اقتراحات…' : 'نجهّز الاقتراحات…')]));
+  body.innerHTML = '';
   const dirs = MK.creative ? DIRECTIONS : [[MK.tone || 'calm', '', '']];
-  let results = [];
-  try {
-    if (aiReady()) results = await Promise.all(dirs.map(function (d) { return makeAI(T, d).catch(function (e) { return { error: e.message, designs: [] }; }); }));
-    else results = dirs.map(function (d) { return makeLocal(T, d); });
-  } catch (e) { toast(e.message); results = dirs.map(function (d) { return makeLocal(T, d); }); }
-  if (results.every(function (r) { return !r.designs.length; })) results = dirs.map(function (d) { return makeLocal(T, d); });
+  let results = [], skip = null;
+  if (aiReady()) {
+    // المساعد قد يأخذ دقيقة: عدّاد ظاهر، وزر لعرض اقتراحات سريعة دون انتظار، وحدّ أقصى ٩٠ ثانية
+    const t0 = Date.now(), secs = el('b', { text: '0' });
+    const skipBtn = el('button', { type: 'button', class: 'btn sm line', hidden: true, onclick: function () { if (skip) skip(); } }, ['لا تنتظر: اعرض اقتراحات سريعة الآن']);
+    body.appendChild(el('div', { class: 'boot mkwait' }, [loader6('يصمّم المساعد ' + (dirs.length > 1 ? 'ثلاثة اتجاهات' : 'اقتراحاتك') + '…'),
+      el('p', { class: 'small muted' }, ['مرّ ', secs, ' ثانية. عادةً يستغرق المساعد من ٢٠ إلى ٦٠ ثانية.']), skipBtn]));
+    const tick = setInterval(function () { const n = Math.round((Date.now() - t0) / 1000); secs.textContent = String(n); if (n >= 12) skipBtn.hidden = false; if (!document.body.contains(secs)) clearInterval(tick); }, 1000);
+    const skipP = new Promise(function (ok) { skip = function () { ok({ skipped: true, designs: [] }); }; });
+    const limit = new Promise(function (ok) { setTimeout(function () { ok({ timeout: true, designs: [] }); }, 90000); });
+    results = await Promise.all(dirs.map(function (d) {
+      return Promise.race([makeAI(T, d).catch(function (e) { return { error: e.message, designs: [] }; }), skipP, limit]).then(function (r) {
+        if (r && r.designs && r.designs.length) return r;
+        const loc = makeLocal(T, d); loc.why = r && r.error ? r.error : r && r.timeout ? 'تأخر المساعد' : ''; return loc;
+      });
+    }));
+    clearInterval(tick);
+    const why = results.map(function (r) { return r.why; }).filter(Boolean)[0];
+    if (why) toast((/تأخر/.test(why) ? 'تأخر المساعد، فعرضنا اقتراحات سريعة' : 'تعذّر المساعد: ' + why) + '. جرّب «اقتراحات أخرى» بعد قليل.');
+  } else {
+    body.appendChild(el('div', { class: 'boot' }, [loader6('نجهّز الاقتراحات…')]));
+    results = dirs.map(function (d) { return makeLocal(T, d); });
+  }
   MK.results = results; MK.step = 'results'; MK.dir = 0;
   track('make', { tool: aiReady() ? 'ai' : 'local' });
   renderMake();
