@@ -113,7 +113,8 @@ function apiFns_() {
     stat_track: stat_track, stat_summary: stat_summary,
     bc_list: bc_list, bc_all: bc_all, bc_save: bc_save, bc_del: bc_del,
     cl_list: cl_list, cl_save: cl_save, set_get: set_get, set_save: set_save, audit_list: audit_list,
-    ai_make: ai_make, ai_status: ai_status, ai_log: ai_log, me_profile: me_profile, font_family: font_family
+    ai_make: ai_make, ai_status: ai_status, ai_log: ai_log,
+    tg_test: tg_test, tg_send: tg_send, tg_queue: tg_queue, tg_cancel: tg_cancel, me_profile: me_profile, font_family: font_family
   };
 }
 function doPost(e) {
@@ -179,7 +180,7 @@ function clip_(s, n) { return String(s == null ? '' : s).slice(0, n); }
                           mustChange, disabled, fails, lockUntil, created, last, legacyKey, prefs} }
    sessions.json: { token: {u, e: انتهاء, l: آخر استخدام} } */
 var ROLES = { super: 'المدير العام', sup: 'مشرف برنامج', user: 'مستخدم' };
-var PERMS = ['social', 'ai', 'upload', 'fonts', 'slides'];
+var PERMS = ['social', 'ai', 'upload', 'fonts', 'slides', 'send'];
 // درجة التعديل في القوالب: content المحتوى فقط، style المحتوى والمظهر، full كامل. الفارغة = درجة البرنامج
 var EDIT_LEVELS = { content: 1, style: 1, full: 1 };   // صلاحيات قابلة للمنح لكل حساب
 var SESSION_DAYS = 30;
@@ -429,6 +430,9 @@ function prog_save(token, json) {
     if (p.block) cur.block = { fonts: (p.block.fonts || []).filter(fam).slice(0, 200), logos: (p.block.logos || []).map(function (k) { return clip_(k, 60); }).slice(0, 200) };   // ما لا يظهر لمستخدمي البرنامج
     if (p.editLevel != null) cur.editLevel = EDIT_LEVELS[p.editLevel] ? p.editLevel : 'full';
     if (p.fonts) cur.fonts = { title: clip_(p.fonts.title, 60), body: clip_(p.fonts.body, 60) };
+    if (p.tg) cur.tg = { chat: clip_(String(p.tg.chat || '').trim(), 80), link: clip_(p.tg.link, 300), hashtag: clip_(String(p.tg.hashtag || '').replace(/^#/, ''), 60), sign: clip_(p.tg.sign, 120) };
+    if (p.captions) cur.captions = p.captions.slice(0, 40).map(function (c) { return { id: clip_(c.id || uid_(), 20), name: clip_(c.name, 60), kind: clip_(c.kind || 'ann', 20), text: clip_(c.text, 2000) }; });
+    if (p.samples != null) cur.samples = clip_(p.samples, 30000);   // نماذج رسائل البرنامج التي يتعلم منها المساعد
     if (isSuper_(me)) { if (p.order != null) cur.order = +p.order || 0; if (p.active != null) cur.active = !!p.active; }
     if (i >= 0) list[i] = cur; else list.push(cur);
     writeJson_('programs.json', list);
@@ -934,8 +938,8 @@ function cl_save(token, json) {
 }
 var DEFAULT_SETTINGS = { ai: { enabled: true, model: 'gemini-3.8-flash', perDay: 20 }, uploadsNeedPerm: false, maxUploadMb: 20 };
 function settings_() { var s = readJson_('settings.json', {}); var o = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)); Object.keys(s).forEach(function (k) { o[k] = s[k]; }); return o; }
-function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: !!props_().getProperty('GEMINI_KEY') }, maxUploadMb: s.maxUploadMb }; }
-function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.aiKey = !!props_().getProperty('GEMINI_KEY'); return JSON.stringify(s); }
+function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: !!props_().getProperty('GEMINI_KEY') }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN') }; }
+function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.aiKey = !!props_().getProperty('GEMINI_KEY'); s.tgOn = !!props_().getProperty('TG_TOKEN'); return JSON.stringify(s); }
 function set_save(token, json) {
   var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
   var s = JSON.parse(json);
@@ -944,6 +948,8 @@ function set_save(token, json) {
     if (s.ai) cur.ai = { enabled: !!s.ai.enabled, model: clip_(s.ai.model || 'gemini-3.8-flash', 60), perDay: Math.max(0, Math.min(500, +s.ai.perDay || 0)) };
     if (s.uploadsNeedPerm != null) cur.uploadsNeedPerm = !!s.uploadsNeedPerm;
     if (s.maxUploadMb != null) cur.maxUploadMb = Math.max(1, Math.min(20, +s.maxUploadMb || 20));
+    if (s.tgToken != null) { var tk = String(s.tgToken).trim(); if (tk) { if (!/^\d+:[\w-]{30,}$/.test(tk)) throw new Error('رمز البوت غير صحيح'); props_().setProperty('TG_TOKEN', tk); } else props_().deleteProperty('TG_TOKEN'); }
+    if (s.sendNeedsApproval != null) cur.sendNeedsApproval = !!s.sendNeedsApproval;
     writeJson_('settings.json', cur); audit_(a, 'غيّر الإعدادات', ''); return JSON.stringify(cur);
   });
 }
@@ -1003,6 +1009,82 @@ function ai_log(token, m, program) {
   list.forEach(function (x) { if (x.ok) { sum.ok++; sum.ms += x.ms; } sum.kinds[x.kind] = (sum.kinds[x.kind] || 0) + 1; sum.users[x.name] = (sum.users[x.name] || 0) + 1; var d = dayKey_(x.t); sum.days[d] = (sum.days[d] || 0) + 1; if (x.err) sum.errs[x.err] = (sum.errs[x.err] || 0) + 1; });
   sum.ms = sum.ok ? Math.round(sum.ms / sum.ok) : 0;
   return JSON.stringify({ m: m, sum: sum, list: list.slice(0, 200).map(function (x) { var o = Object.assign({}, x); delete o.uid; return o; }), settings: settings_().ai });
+}
+
+/* ================= تليجرام: إرسال التصميم إلى قناة البرنامج، فوراً أو في موعد =================
+   بوت واحد للمنصة (رمزه في خصائص السكربت TG_TOKEN)، يُضاف مشرفاً في قناة كل برنامج، ولكل برنامج قناته في programs.json (tg.chat).
+   المجدول يُحفظ في tgq.json وملفاته في المجلد الفرعي tg، ويرسله المؤقّت tgTick كل عشر دقائق. */
+function tgToken_() { var t = props_().getProperty('TG_TOKEN'); if (!t) throw new Error('لم يُضبط بوت تليجرام بعد (الإعدادات)'); return t; }
+function tgCall_(method, payload) {
+  var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + tgToken_() + '/' + method, { method: 'post', payload: payload, muteHttpExceptions: true });
+  var j; try { j = JSON.parse(res.getContentText()); } catch (e) { j = { ok: false, description: 'رد غير مفهوم (' + res.getResponseCode() + ')' }; }
+  if (!j.ok) throw new Error('تليجرام: ' + (j.description || res.getResponseCode()));
+  return j.result;
+}
+function tg_test(token) {
+  var a = auth_(token); needAdmin_(a);
+  var me = tgCall_('getMe', {});
+  return JSON.stringify({ username: me.username, name: me.first_name });
+}
+function tgChatOf_(pid) { var p = progs_().filter(function (x) { return x.id === pid; })[0]; var ch = p && p.tg && p.tg.chat; if (!ch) throw new Error('لم يحدد مشرف البرنامج قناة تليجرام بعد'); return ch; }
+function canSend_(a, pid) { return adminOf_(a, pid) || (inProg_(a, pid) && perm_(a, 'send')); }
+// payload: {program, caption, png (base64 بلا رأس), file (base64 الملف الأصلي، اختياري), fileName, fileMime, mode: photo|doc|both, when (ms، اختياري للجدولة), name}
+function tg_send(token, json) {
+  var a = auth_(token), o = JSON.parse(json), pid = o.program;
+  if (!canSend_(a, pid)) throw new Error('الإرسال إلى القناة يحتاج صلاحية «الإرسال» من المشرف');
+  var chat = tgChatOf_(pid), cap = clip_(String(o.caption || ''), 1024), mode = ['photo', 'doc', 'both'].indexOf(o.mode) >= 0 ? o.mode : 'both';
+  if (!o.png && !o.file) throw new Error('لا تصميم للإرسال');
+  if ((o.png || '').length > 14 * 1024 * 1024 || (o.file || '').length > 68 * 1024 * 1024) throw new Error('الملف أكبر من حد تليجرام (١٠ ميغابايت للصورة، ٥٠ للملف)');
+  var when = +o.when || 0;
+  if (when > now_() + 60000) {
+    var dir = sub_('tg'), rec = { id: uid_(), program: pid, chat: chat, uid: a.uid, name: a.name, title: clip_(o.name, 80), caption: cap, mode: mode, when: when, at: now_(), status: 'queued' };
+    if (o.png) rec.pngId = dir.createFile(Utilities.newBlob(Utilities.base64Decode(o.png), 'image/png', 'tg_' + rec.id + '.png')).getId();
+    if (o.file) rec.fileId = dir.createFile(Utilities.newBlob(Utilities.base64Decode(o.file), clip_(o.fileMime || 'image/png', 60), clip_(o.fileName || ('design_' + rec.id + '.png'), 100))).getId();
+    withLock_(function () { var q = readJson_('tgq.json', []); q.unshift(rec); if (q.length > 500) q.length = 500; writeJson_('tgq.json', q); });
+    audit_(a, 'جدول منشوراً', rec.title + ' · ' + pid);
+    return JSON.stringify({ id: rec.id, queued: true, when: when });
+  }
+  var sent = tgDeliver_(chat, cap, mode, o.png ? Utilities.newBlob(Utilities.base64Decode(o.png), 'image/png', 'design.png') : null, o.file ? Utilities.newBlob(Utilities.base64Decode(o.file), clip_(o.fileMime || 'image/png', 60), clip_(o.fileName || 'design.png', 100)) : null);
+  withLock_(function () { var q = readJson_('tgq.json', []); q.unshift({ id: uid_(), program: pid, chat: chat, uid: a.uid, name: a.name, title: clip_(o.name, 80), caption: cap, mode: mode, when: now_(), at: now_(), status: 'sent', msg: sent.msg }); if (q.length > 500) q.length = 500; writeJson_('tgq.json', q); });
+  audit_(a, 'أرسل إلى القناة', clip_(o.name, 80) + ' · ' + pid);
+  return JSON.stringify(sent);
+}
+function tgDeliver_(chat, cap, mode, pngBlob, fileBlob) {
+  var out = { msg: 0 };
+  if (mode !== 'doc' && pngBlob) { var r1 = tgCall_('sendPhoto', { chat_id: chat, photo: pngBlob, caption: cap, parse_mode: 'HTML' }); out.msg = r1.message_id; }
+  if (mode !== 'photo') { var fb = fileBlob || pngBlob; var r2 = tgCall_('sendDocument', { chat_id: chat, document: fb, caption: mode === 'doc' ? cap : 'الملف بجودته الكاملة', parse_mode: 'HTML' }); if (!out.msg) out.msg = r2.message_id; }
+  if (/^@/.test(chat) && out.msg) out.link = 'https://t.me/' + chat.slice(1) + '/' + out.msg;
+  return out;
+}
+function tg_queue(token, program) {
+  var a = auth_(token);
+  return JSON.stringify(readJson_('tgq.json', []).filter(function (x) { return (!program || x.program === program) && (adminOf_(a, x.program) || x.uid === a.uid || inProg_(a, x.program)); }).slice(0, 100)
+    .map(function (x) { var o = Object.assign({}, x); delete o.pngId; delete o.fileId; delete o.uid; o.mine = x.uid === a.uid; return o; }));
+}
+function tg_cancel(token, id) {
+  var a = auth_(token);
+  return withLock_(function () {
+    var q = readJson_('tgq.json', []), x = q.filter(function (y) { return y.id === id; })[0];
+    if (!x) throw new Error('غير موجود'); if (!(x.uid === a.uid || adminOf_(a, x.program))) throw new Error('ليس لك');
+    if (x.status !== 'queued') throw new Error('أُرسل من قبل');
+    x.status = 'cancelled'; writeJson_('tgq.json', q); return 'ok';
+  });
+}
+// المؤقّت: يرسل ما حان موعده
+function tgTick() {
+  JC = {};
+  var due = readJson_('tgq.json', []).filter(function (x) { return x.status === 'queued' && x.when <= now_(); });
+  due.forEach(function (x) {
+    var res = null, err = '';
+    try { res = tgDeliver_(x.chat, x.caption, x.mode, x.pngId ? DriveApp.getFileById(x.pngId).getBlob() : null, x.fileId ? DriveApp.getFileById(x.fileId).getBlob() : null); } catch (e) { err = String(e && e.message || e); }
+    withLock_(function () { var q = readJson_('tgq.json', []); q.forEach(function (y) { if (y.id === x.id) { y.status = err ? 'failed' : 'sent'; y.err = err; y.sentAt = now_(); if (res) { y.msg = res.msg; y.link = res.link; } } }); writeJson_('tgq.json', q); });
+  });
+}
+function ensureTriggers_(log) {
+  try {
+    var has = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'tgTick'; });
+    if (!has) { ScriptApp.newTrigger('tgTick').timeBased().everyMinutes(10).create(); if (log) log.push('أُنشئ مؤقّت المنشورات المجدولة (كل ١٠ دقائق).'); }
+  } catch (e) { if (log) log.push('تعذّر إنشاء المؤقّت: ' + e); }
 }
 
 /* ================= الإصدار الخامس (يبقى حتى يكتمل الانتقال) ================= */
@@ -1139,6 +1221,7 @@ var OPEN_FONTS = /*OPEN_FONTS*/[];
 function bootstrap() {
   JC = {};
   var log = [];
+  ensureTriggers_(log);
   // ١) المدير العام
   var accs = readJson_('accounts.json', {});
   if (!Object.keys(accs).some(function (k) { return accs[k].role === 'super'; })) {

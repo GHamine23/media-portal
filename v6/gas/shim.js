@@ -128,7 +128,7 @@
   } };
   const TRIG = [];
   const ScriptApp = { getProjectTriggers: function () { return TRIG.slice(); }, deleteTrigger: function (t) { const i = TRIG.indexOf(t); if (i >= 0) TRIG.splice(i, 1); },
-    newTrigger: function (fn) { const t = { getHandlerFunction: function () { return fn; } }; const b = { timeBased: function () { return b; }, everyHours: function () { return b; }, create: function () { TRIG.push(t); return t; } }; return b; },
+    newTrigger: function (fn) { const t = { getHandlerFunction: function () { return fn; } }; const b = { timeBased: function () { return b; }, everyHours: function () { return b; }, everyMinutes: function () { return b; }, create: function () { TRIG.push(t); return t; } }; return b; },
     getOAuthToken: function () { return 'tok'; } };
 
   const GAS = { DriveApp: DriveApp, CacheService: CacheService, PropertiesService: PropertiesService, LockService: LockService, Utilities: Utilities, ContentService: ContentService,

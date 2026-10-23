@@ -1,7 +1,7 @@
 /* ================= لوحة الإدارة: للمدير العام كل شيء، ولمشرف البرنامج ما يخص برنامجه ================= */
 const ADMIN_TABS = [
   ['overview', 'نظرة عامة', 'chart', 0], ['archive', 'أرشيف التصاميم', 'archive', 0], ['accounts', 'الحسابات', 'users', 0], ['programs', 'البرامج والهويات', 'prog', 0],
-  ['assets', 'الشعارات والصور', 'image', 0], ['fonts', 'الخطوط', 'font', 0], ['models', 'النماذج والقوالب', 'model', 0], ['ai', 'الذكاء الاصطناعي', 'sparkles', 0], ['feedback', 'البلاغات', 'flag', 0], ['broadcasts', 'رسائل للمستخدمين', 'megaphone', 0],
+  ['assets', 'الشعارات والصور', 'image', 0], ['fonts', 'الخطوط', 'font', 0], ['models', 'النماذج والقوالب', 'model', 0], ['ai', 'الذكاء الاصطناعي', 'sparkles', 0], ['tg', 'منشورات القناة', 'send', 0], ['feedback', 'البلاغات', 'flag', 0], ['broadcasts', 'رسائل للمستخدمين', 'megaphone', 0],
   ['changelog', 'سجل التحديثات', 'history', 1], ['settings', 'الإعدادات', 'gear', 1], ['audit', 'سجل النشاط', 'shield', 1]
 ];
 function myAdminProgs() { return V6.bundle.programs.filter(function (p) { return isSuper() || (V6.me.role === 'sup' && V6.me.programs.indexOf(p.id) >= 0); }); }
@@ -19,7 +19,7 @@ function showAdmin(tab) {
       body
     ])
   ]));
-  ({ overview: aOverview, archive: aArchive, models: aModels, ai: aAI, accounts: aAccounts, programs: aPrograms, assets: aAssets, fonts: aFonts, feedback: aFeedback, broadcasts: aBroadcasts, changelog: aChangelog, settings: aSettings, audit: aAudit }[tab])(body);
+  ({ overview: aOverview, archive: aArchive, models: aModels, ai: aAI, tg: aTg, accounts: aAccounts, programs: aPrograms, assets: aAssets, fonts: aFonts, feedback: aFeedback, broadcasts: aBroadcasts, changelog: aChangelog, settings: aSettings, audit: aAudit }[tab])(body);
 }
 function aHead(body, title, note, acts) { body.appendChild(el('div', { class: 'ahead' }, [el('div', {}, [el('h2', { text: title }), note ? el('p', { class: 'muted small', text: note }) : null]), el('div', { class: 'row wrapr' }, acts || [])])); }
 function loading(body) { const s = el('div', { class: 'skel ldbox', style: 'height:180px' }, [loader6('', true)]); body.appendChild(s); return s; }
@@ -78,7 +78,7 @@ function hbars(rows, nameFn) {
 }
 
 /* ---------- الحسابات ---------- */
-const PERM_N = { social: 'مواقع التواصل', ai: 'المساعد الذكي', upload: 'رفع الصور', fonts: 'رفع الخطوط', slides: 'الشرائح' };
+const PERM_N = { social: 'مواقع التواصل', ai: 'المساعد الذكي', upload: 'رفع الصور', fonts: 'رفع الخطوط', slides: 'الشرائح', send: 'الإرسال إلى قناة تليجرام' };
 async function aAccounts(body) {
   let list = [], q = '', fprog = '', frole = '';
   aHead(body, 'الحسابات', 'لا تسجيل ذاتي: أنشئ الحساب، وأعطِ صاحبه كلمة المرور المؤقتة، فيختار كلمته عند أول دخول.', [
@@ -186,6 +186,7 @@ async function aPrograms(body) {
         el('div', { class: 'row' }, [el('button', { type: 'button', class: 'btn sm line', text: 'الإعدادات', onclick: function () { progForm(p); } }), el('button', { type: 'button', class: 'btn sm dark', onclick: function () { identityForm(p, null); } }, [ico('plus'), 'هوية'])])]),
       el('p', { class: 'muted small', text: p.desc || '' }),
       el('div', { class: 'row wrapr' }, [p.features && p.features.social === false ? el('span', { class: 'pill', text: 'مواقع التواصل متوقفة' }) : el('span', { class: 'pill gr', text: 'مواقع التواصل لمن له صلاحيتها' }), el('span', { class: 'pill', text: (p.identities || []).length + ' هوية' })]),
+      el('div', { class: 'row wrapr' }, [el('button', { type: 'button', class: 'btn sm line', onclick: function () { tgForm(p); } }, [ico('send'), p.tg && p.tg.chat ? 'القناة: ' + p.tg.chat : 'قناة تليجرام والنصوص المصاحبة'])]),
       el('div', { class: 'idrow' }, (p.identities || []).map(function (t) {
         return el('button', { type: 'button', class: 'idchip', onclick: function () { identityForm(p, t); } }, [el('span', { class: 'sw' }, ['pd', 'p', 's', 'a'].map(function (k) { return el('i', { style: 'background:' + t.c[k] }); })), el('span', { text: t.name })]);
       }).concat((p.identities || []).length ? [] : [el('p', { class: 'tiny', text: 'لا هويات بعد. أضف هوية البرنامج لتظهر القوالب بها.' })]))
@@ -437,6 +438,7 @@ async function aSettings(body) {
   aHead(body, 'الإعدادات', '', []);
   let s; try { s = await API6.me('set_get'); } catch (e) { body.appendChild(el('p', { class: 'err', text: e.message })); return; }
   const aiOn = el('input', { type: 'checkbox', checked: !!s.ai.enabled }), model = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.model, 'aria-label': 'النموذج' }), perDay = el('input', { type: 'number', class: 'inp', min: '0', max: '500', value: String(s.ai.perDay), 'aria-label': 'الحد اليومي' });
+  const tgTok = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.tgOn ? '•••••••• (اترك فارغاً لإبقائه)' : '123456789:AAF…', 'aria-label': 'رمز البوت' });
   const upPerm = el('input', { type: 'checkbox', checked: !!s.uploadsNeedPerm }), maxMb = el('input', { type: 'number', class: 'inp', min: '1', max: '20', value: String(s.maxUploadMb || 20), 'aria-label': 'أقصى حجم' });
   body.appendChild(el('div', { class: 'grid two' }, [
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-pu' }, [ico('ai')]), el('h3', { text: 'اصنع إعلانك بالذكاء' }),
@@ -445,12 +447,17 @@ async function aSettings(body) {
       el('div', { class: 'fld' }, [el('label', { text: 'النموذج' }), model, el('small', { text: 'أقوى نموذج مجاني الآن: gemini-3.8-flash' })]),
       el('div', { class: 'fld' }, [el('label', { text: 'حد الطلبات لكل مستخدم يومياً' }), perDay]),
       el('p', { class: 'tiny', text: 'في الخطة المجانية تستعمل جوجل الطلبات لتحسين منتجاتها، فلا تُرسل بيانات شخصية للطلاب. والمساعد لمن منحته صلاحيته.' })]),
+    el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-gr' }, [ico('send')]), el('h3', { text: 'بوت تليجرام' }),
+      el('p', { class: 'small ' + (s.tgOn ? 'ok' : 'err'), text: s.tgOn ? 'رمز البوت مضبوط. أضف البوت مشرفاً في قناة كل برنامج، وحدد القناة من إعدادات البرنامج.' : 'لم يُضبط رمز البوت بعد. أنشئ بوتاً من BotFather والصق رمزه هنا.' }),
+      el('div', { class: 'fld' }, [el('label', { text: 'رمز البوت (يُحفظ في الخادم ولا يُعرض)' }), tgTok]),
+      el('div', { class: 'row' }, [el('button', { type: 'button', class: 'btn sm line', text: 'اختبر البوت', onclick: async function () { try { const r = await API6.me('tg_test'); toast('البوت يعمل: @' + r.username); } catch (e) { toast(e.message); } } })])]),
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-bl' }, [ico('upload')]), el('h3', { text: 'الرفع' }),
       el('label', { class: 'tog' }, [upPerm, el('span', { text: 'رفع الصور يحتاج صلاحية' })]),
       el('div', { class: 'fld' }, [el('label', { text: 'أقصى حجم للملف (ميغابايت)' }), maxMb])])
   ]));
   body.appendChild(el('button', { type: 'button', class: 'btn dark', text: 'حفظ الإعدادات', onclick: async function () {
-    try { await API6.me('set_save', JSON.stringify({ ai: { enabled: aiOn.checked, model: model.value.trim(), perDay: +perDay.value }, uploadsNeedPerm: upPerm.checked, maxUploadMb: +maxMb.value })); toast('حُفظت'); await refreshBundle(); } catch (e) { toast(e.message); }
+    const o = { ai: { enabled: aiOn.checked, model: model.value.trim(), perDay: +perDay.value }, uploadsNeedPerm: upPerm.checked, maxUploadMb: +maxMb.value }; if (tgTok.value.trim()) o.tgToken = tgTok.value.trim();
+    try { await API6.me('set_save', JSON.stringify(o)); toast('حُفظت'); await refreshBundle(); showAdmin('settings'); } catch (e) { toast(e.message); }
   } }));
 }
 
@@ -608,6 +615,63 @@ async function aAI(body) {
       tbl.appendChild(el('div', { class: 'airow' + (x.ok ? '' : ' bad') }, [el('span', { class: 'tiny', text: fmtTime(x.t) }), el('b', { text: x.name }), el('span', { class: 'pill sm', text: AI_KIND_N[x.kind] || x.kind }), el('span', { class: 'aiq', text: x.q || '' }), el('span', { class: 'tiny', text: x.ok ? (x.ms / 1000).toFixed(1) + ' ث' : x.err })]));
     });
     box.appendChild(el('div', { class: 'card' }, [el('h3', { text: 'آخر الطلبات' }), data.list && data.list.length ? tbl : el('p', { class: 'empty', text: 'لا طلبات بعد.' })]));
+  }
+  load();
+}
+
+/* ---------- قناة تليجرام والنصوص المصاحبة لبرنامج ---------- */
+function tgForm(p) {
+  const tg = Object.assign({ chat: '', link: '', hashtag: '', sign: '' }, p.tg || {});
+  const chatI = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: tg.chat, placeholder: '@channel_username أو -1001234567890' });
+  const linkI = el('input', { type: 'url', class: 'inp', dir: 'ltr', value: tg.link, placeholder: 'https://…' });
+  const hashI = el('input', { type: 'text', class: 'inp', dir: 'auto', value: tg.hashtag, placeholder: 'الأنشطة_التربوية' });
+  const signI = el('input', { type: 'text', class: 'inp', dir: 'auto', value: tg.sign, placeholder: 'ننتظركم على خير 🌿' });
+  const samples = el('textarea', { rows: '8', dir: 'auto', placeholder: 'الصق هنا رسائل حقيقية من قناتكم، كل رسالة ثم سطر فيه --- بينها. يتعلم المساعد منها الأسلوب والبنية.' }); samples.value = p.samples || '';
+  let caps = (p.captions || []).map(function (c) { return Object.assign({}, c); });
+  const capBox = el('div', { class: 'caplist' });
+  function drawCaps() {
+    capBox.innerHTML = '';
+    caps.forEach(function (c, i) {
+      capBox.appendChild(el('div', { class: 'caprow' }, [
+        el('input', { type: 'text', class: 'inp sm', value: c.name, placeholder: 'اسم القالب', oninput: function (e) { c.name = e.target.value; } }),
+        el('select', { class: 'inp sm', onchange: function (e) { c.kind = e.target.value; } }, CAP_KINDS.map(function (k) { return el('option', { value: k[0], text: k[1], selected: k[0] === c.kind }); })),
+        el('button', { type: 'button', class: 'ib sm', 'aria-label': 'حذف', onclick: function () { caps.splice(i, 1); drawCaps(); } }, [ico('trash')]),
+        el('textarea', { rows: '5', dir: 'auto', class: 'captext', oninput: function (e) { c.text = e.target.value; } }, [c.text || ''])
+      ]));
+    });
+    capBox.appendChild(el('div', { class: 'row wrapr' }, [
+      el('button', { type: 'button', class: 'btn sm line', onclick: function () { caps.push({ id: newId(), name: 'قالب جديد', kind: 'ann', text: CAP_BASE[0].text }); drawCaps(); } }, [ico('plus'), 'قالب من الأساسي']),
+      el('button', { type: 'button', class: 'btn sm ghost', onclick: function () { caps.push({ id: newId(), name: 'قالب فارغ', kind: 'free', text: '<b>{title}</b>\n\n{sub}' }); drawCaps(); } }, ['قالب فارغ'])]));
+  }
+  drawCaps();
+  modal({ title: 'قناة ' + p.name + ' والنصوص المصاحبة', wide: true, body: [
+    el('p', { class: 'tiny', text: 'أضف بوت المنصة مشرفاً في القناة (بصلاحية النشر)، ثم اكتب اسم القناة هنا. كل من له صلاحية «الإرسال» في هذا البرنامج يرسل إليها من المحرر.' }),
+    el('div', { class: 'grid two' }, [el('div', { class: 'fld' }, [el('label', { text: 'القناة أو المجموعة' }), chatI]), el('div', { class: 'fld' }, [el('label', { text: 'رابط الحضور أو التسجيل المعتاد {link}' }), linkI]), el('div', { class: 'fld' }, [el('label', { text: 'الوسم المعتاد {hashtag}' }), hashI]), el('div', { class: 'fld' }, [el('label', { text: 'توقيع ختامي {sign}' }), signI])]),
+    el('h4', { class: 'psh', text: 'القوالب الكتابية الخاصة بالبرنامج' }), el('p', { class: 'tiny', text: 'المتغيرات: ' + CAP_VARS.map(function (v) { return '{' + v[0] + '} ' + v[1]; }).join(' · ') + '. والتنسيق بوسوم تليجرام: <b> <i> <u> <blockquote>.' }), capBox,
+    el('h4', { class: 'psh', text: 'نماذج رسائلكم (يتعلم منها المساعد)' }), samples
+  ], acts: [{ t: 'حفظ', cls: 'dark', keep: true, fn: async function (close) {
+    try { await API6.me('prog_save', JSON.stringify({ id: p.id, tg: { chat: chatI.value.trim(), link: linkI.value.trim(), hashtag: hashI.value.trim(), sign: signI.value.trim() }, captions: caps.filter(function (c) { return c.text && c.text.trim(); }), samples: samples.value })); close(); await refreshBundle(); toast('حُفظ'); showAdmin('programs'); }
+    catch (e) { toast(e.message); }
+  } }, { t: 'إلغاء' }] });
+}
+/* ---------- منشورات القناة: المرسل والمجدول ---------- */
+const TG_ST = { queued: ['مجدول', 'bl'], sent: ['أُرسل', 'gr'], failed: ['فشل', 'rd'], cancelled: ['أُلغي', ''] };
+async function aTg(body) {
+  let prog = '';
+  aHead(body, 'منشورات القناة', 'ما أُرسل إلى قنوات تليجرام من المنصة وما جُدول. القناة والقوالب الكتابية تُضبط من «البرامج والهويات»، ورمز البوت من الإعدادات.', [progSelect('', true, function (v) { prog = v; load(); })]);
+  const box = el('div'); body.appendChild(box);
+  async function load() {
+    box.innerHTML = ''; const sk = loading(box);
+    let list; try { list = await API6.me('tg_queue', prog); } catch (e) { sk.remove(); box.appendChild(el('p', { class: 'err', text: e.message })); return; }
+    sk.remove();
+    if (!list.length) { box.appendChild(el('p', { class: 'empty', text: 'لا منشورات بعد.' })); return; }
+    const tbl = el('div', { class: 'ailog' });
+    list.forEach(function (x) {
+      const st = TG_ST[x.status] || [x.status, ''];
+      tbl.appendChild(el('div', { class: 'airow' + (x.status === 'failed' ? ' bad' : '') }, [el('span', { class: 'tiny', text: fmtTime(x.when) }), el('b', { text: x.title || '—' }), el('span', { class: 'pill sm ' + st[1], text: st[0] }), el('span', { class: 'aiq', text: x.name + ' · ' + capPlain(x.caption || '').slice(0, 80) + (x.err ? ' · ' + x.err : '') }),
+        x.status === 'queued' ? el('button', { type: 'button', class: 'btn sm ghost', text: 'إلغاء', onclick: async function () { try { await API6.me('tg_cancel', x.id); load(); } catch (e) { toast(e.message); } } }) : (x.link ? el('a', { class: 'btn sm ghost', href: x.link, target: '_blank', rel: 'noopener', text: 'افتح' }) : el('span'))]));
+    });
+    box.appendChild(tbl);
   }
   load();
 }

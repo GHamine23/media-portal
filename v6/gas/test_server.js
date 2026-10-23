@@ -11,6 +11,12 @@ GAS._fetch.handler = function (url, opt) {
     return fs.existsSync(f) ? { code: 200, body: Array.from(fs.readFileSync(f)) } : { code: 404, body: '' };
   }
   if (url.indexOf('raw.githubusercontent.com/google/fonts') >= 0) return { code: 200, body: [0, 1, 0, 0, 0, 9] };
+  if (url.indexOf('api.telegram.org') >= 0) {
+    GAS._tg = GAS._tg || []; GAS._tg.push({ url: url, opt: opt });
+    if (/getMe$/.test(url)) return { code: 200, body: JSON.stringify({ ok: true, result: { username: 'athar_bot', first_name: 'أثر' } }) };
+    if (!opt.payload.chat_id) return { code: 400, body: JSON.stringify({ ok: false, description: 'chat not found' }) };
+    return { code: 200, body: JSON.stringify({ ok: true, result: { message_id: 40 + GAS._tg.length } }) };
+  }
   if (url.indexOf('generativelanguage.googleapis.com') >= 0) {
     GAS._lastAi = { url: url, opt: opt };
     return { code: 200, body: JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"designs":[{"tpl":"ann_panel"}]}' }] } }] }) };
@@ -133,6 +139,28 @@ const pa = J('prog_list', sp)[0]; ok(pa.fontsId[0] === 'tajawal' && pa.block.fon
 fails('font_family', /للمدير العام/, sp, JSON.stringify({ family: 'tajawal', scope: 'program', program: 'alim' }));
 call('font_family', adm, JSON.stringify({ family: 'zain', scope: 'program', program: 'alim' }));
 ok(J('bundle', at).assets.some(function (x) { return x.family === 'zain'; }) && !J('bundle', ut).assets.some(function (x) { return x.family === 'zain'; }), 'font family moved to one program');
+// telegram
+fails('set_save', /رمز البوت/, adm, JSON.stringify({ tgToken: 'bad' }));
+J('set_save', adm, JSON.stringify({ tgToken: '123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij' }));
+ok(J('set_get', adm).tgOn && J('bundle', ut).settings.tg, 'bot token stored (never returned)');
+ok(J('tg_test', adm).username === 'athar_bot', 'tg_test getMe');
+fails('tg_send', /قناة/, adm, JSON.stringify({ program: 'academy', caption: 'x', png: 'AAAA' }));
+J('prog_save', adm, JSON.stringify({ id: 'academy', tg: { chat: '@jeel_test', link: 'https://example.org/reg', hashtag: 'الأنشطة_التربوية' }, captions: [{ id: 'c1', name: 'إعلان', kind: 'ann', text: '📌 <b>{title}</b>' }], samples: 'نموذج ١\n---\nنموذج ٢' }));
+const pa2 = J('prog_list', adm).filter(function (p) { return p.id === 'academy'; })[0]; ok(pa2.tg.chat === '@jeel_test' && pa2.captions.length === 1 && pa2.samples.indexOf('نموذج') === 0, 'program telegram settings saved');
+fails('tg_send', /صلاحية/, ut, JSON.stringify({ program: 'academy', caption: 'x', png: 'AAAA' }));
+J('acc_save', adm, JSON.stringify({ uid: usr.acc.uid, perms: { ai: true, social: true, send: true } })); ut = J('auth_login', 'ahmad', 'AhmadPass99').token;
+const snt = J('tg_send', ut, JSON.stringify({ program: 'academy', name: 'إعلان', caption: '<b>مرحباً</b>', png: Buffer.from([1, 2, 3]).toString('base64'), file: Buffer.from([4, 5, 6]).toString('base64'), fileName: 'x.png', fileMime: 'image/png', mode: 'both' }));
+ok(snt.link === 'https://t.me/jeel_test/' + snt.msg && GAS._tg.filter(function (c) { return /sendPhoto|sendDocument/.test(c.url); }).length === 2, 'sent photo + document, link built');
+const sch = J('tg_send', ut, JSON.stringify({ program: 'academy', name: 'مجدول', caption: 'بعدين', png: Buffer.from([1]).toString('base64'), mode: 'photo', when: Date.now() + 3600000 }));
+ok(sch.queued && J('tg_queue', ut, 'academy').some(function (x) { return x.id === sch.id && x.status === 'queued' && x.mine; }), 'scheduled post queued');
+const nTg = GAS._tg.length; ctx.tgTick(); ok(GAS._tg.length === nTg, 'tick does not send future posts');
+fails('tg_cancel', /ليس لك/, at, sch.id);
+call('tg_cancel', ut, sch.id); ok(J('tg_queue', adm, 'academy').filter(function (x) { return x.id === sch.id; })[0].status === 'cancelled', 'cancelled by owner');
+const sch2 = J('tg_send', ut, JSON.stringify({ program: 'academy', name: 'حان', caption: 'الآن', png: Buffer.from([1]).toString('base64'), mode: 'photo', when: Date.now() + 120000 }));
+const realNow = ctx.Date.now; ctx.Date.now = function () { return realNow() + 600000; };
+ctx.tgTick(); ctx.Date.now = realNow;
+ok(J('tg_queue', adm, 'academy').filter(function (x) { return x.id === sch2.id; })[0].status === 'sent', 'tick sends due post');
+ok(ctx.ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'tgTick'; }), 'tgTick trigger installed by bootstrap');
 // legacy import
 const imp = J('acc_import', adm, 'academy');
 ok(imp.length === 1 && imp[0].name === 'أ. خالد العمر', 'legacy import');

@@ -13,6 +13,7 @@
     let local = null;
     if (url.indexOf('raw.githubusercontent.com/GHamine23/media-portal/main/assets/') >= 0) local = ROOT + 'assets/' + url.split('/main/assets/')[1];
     else if (url.indexOf('raw.githubusercontent.com/google/fonts/main/ofl/') >= 0) local = '/gfonts/' + decodeURIComponent(url.split('/ofl/')[1]).replace(/[\[\],]/g, '_');
+    else if (url.indexOf('api.telegram.org') >= 0) { window.DEMO_TG = (window.DEMO_TG || []).concat([{ url: url, payload: opt.payload }]); return /getMe$/.test(url) ? { code: 200, body: JSON.stringify({ ok: true, result: { username: 'athar_demo_bot', first_name: 'أثر' } }) } : { code: 200, body: JSON.stringify({ ok: true, result: { message_id: 100 + window.DEMO_TG.length } }) }; }
     else if (url.indexOf('generativelanguage.googleapis.com') >= 0 && window.DEMO_AI) return { code: 200, body: JSON.stringify({ candidates: [{ content: { parts: [{ text: window.DEMO_AI(opt.payload) }] } }] }) };
     if (!local) return { code: 404, body: '' };
     const b = syncGet(local, true); return b ? { code: 200, body: b } : { code: 404, body: '' };
@@ -26,7 +27,7 @@
       return new Promise(function (ok, bad) {
         setTimeout(function () {
           const out = JSON.parse(srv.doPost({ postData: { contents: JSON.stringify({ fn: fn, args: args }) } }).getContent());
-          if (/^(auth_|acc_|prog_|asset_put|asset_del|asset_meta|item_save|item_del|item_model|arc_put|pack_put|pack_toggle|fb_|bc_|cl_|set_|prefs_)/.test(fn)) { try { localStorage.setItem('demo.gas', GAS._dump()); } catch (e) {} }
+          if (/^(auth_|acc_|prog_|asset_put|asset_del|asset_meta|item_save|item_del|item_model|arc_put|pack_put|pack_toggle|tg_send|tg_cancel|me_profile|font_family|fb_|bc_|cl_|set_|prefs_)/.test(fn)) { try { localStorage.setItem('demo.gas', GAS._dump()); } catch (e) {} }
           if (out.error) { if (/انتهت الجلسة|موقوف/.test(out.error) && fn !== 'auth_login' && typeof sessionLost === 'function') sessionLost(out.error); bad(new Error(out.error)); } else ok(out.result);
         }, 20);
       });

@@ -143,6 +143,7 @@ function showEditor6(doc, fromDraft) {
       el('div', { class: 'e-mode', title: 'البسيط يعرض الأساسيات، والكامل يفتح كل الأدوات' }, [segOf([['simple', 'بسيط'], ['full', 'تحكم كامل']], ED.mode, function (v) { ED.mode = v; ls('emode', v); buildRail(); if (!railItems().some(function (r) { return r[0] === ED.tab; })) { ED.tab = 'content'; } buildPanel(); })])
     ]),
     el('button', { type: 'button', class: 'ib', id: 'e_share', title: 'شارك بالرابط مع فريقك', 'aria-label': 'مشاركة بالرابط', onclick: function () { shareDialog(); } }, [ico('share')]),
+    doc.kind !== 'deck' ? el('button', { type: 'button', class: 'btn line e-cap', id: 'e_cap', title: 'النص المصاحب للإعلان، والإرسال إلى قناة تليجرام', onclick: function () { captionDialog(); } }, [ico('send'), el('span', { class: 'hide-s', text: 'النص والقناة' })]) : null,
     el('button', { type: 'button', class: 'ib', title: 'ملاحظة للفريق', 'aria-label': 'ملاحظة', onclick: function () { showFeedback6(); } }, [ico('chat')]),
     el('button', { type: 'button', class: 'btn line', id: 'e_save', onclick: function () { saveDialog(); } }, [ico('heart'), el('span', { class: 'hide-s', text: doc.id ? 'محفوظ' : 'حفظ' })]),
     el('button', { type: 'button', class: 'btn dark', id: 'e_dl', onclick: function (e) { dlMenu(e.currentTarget); } }, [ico('download'), el('span', { class: 'hide-s', text: 'تنزيل' })])
@@ -328,6 +329,7 @@ function dlMenu(btn) {
   const items = [{ hd: 'تنزيل بجودة عالية' }, { t: 'صورة PNG (أعلى جودة)', ic: 'download', fn: function () { exportImg6('png'); } }, { t: 'صورة JPG (حجم أخف)', ic: 'download', fn: function () { exportImg6('jpg'); } }];
   if (ED.doc.kind === 'deck') items.push({ t: 'العرض كاملاً PDF', ic: 'slides', fn: exportPdf6 }, { t: 'عرض بملء الشاشة', ic: 'play', fn: present6 });
   if (navigator.canShare) items.push('-', { t: 'مشاركة مباشرة', ic: 'share', fn: function () { exportImg6('png', true); } });
+  if (ED.doc.kind !== 'deck') items.push('-', { t: 'النص المصاحب وإرسال إلى القناة', ic: 'send', fn: captionDialog });
   popMenu(btn, items);
 }
 async function checkPlaceholders() {
