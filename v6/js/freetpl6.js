@@ -7,16 +7,16 @@ function clamp01(v, d) { v = +v; return isFinite(v) ? Math.max(0, Math.min(1, v)
 function cleanLayout(L) {
   L = L && typeof L === 'object' ? L : {};
   const bg = L.bg && typeof L.bg === 'object' ? L.bg : {};
-  const out = { bg: { kind: ['solid', 'split', 'band', 'frame', 'diagonal'].indexOf(bg.kind) >= 0 ? bg.kind : 'solid', role: FREE_ROLES.indexOf(bg.role) >= 0 ? bg.role : 'paper', role2: FREE_ROLES.indexOf(bg.role2) >= 0 ? bg.role2 : 'pd', ratio: clamp01(bg.ratio, 0.42), pos: ['top', 'bottom', 'right', 'left'].indexOf(bg.pos) >= 0 ? bg.pos : 'bottom' }, deco: [], blocks: [] };
+  const out = { bg: { kind: ['solid', 'split', 'band', 'frame', 'diagonal', 'gradient', 'circle', 'photo', 'wave'].indexOf(bg.kind) >= 0 ? bg.kind : 'solid', role: FREE_ROLES.indexOf(bg.role) >= 0 ? bg.role : 'paper', role2: FREE_ROLES.indexOf(bg.role2) >= 0 ? bg.role2 : 'pd', ratio: clamp01(bg.ratio, 0.42), photo: typeof bg.photo === 'string' ? bg.photo.replace(/[^\w:]/g, '').slice(0, 40) : '', overlay: clamp01(bg.overlay, 0.55), pattern: ['', 'star8', 'girih', 'zellij', 'dots', 'grid', 'rays', 'waves', 'ring', 'petals'].indexOf(bg.pattern) >= 0 ? bg.pattern : '', pos: ['top', 'bottom', 'right', 'left'].indexOf(bg.pos) >= 0 ? bg.pos : 'bottom' }, deco: [], blocks: [] };
   (Array.isArray(L.deco) ? L.deco : []).slice(0, 10).forEach(function (q) {
     if (!q || typeof q !== 'object') return;
-    out.deco.push({ shape: ['circle', 'ring', 'petal', 'star', 'dots', 'lines', 'arc', 'blob'].indexOf(q.shape) >= 0 ? q.shape : 'circle', x: clamp01(q.x, 0.5), y: clamp01(q.y, 0.5), r: Math.max(0.01, Math.min(0.9, +q.r || 0.1)), role: FREE_ROLES.indexOf(q.role) >= 0 ? q.role : 'a', alpha: Math.max(0.04, Math.min(1, +q.alpha || 1)), rot: +q.rot || 0 });
+    out.deco.push({ shape: ['circle', 'ring', 'petal', 'star', 'dots', 'lines', 'arc', 'blob', 'star8', 'halfring', 'triangle', 'stripe', 'bigtext', 'crescent', 'squares'].indexOf(q.shape) >= 0 ? q.shape : 'circle', x: clamp01(q.x, 0.5), y: clamp01(q.y, 0.5), r: Math.max(0.01, Math.min(0.9, +q.r || 0.1)), text: typeof q.text === 'string' ? q.text.slice(0, 24) : '', role: FREE_ROLES.indexOf(q.role) >= 0 ? q.role : 'a', alpha: Math.max(0.04, Math.min(1, +q.alpha || 1)), rot: +q.rot || 0 });
   });
-  const KINDS = ['title', 'sub', 'who', 'time', 'place', 'note', 'photo', 'logo', 'academy', 'social', 'badge', 'rule'];
+  const KINDS = ['title', 'sub', 'who', 'time', 'place', 'note', 'photo', 'logo', 'academy', 'social', 'badge', 'rule', 'card', 'number', 'label', 'quote', 'date'];
   (Array.isArray(L.blocks) ? L.blocks : []).slice(0, 14).forEach(function (b) {
     if (!b || typeof b !== 'object' || KINDS.indexOf(b.k) < 0) return;
     out.blocks.push({ k: b.k, x: clamp01(b.x, 0.08), y: clamp01(b.y, 0.1), w: Math.max(0.05, Math.min(1, +b.w || 0.84)), h: Math.max(0.02, Math.min(1, +b.h || 0.2)), align: ['right', 'center', 'left'].indexOf(b.align) >= 0 ? b.align : 'right',
-      size: Math.max(0.018, Math.min(0.2, +b.size || 0.05)), role: b.role === 'auto' || !b.role ? 'auto' : (FREE_ROLES.indexOf(b.role) >= 0 ? b.role : 'auto'), bold: Math.max(0, Math.min(1, +b.bold || 0)), icon: typeof b.icon === 'string' ? b.icon.replace(/[^a-z]/g, '').slice(0, 10) : '', text: typeof b.text === 'string' ? b.text.slice(0, 40) : '', fill: FREE_ROLES.indexOf(b.fill) >= 0 ? b.fill : '', round: Math.max(0, Math.min(1, +b.round || 0)), hl: FREE_ROLES.indexOf(b.hl) >= 0 ? b.hl : 'a' });
+      size: Math.max(0.018, Math.min(0.2, +b.size || 0.05)), role: b.role === 'auto' || !b.role ? 'auto' : (FREE_ROLES.indexOf(b.role) >= 0 ? b.role : 'auto'), rot: Math.max(-25, Math.min(25, +b.rot || 0)), shape: ['', 'circle', 'arch', 'blob'].indexOf(b.shape) >= 0 ? b.shape : '', alpha: clamp01(b.alpha, 1), bold: Math.max(0, Math.min(1, +b.bold || 0)), icon: typeof b.icon === 'string' ? b.icon.replace(/[^a-z]/g, '').slice(0, 10) : '', text: typeof b.text === 'string' ? b.text.slice(0, 40) : '', fill: FREE_ROLES.indexOf(b.fill) >= 0 ? b.fill : '', round: Math.max(0, Math.min(1, +b.round || 0)), hl: FREE_ROLES.indexOf(b.hl) >= 0 ? b.hl : 'a' });
   });
   return out;
 }
@@ -24,17 +24,25 @@ function parseLayout(s) { if (s && typeof s === 'object') return cleanLayout(s);
 // لون الخلفية تحت نقطة معيّنة (ليُختار لون النص تلقائياً)
 function bgAt(L, T, x, y) {
   const b = L.bg, c1 = roleColor(T, b.role, T.c.paper), c2 = roleColor(T, b.role2, T.c.pd);
-  if (b.kind === 'solid') return c1;
-  if (b.kind === 'frame') return c1;
+  if (b.kind === 'solid' || b.kind === 'frame' || b.kind === 'wave' && y < 1 - b.ratio) return c1;
+  if (b.kind === 'wave') return c2;
+  if (b.kind === 'gradient') return mixC(c1, c2, (x + y) / 2);
+  if (b.kind === 'photo') return mixC(c2, '#000000', 0.3);
+  if (b.kind === 'circle') { const cx = b.pos === 'left' ? 0.2 : b.pos === 'right' ? 0.8 : 0.5, cy = b.pos === 'top' ? 0.2 : b.pos === 'bottom' ? 0.8 : 0.5; return Math.hypot((x - cx) * 1.0, (y - cy) * 1.25) < b.ratio * 1.2 ? c2 : c1; }
   const inSecond = b.pos === 'bottom' ? y > 1 - b.ratio : b.pos === 'top' ? y < b.ratio : b.pos === 'right' ? x > 1 - b.ratio : x < b.ratio;
   if (b.kind === 'diagonal') return (b.pos === 'bottom' ? y > 1 - b.ratio * (1.3 - x * 0.6) : y < b.ratio * (0.7 + x * 0.6)) ? c2 : c1;
   return inSecond ? c2 : c1;
 }
 function drawFreeBg(ctx, W, H, L, T) {
   const b = L.bg, c1 = roleColor(T, b.role, T.c.paper), c2 = roleColor(T, b.role2, T.c.pd), u = W / 1080;
-  paintBg(ctx, W, H, c1);
+  const sv = BGFX; if (b.pattern && !BGFX) BGFX = { p: b.pattern };
+  paintBg(ctx, W, H, c1); BGFX = sv;
   if (b.kind === 'solid') return;
   ctx.fillStyle = c2;
+  if (b.kind === 'gradient') { const g = ctx.createLinearGradient(0, 0, W * 0.6, H); g.addColorStop(0, c1); g.addColorStop(1, c2); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); return; }
+  if (b.kind === 'circle') { const cx = b.pos === 'left' ? 0.2 : b.pos === 'right' ? 0.8 : 0.5, cy = b.pos === 'top' ? 0.2 : b.pos === 'bottom' ? 0.8 : 0.5; ctx.beginPath(); ctx.ellipse(cx * W, cy * H, b.ratio * 1.2 * W, b.ratio * 1.2 * W / 1.25, 0, 0, Math.PI * 2); ctx.fill(); return; }
+  if (b.kind === 'wave') { const y0 = H * (1 - b.ratio); ctx.beginPath(); ctx.moveTo(0, y0 + 40 * u); ctx.bezierCurveTo(W * 0.3, y0 - 60 * u, W * 0.6, y0 + 90 * u, W, y0 - 20 * u); ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath(); ctx.fill(); return; }
+  if (b.kind === 'photo') { const im = (photoOf({ src: b.photo || 'lib:img_mosque', z: 1 }) || {}).im; if (im) drawPhoto(ctx, im, 0, 0, W, H, {}); ctx.fillStyle = alpha(c2, b.overlay); ctx.fillRect(0, 0, W, H); return; }
   if (b.kind === 'frame') { ctx.lineWidth = 22 * u; ctx.strokeStyle = c2; rrect(ctx, 40 * u, 40 * u, W - 80 * u, H - 80 * u, 36 * u); ctx.stroke(); return; }
   const r = b.ratio;
   if (b.kind === 'diagonal') {
@@ -61,6 +69,13 @@ function drawFreeDeco(ctx, W, H, L, T) {
     else if (q.shape === 'dots') { const st = Math.max(30 * u, r * 0.5); for (let yy = cy - r; yy <= cy + r; yy += st) for (let xx = cx - r; xx <= cx + r; xx += st) { ctx.beginPath(); ctx.arc(xx, yy, Math.max(3 * u, st * 0.12), 0, Math.PI * 2); ctx.fill(); } area(cx - r, cy - r, cx + r, cy + r); }
     else if (q.shape === 'lines') { ctx.lineWidth = 4 * u; const st = Math.max(24 * u, r * 0.25); ctx.save(); ctx.translate(cx, cy); ctx.rotate(q.rot || -0.6); for (let i = -r; i <= r; i += st) { ctx.beginPath(); ctx.moveTo(i, -r); ctx.lineTo(i, r); ctx.stroke(); } ctx.restore(); area(cx - r, cy - r, cx + r, cy + r); }
     else if (q.shape === 'arc') { ctx.lineWidth = Math.max(10 * u, r * 0.08); ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI * (1 + (q.rot || 0)), Math.PI * (1.85 + (q.rot || 0))); ctx.stroke(); }
+    else if (q.shape === 'star8') { ctx.beginPath(); for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8 + (q.rot || 0), rr = i % 2 ? r * 0.72 : r; ctx.lineTo(cx + rr * Math.cos(a), cy + rr * Math.sin(a)); } ctx.closePath(); ctx.fill(); area(cx - r, cy - r, cx + r, cy + r); }
+    else if (q.shape === 'halfring') { ctx.lineWidth = Math.max(10 * u, r * 0.18); ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI * (q.rot || 0), Math.PI * (1 + (q.rot || 0))); ctx.stroke(); area(cx - r, cy - r, cx + r, cy + r); }
+    else if (q.shape === 'triangle') { ctx.save(); ctx.translate(cx, cy); ctx.rotate(q.rot || 0); ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r * 0.87, r * 0.5); ctx.lineTo(-r * 0.87, r * 0.5); ctx.closePath(); ctx.fill(); ctx.restore(); area(cx - r, cy - r, cx + r, cy + r); }
+    else if (q.shape === 'stripe') { ctx.save(); ctx.translate(cx, cy); ctx.rotate(q.rot || -0.5); ctx.fillRect(-W, -r * 0.5, W * 2, r); ctx.restore(); }
+    else if (q.shape === 'crescent') { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.arc(cx + r * 0.42, cy - r * 0.18, r * 0.86, 0, Math.PI * 2, true); ctx.fill(); area(cx - r, cy - r, cx + r, cy + r); }
+    else if (q.shape === 'squares') { const st = Math.max(40 * u, r * 0.5); ctx.save(); ctx.translate(cx, cy); ctx.rotate(q.rot || 0.78); for (let yy = -r; yy <= r; yy += st) for (let xx = -r; xx <= r; xx += st) { ctx.fillRect(xx, yy, st * 0.55, st * 0.55); } ctx.restore(); area(cx - r, cy - r, cx + r, cy + r); }
+    else if (q.shape === 'bigtext') { if (q.text) line(ctx, q.text, cx, cy, { size: r * 1.6, color: c, align: 'center', bold: 1 }); }
     else if (q.shape === 'blob') { ctx.beginPath(); for (let i = 0; i <= 24; i++) { const a = i / 24 * Math.PI * 2, rr = r * (0.82 + 0.18 * Math.sin(a * 3 + (q.rot || 0))); ctx.lineTo(cx + rr * Math.cos(a), cy + rr * Math.sin(a)); } ctx.closePath(); ctx.fill(); area(cx - r, cy - r, cx + r, cy + r); }
     ctx.restore();
   });
@@ -76,7 +91,12 @@ function drawFreeBlocks(ctx, W, H, L, T, d, k, P) {
     const x = b.x * W, y = b.y * H, w = b.w * W, h = b.h * H, under = bgAt(L, T, b.x + b.w / 2, b.y + b.h / 2);
     const col = b.role === 'auto' ? onBg(under, T.c.ink) : roleColor(T, b.role, T.c.ink);
     const anchorX = b.align === 'right' ? x + w : b.align === 'center' ? x + w / 2 : x;
-    if (b.k === 'photo') { if (P.photo && P.photo.im) { if (b.round) { ctx.save(); rrect(ctx, x, y, w, h, Math.min(w, h) * b.round * 0.5); ctx.clip(); drawPhoto(ctx, P.photo.im, x, y, w, h, { z: P.photo.z, ox: P.photo.ox, oy: P.photo.oy, fit: 'cover' }); ctx.restore(); } else drawPhoto(ctx, P.photo.im, x, y, w, h, { z: P.photo.z, ox: P.photo.ox, oy: P.photo.oy, fit: 'cover' }); } return; }
+    if (b.k === 'card') { ctx.save(); ctx.fillStyle = alpha(roleColor(T, b.fill || 'white', '#ffffff'), b.alpha); if (b.rot) { ctx.translate(x + w / 2, y + h / 2); ctx.rotate(b.rot * Math.PI / 180); ctx.translate(-(x + w / 2), -(y + h / 2)); } rrect(ctx, x, y, w, h, Math.min(w, h) * (b.round || 0.12) * 0.5); ctx.fill(); ctx.restore(); return; }
+    if (b.k === 'number') { const t = b.text || d.badge || ''; if (!t.trim()) return; line(ctx, t, anchorX, y + h / 2, { size: Math.min(h * 0.9, b.size * W * 2.2), color: roleColor(T, b.role === 'auto' ? b.hl : b.role, T.c.a), align: b.align, bold: 1, maxW: w }); return; }
+    if (b.k === 'label') { const t = b.text || ''; if (!t.trim()) return; line(ctx, t, anchorX, y + h / 2, { size: b.size * W, color: col, align: b.align, bold: b.bold, maxW: w }); return; }
+    if (b.k === 'date') { const t = b.text || d.time || ''; if (!t.trim()) return; const fillC = roleColor(T, b.fill || 'a', T.c.a); fillRR(ctx, x, y, w, h, Math.min(w, h) * 0.2, fillC); area(x, y, x + w, y + h); line(ctx, t, x + w / 2, y + h / 2, { size: Math.min(h * 0.5, b.size * W), color: onBg(fillC, T.c.ink), align: 'center', bold: 0.7, maxW: w * 0.9 }); return; }
+    if (b.k === 'quote') { const t = b.text || d.sub || ''; if (!t.trim()) return; line(ctx, '”', anchorX, y, { size: b.size * W * 3, color: alpha(roleColor(T, b.hl, T.c.a), 0.5), align: b.align }); const f0 = fit(ctx, t, { maxW: w, maxH: h, size: b.size * W, lh: 1.5, balance: true, bold: 0.4, maxLines: 5 }); drawFit(ctx, f0, anchorX, y + b.size * W * 0.9, { align: b.align, color: col }); return; }
+    if (b.k === 'photo') { if (P.photo && P.photo.im) { if (b.shape === 'circle') { ctx.save(); ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.clip(); drawPhoto(ctx, P.photo.im, x, y, w, h, { z: P.photo.z, ox: P.photo.ox, oy: P.photo.oy, fit: 'cover' }); ctx.restore(); } else if (b.shape === 'arch') { ctx.save(); ctx.beginPath(); ctx.moveTo(x, y + h); ctx.lineTo(x, y + w / 2); ctx.arc(x + w / 2, y + w / 2, w / 2, Math.PI, 0); ctx.lineTo(x + w, y + h); ctx.closePath(); ctx.clip(); drawPhoto(ctx, P.photo.im, x, y, w, h, { z: P.photo.z, ox: P.photo.ox, oy: P.photo.oy, fit: 'cover' }); ctx.restore(); } else if (b.round) { ctx.save(); rrect(ctx, x, y, w, h, Math.min(w, h) * b.round * 0.5); ctx.clip(); drawPhoto(ctx, P.photo.im, x, y, w, h, { z: P.photo.z, ox: P.photo.ox, oy: P.photo.oy, fit: 'cover' }); ctx.restore(); } else drawPhoto(ctx, P.photo.im, x, y, w, h, { z: P.photo.z, ox: P.photo.ox, oy: P.photo.oy, fit: 'cover' }); } return; }
     if (b.k === 'logo') { drawLogo(ctx, T, anchorX, y, w, isDark(under) ? '#ffffff' : 'color', b.align === 'right' ? 'tr' : b.align === 'center' ? 'tc' : 'tl'); return; }
     if (b.k === 'academy') { academy(ctx, alpha(onBg(under, T.c.ink), 0.85), anchorX, y, w, b.align === 'right' ? 'tr' : b.align === 'center' ? 'tc' : 'tl'); return; }
     if (b.k === 'social') { social(ctx, alpha(onBg(under, T.c.ink), 0.75), anchorX, y, w, b.align === 'right' ? 'tr' : b.align === 'center' ? 'tc' : 'tl'); return; }
@@ -90,8 +110,10 @@ function drawFreeBlocks(ctx, W, H, L, T, d, k, P) {
       line(ctx, txt, anchorX, y + h / 2, { size: b.size * W, color: col, align: b.align, maxW: w, bold: b.bold }); return;
     }
     const isT = b.k === 'title';
+    if (b.rot) { ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(b.rot * Math.PI / 180); ctx.translate(-(x + w / 2), -(y + h / 2)); }
     const f = fit(ctx, txt, { maxW: w, maxH: h, size: b.size * W * (isT ? k : 1), lh: isT ? 1.25 : 1.45, balance: true, bold: isT ? Math.max(0.6, b.bold) : b.bold, title: isT, maxLines: isT ? 4 : 6 });
     drawFit(ctx, f, anchorX, y, { align: b.align, color: isT && OV.title ? OV.title : col, hl: roleColor(T, b.hl, T.c.a) });
+    if (b.rot) ctx.restore();
   });
 }
 // مولّد محلي: تخطيطات مدروسة تتبدّل ألوانها وأشكالها بالهوية، تعمل بلا مساعد

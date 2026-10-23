@@ -70,7 +70,7 @@ async def main():
         await pg.screenshot(path=OUT + 'b3_upload.png')
         # ---------- الشرائح ----------
         await pg.goto(URL + '#/s/ishraq'); await pg.wait_for_timeout(1500)
-        await pg.click('.slsample'); await pg.wait_for_timeout(2500); await clean(pg)
+        await pg.click('.sldeck .btn.dark'); await pg.wait_for_timeout(2500); await clean(pg)
         n = await pg.evaluate("ED.doc.pages.length"); ok(n >= 5, 'deck opened with %d slides' % n)
         await pg.click('#e_pages .pg:nth-child(2)'); await pg.wait_for_timeout(600)
         ok(await pg.evaluate("ED.cur") == 1, 'page switch')

@@ -49,7 +49,7 @@ function freeImagesSection(b) {
   b.appendChild(el('div', { class: 'row' }, [q, el('button', { type: 'button', class: 'btn sm dark', onclick: function () { search(1); } }, [ico('search')]), ai]));
   b.appendChild(el('div', { class: 'row wrapr' }, [segOf([['', 'الكل'], ['portrait', 'طولي'], ['landscape', 'عرضي'], ['square', 'مربع']], orient, function (v) { orient = v; if (lastQ) { lastQ = ''; search(1); } }), suggest]));
   b.appendChild(res); b.appendChild(more);
-  b.appendChild(el('p', { class: 'tiny pxcredit' }, ['الصور من ', el('a', { href: 'https://www.pexels.com', target: '_blank', rel: 'noopener', text: 'Pexels' }), ' برخصتها المجانية، ويُحفظ اسم المصوّر مع كل صورة.']));
+  b.appendChild(el('p', { class: 'tiny pxcredit' }, ['الصور من ', el('a', { href: 'https://pixabay.com', target: '_blank', rel: 'noopener', text: 'Pixabay' }), ' و', el('a', { href: 'https://www.pexels.com', target: '_blank', rel: 'noopener', text: 'Pexels' }), ' برخصتيهما المجانيتين، ويُحفظ اسم المصوّر مع كل صورة.']));
 }
 function sizeOrient() { const sz = SIZES[S.size] || {}; return !sz.w ? '' : sz.w > sz.h * 1.2 ? 'landscape' : sz.h > sz.w * 1.1 ? 'portrait' : 'square'; }
 async function imgQueryAI() {

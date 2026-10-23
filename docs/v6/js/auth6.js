@@ -13,6 +13,7 @@ function floatCards() {
   return wrap;
 }
 function showLogin() {
+  splashHide();
   document.title = 'الدخول — منصة الأثر الإعلامي';
   $('#top').hidden = true; $('#banner').innerHTML = '';
   const idI = el('input', { type: 'text', id: 'lg_id', autocomplete: 'username', dir: 'auto', placeholder: 'اسم المستخدم أو البريد', required: true });
@@ -53,6 +54,7 @@ function showLogin() {
 /* ---------- تغيير كلمة المرور (إجباري بعد المؤقتة) ---------- */
 function pwStrength(p) { let s = 0; if (p.length >= 8) s++; if (p.length >= 12) s++; if (/[a-z؀-ۿ]/i.test(p) && /\d/.test(p)) s++; if (/[^\w؀-ۿ]/.test(p)) s++; return s; }
 function showChangePw(forced) {
+  splashHide();
   $('#top').hidden = !!forced;
   const oldI = el('input', { type: 'password', id: 'cp_old', autocomplete: 'current-password' });
   const newI = el('input', { type: 'password', id: 'cp_new', autocomplete: 'new-password', minlength: '8' });
@@ -83,9 +85,10 @@ function showChangePw(forced) {
 
 /* ---------- بعد الدخول ---------- */
 async function afterLogin() {
-  view(el('div', { class: 'boot' }, [loader6('نجهّز هوية برنامجك…')]));
+  splash('أهلاً بك يا ' + String(V6.me.name || '').split(' ')[0] + '… نجهّز هوية برنامجك', true);
+  try { ls('lastName', String(V6.me.name || '').split(' ')[0]); } catch (e) {}
   try { await loadBundle(); }
-  catch (e) { view(el('div', { class: 'boot' }, [el('p', { class: 'err', text: 'تعذّر تحميل المنصة: ' + e.message }), el('button', { class: 'btn dark', text: 'إعادة المحاولة', onclick: afterLogin })])); return; }
+  catch (e) { splashHide(); view(el('div', { class: 'boot' }, [el('p', { class: 'err', text: 'تعذّر تحميل المنصة: ' + e.message }), el('button', { class: 'btn dark', text: 'إعادة المحاولة', onclick: afterLogin })])); return; }
   setMotion((V6.me.prefs && V6.me.prefs.motion) || 'calm');
   buildTop();
   const after = ls('after'); ls('after', null);
@@ -99,7 +102,10 @@ async function restore() {
   try { V6.me = await API6.me('auth_me'); }
   catch (e) { V6.token = ''; ls('token', null); return false; }
   if (V6.me.mustChange) { showChangePw(true); return 'must'; }
+  try { ls('lastName', String(V6.me.name || '').split(' ')[0]); } catch (e) {}
+  splash('نجهّز هوية برنامجك…');
   await loadBundle();
+  splash('نصفّ القوالب صفّاً منتظماً…');
   setMotion((V6.me.prefs && V6.me.prefs.motion) || 'calm');
   buildTop(); loadNews();
   return true;

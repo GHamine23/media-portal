@@ -448,6 +448,8 @@ async function aSettings(body) {
   const lightM = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite', 'aria-label': 'نموذج المهام الخفيفة' });
   const fbm = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 'aria-label': 'النماذج الاحتياطية' });
   const tgTok = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.tgOn ? '•••••••• (اترك فارغاً لإبقائه)' : '123456789:AAF…', 'aria-label': 'رمز البوت' });
+  let imgProv = s.imgProvider || '';
+  const pbKey = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.pixabayOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'مفتاح Pixabay', 'aria-label': 'مفتاح Pixabay' });
   const pxKey = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.pexelsOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'مفتاح Pexels', 'aria-label': 'مفتاح Pexels' });
   const upPerm = el('input', { type: 'checkbox', checked: !!s.uploadsNeedPerm }), maxMb = el('input', { type: 'number', class: 'inp', min: '1', max: '20', value: String(s.maxUploadMb || 20), 'aria-label': 'أقصى حجم' });
   body.appendChild(el('div', { class: 'grid two' }, [
@@ -471,13 +473,15 @@ async function aSettings(body) {
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-bl' }, [ico('upload')]), el('h3', { text: 'الرفع' }),
       el('label', { class: 'tog' }, [upPerm, el('span', { text: 'رفع الصور يحتاج صلاحية' })]),
       el('div', { class: 'fld' }, [el('label', { text: 'أقصى حجم للملف (ميغابايت)' }), maxMb])]),
-    el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-or' }, [ico('image')]), el('h3', { text: 'صور مجانية (Pexels)' }),
-      el('p', { class: 'small ' + (s.pexelsOn ? 'ok' : 'err'), text: s.pexelsOn ? 'مفتاح Pexels مضبوط: الفريق يبحث عن صور مجانية من المحرر.' : 'بلا مفتاح: أنشئ مفتاحاً مجانياً من pexels.com/api ثم ألصقه هنا.' }),
-      el('div', { class: 'fld' }, [el('label', { text: 'مفتاح Pexels (يُحفظ في الخادم ولا يُعرض)' }), pxKey]),
+    el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-or' }, [ico('image')]), el('h3', { text: 'صور مجانية (Pixabay / Pexels)' }),
+      el('p', { class: 'small ' + (s.pexelsOn || s.pixabayOn ? 'ok' : 'err'), text: s.pixabayOn || s.pexelsOn ? 'مصدر الصور مضبوط: ' + [s.pixabayOn ? 'Pixabay' : '', s.pexelsOn ? 'Pexels' : ''].filter(Boolean).join(' و') + '. الفريق يبحث عن صور مجانية من المحرر.' : 'بلا مفتاح بعد. Pixabay يعطي مفتاحاً مجانياً فوراً.' }),
+      el('div', { class: 'fld' }, [el('label', { text: 'مفتاح Pixabay (يُحفظ في الخادم ولا يُعرض)' }), pbKey, el('small', { text: 'مجاني فوري من pixabay.com/api/docs بعد التسجيل. الصور حتى ١٢٨٠ بكسل، وتطلب من دعم Pixabay «full API access» مجاناً لتصل الأصول الكاملة.' })]),
+      el('div', { class: 'fld' }, [el('label', { text: 'مفتاح Pexels (إن توفر؛ إصدار المفاتيح متوقف عندهم حالياً)' }), pxKey]),
+      el('div', { class: 'fld' }, [el('label', { text: 'المصدر المفضّل' }), segOf([['', 'تلقائي'], ['pixabay', 'Pixabay'], ['pexels', 'Pexels']], s.imgProvider || '', function (v) { imgProv = v; })]),
       el('p', { class: 'tiny', text: 'الحد المجاني ٢٠٠ بحث في الساعة. الصورة التي يختارها المستخدم تُحفظ بأصلها كاملاً في مكتبته، ويقترحها للبرنامج فتوافق أنت من «الشعارات والصور».' })])
   ]));
   body.appendChild(el('button', { type: 'button', class: 'btn dark', text: 'حفظ الإعدادات', onclick: async function () {
-    const o = { ai: { enabled: aiOn.checked, model: model.value.trim(), fallback: fbm.value.trim(), light: lightM.value.trim(), groqModel: groqM.value.trim(), route: route, perDay: +perDay.value }, uploadsNeedPerm: upPerm.checked, maxUploadMb: +maxMb.value }; if (tgTok.value.trim()) o.tgToken = tgTok.value.trim(); if (pxKey.value.trim()) o.pexelsKey = pxKey.value.trim(); if (groqTok.value.trim()) o.groqKey = groqTok.value.trim();
+    const o = { ai: { enabled: aiOn.checked, model: model.value.trim(), fallback: fbm.value.trim(), light: lightM.value.trim(), groqModel: groqM.value.trim(), route: route, perDay: +perDay.value }, uploadsNeedPerm: upPerm.checked, maxUploadMb: +maxMb.value }; if (tgTok.value.trim()) o.tgToken = tgTok.value.trim(); if (pxKey.value.trim()) o.pexelsKey = pxKey.value.trim(); if (pbKey.value.trim()) o.pixabayKey = pbKey.value.trim(); o.imgProvider = imgProv; if (groqTok.value.trim()) o.groqKey = groqTok.value.trim();
     try { await API6.me('set_save', JSON.stringify(o)); toast('حُفظت'); await refreshBundle(); showAdmin('settings'); } catch (e) { toast(e.message); }
   } }));
 }

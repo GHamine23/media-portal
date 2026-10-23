@@ -22,7 +22,7 @@ async def main():
         # الإعدادات: مفتاح Pexels
         await pg.goto(URL + '#/admin/settings'); await pg.wait_for_timeout(1500)
         await pg.fill('input[aria-label="مفتاح Pexels"]', 'PXDEMOKEY'); await pg.click('#abody > .btn.dark'); await pg.wait_for_timeout(1800)
-        ok('مفتاح Pexels مضبوط' in await pg.inner_text('#abody'), 'pexels key saved')
+        ok('مصدر الصور مضبوط' in await pg.inner_text('#abody'), 'pexels key saved')
         # المحرر: العناصر — QR وأيقونات
         await pg.goto(URL + '#/e/ithmar/ann_cards'); await pg.wait_for_timeout(2500); await clean(pg)
         await pg.evaluate("openTab('els'); void 0"); await pg.wait_for_timeout(600)

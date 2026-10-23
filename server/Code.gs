@@ -947,8 +947,8 @@ function cl_save(token, json) {
 }
 var DEFAULT_SETTINGS = { ai: { enabled: true, model: 'gemini-3.8-flash', perDay: 20 }, uploadsNeedPerm: false, maxUploadMb: 20 };
 function settings_() { var s = readJson_('settings.json', {}); var o = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)); Object.keys(s).forEach(function (k) { o[k] = s[k]; }); return o; }
-function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: !!(props_().getProperty('GEMINI_KEY') || props_().getProperty('GROQ_KEY')) }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN'), pexels: !!props_().getProperty('PEXELS_KEY') }; }
-function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.aiKey = !!props_().getProperty('GEMINI_KEY'); s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); s.groqOn = !!props_().getProperty('GROQ_KEY'); s.routeDefault = AI_ROUTE_DEFAULT; return JSON.stringify(s); }
+function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: !!(props_().getProperty('GEMINI_KEY') || props_().getProperty('GROQ_KEY')) }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN'), pexels: !!(props_().getProperty('PEXELS_KEY') || props_().getProperty('PIXABAY_KEY')) }; }
+function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.aiKey = !!props_().getProperty('GEMINI_KEY'); s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); s.pixabayOn = !!props_().getProperty('PIXABAY_KEY'); s.groqOn = !!props_().getProperty('GROQ_KEY'); s.routeDefault = AI_ROUTE_DEFAULT; return JSON.stringify(s); }
 function set_save(token, json) {
   var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
   var s = JSON.parse(json);
@@ -960,6 +960,8 @@ function set_save(token, json) {
     if (s.tgToken != null) { var tk = String(s.tgToken).trim(); if (tk) { if (!/^\d+:[\w-]{30,}$/.test(tk)) throw new Error('رمز البوت غير صحيح'); props_().setProperty('TG_TOKEN', tk); } else props_().deleteProperty('TG_TOKEN'); }
     if (s.sendNeedsApproval != null) cur.sendNeedsApproval = !!s.sendNeedsApproval;
     if (s.groqKey != null) { var gk = String(s.groqKey).trim(); if (gk) props_().setProperty('GROQ_KEY', gk); else props_().deleteProperty('GROQ_KEY'); }
+    if (s.pixabayKey != null) { var pbk = String(s.pixabayKey).trim(); if (pbk) props_().setProperty('PIXABAY_KEY', pbk); else props_().deleteProperty('PIXABAY_KEY'); }
+    if (s.imgProvider != null) cur.imgProvider = s.imgProvider === 'pixabay' ? 'pixabay' : s.imgProvider === 'pexels' ? 'pexels' : '';
     if (s.pexelsKey != null) { var pk = String(s.pexelsKey).trim(); if (pk) props_().setProperty('PEXELS_KEY', pk); else props_().deleteProperty('PEXELS_KEY'); }
     writeJson_('settings.json', cur); audit_(a, 'غيّر الإعدادات', ''); return JSON.stringify(cur);
   });
@@ -978,7 +980,7 @@ function ai_status(token) {
 // نداء Gemini الأساسي (يستعمله ai_make والتقارير الأسبوعية). يسجّل كل طلب في ailog
 
 /* ---------- توزيع المهام بين المساعدين: Gemini (يرى الصور) وGroq (نصي، سريع، لا يدرّب على البيانات) ---------- */
-var AI_ROUTE_DEFAULT = { intake: 'groq', caption: 'groq', outline: 'groq', imgq: 'groq', week: 'groq', weekly: 'groq', design: 'gemini', creative: 'gemini', review: 'gemini', spell: 'gemini' };
+var AI_ROUTE_DEFAULT = { intake: 'groq', caption: 'groq', outline: 'groq', imgq: 'groq', week: 'groq', weekly: 'groq', design: 'groq', creative: 'groq', spell: 'groq', review: 'gemini' };
 function aiRoute_(kind) { var s = settings_(), r = (s.ai && s.ai.route) || {}; return r[kind] || AI_ROUTE_DEFAULT[kind] || 'gemini'; }
 function geminiCall_(req, who) {
   var hasGroq = !!props_().getProperty('GROQ_KEY'), hasGem = !!props_().getProperty('GEMINI_KEY');
@@ -1651,26 +1653,44 @@ function resetPin() {
 /* ================= صور مجانية (Pexels) وآيات وأحاديث موثقة ================= */
 // مفتاح Pexels في خصائص السكربت PEXELS_KEY. البحث للمستخدمين، والصورة تُحفظ بأصلها كاملاً في مكتبة المستخدم،
 // ومن أراد إضافتها لمكتبة البرنامج يطلب، فيوافق مشرف البرنامج.
-function pexelsKey_() { var k = props_().getProperty('PEXELS_KEY'); if (!k) throw new Error('لم يُضبط مفتاح الصور المجانية بعد (الإعدادات)'); return k; }
+function imgProvider_() {
+  var px = props_().getProperty('PEXELS_KEY'), pb = props_().getProperty('PIXABAY_KEY'), pref = settings_().imgProvider || '';
+  if (pref === 'pixabay' && pb) return 'pixabay'; if (pref === 'pexels' && px) return 'pexels';
+  if (px) return 'pexels'; if (pb) return 'pixabay';
+  throw new Error('لم يُضبط مفتاح الصور المجانية بعد (الإعدادات)');
+}
 function img_search(token, q, page, orient) {
   var a = auth_(token); q = clip_(q, 100).trim(); if (!q) throw new Error('اكتب ما تبحث عنه');
-  var key = pexelsKey_(), c = CacheService.getScriptCache(), ck = 'px:' + Utilities.base64EncodeWebSafe(q + '|' + (page || 1) + '|' + (orient || '')).slice(0, 200), hit = c.get(ck);
+  var prov = imgProvider_(), c = CacheService.getScriptCache(), ck = 'im:' + prov + ':' + Utilities.base64EncodeWebSafe(q + '|' + (page || 1) + '|' + (orient || '')).slice(0, 190), hit = c.get(ck);
   if (hit) return hit;
-  var url = 'https://api.pexels.com/v1/search?query=' + encodeURIComponent(q) + '&per_page=24&page=' + (Math.max(1, +page || 1)) + (orient ? '&orientation=' + encodeURIComponent(orient) : '') + (/[؀-ۿ]/.test(q) ? '&locale=ar-SA' : '');
-  var res = UrlFetchApp.fetch(url, { headers: { Authorization: key }, muteHttpExceptions: true });
-  if (res.getResponseCode() === 429) throw new Error('بلغنا حد البحث هذه الساعة؛ جرّب بعد قليل');
-  if (res.getResponseCode() !== 200) throw new Error('تعذّر البحث عن الصور (' + res.getResponseCode() + ')');
-  var j = JSON.parse(res.getContentText());
-  var out = { total: j.total_results || 0, page: j.page || 1, photos: (j.photos || []).map(function (p) {
-    return { id: p.id, w: p.width, h: p.height, thumb: p.src.medium, big: p.src.large2x, orig: p.src.original, by: p.photographer, byUrl: p.photographer_url, url: p.url, alt: clip_(p.alt, 160), color: p.avg_color };
-  }) };
+  var out, res;
+  if (prov === 'pexels') {
+    var url = 'https://api.pexels.com/v1/search?query=' + encodeURIComponent(q) + '&per_page=24&page=' + (Math.max(1, +page || 1)) + (orient ? '&orientation=' + encodeURIComponent(orient) : '') + (/[؀-ۿ]/.test(q) ? '&locale=ar-SA' : '');
+    res = UrlFetchApp.fetch(url, { headers: { Authorization: props_().getProperty('PEXELS_KEY') }, muteHttpExceptions: true });
+    if (res.getResponseCode() === 429) throw new Error('بلغنا حد البحث هذه الساعة؛ جرّب بعد قليل');
+    if (res.getResponseCode() !== 200) throw new Error('تعذّر البحث عن الصور (' + res.getResponseCode() + ')');
+    var j = JSON.parse(res.getContentText());
+    out = { provider: 'pexels', total: j.total_results || 0, page: j.page || 1, photos: (j.photos || []).map(function (p) {
+      return { id: p.id, w: p.width, h: p.height, thumb: p.src.medium, big: p.src.large2x, orig: p.src.original, by: p.photographer, byUrl: p.photographer_url, url: p.url, alt: clip_(p.alt, 160), color: p.avg_color };
+    }) };
+  } else {
+    var o2 = orient === 'portrait' ? 'vertical' : orient === 'landscape' ? 'horizontal' : 'all';
+    var url2 = 'https://pixabay.com/api/?key=' + encodeURIComponent(props_().getProperty('PIXABAY_KEY')) + '&q=' + encodeURIComponent(q) + '&image_type=photo&safesearch=true&per_page=24&page=' + (Math.max(1, +page || 1)) + '&orientation=' + o2 + (/[؀-ۿ]/.test(q) ? '&lang=ar' : '');
+    res = UrlFetchApp.fetch(url2, { muteHttpExceptions: true });
+    if (res.getResponseCode() === 429) throw new Error('بلغنا حد البحث هذه الدقيقة؛ جرّب بعد قليل');
+    if (res.getResponseCode() !== 200) throw new Error('تعذّر البحث عن الصور (' + res.getResponseCode() + ')');
+    var j2 = JSON.parse(res.getContentText());
+    out = { provider: 'pixabay', total: j2.totalHits || 0, page: Math.max(1, +page || 1), photos: (j2.hits || []).map(function (p) {
+      return { id: p.id, w: p.imageWidth, h: p.imageHeight, thumb: String(p.webformatURL || '').replace('_640', '_340'), big: p.largeImageURL, orig: p.fullHDURL || p.imageURL || p.largeImageURL, by: p.user, byUrl: 'https://pixabay.com/users/' + encodeURIComponent(p.user) + '-' + p.user_id + '/', url: p.pageURL, alt: clip_(p.tags, 160), color: '' };
+    }) };
+  }
   var txt = JSON.stringify(out); if (txt.length < 90000) c.put(ck, txt, 3600);
   return txt;
 }
 // حفظ صورة بأصلها الكامل في مكتبة المستخدم (أو البرنامج إن كان مشرفه)، واختيارياً طلب إضافتها لمكتبة البرنامج
 function img_pick(token, json) {
   var a = auth_(token), m = JSON.parse(json);
-  if (!/^https:\/\/images\.pexels\.com\//.test(m.orig || '')) throw new Error('رابط غير مقبول');
+  if (!/^https:\/\/(images\.pexels\.com|pixabay\.com|cdn\.pixabay\.com)\//.test(m.orig || '')) throw new Error('رابط غير مقبول');
   if (!perm_(a, 'upload') && readJson_('settings.json', {}).uploadsNeedPerm) throw new Error('إضافة الصور تحتاج صلاحية من المشرف');
   var res = UrlFetchApp.fetch(m.orig, { muteHttpExceptions: true });
   if (res.getResponseCode() !== 200) throw new Error('تعذّر تنزيل الصورة');
@@ -1681,8 +1701,8 @@ function img_pick(token, json) {
   var fileId = sub_('assets').createFile(Utilities.newBlob(bytes, mime, name + (mime === 'image/png' ? '.png' : '.jpg'))).getId();
   var x = withLock_(function () {
     var reg = regName_(scope, a.uid), list = readJson_(reg, []);
-    var it = { id: scope === 'user' ? a.uid + '_' + uid_() : uid_(), at: now_(), owner: a.uid, ownerName: a.name, ver: 1, upd: now_(), kind: 'image', name: name, mime: mime, scope: scope, program: toProg ? m.program : '', fileId: fileId, size: bytes.length, key: '', thumb: /^https:\/\/images\.pexels\.com\//.test(m.thumb || '') ? clip_(m.thumb, 300) : '', data: null,
-      tags: clip_('pexels ' + (m.by || ''), 120), credit: { by: clip_(m.by, 80), byUrl: clip_(m.byUrl, 200), url: clip_(m.url, 200), src: 'Pexels' } };
+    var it = { id: scope === 'user' ? a.uid + '_' + uid_() : uid_(), at: now_(), owner: a.uid, ownerName: a.name, ver: 1, upd: now_(), kind: 'image', name: name, mime: mime, scope: scope, program: toProg ? m.program : '', fileId: fileId, size: bytes.length, key: '', thumb: /^https:\/\/(images\.pexels\.com|pixabay\.com|cdn\.pixabay\.com)\//.test(m.thumb || '') ? clip_(m.thumb, 300) : '', data: null,
+      tags: clip_((/pixabay/.test(m.orig) ? 'pixabay ' : 'pexels ') + (m.by || ''), 120), credit: { by: clip_(m.by, 80), byUrl: clip_(m.byUrl, 200), url: clip_(m.url, 200), src: /pixabay/.test(m.orig) ? 'Pixabay' : 'Pexels' } };
     list.unshift(it); writeJson_(reg, list); return it;
   });
   var req = null;
@@ -1755,13 +1775,18 @@ function hadith_find(token, q) {
   var r = UrlFetchApp.fetch('https://dorar.net/dorar_api.json?skey=' + encodeURIComponent(q), { muteHttpExceptions: true });
   if (r.getResponseCode() !== 200) throw new Error('تعذّر الوصول إلى الدرر السنية');
   var html = ''; try { html = JSON.parse(r.getContentText()).ahadith.result || ''; } catch (e) { throw new Error('رد غير مفهوم من الدرر السنية'); }
-  var out = [], re = /<div class="hadith"[^>]*>([\s\S]*?)<\/div>\s*<div class="hadith-info"[^>]*>([\s\S]*?)<\/div>/g, m;
-  var strip = function (h) { return h.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim(); };
+  var strip = function (h) { return String(h || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#039;|&#39;/g, "'").replace(/\s+/g, ' ').trim(); };
   var fields = function (info) { var o = {}, re2 = /(خلاصة حكم المحدث|الصفحة أو الرقم|الراوي|المحدث|المصدر|التخريج)\s*:/g, hits = [], h; while ((h = re2.exec(info))) hits.push({ k: h[1], s: h.index, e: h.index + h[0].length }); hits.forEach(function (x, idx) { o[x.k] = info.slice(x.e, idx + 1 < hits.length ? hits[idx + 1].s : info.length).replace(/[|•]/g, ' ').trim(); }); return o; };
-  while ((m = re.exec(html)) && out.length < 20) {
-    var text = strip(m[1]), f = fields(strip(m[2]));
-    var grade = f['خلاصة حكم المحدث'] || '';
+  // كل نتيجة: كتلة نص الحديث ثم كتلة معلوماته. نقسم على كتل المعلومات ونأخذ آخر كتلة حديث قبل كل واحدة
+  var out = [], parts = html.split(/<div[^>]*class="[^"]*hadith-info[^"]*"[^>]*>/);
+  for (var pi = 0; pi + 1 < parts.length && out.length < 20; pi++) {
+    var before = parts[pi], infoRaw = parts[pi + 1];
+    var hi = before.lastIndexOf('class="hadith"'); if (hi < 0) hi = before.lastIndexOf("class='hadith'"); if (hi < 0) continue;
+    var textHtml = before.slice(before.indexOf('>', hi) + 1), infoHtml = infoRaw.split(/<\/div>/)[0];
+    var text = strip(textHtml.replace(/<\/div>[\s\S]*$/, '')), f = fields(strip(infoHtml)), grade = f['خلاصة حكم المحدث'] || '';
+    if (!text) continue;
     out.push({ text: text, rawi: f['الراوي'] || '', muhaddith: f['المحدث'] || '', source: f['المصدر'] || '', page: f['الصفحة أو الرقم'] || '', grade: grade, sahih: /صحيح|حسن|ثابت|إسناده جيد/.test(grade) && !/ضعيف|موضوع|منكر|لا يصح|باطل|لا أصل/.test(grade) });
   }
+  if (!out.length && html.length > 200) throw new Error('تغيّر شكل صفحة الدرر السنية؛ أبلغ المطوّر');
   var txt = JSON.stringify(out); if (txt.length < 90000) c.put(ck, txt, 21600); return txt;
 }

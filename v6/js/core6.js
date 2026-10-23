@@ -52,10 +52,14 @@ function render() {
   if (!r.opt.public && !V6.token) { if (h !== '/login') ls('after', h); return go('#/login'); }
   const m = h.match(r.re) || [];
   const n = ++RENDER_N;
-  const run = function () { if (n !== RENDER_N) return; LEAVE.forEach(function (f) { try { f(); } catch (e) {} }); LEAVE.length = 0; r.fn.apply(null, m.slice(1).map(function (x) { return x == null ? undefined : decodeURIComponent(x); })); /* الجزء الاختياري الغائب يبقى غائباً لا «undefined» */ };
+  const run = function () { if (n !== RENDER_N) return; splashHide(); LEAVE.forEach(function (f) { try { f(); } catch (e) {} }); LEAVE.length = 0; r.fn.apply(null, m.slice(1).map(function (x) { return x == null ? undefined : decodeURIComponent(x); })); /* الجزء الاختياري الغائب يبقى غائباً لا «undefined» */ };
   document.body.dataset.page = r.opt.page || '';
-  if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches && !r.opt.noVT && RENDER_N > 1) document.startViewTransition(run);
-  else run();
+  if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches && !r.opt.noVT && RENDER_N > 1) {
+    // أحياناً لا يستدعي المتصفح دالة الانتقال (انتقال سابق لم يكتمل)، فنضمن الرسم بعد مهلة قصيرة
+    let ran = false; const once = function () { if (ran) return; ran = true; run(); };
+    try { const t = document.startViewTransition(once); if (t && t.ready) t.ready.catch(function () {}); } catch (e) { once(); }
+    setTimeout(once, 300);
+  } else run();
 }
 const LEAVE = [];   // تنظيف عند مغادرة الصفحة
 window.addEventListener('hashchange', render);
@@ -203,6 +207,10 @@ window.addEventListener('unhandledrejection', function (e) { ERRS6.push('promise
 
 /* ---------- حركة الانتظار: علامة «أثـر» يدور حولها أثر يُرسم، وجمل لطيفة تتبدّل إن طال الانتظار ---------- */
 const LOAD_LINES = ['نرتّب الألوان على مقاس هويتك…', 'نوقظ الخطوط من نومها…', 'نلمّع الشعارات…', 'نصفّ القوالب صفّاً منتظماً…', 'لحظات، والجميل يستحق الانتظار…', 'نضبط المسافات بالمسطرة…'];
+/* شاشة الترحيب: تُعرض من أول بايت في الصفحة، ونحدّث سطرها ثم نخفيها عند أول عرض */
+let SPLASH_OFF = false;
+function splash(step, force) { const s = $('#splash'); if (!s) return; if (SPLASH_OFF && !force) return; if (force) { SPLASH_OFF = false; s.classList.remove('off'); } if (step) { const t = $('#splash_step'); if (t) { t.style.opacity = 0; setTimeout(function () { t.textContent = step; t.style.opacity = 1; }, 160); } } }
+function splashHide() { const s = $('#splash'); if (!s) return; SPLASH_OFF = true; setTimeout(function () { s.classList.add('off'); }, 250); }
 function loader6(text, small) {
   const t = el('p', { class: 'ldt', text: text || '' });
   const node = el('div', { class: 'ld6' + (small ? ' sm' : ''), role: 'status', 'aria-live': 'polite' }, [

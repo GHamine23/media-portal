@@ -26,6 +26,8 @@ GAS._fetch.handler = function (url, opt) {
     if (!opt.headers || opt.headers.Authorization !== 'PXKEY') return { code: 401, body: '' };
     return { code: 200, body: JSON.stringify({ total_results: 2, page: 1, photos: [{ id: 1, width: 4000, height: 6000, src: { medium: 'https://images.pexels.com/m1.jpg', large2x: 'https://images.pexels.com/l1.jpg', original: 'https://images.pexels.com/o1.jpg' }, photographer: 'سمير', photographer_url: 'https://www.pexels.com/@samir', url: 'https://www.pexels.com/photo/1/', alt: 'مسجد', avg_color: '#777' }] }) };
   }
+  if (url.indexOf('pixabay.com/api/') >= 0) return { code: 200, body: JSON.stringify({ totalHits: 1, hits: [{ id: 9, imageWidth: 3000, imageHeight: 2000, webformatURL: 'https://pixabay.com/get/x_640.jpg', largeImageURL: 'https://pixabay.com/get/x_1280.jpg', user: 'Nadia', user_id: 5, pageURL: 'https://pixabay.com/photos/x-9/', tags: 'mosque, dome' }] }) };
+  if (url.indexOf('pixabay.com/get/x_1280.jpg') >= 0) return { code: 200, body: [255, 216, 255, 9], mime: 'image/jpeg' };
   if (url.indexOf('images.pexels.com/o1.jpg') >= 0) return { code: 200, body: [255, 216, 255, 1, 2, 3], mime: 'image/jpeg' };
   if (url.indexOf('api.alquran.cloud/v1/surah') >= 0) return { code: 200, body: JSON.stringify({ data: [{ number: 1, name: 'سُورَةُ ٱلْفَاتِحَةِ' }, { number: 17, name: 'سُورَةُ الإِسۡرَاءِ' }] }) };
   if (url.indexOf('api.alquran.cloud/v1/ayah/17:23') >= 0) return { code: 200, body: JSON.stringify({ data: { text: 'وَقَضَىٰ رَبُّكَ أَلَّا تَعْبُدُوا إِلَّا إِيَّاهُ وَبِالْوَالِدَيْنِ إِحْسَانًا', surah: { number: 17, name: 'سُورَةُ الإِسۡرَاءِ' }, numberInSurah: 23 } }) };
@@ -228,6 +230,11 @@ fails('img_requests', /لمدير/, ut);
 const reqs = J('img_requests', adm, 'academy'); ok(reqs.length === 1 && reqs[0].asset === pick.asset.id, 'admin sees request');
 const dec = J('img_decide', adm, reqs[0].id, true); ok(dec.status === 'ok', 'request approved');
 ok(JSON.parse(call('asset_list', ut, 'program', 'academy')).some(function (x) { return x.name === 'مسجد' && x.scope === 'program' && x.credit; }), 'approved image copied into program library');
+call('set_save', adm, JSON.stringify({ pixabayKey: 'PBKEY', imgProvider: 'pixabay' }));
+const pb = J('img_search', ut, 'mosque', 1, ''); ok(pb.provider === 'pixabay' && pb.photos[0].by === 'Nadia' && /_340/.test(pb.photos[0].thumb), 'pixabay search mapped');
+const pbPick = J('img_pick', ut, JSON.stringify({ orig: pb.photos[0].orig, name: 'قبة', by: 'Nadia', url: pb.photos[0].url, program: 'academy' }));
+ok(pbPick.asset.credit.src === 'Pixabay' && pbPick.asset.mime === 'image/jpeg', 'pixabay pick stored with credit');
+call('set_save', adm, JSON.stringify({ imgProvider: 'pexels' }));
 const adminPick = J('img_pick', adm, JSON.stringify({ orig: px.photos[0].orig, name: 'مباشر', by: 'سمير', program: 'academy' }));
 ok(adminPick.asset.scope === 'program' && !adminPick.request, 'admin picks straight into program library');
 const ay = J('quran_find', ut, 'الإسراء 23'); ok(ay.length === 1 && ay[0].sn === 17 && ay[0].n === 23 && /وَبِالْوَالِدَيْنِ/.test(ay[0].text), 'ayah by reference');

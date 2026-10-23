@@ -5,6 +5,7 @@ const MK_AUD = [['students', 'الطلاب'], ['parents', 'أولياء الأم
 const MK_TONE = [['calm', 'هادئة'], ['bold', 'حماسية'], ['formal', 'رسمية'], ['warm', 'دافئة وقريبة'], ['spirit', 'روحانية']];
 const MK_SIZE = [['post', 'منشور'], ['square', 'مربع'], ['story', 'قصة'], ['yt', 'غلاف يوتيوب'], ['banner', 'غلاف استمارة']];
 const DIRECTIONS = [['calm', 'هادئ', 'مساحات بيضاء واسعة، لون واحد غامق للعنوان، زخرفة قليلة'], ['bold', 'جريء', 'خلفية داكنة أو ملوّنة بالكامل، عنوان ضخم، تباين قوي'], ['classic', 'كلاسيكي', 'إطار وتوازن متماثل، عناصر مرتبة في الوسط، وقار']];
+let MK_LAST = null;
 let MK = { text: '', tid: '', type: '', aud: '', tone: '', size: '', who: '', time: '', place: '', date: '', title: '', creative: false, results: null, dir: 0 };
 function aiReady() { const a = V6.settings && V6.settings.ai; return !!(a && a.enabled && a.ready && can('ai')); }
 function mkSave() { ls('make', { text: MK.text, tid: MK.tid, type: MK.type, aud: MK.aud, tone: MK.tone, size: MK.size, who: MK.who, time: MK.time, place: MK.place, date: MK.date, title: MK.title, creative: MK.creative }); }
@@ -12,13 +13,15 @@ function mkSave() { ls('make', { text: MK.text, tid: MK.tid, type: MK.type, aud:
 function showMake6() {
   document.title = 'المصمّم الذكي';
   const saved = ls('make'); if (saved) MK = Object.assign(MK, saved, { results: null });
+  const qs0 = location.hash.split('?')[1] || '';
   const tracks = tracksOf();
   if (!tracks.length) { view(el('div', { class: 'wrap page' }, [H('h1', 'المصمّم الذكي'), el('p', { class: 'muted', text: 'أضف هوية البرنامج أولاً.' })])); return; }
-  const qs = location.hash.split('?')[1] || '', qTid = /tid=([a-z0-9_\-]+)/.exec(qs); if (qTid && TRACKS[qTid[1]]) MK.tid = qTid[1];
+  const qs = qs0, qTid = /tid=([a-z0-9_\-]+)/.exec(qs); if (qTid && TRACKS[qTid[1]]) MK.tid = qTid[1];
   if (/creative=1/.test(qs)) MK.creative = true;
   if (!TRACKS[MK.tid]) MK.tid = ls('lastTrack') && TRACKS[ls('lastTrack')] ? ls('lastTrack') : tracks[0].id;
   if (!canSocial() && MK.type === 'social') MK.type = '';
-  MK.step = 'idea'; MK.results = null;
+  if (MK_LAST && MK_LAST.results && /back=1/.test(qs)) { Object.assign(MK, MK_LAST); MK.step = 'results'; }
+  else { MK.step = 'idea'; MK.results = null; }
   renderMake();
 }
 function renderMake() {
@@ -168,7 +171,7 @@ async function mkGenerate(body) {
     body.appendChild(el('div', { class: 'boot' }, [loader6('نجهّز الاقتراحات…')]));
     results = dirs.map(function (d) { return makeLocal(T, d); });
   }
-  MK.results = results; MK.step = 'results'; MK.dir = 0;
+  MK.results = results; MK.step = 'results'; MK.dir = 0; MK_LAST = JSON.parse(JSON.stringify(MK));
   track('make', { tool: aiReady() ? 'ai' : 'local' });
   renderMake();
 }
@@ -187,7 +190,7 @@ function mkResults(body) {
     if (r.missing && r.missing.length) grid.appendChild(el('div', { class: 'card flat mkask', style: 'grid-column:1/-1' }, [el('b', { text: 'لإكمال الإعلان:' }), el('span', { text: ' ' + r.missing.join('، ') + '. اكتبها في التصميم مباشرة.' })]));
     r.designs.forEach(function (dz, i) {
       const tpl = TEMPLATES.find(function (t) { return t.id === dz.tpl; }); if (!tpl) return;
-      grid.appendChild(el('button', { type: 'button', class: 'tcard6 hover-lift rv', style: '--d:' + (i % 8), onclick: function () { ls('makePick', { tid: T.id, page: dz.page }); go('#/e/' + T.id + '/' + tpl.id + '?make'); } },
+      grid.appendChild(el('button', { type: 'button', class: 'tcard6 hover-lift rv', style: '--d:' + (i % 8), onclick: function () { MK_LAST = JSON.parse(JSON.stringify(MK)); ls('makePick', { tid: T.id, page: dz.page, back: true }); go('#/e/' + T.id + '/' + tpl.id + '?make'); } },
         [el('div', { class: 'tthumb' }, [tplThumb(tpl, T, dz.page.size, 300, dz.page), dz.free ? el('span', { class: 'pill pu tnew', text: 'تصميم جديد' }) : null]), el('div', { class: 'tmeta6' }, [el('b', { text: dz.free ? 'تصميم من هوية ' + T.name : tpl.name }), el('span', { class: 'tiny', text: dz.note || '' })])]));
     });
     if (!r.designs.length) grid.appendChild(el('p', { class: 'empty', text: 'لم نجد اقتراحاً. جرّب نوعاً آخر.' }));
@@ -248,13 +251,14 @@ async function makeAI(T, dir) {
     aud ? 'الجمهور: ' + aud + '.' : '', tone ? 'النبرة: ' + tone + '.' : '',
     dir && dir[2] ? 'الاتجاه البصري المطلوب لهذه الدفعة: «' + dir[1] + '»: ' + dir[2] + '.' : '',
     MK.typeFree || MK.audFree || MK.toneFree || MK.sizeFree ? 'تفاصيل من المستخدم: ' + [MK.typeFree, MK.audFree, MK.toneFree, MK.sizeFree].filter(Boolean).join(' · ') : '',
-    'أولاً designs: اختر من ٤ إلى ٦ قوالب مختلفة الأشكال، ولكل قالب املأ خاناته بما يناسب حدودها.',
-    'ثانياً free: صمّم تخطيطين حرّين جديدين (٢) بوصف JSON: bg {kind: solid|split|band|frame|diagonal, role, role2, ratio 0.3-0.6, pos: top|bottom|left|right}؛ deco حتى ٥ أشكال {shape: circle|ring|petal|star|dots|lines|arc|blob, x, y, r (نسب من العرض), role, alpha, rot}؛ blocks من ٦ إلى ١٠ عناصر {k: title|sub|who|time|place|note|badge|logo|academy|social|photo|rule, x, y, w, h (نسب 0-1 من العرض والارتفاع، لا تتداخل العناصر النصية)، align: right|center|left، size (نسبة من العرض: العنوان 0.07-0.12، الفرعي 0.03-0.04، المعلومات 0.028-0.034)، role: auto أو اسم لون، bold 0-1، fill للوسم}. أدوار الألوان: paper (ورق فاتح), warm, p (الأساسي), pd (داكن), pl (فاتح), s, sd, sdd, a (تمييز), a2, teal, tealL, ink, muted, white. الشعار في الأعلى دائماً، والعنوان أكبر عنصر، واترك هوامش ٧٪.',
+    'المطلوب الأهم: free: ثلاثة تصاميم جديدة من الصفر (٣)، مختلفة جذرياً في البنية، لا تشبه القوالب الجاهزة: واحد يعتمد على عنوان ضخم (size 0.13-0.18) يملأ العرض مع خلفية داكنة وزخرفة هندسية (star8/girih) خافتة؛ وآخر على كتلة لونية كبيرة (bg kind circle أو wave أو diagonal) تحمل العنوان وتقابلها بطاقة card بيضاء بالتفاصيل؛ وثالث على صورة (bg kind photo مع overlay 0.5-0.7 من لون داكن) وعنوان فاتح فوقها، أو رقم كبير number (التاريخ أو العدد) كبطل التصميم. نوّع التوازن: غير متماثل، قطري، مركزي. استعمل deco بجرأة (٣-٦ أشكال كبيرة وصغيرة بألوان الهوية، وbigtext بكلمة من العنوان بشفافية 0.06-0.1). ضع card تحت النصوص عند الحاجة للقراءة. ألوان الهوية بأدوارها فقط.',
+    'صيغة التخطيط: bg {kind: solid|split|band|frame|diagonal|gradient|circle|wave|photo, role, role2, ratio 0.3-0.6, pos: top|bottom|left|right, overlay 0.4-0.8 للصورة, photo من: lib:img_mosque|lib:img_dome|lib:img_quran|lib:img_arch, pattern: star8|girih|zellij|dots|rays أو فارغ}؛ deco حتى ٦ {shape: circle|ring|petal|star|star8|halfring|triangle|stripe|crescent|squares|dots|lines|arc|blob|bigtext, x, y, r (نسب من العرض), role, alpha, rot, text للـbigtext}؛ blocks من ٦ إلى ١٢ بالترتيب من الخلف إلى الأمام {k: card|title|sub|who|time|place|note|badge|number|label|date|quote|photo|logo|academy|social|rule, x, y, w, h (نسب)، align, size (نسبة من العرض: العنوان 0.08-0.18، النص 0.028-0.045)، role (لون النص أو auto)، fill (للبطاقة والوسم)، hl (لون الكلمة المميزة)، bold 0-1، round 0-1، rot -15..15، shape للصورة: circle|arch، alpha للبطاقة، text للرقم والتسمية}. اجعل المقاس ' + (MK.size || 'post') + '. لا تترك عنصرين متداخلين، واترك هوامش 0.06.',
+    'ثانياً designs: اختر من ٢ إلى ٣ قوالب جاهزة مناسبة فقط، واملأ خاناتها بنصوص مصقولة. وإن لم يُذكر في الوصف مقدّم أو مكان فلا تخترعه.',
     'القوالب المتاحة (المعرّف، الاسم، الخانات):', JSON.stringify(catalog)
   ].filter(Boolean).join('\n');
-  const block = { type: 'OBJECT', properties: { k: { type: 'STRING' }, x: { type: 'NUMBER' }, y: { type: 'NUMBER' }, w: { type: 'NUMBER' }, h: { type: 'NUMBER' }, align: { type: 'STRING' }, size: { type: 'NUMBER' }, role: { type: 'STRING' }, bold: { type: 'NUMBER' }, fill: { type: 'STRING' }, text: { type: 'STRING' }, round: { type: 'NUMBER' } }, required: ['k', 'x', 'y', 'w', 'h'] };
-  const deco = { type: 'OBJECT', properties: { shape: { type: 'STRING' }, x: { type: 'NUMBER' }, y: { type: 'NUMBER' }, r: { type: 'NUMBER' }, role: { type: 'STRING' }, alpha: { type: 'NUMBER' }, rot: { type: 'NUMBER' } }, required: ['shape', 'x', 'y', 'r'] };
-  const layout = { type: 'OBJECT', properties: { bg: { type: 'OBJECT', properties: { kind: { type: 'STRING' }, role: { type: 'STRING' }, role2: { type: 'STRING' }, ratio: { type: 'NUMBER' }, pos: { type: 'STRING' } }, required: ['kind', 'role'] }, deco: { type: 'ARRAY', items: deco }, blocks: { type: 'ARRAY', items: block } }, required: ['bg', 'blocks'] };
+  const block = { type: 'OBJECT', properties: { k: { type: 'STRING' }, x: { type: 'NUMBER' }, y: { type: 'NUMBER' }, w: { type: 'NUMBER' }, h: { type: 'NUMBER' }, align: { type: 'STRING' }, size: { type: 'NUMBER' }, role: { type: 'STRING' }, bold: { type: 'NUMBER' }, fill: { type: 'STRING' }, hl: { type: 'STRING' }, text: { type: 'STRING' }, round: { type: 'NUMBER' }, rot: { type: 'NUMBER' }, shape: { type: 'STRING' }, alpha: { type: 'NUMBER' } }, required: ['k', 'x', 'y', 'w', 'h'] };
+  const deco = { type: 'OBJECT', properties: { shape: { type: 'STRING' }, x: { type: 'NUMBER' }, y: { type: 'NUMBER' }, r: { type: 'NUMBER' }, role: { type: 'STRING' }, alpha: { type: 'NUMBER' }, rot: { type: 'NUMBER' }, text: { type: 'STRING' } }, required: ['shape', 'x', 'y', 'r'] };
+  const layout = { type: 'OBJECT', properties: { bg: { type: 'OBJECT', properties: { kind: { type: 'STRING' }, role: { type: 'STRING' }, role2: { type: 'STRING' }, ratio: { type: 'NUMBER' }, pos: { type: 'STRING' }, overlay: { type: 'NUMBER' }, pattern: { type: 'STRING' }, photo: { type: 'STRING' } }, required: ['kind', 'role'] }, deco: { type: 'ARRAY', items: deco }, blocks: { type: 'ARRAY', items: block } }, required: ['bg', 'blocks'] };
   const schema = { type: 'OBJECT', properties: {
     info: { type: 'OBJECT', properties: { title: { type: 'STRING' }, sub: { type: 'STRING' }, who: { type: 'STRING' }, place: { type: 'STRING' }, time: { type: 'STRING' }, date: { type: 'STRING' }, body: { type: 'STRING' }, note: { type: 'STRING' }, badge: { type: 'STRING' } }, required: ['title'] },
     designs: { type: 'ARRAY', items: { type: 'OBJECT', properties: { tpl: { type: 'STRING' }, why: { type: 'STRING' }, fields: { type: 'ARRAY', items: { type: 'OBJECT', properties: { k: { type: 'STRING' }, v: { type: 'STRING' } }, required: ['k', 'v'] } } }, required: ['tpl', 'fields'] } },
@@ -262,11 +266,11 @@ async function makeAI(T, dir) {
     missing: { type: 'ARRAY', items: { type: 'STRING' } }
   }, required: ['info', 'designs', 'free', 'missing'] };
   const prompt = ['الوصف: ' + (MK.text || '(لم يكتب وصفاً، فابتكر إعلاناً نموذجياً لهذا النوع بهوية ' + T.full.replace('ـ', '') + ')'), MK.title ? 'العنوان المقترح: ' + MK.title : '', MK.who ? 'المقدّم: ' + MK.who : '', MK.time ? 'الوقت: ' + MK.time : '', MK.place ? 'المكان: ' + MK.place : ''].filter(Boolean).join('\n');
-  const raw = await API6.call('ai_make', V6.token, JSON.stringify({ kind: MK.creative ? 'creative' : 'design', program: V6.prog.id, system: system, prompt: prompt, schema: schema, temperature: dir && dir[0] === 'bold' ? 1 : 0.85 }));
+  const raw = await API6.call('ai_make', V6.token, JSON.stringify({ kind: MK.creative ? 'creative' : 'design', program: V6.prog.id, system: system, prompt: prompt, schema: schema, temperature: dir && dir[0] === 'bold' ? 1 : 0.9 }));
   let r; try { r = JSON.parse(raw); } catch (e) { throw new Error('لم يفهم المساعد الطلب. أعد صياغته.'); }
   const I = Object.assign({}, info, r.info || {}); if (MK.date) I.date = MK.date; I.name = I.title; ['who', 'time', 'place'].forEach(function (k) { if (MK[k]) I[k] = MK[k]; });
   const designs = [];
-  (r.free || []).slice(0, 3).forEach(function (f, i) { designs.push({ tpl: 'ai_free', page: freePage(T, f.layout, I), note: f.why || 'تصميم جديد', free: true }); });
+  (r.free || []).slice(0, 4).forEach(function (f, i) { designs.push({ tpl: 'ai_free', page: freePage(T, f.layout, I), note: f.why || 'تصميم جديد من الصفر', free: true }); });
   (r.designs || []).forEach(function (dz) {
     const tpl = list.find(function (t) { return t.id === dz.tpl; }); if (!tpl) return;
     const page = pageFromInfo(tpl, T, I, dz.fields, null); page.size = sizeFor(tpl);

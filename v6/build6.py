@@ -32,7 +32,7 @@ for n in ORDER: (OUT / 'js' / n).write_text(parts[n])
 shell = (V6 / 'shell.html').read_text()
 css = (V6 / 'style6.css').read_text()
 site = 'https://ghamine23.github.io/media-portal/' + ('' if '--root' in sys.argv else 'v6/')
-shell = shell.replace('/*SITE*/', site).replace('<!--STYLE-->', '<style>\n' + css + '\n</style>')
+shell = shell.replace('/*SITE*/', site).replace('<!--STYLE-->', '<style>\n' + css + '\n</style>').replace('<!--MARK-->', brand['mark'])
 tags = '\n'.join('<script src="js/%s?v=%s"></script>' % (n, ver(parts[n])) for n in ORDER)
 (OUT / 'index.html').write_text(shell.replace('<!--SCRIPTS-->', tags))
 (OUT / '.nojekyll').write_text('') if '--root' in sys.argv else None

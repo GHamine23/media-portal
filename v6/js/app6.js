@@ -36,10 +36,12 @@ window.addEventListener('hashchange', function () { setTimeout(markNav, 0); });
 
 (async function boot() {
   setMotion('calm');
+  const nm = ls('lastName'); splash(nm ? 'أهلاً بك يا ' + nm + '…' : 'نرحّب بك…');
   const fonts = loadUiFonts().catch(function () {});
+  setTimeout(function () { splash('نوقظ الخطوط من نومها…'); }, 700);
   await Promise.race([fonts, new Promise(function (ok) { setTimeout(ok, 1500); })]);
   let r = false;
   try { r = await restore(); } catch (e) { console.warn(e); }
-  if (r === 'must') return;
+  if (r === 'must') { splashHide(); return; }
   render();
 })();

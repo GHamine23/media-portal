@@ -775,3 +775,83 @@ svg.flip{transform:scaleX(-1)}
 .e-tools{flex:none}
 
 .routes{display:grid;gap:6px}.routerow{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px}.routerow .seg{flex:none}
+
+/* ===== حركات دخول العناصر في العرض الحي ===== */
+.pstage .pan{animation-duration:var(--dur,.7s);animation-fill-mode:both;animation-timing-function:cubic-bezier(.22,1,.36,1);pointer-events:none}
+.an-fade{animation-name:anFade}.an-up{animation-name:anUp}.an-down{animation-name:anDown}.an-right{animation-name:anRight}.an-left{animation-name:anLeft}
+.an-zoom{animation-name:anZoom}.an-pop{animation-name:anPop;animation-timing-function:cubic-bezier(.34,1.56,.64,1)}.an-blur{animation-name:anBlur}
+.an-flip{animation-name:anFlip}.an-wipe{animation-name:anWipe}.an-drop{animation-name:anDrop;animation-timing-function:cubic-bezier(.34,1.4,.64,1)}.an-spin{animation-name:anSpin}
+.an-glow{animation-name:anGlow}
+@keyframes anFade{from{opacity:0}to{opacity:1}}
+@keyframes anUp{from{opacity:0;transform:translateY(6%)}to{opacity:1;transform:none}}
+@keyframes anDown{from{opacity:0;transform:translateY(-6%)}to{opacity:1;transform:none}}
+@keyframes anRight{from{opacity:0;transform:translateX(8%)}to{opacity:1;transform:none}}
+@keyframes anLeft{from{opacity:0;transform:translateX(-8%)}to{opacity:1;transform:none}}
+@keyframes anZoom{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+@keyframes anPop{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:none}}
+@keyframes anBlur{from{opacity:0;filter:blur(18px)}to{opacity:1;filter:blur(0)}}
+@keyframes anFlip{from{opacity:0;transform:perspective(1200px) rotateX(-70deg)}to{opacity:1;transform:none}}
+@keyframes anWipe{from{clip-path:inset(0 0 0 100%)}to{clip-path:inset(0)}}
+@keyframes anDrop{from{opacity:0;transform:translateY(-14%)}to{opacity:1;transform:none}}
+@keyframes anSpin{from{opacity:0;transform:rotate(-8deg) scale(.8)}to{opacity:1;transform:none}}
+@keyframes anGlow{0%{opacity:0;filter:brightness(2.4) blur(6px)}60%{opacity:1;filter:brightness(1.4) blur(0)}100%{opacity:1;filter:none}}
+/* لوحة الحركة في المحرر */
+.anstyles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.anst{border:1px solid var(--line);border-radius:12px;background:var(--bg2);padding:8px 6px 6px;display:grid;justify-items:center;gap:4px;cursor:pointer;transition:border-color .2s,transform .25s var(--spring)}
+.anst.on{border-color:var(--ink);background:#fff;box-shadow:var(--sh1)}.anst:hover{transform:translateY(-2px)}
+.anst i{display:block;width:34px;height:20px;border-radius:6px;background:linear-gradient(90deg,#7a5cff,#f29e4c);animation-duration:1.6s;animation-iteration-count:infinite;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+.anst:hover i,.anst.on i{animation-name:inherit}
+.anst small{font-size:11.5px;color:var(--ink2)}
+.anst.an-fade i{animation-name:anFade}.anst.an-up i{animation-name:anUp}.anst.an-down i{animation-name:anDown}.anst.an-right i{animation-name:anRight}.anst.an-left i{animation-name:anLeft}.anst.an-zoom i{animation-name:anZoom}.anst.an-pop i{animation-name:anPop}.anst.an-blur i{animation-name:anBlur}.anst.an-flip i{animation-name:anFlip}.anst.an-wipe i{animation-name:anWipe}.anst.an-drop i{animation-name:anDrop}.anst.an-spin i{animation-name:anSpin}.anst.an-glow i{animation-name:anGlow}
+.anst.an-none i{animation:none;opacity:.35}
+.anrow{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:var(--bg2);font-size:13px}
+.anrow select{font:inherit;font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:4px 6px;background:#fff}
+.anrow .tog{font-size:12px}
+.anlist{display:grid;gap:6px}
+.e-present{background:linear-gradient(135deg,#7a5cff,#5b3df5);color:#fff;border:0}.e-present:hover{filter:brightness(1.08)}
+.e-present svg{color:#fff}
+
+/* ===== صفحة الشرائح ===== */
+.slhero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:28px;align-items:center;padding-top:28px;padding-bottom:10px}
+@media (max-width:900px){.slhero{grid-template-columns:1fr}}
+.slhero-t h1{margin:4px 0 8px}.slhero-t .muted{max-width:520px;line-height:1.9}
+.slids{margin-top:14px}
+.slhero-pv{position:relative;aspect-ratio:16/9;border-radius:22px;overflow:hidden;background:var(--bg2);box-shadow:var(--sh2);isolation:isolate}
+.slhero-pv::after{content:'';position:absolute;inset:0;border-radius:22px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06);pointer-events:none}
+.slhero-c{position:absolute;inset:0;width:100%!important;height:100%!important;opacity:0;transform:scale(1.04);transition:opacity .7s var(--ease),transform 3.4s linear}
+.slhero-c.in{opacity:1;transform:scale(1)}.slhero-c.out{opacity:0}
+.sldecks{gap:14px}
+.sldeck{position:relative;flex:none;width:300px;border-radius:16px;overflow:hidden;background:var(--card);box-shadow:var(--sh1)}
+.sldeck canvas,.sldeck img{display:block;width:100%!important;aspect-ratio:16/9;object-fit:cover;background:var(--bg2)}
+.sldeck-m{padding:10px 12px 12px;display:grid;gap:2px}.sldeck-m b{font-size:15px}
+.sldeck-a{position:absolute;inset:0 0 auto 0;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(10,10,10,.42);opacity:0;transition:opacity .25s}
+.sldeck:hover .sldeck-a,.sldeck:focus-within .sldeck-a{opacity:1}
+.slways{margin:26px 0}
+.slfeat{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:10px 0 30px}
+.slf{background:var(--card);border-radius:var(--r2);padding:16px;box-shadow:var(--sh1);display:grid;gap:4px}.slf b{font-size:15px}
+@media (max-width:640px){.sldeck{width:240px}}
+
+/* ===== شاشة الترحيب عند الفتح ===== */
+#splash{position:fixed;inset:0;z-index:400;display:grid;place-items:center;background:radial-gradient(120% 90% at 85% 10%,#fff4e8 0%,#f7f7f7 45%,#eef0ff 100%);overflow:hidden;transition:opacity .55s var(--ease),visibility .55s}
+#splash.off{opacity:0;visibility:hidden;pointer-events:none}
+#splash .so{position:absolute;border-radius:50%;filter:blur(40px);opacity:.55;animation:soFloat 9s ease-in-out infinite alternate}
+#splash .so1{width:42vmax;height:42vmax;background:#ffd9b8;inset:auto auto -12vmax -10vmax}
+#splash .so2{width:34vmax;height:34vmax;background:#d8d0ff;inset:-10vmax -8vmax auto auto;animation-delay:-3s}
+#splash .so3{width:22vmax;height:22vmax;background:#cfeee9;inset:30% auto auto 20%;animation-delay:-6s;opacity:.4}
+@keyframes soFloat{to{transform:translate(6vmax,-4vmax) scale(1.12)}}
+.splash-in{position:relative;display:grid;justify-items:center;gap:8px;text-align:center;animation:spIn .9s var(--ease) both}
+@keyframes spIn{from{opacity:0;transform:translateY(16px) scale(.96)}}
+.splash-mark{width:96px;height:96px;position:relative}
+.splash-mark svg{width:100%;height:100%;display:block;animation:spMark 2.6s cubic-bezier(.22,1,.36,1) infinite}
+.splash-mark::before{content:'';position:absolute;inset:-14px;border-radius:50%;border:2px solid rgba(0,0,0,.08);border-top-color:#000;animation:spRing 1.4s linear infinite}
+.splash-mark::after{content:'';position:absolute;inset:-30px;border-radius:50%;background:radial-gradient(circle,rgba(242,158,76,.35),transparent 70%);animation:spPulse 2.6s ease-in-out infinite;z-index:-1}
+@keyframes spMark{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(1.06) rotate(-3deg)}}
+@keyframes spRing{to{transform:rotate(360deg)}}
+@keyframes spPulse{0%,100%{transform:scale(.9);opacity:.5}50%{transform:scale(1.15);opacity:1}}
+.splash-word{font-family:var(--fd,var(--ft));font-size:44px;font-weight:800;letter-spacing:-.5px;margin-top:14px;line-height:1}
+.splash-sub{color:var(--ink2);font-size:15px}
+.splash-step{margin:14px 0 0;font-size:14px;color:var(--ink3);min-height:1.6em;transition:opacity .3s}
+.splash-bar{width:160px;height:4px;border-radius:4px;background:rgba(0,0,0,.08);overflow:hidden;margin-top:6px}
+.splash-bar i{display:block;height:100%;width:40%;border-radius:4px;background:linear-gradient(90deg,#7a5cff,#f29e4c);animation:spBar 1.4s ease-in-out infinite}
+@keyframes spBar{0%{transform:translateX(160%)}100%{transform:translateX(-260%)}}
+@media (prefers-reduced-motion:reduce){#splash *{animation:none!important}}

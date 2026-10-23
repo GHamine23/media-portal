@@ -23,10 +23,10 @@ function pageAtStep(p, step) {
 }
 function renderSlide(c, p, T, scale, collect) { const tpl = TEMPLATES.find(function (t) { return t.id === p.tpl; }); return renderTo(c, tpl, p.size || 'slide', p, T, scale, collect); }
 
-function present6(fromView) {
+function present6(fromView, startAt) {
   if (!fromView) commitPage();
   const doc = ED.doc, pages = doc.pages, T = S.track;
-  let i = fromView ? 0 : ED.cur, step = 0, timer = null, timerLeft = 0, notesOn = false;
+  let i = startAt != null ? startAt : (fromView ? 0 : ED.cur), step = 0, timer = null, timerLeft = 0, notesOn = false;
   const stage = el('div', { class: 'pstage' }), media = el('div', { class: 'pmedia' });
   const bar = el('div', { class: 'pbar' }), counter = el('span', { class: 'pcount' }), timerEl = el('div', { class: 'ptimer', hidden: true }), notesEl = el('aside', { class: 'pnotes', hidden: true });
   stage.appendChild(media);
@@ -58,17 +58,76 @@ function present6(fromView) {
       media.appendChild(box);
     });
   }
+  let animTimers = [];
+  function clearAnims() { animTimers.forEach(clearTimeout); animTimers = []; $$('.pan', stage).forEach(function (x) { x.remove(); }); }
+  // قناع الفرق بين حالتين: ما ظهر جديداً فقط (العنصر وحده على شفافية)
+  function diffCanvas(a, b) {
+    const w = a.width, h = a.height, c = document.createElement('canvas'); c.width = w; c.height = h;
+    const da = a.getContext('2d').getImageData(0, 0, w, h).data, ib = b.getContext('2d').getImageData(0, 0, w, h), db = ib.data;
+    let any = false;
+    for (let i = 0; i < db.length; i += 4) { if (Math.abs(da[i] - db[i]) + Math.abs(da[i + 1] - db[i + 1]) + Math.abs(da[i + 2] - db[i + 2]) < 18 && Math.abs(da[i + 3] - db[i + 3]) < 18) db[i + 3] = 0; else any = true; }
+    if (!any) return null;
+    c.getContext('2d').putImageData(ib, 0, 0); return c;
+  }
+  function renderState(q, scale) { const c = document.createElement('canvas'); q.d.__n = i ? String(i + 1) : ''; renderSlide(c, q, T, scale); return c; }
+  function elementsOf(q, boxes) {
+    const keys = Object.keys(boxes).filter(function (g) { return g !== 'deco' && g !== 'footer' && g !== 'academy' && g !== 'social'; });
+    const hidden = q.hide || {}; return keys.filter(function (g) { return !hidden['g_' + g]; }).sort(function (x, y) { return (boxes[x].y0 - boxes[y].y0) || (boxes[y].x0 - boxes[x].x0); });
+  }
+  function animOf(p, g) { const A = p.anim || {}; if (A.mode === 'none') return 'none'; if (A.mode === 'custom' && A.items && A.items[g]) return A.items[g]; return A.style || doc.animStyle || 'up'; }
+  function animDur(p) { const sp = (p.anim || {}).speed || doc.animSpeed || 'normal'; return sp === 'fast' ? 420 : sp === 'slow' ? 1100 : 700; }
+  function playEntrance(p, q, boxes, scale, groups, stagger) {
+    // q: الحالة النهائية. نرسم الحالة بلا هذه العناصر ثم نضيفها واحداً واحداً بأقنعة متحركة
+    const dur = animDur(p), gap = stagger == null ? Math.min(220, Math.max(90, 900 / Math.max(1, groups.length))) : stagger;
+    const base = JSON.parse(JSON.stringify(q)); base.hide = Object.assign({}, base.hide); groups.forEach(function (g) { base.hide['g_' + g] = true; });
+    let prev = renderState(base, scale);
+    const layers = [];
+    groups.forEach(function (g, k) {
+      const st = JSON.parse(JSON.stringify(base)); groups.slice(0, k + 1).forEach(function (x) { delete st.hide['g_' + x]; });
+      const cur2 = renderState(st, scale), mask = diffCanvas(prev, cur2); prev = cur2;
+      if (!mask) return;
+      const style = animOf(p, g); if (style === 'none') { mask.className = 'pcv pan'; stage.appendChild(mask); return; }
+      mask.className = 'pcv pan an-' + style; mask.style.setProperty('--dur', dur + 'ms'); mask.style.animationDelay = (k * gap) + 'ms';
+      const b = boxes[g]; if (b) mask.style.transformOrigin = ((b.x0 + b.x1) / 2 / (SIZES[p.size || 'slide'].w)) * 100 + '% ' + ((b.y0 + b.y1) / 2 / (SIZES[p.size || 'slide'].h)) * 100 + '%';
+      stage.appendChild(mask); layers.push(mask);
+    });
+    return { base: null, total: groups.length * gap + dur };
+  }
   function draw(dir) {
-    const p = pages[i], r = fitStage();
+    clearAnims();
+    const p = pages[i], r = fitStage(), scale = r * Math.min(2, devicePixelRatio || 1);
     const c = el('canvas', { class: 'pcv' });
     const q = pageAtStep(p, step); q.d.__n = i ? String(i + 1) : '';
-    const boxes = renderSlide(c, q, T, r * Math.min(2, devicePixelRatio || 1), true) || {};
+    const boxes = renderSlide(c, q, T, scale, true) || {};
     const kind = p.trans || doc.trans || 'fade';
-    if (cur && dir !== 'step') { const old = cur; old.animate(transKeyframes(kind, true), { duration: 420, easing: EASE6, fill: 'forwards' }).onfinish = function () { old.remove(); }; }
-    else if (cur) cur.remove();
-    stage.appendChild(c); cur = c;
-    if (dir === 'step') c.animate([{ opacity: 0.6 }, { opacity: 1 }], { duration: 260, easing: EASE6 });
-    else c.animate(transKeyframes(kind, false), { duration: 480, easing: EASE6, fill: 'forwards' });
+    const A = p.anim || {}, mode = A.mode || doc.animMode || 'auto', animate = mode !== 'none' && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+    if (dir === 'step' && animate && step > 0 && stepsOf(p)[step - 1] !== '__answer') {
+      // خطوة بنقرة: العنصر الجديد وحده يدخل بحركته، وما قبله ثابت
+      const g = stepsOf(p)[step - 1], before = pageAtStep(p, step - 1); before.d.__n = q.d.__n;
+      const prevC = renderState(before, scale), mask = diffCanvas(prevC, c);
+      if (cur) cur.remove(); stage.appendChild(prevC); prevC.className = 'pcv'; cur = prevC;
+      if (mask) { const style = animOf(p, g) === 'none' ? 'fade' : animOf(p, g); mask.className = 'pcv pan an-' + style; mask.style.setProperty('--dur', animDur(p) + 'ms'); const b = boxes[g]; if (b) mask.style.transformOrigin = ((b.x0 + b.x1) / 2 / SIZES[p.size || 'slide'].w) * 100 + '% ' + ((b.y0 + b.y1) / 2 / SIZES[p.size || 'slide'].h) * 100 + '%'; stage.appendChild(mask); }
+      animTimers.push(setTimeout(function () { if (cur !== prevC) return; stage.appendChild(c); c.className = 'pcv'; prevC.remove(); cur = c; $$('.pan', stage).forEach(function (x) { x.remove(); }); }, animDur(p) + 60));
+    } else if (dir === 'step' && animate && step > 0) {
+      // كشف الجواب: تلاشٍ ناعم
+      if (cur) { const old = cur; old.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: 'forwards' }).onfinish = function () { old.remove(); }; }
+      stage.appendChild(c); cur = c; c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 350, easing: EASE6 });
+    } else if (dir !== 'step' && animate) {
+      // دخول شريحة: الخلفية تنتقل، ثم تدخل العناصر بترتيبها
+      const groups = elementsOf(q, boxes).filter(function (g) { return stepsOf(p).indexOf(g) < 0 || stepsOf(p).indexOf(g) < step; });
+      const base = JSON.parse(JSON.stringify(q)); base.hide = Object.assign({}, base.hide); groups.forEach(function (g) { base.hide['g_' + g] = true; });
+      const bg = renderState(base, scale); bg.className = 'pcv';
+      if (cur) { const old = cur; old.animate(transKeyframes(kind, true), { duration: 420, easing: EASE6, fill: 'forwards' }).onfinish = function () { old.remove(); }; }
+      stage.appendChild(bg); cur = bg; bg.animate(transKeyframes(kind, false), { duration: 480, easing: EASE6, fill: 'forwards' });
+      const res = playEntrance(p, q, boxes, scale, groups);
+      animTimers.push(setTimeout(function () { if (cur !== bg) return; stage.appendChild(c); c.className = 'pcv'; bg.remove(); cur = c; $$('.pan', stage).forEach(function (x) { x.remove(); }); }, 480 + (res ? res.total : 0) + 80));
+    } else {
+      if (cur && dir !== 'step') { const old = cur; old.animate(transKeyframes(kind, true), { duration: 420, easing: EASE6, fill: 'forwards' }).onfinish = function () { old.remove(); }; }
+      else if (cur) cur.remove();
+      stage.appendChild(c); cur = c;
+      if (dir === 'step') c.animate([{ opacity: 0.6 }, { opacity: 1 }], { duration: 260, easing: EASE6 });
+      else c.animate(transKeyframes(kind, false), { duration: 480, easing: EASE6, fill: 'forwards' });
+    }
     placeMedia(q, boxes);
     counter.textContent = (i + 1) + ' / ' + pages.length + (stepsOf(p).length ? ' · ' + step + '/' + stepsOf(p).length : '');
     notesEl.textContent = p.notes || 'لا ملاحظات لهذه الشريحة.';
@@ -119,7 +178,7 @@ function present6(fromView) {
   let hideT = 0; const wake = function () { ov.classList.add('awake'); clearTimeout(hideT); hideT = setTimeout(function () { ov.classList.remove('awake'); }, 2600); };
   ov.addEventListener('mousemove', wake); ov.addEventListener('touchstart', wake, { passive: true });
   stage.addEventListener('click', function (e) { if (e.clientX < innerWidth / 2) next(); else prev(); });
-  function close() { document.removeEventListener('keydown', key); window.removeEventListener('resize', onResize); if (timer) clearInterval(timer); if (chan) chan.close(); ov.remove(); if (document.fullscreenElement) document.exitFullscreen().catch(function () {}); }
+  function close() { clearAnims(); document.removeEventListener('keydown', key); window.removeEventListener('resize', onResize); if (timer) clearInterval(timer); if (chan) chan.close(); ov.remove(); if (document.fullscreenElement) document.exitFullscreen().catch(function () {}); }
   function onResize() { draw('step'); }
   document.addEventListener('keydown', key); window.addEventListener('resize', onResize);
   document.body.appendChild(ov); draw('next'); ov.focus(); wake();
@@ -129,30 +188,74 @@ function present6(fromView) {
 function markDirtySafe() { try { if (ED.open) markDirty(); } catch (e) {} }
 
 /* ---------- إعدادات الشريحة في المحرر: الظهور التدريجي، والملاحظات، والانتقال ---------- */
-function slideSettings(i) {
-  commitPage();
-  if (i !== ED.cur) { loadPage(i); afterPages(); }
-  const p = ED.doc.pages[i], groups = Object.keys(LASTG).filter(function (g) { return g !== 'logo' && g !== 'footer' && g !== 'deco' && g !== 'tag'; });
-  let steps = (p.steps || []).filter(function (g) { return groups.indexOf(g) >= 0 || isLayer(g); });
-  const list = el('div', { class: 'steplist' });
-  function drawList() {
-    list.innerHTML = '';
-    const rest = groups.filter(function (g) { return steps.indexOf(g) < 0; });
-    steps.forEach(function (g, k) { list.appendChild(el('div', { class: 'steprow on' }, [el('b', { text: (k + 1) + '. ' + gName(g) }), el('span', { class: 'sp' }),
-      el('button', { type: 'button', class: 'ib sm', 'aria-label': 'للأعلى', disabled: k === 0, onclick: function () { steps.splice(k - 1, 0, steps.splice(k, 1)[0]); drawList(); } }, [ico('up')]),
-      el('button', { type: 'button', class: 'ib sm', 'aria-label': 'للأسفل', disabled: k === steps.length - 1, onclick: function () { steps.splice(k + 1, 0, steps.splice(k, 1)[0]); drawList(); } }, [ico('down')]),
-      el('button', { type: 'button', class: 'ib sm', 'aria-label': 'إزالة', onclick: function () { steps.splice(k, 1); drawList(); } }, [ico('close')])])); });
-    if (rest.length) list.appendChild(el('div', { class: 'row wrapr', style: 'margin-top:8px' }, [el('span', { class: 'tiny', text: 'أضف عنصراً يظهر بنقرة:' })].concat(rest.map(function (g) { return el('button', { type: 'button', class: 'chip', onclick: function () { steps.push(g); drawList(); } }, [gName(g)]); }))));
-    if (p.tpl === 'sl_quiz') list.appendChild(el('p', { class: 'tiny', text: 'شريحة السؤال: الجواب الصحيح يظهر بنقرة أخيرة تلقائياً.' }));
+const AN_STYLES = [['up', 'صعود'], ['fade', 'تلاشٍ'], ['right', 'من اليمين'], ['left', 'من اليسار'], ['down', 'هبوط'], ['zoom', 'تكبير'], ['pop', 'قفزة'], ['blur', 'من الضباب'], ['flip', 'قلب'], ['wipe', 'مسح'], ['drop', 'سقوط'], ['spin', 'دوران'], ['glow', 'توهّج']];
+const AN_NAME = {}; AN_STYLES.forEach(function (x) { AN_NAME[x[0]] = x[1]; });
+function slideSettings(i) { if (i !== ED.cur) { commitPage(); loadPage(i); afterPages(); } openTab('anim'); }
+function curPage() { return ED.doc.pages[ED.cur]; }
+function animStylesGrid(cur, on, withNone) {
+  const list = (withNone ? [['none', 'بلا']] : []).concat(AN_STYLES);
+  return el('div', { class: 'anstyles' }, list.map(function (x) { return el('button', { type: 'button', class: 'anst an-' + x[0] + (cur === x[0] ? ' on' : ''), title: x[1], onclick: function (e) { $$('.anst', e.currentTarget.parentNode).forEach(function (b) { b.classList.remove('on'); }); e.currentTarget.classList.add('on'); on(x[0]); } }, [el('i'), el('small', { text: x[1] })]); }));
+}
+/* ---------- لوحة الحركة: انتقال الشرائح، ودخول العناصر، والظهور بنقرة، والملاحظات ---------- */
+function pAnim(b) {
+  const doc = ED.doc, p = curPage(); p.anim = p.anim || {};
+  b.appendChild(panelHead('الحركة', 'كيف تدخل الشرائح وعناصرها في العرض الحي. جرّب ثم «عاين».'));
+  b.appendChild(el('button', { type: 'button', class: 'btn dark', style: 'width:100%', onclick: function () { present6(false, ED.cur); } }, [ico('play'), 'عاين هذه الشريحة في العرض']));
+  // ١) انتقال الشرائح
+  b.appendChild(el('h4', { class: 'psh', text: 'الانتقال بين الشرائح' }));
+  b.appendChild(el('p', { class: 'tiny', text: 'للعرض كله، ولك أن تخص هذه الشريحة بانتقال مختلف.' }));
+  b.appendChild(el('div', { class: 'fld' }, [el('label', { text: 'العرض كله' }), segOf(TRANS, doc.trans || 'fade', function (v) { doc.trans = v; markDirty(); })]));
+  b.appendChild(el('div', { class: 'fld' }, [el('label', { text: 'هذه الشريحة' }), segOf([['', 'كالعرض']].concat(TRANS), p.trans || '', function (v) { if (v) p.trans = v; else delete p.trans; markDirty(); })]));
+  // ٢) دخول العناصر
+  b.appendChild(el('h4', { class: 'psh', text: 'دخول العناصر' }));
+  b.appendChild(el('p', { class: 'tiny', text: 'تلقائي: تدخل العناصر واحداً تلو الآخر من الأعلى إلى الأسفل بالحركة المختارة. مخصص: تختار لكل عنصر حركته.' }));
+  const modeBox = el('div');
+  function drawMode() {
+    modeBox.innerHTML = '';
+    const mode = p.anim.mode || doc.animMode || 'auto';
+    modeBox.appendChild(segOf([['auto', 'تلقائي'], ['custom', 'مخصص'], ['none', 'بلا حركة']], mode, function (v) { p.anim.mode = v; markDirty(); drawMode(); }));
+    if (mode === 'none') return;
+    modeBox.appendChild(el('p', { class: 'tiny', style: 'margin-top:8px', text: mode === 'auto' ? 'الحركة لكل العناصر:' : 'الحركة الافتراضية (ويمكن تغييرها لكل عنصر):' }));
+    modeBox.appendChild(animStylesGrid(p.anim.style || doc.animStyle || 'up', function (v) { p.anim.style = v; markDirty(); if (mode === 'custom') drawItems(); }, false));
+    modeBox.appendChild(el('div', { class: 'fld', style: 'margin-top:8px' }, [el('label', { text: 'السرعة' }), segOf([['fast', 'سريعة'], ['normal', 'عادية'], ['slow', 'هادئة']], p.anim.speed || doc.animSpeed || 'normal', function (v) { p.anim.speed = v; markDirty(); })]));
+    modeBox.appendChild(el('div', { class: 'row wrapr', style: 'margin-top:6px' }, [el('button', { type: 'button', class: 'btn sm line', onclick: function () { doc.animMode = p.anim.mode || 'auto'; doc.animStyle = p.anim.style || doc.animStyle || 'up'; doc.animSpeed = p.anim.speed || doc.animSpeed || 'normal'; doc.pages.forEach(function (q) { q.anim = Object.assign({}, q.anim || {}, { mode: doc.animMode, style: doc.animStyle, speed: doc.animSpeed }); }); markDirty(); toast('طُبّق على كل الشرائح'); } }, ['طبّق على كل الشرائح'])]));
+    if (mode === 'custom') { const itemsBox = el('div', { class: 'anlist', style: 'margin-top:10px' }); modeBox.appendChild(itemsBox); drawItems(itemsBox); }
   }
-  drawList();
-  const notes = el('textarea', { rows: '4', dir: 'auto', placeholder: 'ما تريد تذكّره وأنت تعرض هذه الشريحة. يراه المقدّم فقط.' }); notes.value = p.notes || '';
-  let tr = p.trans || '';
-  modal({ title: 'الشريحة ' + (i + 1), wide: true, body: [
-    el('h4', { class: 'psh', text: 'الظهور التدريجي' }), el('p', { class: 'tiny', text: 'ما تضيفه هنا يظهر عنصراً عنصراً بالنقر أثناء العرض، بالترتيب.' }), list,
-    el('h4', { class: 'psh', text: 'ملاحظات المقدّم' }), notes,
-    el('h4', { class: 'psh', text: 'الانتقال إلى هذه الشريحة' }), segOf([['', 'كالعرض']].concat(TRANS), tr, function (v) { tr = v; })
-  ], acts: [{ t: 'حفظ', cls: 'dark', fn: function () { p.steps = steps; p.notes = notes.value; if (tr) p.trans = tr; else delete p.trans; markDirty(); buildPages(); toast('حُفظ'); } }, { t: 'إلغاء' }] });
+  let itemsHost = null;
+  function drawItems(host) {
+    itemsHost = host || itemsHost; if (!itemsHost) return; itemsHost.innerHTML = '';
+    p.anim.items = p.anim.items || {};
+    const o = stackOrder(), groups = o.all.filter(function (g) { return !S.hide['g_' + g] && g !== 'deco' && g !== 'footer'; });
+    let steps = (p.steps || []).slice();
+    groups.forEach(function (g) {
+      const sel = el('select', { 'aria-label': 'حركة ' + gName(g), onchange: function (e) { p.anim.items[g] = e.target.value; markDirty(); } }, [el('option', { value: '', text: 'الافتراضية (' + AN_NAME[p.anim.style || doc.animStyle || 'up'] + ')' }), el('option', { value: 'none', text: 'بلا' })].concat(AN_STYLES.map(function (x) { return el('option', { value: x[0], text: x[1] }); })));
+      sel.value = p.anim.items[g] || '';
+      const inSteps = steps.indexOf(g) >= 0;
+      const tg = el('label', { class: 'tog', title: 'يظهر بنقرة أثناء العرض' }, [el('input', { type: 'checkbox', checked: inSteps, onchange: function (e) { if (e.target.checked) { if (steps.indexOf(g) < 0) steps.push(g); } else steps = steps.filter(function (x) { return x !== g; }); p.steps = steps; markDirty(); } }), el('span', { text: 'بنقرة' })]);
+      itemsHost.appendChild(el('div', { class: 'anrow' }, [el('b', { text: gName(g) }), sel, tg]));
+    });
+    if (p.tpl === 'sl_quiz') itemsHost.appendChild(el('p', { class: 'tiny', text: 'شريحة السؤال: الجواب الصحيح يظهر بنقرة أخيرة تلقائياً.' }));
+  }
+  b.appendChild(modeBox); drawMode();
+  // ٣) الظهور بنقرة (في الوضع التلقائي)
+  b.appendChild(el('h4', { class: 'psh', text: 'الظهور بنقرة' }));
+  b.appendChild(el('p', { class: 'tiny', text: 'ما تختاره هنا لا يظهر مع الشريحة، بل بنقرة أثناء العرض، بالترتيب.' }));
+  const stepBox = el('div', { class: 'anlist' }); b.appendChild(stepBox);
+  function drawSteps() {
+    stepBox.innerHTML = '';
+    const o = stackOrder(), groups = o.all.filter(function (g) { return !S.hide['g_' + g] && g !== 'deco' && g !== 'footer' && g !== 'logo'; });
+    const steps = (p.steps || []).filter(function (g) { return groups.indexOf(g) >= 0; }); p.steps = steps;
+    steps.forEach(function (g, k) { stepBox.appendChild(el('div', { class: 'steprow on' }, [el('b', { text: (k + 1) + '. ' + gName(g) }), el('span', { class: 'sp' }),
+      el('button', { type: 'button', class: 'ib sm', 'aria-label': 'للأعلى', disabled: k === 0, onclick: function () { steps.splice(k - 1, 0, steps.splice(k, 1)[0]); markDirty(); drawSteps(); } }, [ico('up')]),
+      el('button', { type: 'button', class: 'ib sm', 'aria-label': 'إزالة', onclick: function () { steps.splice(k, 1); markDirty(); drawSteps(); } }, [ico('close')])])); });
+    const rest = groups.filter(function (g) { return steps.indexOf(g) < 0; });
+    if (rest.length) stepBox.appendChild(el('div', { class: 'row wrapr' }, rest.map(function (g) { return el('button', { type: 'button', class: 'chip', onclick: function () { steps.push(g); markDirty(); drawSteps(); } }, ['+ ' + gName(g)]); })));
+  }
+  drawSteps();
+  // ٤) ملاحظات المقدّم
+  b.appendChild(el('h4', { class: 'psh', text: 'ملاحظات المقدّم' }));
+  const notes = el('textarea', { rows: '4', dir: 'auto', placeholder: 'ما تريد تذكّره وأنت تعرض هذه الشريحة. يراه المقدّم فقط (N في العرض).', oninput: function (e) { p.notes = e.target.value; markDirty(); } }); notes.value = p.notes || '';
+  b.appendChild(notes);
 }
 /* ---------- وسائط الشريحة: فيديو وصوت من الجهاز، ورابط يوتيوب ---------- */
 function mediaPanelSection(b) {

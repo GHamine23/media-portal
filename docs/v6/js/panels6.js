@@ -25,7 +25,7 @@ function buildPanel() {
   p.innerHTML = '';
   p.appendChild(el('div', { class: 'grab', 'aria-hidden': 'true' }));
   const body = el('div', { class: 'pbody' }); p.appendChild(body);
-  ({ content: pContent, tpls: pTpls, text: pText, els: pEls, imgs: pImgs, colors: pColors, fonts: pFonts, layers: pLayers, assist: pAssist, el: pEl }[ED.tab] || pContent)(body);
+  ({ content: pContent, tpls: pTpls, text: pText, els: pEls, imgs: pImgs, colors: pColors, fonts: pFonts, layers: pLayers, assist: pAssist, el: pEl, anim: pAnim }[ED.tab] || pContent)(body);
   if (ED.lastTab !== ED.tab) { body.classList.add('fresh'); Array.prototype.forEach.call(body.children, function (c, i) { c.style.setProperty('--i', Math.min(i, 14)); }); ED.lastTab = ED.tab; }
   p.scrollTop = st;
 }

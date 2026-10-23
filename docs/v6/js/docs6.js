@@ -19,7 +19,7 @@ function newPage(tpl, T, generic) {
 function pageOfState() {
   const s = snap(); const old = ED.doc.pages[ED.cur] || {};
   // ما يخص الشريحة في العرض الحي (الخطوات والملاحظات والانتقال) ليس من حالة المحرر، فيبقى
-  const keep = {}; ['steps', 'notes', 'trans'].forEach(function (k) { if (old[k] !== undefined) keep[k] = old[k]; });
+  const keep = {}; ['steps', 'notes', 'trans', 'anim'].forEach(function (k) { if (old[k] !== undefined) keep[k] = old[k]; });
   return Object.assign({ tpl: S.tpl.id, ph: old.ph || {} }, s, keep);
 }
 function commitPage() { if (ED.doc && S.tpl) ED.doc.pages[ED.cur] = pageOfState(); }
@@ -55,7 +55,7 @@ async function openNew(tid, tplId) {
   S.track = T; ls('lastTrack', T.id);
   const key = 'draft.' + T.id + '.' + tpl.id, draft = ls(key), pick = fromMake ? ls('makePick') : null;
   let doc;
-  if (pick && pick.page && pick.page.tpl === tpl.id) { ls('makePick', null); doc = { kind: 'design', name: (String(pick.page.d.title || tpl.name).replace(/[*\n]/g, ' ').trim().slice(0, 50)) || tpl.name, track: T.id, program: V6.prog.id, shared: false, pages: [pick.page] }; }
+  if (pick && pick.page && pick.page.tpl === tpl.id) { ls('makePick', null); doc = { fromMake: true, kind: 'design', name: (String(pick.page.d.title || tpl.name).replace(/[*\n]/g, ' ').trim().slice(0, 50)) || tpl.name, track: T.id, program: V6.prog.id, shared: false, pages: [pick.page] }; }
   else doc = draft && draft.pages ? draft : { kind: 'design', name: tpl.id === 'blank' ? 'تصميم جديد' : tpl.name, track: T.id, program: V6.prog.id, shared: false, pages: [newPage(tpl, T, tpl.id !== 'blank')] };
   showEditor6(doc, !!draft && !pick);
   track('open', { tpl: tpl.id });
@@ -119,7 +119,7 @@ const RAIL = [
   ['imgs', 'الصور', 'image', 1], ['colors', 'الألوان', 'palette', 1], ['fonts', 'الخطوط', 'font', 0], ['layers', 'الطبقات', 'layers', 0], ['assist', 'المساعد', 'sparkles', 0]
 ];
 const LEVEL_TABS = { content: ['content', 'tpls', 'imgs'], style: ['content', 'tpls', 'imgs', 'colors', 'fonts', 'layers'] };
-function railItems() { const lv = LEVEL_TABS[editLevel()]; return RAIL.filter(function (r) { return (ED.mode === 'full' || r[3] || lv) && (!lv || lv.indexOf(r[0]) >= 0); }); }
+function railItems() { const lv = LEVEL_TABS[editLevel()]; const items = RAIL.filter(function (r) { return (ED.mode === 'full' || r[3] || lv) && (!lv || lv.indexOf(r[0]) >= 0); }); if (ED.doc && ED.doc.kind === 'deck') items.splice(2, 0, ['anim', 'الحركة', 'sparkles', 1]); return items; }
 function showEditor6(doc, fromDraft) {
   ED.open = true; ED.doc = doc; ED.cur = 0; ED.undo = []; ED.redo = []; ED.autoFit = true; ED.proxies = {}; ED.editing = null;
   ED.mode = ls('emode') || 'simple';
@@ -146,10 +146,12 @@ function showEditor6(doc, fromDraft) {
     ]),
     el('button', { type: 'button', class: 'ib', id: 'e_share', title: 'شارك بالرابط مع فريقك', 'aria-label': 'مشاركة بالرابط', onclick: function () { shareDialog(); } }, [ico('share')]),
     doc.kind !== 'deck' ? el('button', { type: 'button', class: 'btn line e-cap', id: 'e_cap', title: 'النص المصاحب للإعلان، والإرسال إلى قناة تليجرام', onclick: function () { captionDialog(); } }, [ico('send'), el('span', { class: 'hide-s', text: 'النص والقناة' })]) : null,
+    doc.fromMake ? el('a', { class: 'btn line e-back', href: '#/make?back=1', title: 'العودة إلى اقتراحات المصمّم الذكي' }, [ico('chev'), el('span', { class: 'hide-s', text: 'الاقتراحات' })]) : null,
     el('button', { type: 'button', class: 'btn line e-rv', id: 'e_rv', title: 'مراجعة التصميم بالمصمّم الذكي أو من إدارة أثر، والتعليقات', onclick: function (e) { reviewMenu(e.currentTarget); } }, [ico('review'), el('span', { class: 'hide-s', text: 'مراجعة' })]),
     el('button', { type: 'button', class: 'ib cmb', id: 'e_cm', title: 'التعليقات', 'aria-label': 'التعليقات', onclick: function () { commentsDialog(); } }, [ico('comment'), el('b', {})]),
     el('button', { type: 'button', class: 'ib', title: 'ملاحظة للفريق', 'aria-label': 'ملاحظة', onclick: function () { showFeedback6(); } }, [ico('chat')]),
     el('button', { type: 'button', class: 'btn line', id: 'e_save', onclick: function () { saveDialog(); } }, [ico('heart'), el('span', { class: 'hide-s', text: doc.id ? 'محفوظ' : 'حفظ' })]),
+    doc.kind === 'deck' ? el('button', { type: 'button', class: 'btn e-present', id: 'e_present', title: 'اعرض بملء الشاشة (من الشريحة الحالية)', onclick: function () { present6(false, ED.cur); } }, [ico('play'), el('span', { text: 'اعرض' })]) : null,
     el('button', { type: 'button', class: 'btn dark', id: 'e_dl', onclick: function (e) { dlMenu(e.currentTarget); } }, [ico('download'), el('span', { class: 'hide-s', text: 'تنزيل' })])
   ]);
   const rail = el('nav', { class: 'e-rail', 'aria-label': 'الأدوات', id: 'e_rail' });
@@ -239,7 +241,7 @@ async function saveRemote(quiet) {
   commitPage();
   const d = ED.doc;
   if (!d.id) d.id = newId() + newId();
-  const item = { id: d.id, kind: d.kind, name: d.name || 'تصميمي', shared: !!d.shared, coedit: !!d.coedit, tpl: d.pages[0].tpl, track: d.track, program: d.program || V6.prog.id, pages: d.pages, trans: d.trans || '', arc: d.arc || null, thumb: thumbOfDoc() };
+  const item = { id: d.id, kind: d.kind, name: d.name || 'تصميمي', shared: !!d.shared, coedit: !!d.coedit, tpl: d.pages[0].tpl, track: d.track, program: d.program || V6.prog.id, pages: d.pages, trans: d.trans || '', animMode: d.animMode || '', animStyle: d.animStyle || '', animSpeed: d.animSpeed || '', arc: d.arc || null, thumb: thumbOfDoc() };
   const sv = $('#e_saved'); if (sv) sv.textContent = 'جارٍ الحفظ…';
   try {
     await API6.me('item_save', JSON.stringify(item));
@@ -404,7 +406,7 @@ function pageMenu(anchor, i) {
     { t: 'تكرار الشريحة', ic: 'copy', fn: function () { commitPage(); ED.doc.pages.splice(i + 1, 0, JSON.parse(JSON.stringify(ED.doc.pages[i]))); loadPage(i + 1); afterPages(); } },
     i > 0 ? { t: 'تحريكها للأمام', ic: 'chev', fn: function () { commitPage(); const p = ED.doc.pages.splice(i, 1)[0]; ED.doc.pages.splice(i - 1, 0, p); loadPage(i - 1); afterPages(); } } : null,
     i < n - 1 ? { t: 'تحريكها للخلف', ic: 'chev', fn: function () { commitPage(); const p = ED.doc.pages.splice(i, 1)[0]; ED.doc.pages.splice(i + 1, 0, p); loadPage(i + 1); afterPages(); } } : null,
-    { t: 'الظهور التدريجي والملاحظات والانتقال', ic: 'wand', fn: function () { slideSettings(i); } },
+    { t: 'الحركة والظهور بنقرة والملاحظات', ic: 'sparkles', fn: function () { slideSettings(i); } },
     { t: 'تطبيق ألوانها وخلفيتها على كل الشرائح', ic: 'palette', fn: function () { commitPage(); const src = ED.doc.pages[i]; ED.doc.pages.forEach(function (p) { p.variant = src.variant; p.ov = Object.assign({}, src.ov); p.bgfx = src.bgfx ? Object.assign({}, src.bgfx) : null; }); loadPage(ED.cur); afterPages(); toast('طُبّقت على ' + n + ' شرائح'); } },
     n > 1 ? '-' : null,
     n > 1 ? { t: 'حذف الشريحة', ic: 'trash', fn: function () { commitPage(); ED.doc.pages.splice(i, 1); loadPage(Math.max(0, Math.min(i, ED.doc.pages.length - 1))); afterPages(); } } : null

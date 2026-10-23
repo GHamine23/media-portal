@@ -45,21 +45,57 @@ function showSlides6(tid) {
   const T = trackOf(tid) || tracksOf()[0]; if (!T) return go('#/');
   S.track = T;
   document.title = 'الشرائح — ' + T.name;
-  const samples = sampleDecks(T);
-  const ta = el('textarea', { id: 'sl_out', rows: '7', dir: 'auto', placeholder: '# عنوان العرض\n## القسم الأول\n- نقطة\n- نقطة\n> عبارة مختارة\n٨٠٪: نسبة الحضور' });
-  view(el('div', { class: 'wrap page' }, [
-    el('div', { class: 'phead' }, [H('h1', 'الشرائح'), el('p', { class: 'muted rv', text: 'عروض للقاءات والمحاضرات بهوية ' + T.full.replace('ـ', '') + '، تُنزَّل PDF أو تُعرض بملء الشاشة.' })]),
-    el('div', { class: 'grid two' }, [
-      el('div', { class: 'card rv' }, [el('span', { class: 'icon-tile t-bl' }, [ico('content')]), el('h3', { text: 'من نقاطك' }), el('p', { class: 'muted small', text: 'السطر الأول عنوان العرض، و## تبدأ قسماً، والشرطة نقطة، و> عبارة، و«رقم: وصف» شريحة أرقام.' }),
-        el('div', { class: 'fld' }, [ta]), el('button', { type: 'button', class: 'btn dark', text: 'اصنع العرض', onclick: function () { if (!ta.value.trim()) { ta.focus(); return; } const sl = deckFromOutline(ta.value, T); if (!sl) { toast('لم نفهم المخطط'); return; } openDeckNew(T.id, sl, String(sl[0].d.title || 'عرض جديد').replace(/\n/g, ' ')); } })]),
-      el('div', { class: 'card rv', style: '--d:1' }, [el('span', { class: 'icon-tile t-or' }, [ico('slides')]), el('h3', { text: 'ابدأ من عرض جاهز' }),
-        el('div', { class: 'slsamples' }, samples.map(function (s) {
+  const samples = sampleDecks(T), tracks = tracksOf();
+  const ta = el('textarea', { id: 'sl_out', rows: '6', dir: 'auto', placeholder: '# عنوان العرض\n## القسم الأول\n- نقطة\n- نقطة\n> عبارة مختارة\n٨٠٪: نسبة الحضور' });
+  // معاينة حية في الرأس: شرائح العيّنة تتبدل بحركة
+  const heroPv = el('div', { class: 'slhero-pv' });
+  (function () {
+    const pages = samples[0] ? samples[0].slides.slice(0, 4) : []; let k = 0;
+    function show() {
+      if (!pages.length) return; const sl = pages[k % pages.length], tpl = slideTpl(sl.tpl), st = { d: Object.assign(defaults(tpl, T), sl.d), variant: samples[0].style || tpl.variants[0].id, k: 1 };
+      const c = tplThumb(tpl, T, 'slide', 640, st); c.className = 'slhero-c'; heroPv.appendChild(c);
+      requestAnimationFrame(function () { c.classList.add('in'); }); const olds = $$('.slhero-c', heroPv).slice(0, -1); olds.forEach(function (o) { o.classList.add('out'); setTimeout(function () { o.remove(); }, 700); }); k++;
+    }
+    show(); const t = setInterval(function () { if (!document.body.contains(heroPv)) { clearInterval(t); return; } show(); }, 3200);
+  })();
+  const idSel = tracks.length > 1 ? el('div', { class: 'row wrapr slids' }, tracks.map(function (t) { return el('a', { class: 'chip' + (t.id === T.id ? ' on' : ''), href: '#/s/' + t.id, text: t.name }); })) : null;
+  const recent = el('div', { class: 'strip sldecks' }, [1, 2, 3].map(function () { return el('div', { class: 'skel', style: 'width:240px;aspect-ratio:16/9;flex:none' }); }));
+  view(
+    el('section', { class: 'slhero wrap' }, [
+      el('div', { class: 'slhero-t' }, [el('span', { class: 'eyebrow rv', text: 'بهوية ' + T.full.replace('ـ', '') }), H('h1', 'الشرائح'),
+        el('p', { class: 'muted rv', style: '--d:1', text: 'عروض للقاءات والمحاضرات: تُبنى من نقاطك أو من درس بالذكاء، بحركات دخول وانتقالات، ووسائط وسؤال وجواب ومؤقّت وملاحظات للمقدّم، وتُنزَّل PDF.' }),
+        el('div', { class: 'row wrapr rv', style: '--d:2' }, [
+          el('button', { type: 'button', class: 'btn dark', onclick: function () { openDeckNew(T.id, [{ tpl: 'sl_cover', d: {} }, { tpl: 'sl_points', d: {} }], 'عرض جديد'); } }, [ico('plus'), 'عرض جديد']),
+          el('a', { class: 'btn line', href: '#/mine', onclick: function () { ls('mineTab', 'mine'); }, text: 'عروضي المحفوظة' })]),
+        idSel]),
+      heroPv
+    ]),
+    el('div', { class: 'wrap' }, [
+      el('section', { class: 'hsec' }, [el('div', { class: 'shead' }, [H('h2', 'ابدأ من عرض جاهز'), el('span', { class: 'tiny', text: 'افتحه ثم بدّل النصوص' })]),
+        stripNav(el('div', { class: 'strip sldecks' }, samples.map(function (s, i) {
           const first = s.slides[0], tpl = slideTpl(first.tpl), st = { d: Object.assign(defaults(tpl, T), first.d), variant: s.style || tpl.variants[0].id, k: 1 };
-          return el('button', { type: 'button', class: 'slsample hover-lift', onclick: function () { openDeckNew(T.id, s.slides, s.name); } }, [tplThumb(tpl, T, 'slide', 220, st), el('b', { text: s.name }), el('small', { class: 'tiny', text: s.slides.length + ' شرائح' })]);
-        }).concat([el('button', { type: 'button', class: 'slsample blank hover-lift', onclick: function () { openDeckNew(T.id, [{ tpl: 'sl_cover', d: {} }, { tpl: 'sl_points', d: {} }], 'عرض جديد'); } }, [ico('plus'), el('b', { text: 'عرض فارغ' })])]))]),
-      lessonCard(T),
-      el('div', { class: 'card rv', style: '--d:3' }, [el('span', { class: 'icon-tile t-gr' }, [ico('play')]), el('h3', { text: 'في العرض الحي' }),
-        el('ul', { class: 'feat6' }, [['انتقالات بين الشرائح: تلاشٍ وانزلاق وتكبير وقلب، للعرض كله أو لشريحة بعينها.'], ['ظهور تدريجي: اختر ما يظهر بنقرة من قائمة الشريحة (زر ⋯ تحت الشرائح).'], ['فيديو وصوت من جهازك ورابط يوتيوب من لوحة «العناصر».'], ['شريحة سؤال يظهر جوابها بنقرة، ومؤقّت (T)، وملاحظات المقدّم (N) أو في نافذة ثانية.']].map(function (x) { return el('li', { text: x[0] }); }))])
+          return el('div', { class: 'sldeck hover-lift rv', style: '--d:' + i }, [tplThumb(tpl, T, 'slide', 320, st), el('div', { class: 'sldeck-m' }, [el('b', { text: s.name }), el('small', { class: 'tiny', text: s.slides.length + ' شرائح' })]),
+            el('div', { class: 'sldeck-a' }, [el('button', { type: 'button', class: 'btn sm dark', onclick: function () { openDeckNew(T.id, s.slides, s.name); } }, [ico('pencil'), 'افتح']), el('button', { type: 'button', class: 'btn sm line', onclick: function () { openDeckNew(T.id, s.slides, s.name); setTimeout(function () { present6(false, 0); }, 900); } }, [ico('play'), 'اعرض'])])]);
+        })))]),
+      el('div', { class: 'grid two slways' }, [
+        lessonCard(T),
+        el('div', { class: 'card rv', style: '--d:1' }, [el('span', { class: 'icon-tile t-bl' }, [ico('content')]), el('h3', { text: 'من نقاطك' }), el('p', { class: 'muted small', text: 'السطر الأول عنوان العرض، و## تبدأ قسماً، والشرطة نقطة، و> عبارة، و«رقم: وصف» شريحة أرقام.' }),
+          el('div', { class: 'fld' }, [ta]), el('button', { type: 'button', class: 'btn dark', onclick: function () { if (!ta.value.trim()) { ta.focus(); return; } const sl = deckFromOutline(ta.value, T); if (!sl) { toast('لم نفهم المخطط'); return; } openDeckNew(T.id, sl, String(sl[0].d.title || 'عرض جديد').replace(/\n/g, ' ')); } }, [ico('slides'), 'اصنع العرض'])])
+      ]),
+      el('section', { class: 'hsec', id: 'mydecks' }, [el('div', { class: 'shead' }, [H('h2', 'عروضك الأخيرة'), el('a', { class: 'btn sm line', href: '#/mine', onclick: function () { ls('mineTab', 'mine'); }, text: 'كلها' })]), stripNav(recent)]),
+      el('section', { class: 'slfeat' }, [['sparkles', 'حركات دخول وانتقالات', 'من تبويب «الحركة» في المحرر: لكل الشرائح أو لكل عنصر.'], ['play', 'عرض حي بملء الشاشة', 'ظهور بنقرة، ومؤقّت، وملاحظات للمقدّم، ونافذة مقدّم.'], ['image', 'فيديو وصوت ويوتيوب', 'من لوحة «العناصر»، تعمل أثناء العرض.'], ['ai', 'من درس إلى عرض', 'الصق النص أو ارفع PDF أو Word ويرتّبه المساعد.']].map(function (f, i) {
+        return el('div', { class: 'slf rv', style: '--d:' + i }, [el('span', { class: 'icon-tile t-pu' }, [ico(f[0])]), el('b', { text: f[1] }), el('small', { class: 'tiny', text: f[2] })]);
+      }))
     ])
-  ]));
+  );
+  API6.me('item_list').then(function (list) {
+    const decks = list.filter(function (x) { return x.kind === 'deck' && (x.mine || x.shared); }).sort(function (a, b) { return (b.at || 0) - (a.at || 0); }).slice(0, 12);
+    recent.innerHTML = '';
+    if (!decks.length) { $('#mydecks').hidden = true; return; }
+    decks.forEach(function (x, i) {
+      recent.appendChild(el('div', { class: 'sldeck hover-lift rv', style: '--d:' + i }, [el('img', { src: x.thumb || '', alt: '', loading: 'lazy' }), el('div', { class: 'sldeck-m' }, [el('b', { text: x.name }), el('small', { class: 'tiny', text: (x.mine ? '' : x.owner + ' · ') + fmtTime(x.at) })]),
+        el('div', { class: 'sldeck-a' }, [el('a', { class: 'btn sm dark', href: '#/d/' + x.id }, [ico('pencil'), 'افتح']), el('a', { class: 'btn sm line', href: '#/p/' + x.id }, [ico('play'), 'اعرض'])])]));
+    });
+    revealAll(recent);
+  }).catch(function () { $('#mydecks').hidden = true; });
 }
