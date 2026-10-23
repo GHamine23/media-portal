@@ -279,6 +279,8 @@ ok(JSON.parse(fb).designs && GAS._lastAi.url.indexOf('gemini-3.6-flash') >= 0, '
 GAS._busy = 'gemini-3';
 fails('ai_make', /مزدحمة/, adm, JSON.stringify({ kind: 'design', prompt: 'p', system: 's' }));
 GAS._busy = null;
+call('ai_make', adm, JSON.stringify({ kind: 'caption', prompt: 'p', system: 's' }));
+ok(GAS._lastAi.url.indexOf('gemini-3.5-flash-lite') >= 0, 'light tasks use the high-quota model');
 // lockout and disable
 for (let i = 0; i < 8; i++) { try { call('auth_login', 'ahmad', 'wrong' + i); } catch (e) {} }
 fails('auth_login', /محاولات كثيرة/, 'ahmad', 'AhmadPass99');

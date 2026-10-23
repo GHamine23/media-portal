@@ -954,7 +954,7 @@ function set_save(token, json) {
   var s = JSON.parse(json);
   return withLock_(function () {
     var cur = settings_();
-    if (s.ai) cur.ai = { enabled: !!s.ai.enabled, model: clip_(s.ai.model || 'gemini-3.8-flash', 60), fallback: clip_(s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 120), perDay: Math.max(0, Math.min(500, +s.ai.perDay || 0)) };
+    if (s.ai) cur.ai = { enabled: !!s.ai.enabled, model: clip_(s.ai.model || 'gemini-3.8-flash', 60), fallback: clip_(s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 120), light: clip_(s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite', 60), perDay: Math.max(0, Math.min(500, +s.ai.perDay || 0)) };
     if (s.uploadsNeedPerm != null) cur.uploadsNeedPerm = !!s.uploadsNeedPerm;
     if (s.maxUploadMb != null) cur.maxUploadMb = Math.max(1, Math.min(20, +s.maxUploadMb || 20));
     if (s.tgToken != null) { var tk = String(s.tgToken).trim(); if (tk) { if (!/^\d+:[\w-]{30,}$/.test(tk)) throw new Error('رمز البوت غير صحيح'); props_().setProperty('TG_TOKEN', tk); } else props_().deleteProperty('TG_TOKEN'); }
@@ -983,10 +983,13 @@ function geminiCall_(req, who) {
     systemInstruction: { parts: [{ text: clip_(req.system, 30000) }] },
     generationConfig: { temperature: req.temperature != null ? +req.temperature : 0.9 } };
   if (req.schema) { body.generationConfig.responseMimeType = 'application/json'; body.generationConfig.responseSchema = req.schema; }
-  var model = String(s.ai.model || 'gemini-3.8-flash').replace(/[^\w.\-]/g, '');
+  // المهام الخفيفة (فهم الفكرة، النص المصاحب، التصحيح، كلمات الصور، المخطط، تقرير الأسبوع) على نموذج حصته اليومية أكبر،
+  // والتصميم والمراجعة على النموذج الأقوى. الحصة المجانية لكل نموذج على حدة.
+  var LIGHT = { intake: 1, caption: 1, spell: 1, imgq: 1, outline: 1, week: 1, weekly: 1 };
+  var model = String((LIGHT[req.kind] && (s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite')) || s.ai.model || 'gemini-3.8-flash').replace(/[^\w.\-]/g, '');
   var t0 = now_(), log = { t: t0, uid: who.uid, name: who.name, program: clip_(req.program || '', 30), kind: clip_(req.kind || 'design', 20), inChars: parts[0].text.length, files: parts.length - 1, model: model, ok: false, ms: 0, outChars: 0, err: '', q: clip_(String(req.prompt || '').replace(/\s+/g, ' '), 90) };
   // ازدحام جوجل (503/500/429) مؤقت: نعيد المحاولة مرة بعد ثانيتين، ثم ننتقل إلى نموذج احتياطي
-  var models = [model].concat(String(s.ai.fallback || 'gemini-3.6-flash,gemini-3.5-flash-lite').split(',').map(function (m) { return m.trim().replace(/[^\w.\-]/g, ''); }).filter(function (m) { return m && m !== model; }));
+  var models = [model].concat(String(s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite').split(',').map(function (m) { return m.trim().replace(/[^\w.\-]/g, ''); }).filter(function (m) { return m && m !== model; }));
   var out = '', tries = 0, lastCode = 0;
   outer: for (var mi = 0; mi < models.length; mi++) {
     for (var attempt = 0; attempt < (mi === 0 ? 2 : 1); attempt++) {
