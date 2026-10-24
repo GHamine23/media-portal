@@ -3,6 +3,8 @@
    (أو تفاصيل النشر إن لم يكن له تصميم محفوظ يصل إليه). سحب العنصر إلى يوم أو ساعة أخرى يغيّر موعده.
    كل تغيير يُظهر حاله: الزر يشتغل ثم يعلن «تم»، والبطاقة تومض. */
 const CAL = { view: ls('calView') || 'month', mode: ls('calMode') || 'h', cursor: null, posts: [], tasks: [], status: 'all', showDone: false, loaded: false, lprog: null, q: '', range: 'up' };
+// التقويم ظاهر، أو تبويب «النشر» في المحرر (يستعمل الحوارات نفسها)
+function calShown() { return !!($('.calpage') || (typeof ED !== 'undefined' && ED.open && ED.tab === 'pub')); }
 const TG_STATUS = { queued: ['مجدول', 'bl', 'clock'], sent: ['أُرسل', 'gr', 'check'], failed: ['فشل', 'rd', 'close'], cancelled: ['أُلغي', '', 'close'] };
 const REMIND_OPTS = [['', 'بلا تذكير'], ['0', 'عند الموعد'], ['10', 'قبل ١٠ دقائق'], ['60', 'قبل ساعة'], ['1440', 'قبل يوم']];
 function dayKey6(t) { const d = new Date(t); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
@@ -182,7 +184,7 @@ async function toggleTask(t, chip) {
     const r = await API6.me('task_done', t.id, on), next = r.next; delete r.next; Object.assign(t, r);
     if (chip) { chip.classList.toggle('done', on); const k = chip.querySelector('.tchk'); if (k) k.setAttribute('aria-checked', on ? 'true' : 'false'); flashOk(chip); }
     if (on) chime6();
-    if (next) { CAL.tasks.unshift(next); toast('أُنجزت ✓ والتالية ' + fmtTime(next.due)); CAL.flash = next.id; if (CAL.redraw && $('.calpage')) setTimeout(CAL.redraw, 650); }
+    if (next) { CAL.tasks.unshift(next); toast('أُنجزت ✓ والتالية ' + fmtTime(next.due)); CAL.flash = next.id; if (CAL.redraw && calShown()) setTimeout(CAL.redraw, 650); }
     else toast(on ? 'أُنجزت ✓' : 'أُعيدت مفتوحة');
   } catch (e) { toast(e.message); }
 }
@@ -436,12 +438,12 @@ function postDialog(x) {
   [dI, tI].forEach(function (i) { i.addEventListener('change', dirty); });
   save.onclick = function () {
     const when = fromISO(dI.value, tI.value); if (!when || when.getTime() < Date.now() + 60000) { toast('اختر موعداً في المستقبل'); return; }
-    return withBusy(save, async function () { const r = await API6.me('tg_update', JSON.stringify({ id: x.id, when: when.getTime(), caption: E.get(), repeat: rep.get() })); Object.assign(x, r); POSTS = null; CAL.flash = x.id; CAL.redraw && $('.calpage') && CAL.redraw(); }, { done: 'حُفظت', keep: true });
+    return withBusy(save, async function () { const r = await API6.me('tg_update', JSON.stringify({ id: x.id, when: when.getTime(), caption: E.get(), repeat: rep.get() })); Object.assign(x, r); POSTS = null; CAL.flash = x.id; CAL.redraw && calShown() && CAL.redraw(); }, { done: 'حُفظت', keep: true });
   };
   // بعد النشر تُنقل صورة المنشور إلى سلة درايف، فإعادة نشره تكون من التصميم نفسه
   const gone = !queued && x.hasFile === false;
   const acts = [];
-  if (queued && canEdit) acts.push({ t: 'إلغاء الجدولة', cls: 'danger', keep: true, fn: async function (close) { if (!(await ask('إلغاء الجدولة', 'لن يُنشر «' + (x.title || 'المنشور') + '»' + (x.repeat ? '، ويتوقف تكراره' : '') + '.', 'ألغِ', true))) return false; try { await API6.me('tg_cancel', x.id); x.status = 'cancelled'; POSTS = null; toast('أُلغيت'); close(); CAL.redraw && $('.calpage') && CAL.redraw(); } catch (e) { toast(e.message); } return false; } });
+  if (queued && canEdit) acts.push({ t: 'إلغاء الجدولة', cls: 'danger', keep: true, fn: async function (close) { if (!(await ask('إلغاء الجدولة', 'لن يُنشر «' + (x.title || 'المنشور') + '»' + (x.repeat ? '، ويتوقف تكراره' : '') + '.', 'ألغِ', true))) return false; try { await API6.me('tg_cancel', x.id); x.status = 'cancelled'; POSTS = null; toast('أُلغيت'); close(); CAL.redraw && calShown() && CAL.redraw(); } catch (e) { toast(e.message); } return false; } });
   if (!queued && canEdit && !gone) acts.push({ t: 'أعد جدولته', cls: 'dark', keep: true, fn: function (close) { requeueDialog(x, close); return false; } });
   acts.push({ t: 'إغلاق' });
   modal({ title: x.title || 'منشور', wide: true, body: [
@@ -467,7 +469,7 @@ function requeueDialog(x, closeParent) {
   const d = new Date(Date.now() + 3600000), dI = el('input', { type: 'date', class: 'inp sm', value: localISO(d), min: localISO() }), tI = el('input', { type: 'time', class: 'inp sm', value: localHM(d) });
   modal({ title: 'إعادة جدولة «' + (x.title || 'المنشور') + '»', body: [el('p', { class: 'muted small', text: 'يُنشر مرة أخرى بالصورة والنص نفسيهما في الموعد الذي تختاره.' }), el('div', { class: 'row wrapr' }, [dI, tI])], acts: [{ t: 'جدوله', cls: 'dark', keep: true, fn: function (close) {
     const b = $$('.modal .acts .btn.dark, .msheet .sacts .btn.dark').pop(), when = fromISO(dI.value, tI.value); if (!when || when.getTime() < Date.now() + 60000) { toast('اختر موعداً في المستقبل'); return false; }
-    withBusy(b, async function () { const r = await API6.me('tg_requeue', x.id, when.getTime()); POSTS = null; if (r && r.id) CAL.flash = r.id; }, { busy: 'نجدول…', done: 'جُدول' }).then(function () { setTimeout(function () { close(); if (closeParent) closeParent(); CAL.loaded = false; CAL.redraw && $('.calpage') && CAL.redraw(); }, 500); }).catch(function () {});
+    withBusy(b, async function () { const r = await API6.me('tg_requeue', x.id, when.getTime()); POSTS = null; if (r && r.id) CAL.flash = r.id; }, { busy: 'نجدول…', done: 'جُدول' }).then(function () { setTimeout(function () { close(); if (closeParent) closeParent(); CAL.loaded = false; CAL.redraw && calShown() && CAL.redraw(); }, 500); }).catch(function () {});
     return false;
   } }, { t: 'إلغاء' }] });
 }
@@ -509,11 +511,11 @@ async function taskDialog(t, day, timed, allDay0) {
       if (isNew) CAL.tasks.unshift(Object.assign({ canEdit: true, canDone: true, mine: true }, r)); else Object.assign(t, r);
       CAL.flash = r.id;
       notifyDone(isNew ? 'أُضيفت المهمة' : 'حُفظت المهمة', title);
-    }, { busy: 'نحفظ…', done: isNew ? 'أُضيفت' : 'حُفظت' }).then(function () { setTimeout(function () { closeModals(); CAL.redraw && $('.calpage') && CAL.redraw(); }, 600); }).catch(function () {});
+    }, { busy: 'نحفظ…', done: isNew ? 'أُضيفت' : 'حُفظت' }).then(function () { setTimeout(function () { closeModals(); CAL.redraw && calShown() && CAL.redraw(); }, 600); }).catch(function () {});
   } }, [ico('check'), isNew ? 'أضف المهمة' : 'احفظ']);
   const acts = [];
-  if (!isNew && canDone) acts.push({ t: t.status === 'done' ? 'أعدها مفتوحة' : 'أُنجزت ✓', cls: t.status === 'done' ? '' : 'dark', fn: function () { toggleTask(t, null).then(function () { CAL.redraw && $('.calpage') && CAL.redraw(); }); } });
-  if (!isNew && canEdit) acts.push({ t: 'حذف', cls: 'danger', keep: true, fn: async function (close) { if (!(await ask('حذف المهمة', t.title + (t.repeat ? ' (هذه المرة فقط؛ لن تُضاف التالية)' : ''), 'احذف', true))) return false; try { await API6.me('task_del', t.id); CAL.tasks = CAL.tasks.filter(function (x) { return x.id !== t.id; }); toast('حُذفت'); close(); CAL.redraw && $('.calpage') && CAL.redraw(); } catch (e) { toast(e.message); } return false; } });
+  if (!isNew && canDone) acts.push({ t: t.status === 'done' ? 'أعدها مفتوحة' : 'أُنجزت ✓', cls: t.status === 'done' ? '' : 'dark', fn: function () { toggleTask(t, null).then(function () { CAL.redraw && calShown() && CAL.redraw(); }); } });
+  if (!isNew && canEdit) acts.push({ t: 'حذف', cls: 'danger', keep: true, fn: async function (close) { if (!(await ask('حذف المهمة', t.title + (t.repeat ? ' (هذه المرة فقط؛ لن تُضاف التالية)' : ''), 'احذف', true))) return false; try { await API6.me('task_del', t.id); CAL.tasks = CAL.tasks.filter(function (x) { return x.id !== t.id; }); toast('حُذفت'); close(); CAL.redraw && calShown() && CAL.redraw(); } catch (e) { toast(e.message); } return false; } });
   acts.push({ t: 'إغلاق' });
   modal({ title: isNew ? 'مهمة جديدة' : 'المهمة', wide: true, body: [
     !isNew ? el('div', { class: 'row wrapr tiny' }, [el('span', { class: 'pill ' + (t.status === 'done' ? 'gr' : 'or'), text: t.status === 'done' ? 'منجزة' + (t.doneBy ? ' · ' + t.doneBy : '') : 'مفتوحة' }), el('span', { text: 'من ' + (t.fromName || '') + (t.to ? ' إلى ' + (t.toName || '') : ' إلى كل الفريق') }), el('span', { text: '· ' + ago(t.at) }), t.seriesId ? el('span', { class: 'pill' }, [ico('history'), 'من سلسلة متكررة']) : null]) : null,

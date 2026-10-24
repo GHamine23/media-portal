@@ -281,7 +281,7 @@ function captionDialog(opts) {
       await ensureFonts(fontsOfState(snap()));
       const c = document.createElement('canvas'); renderTo(c, S.tpl, S.size, snap(), S.track, 2);
       const png = c.toDataURL('image/png').split(',')[1];
-      const r = await API6.me('tg_send', JSON.stringify({ program: V6.prog.id, track: S.track && S.track.id, name: ED.doc.name, item: ED.doc.id || '', caption: E.get(), png: mode === 'doc' ? '' : png, file: mode === 'photo' ? '' : png, fileName: fileName6('png'), fileMime: 'image/png', mode: mode, when: when || 0, repeat: repeat, thumb: thumbB64() }));
+      const r = await API6.me('tg_send', JSON.stringify({ program: V6.prog.id, track: S.track && S.track.id, name: ED.doc.name, item: ED.doc.id || '', caption: E.get(), png: mode === 'doc' ? '' : png, file: mode === 'photo' ? '' : png, fileName: fileName6('png'), fileMime: 'image/png', mode: mode, when: when || 0, repeat: repeat }));
       track('tg', { tool: when ? 'schedule' : 'send' }); archive6('share'); POSTS = null;
       if (ED.pubIds) ED.pubIds.push(r.id);   // منشورات هذه الجلسة تظهر في «النشر» ولو لم يُحفظ التصميم
       if (r.queued) { scheduled = { id: r.id, when: r.when }; sent = false; } else { sent = true; scheduled = null; if (r.link) lastLink = r.link; }
@@ -351,7 +351,7 @@ async function pubLoad(force) {
 function pubRefresh() { PUB.at = 0; if (ED.open && ED.tab === 'pub') buildPanel(); }
 function pubRow(x) {
   const st = (typeof TG_STATUS !== 'undefined' && TG_STATUS[x.status]) || ['', '', 'info'], queued = x.status === 'queued', canEdit = x.canEdit !== false;
-  const th = el('div', { class: 'cthumb pubth', 'data-id': x.id }); if (typeof CAL !== 'undefined' && CAL.thumbs[x.id]) { th.style.backgroundImage = 'url(' + CAL.thumbs[x.id] + ')'; th.classList.add('has'); }
+  const th = el('div', { class: 'pubth st-' + x.status, 'data-id': x.id }, [ico(st[2] || 'send')]);   // لا مصغّرات: أيقونة الحالة بلونها
   const acts = el('div', { class: 'row wrapr pubacts' });
   if (queued && canEdit) {
     acts.appendChild(el('button', { type: 'button', class: 'btn sm line', onclick: function () { postDialog(x); } }, [ico('pencil'), 'عدّل']));
@@ -403,6 +403,5 @@ function pPub(b) {
     if (!mine.length) { box.appendChild(el('div', { class: 'pubempty' }, [ico('send'), el('span', { text: 'لم يُنشر من هذا التصميم شيء بعد.' })])); return; }
     if (up.length) { box.appendChild(el('div', { class: 'pubgrp', text: 'القادمة (' + up.length + ')' })); up.forEach(function (x) { box.appendChild(pubRow(x)); }); }
     if (past.length) { box.appendChild(el('div', { class: 'pubgrp', text: 'السابقة (' + past.length + ')' })); past.slice(0, 20).forEach(function (x) { box.appendChild(pubRow(x)); }); }
-    if (typeof calThumbs === 'function') calThumbs(mine.map(function (x) { return x.id; }));
   }).catch(function (e) { if (!box.isConnected) return; box.innerHTML = ''; box.appendChild(el('p', { class: 'err small', text: 'تعذّر جلب المنشورات: ' + e.message })); box.appendChild(el('button', { type: 'button', class: 'btn sm line', onclick: function () { pubRefresh(); } }, [ico('reset'), 'أعد المحاولة'])); });
 }
