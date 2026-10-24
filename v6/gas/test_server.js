@@ -529,4 +529,28 @@ ok(JSON.parse(call('api_tpl_list', l5.token)).length >= 1, 'v5 still works');
   ok(J('set_get', adm).aiKeys >= 1, 'bad paste keeps existing keys');
   over = null; GAS._fetch.handler = base;
 })();
+// مساعد المنصة «اسأل أثر»: نوع help يذهب إلى Groq أولاً (سريع)، ويُعدّ من المهام الخفيفة، وله مهارته الأساسية
+ok(ctx.AI_ROUTE_DEFAULT.help === 'groq' && ctx.aiRoute_('help') === 'groq', 'help kind routes to groq by default');
+ok(ctx.AI_FAST.help === 1, 'help kind is a light task');
+ok(/مساعد المنصة/.test(ctx.skillsFor_('help')) && /اسأل الإشراف/.test(ctx.skillsFor_('help')) && /الضوابط/.test(ctx.skillsFor_('help')), 'help skill + safety skill attached to help kind');
+ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not attached to other kinds');
+// «اسأل أثر» لكل مستخدم: بلا صلاحية المساعد، وبحد يومي خاص منفصل عن حد المساعد
+(function () {
+  const nh = J('acc_save', adm, JSON.stringify({ username: 'helpme', name: 'سائل', role: 'user', programs: ['academy'], perms: {} }));
+  let ht = J('auth_login', 'helpme', nh.temp).token; J('auth_password', ht, nh.temp, 'HelpMe12345');
+  const HQ = function (q) { return JSON.stringify({ kind: 'help', program: 'academy', system: 'دليل', prompt: q }); };
+  fails('ai_make', /صلاحية/, ht, JSON.stringify({ kind: 'design', program: 'academy', system: 's', prompt: 'p' }));
+  const before = J('ai_status', ht).used;
+  ok(typeof call('ai_make', ht, HQ('كيف أحفظ تصميمي؟')) === 'string', 'user without ai perm can ask help');
+  ok(J('ai_status', ht).used === before, 'help does not consume the normal daily AI quota');
+  const cache = GAS.CacheService.getScriptCache(), hk = 'aih:' + nh.acc.uid + ':' + ctx.dayKey_(ctx.now_());
+  ok(+cache.get(hk) === 1, 'help counted on its own key');
+  cache.put(hk, String(ctx.AI_HELP_PER_DAY), 90000);
+  fails('ai_make', /اسأل أثر.*كثيراً اليوم/, ht, HQ('سؤال آخر'));
+  ok(J('ai_status', ht).used === before, 'normal counter still untouched at help cap');
+  const st = JSON.parse(JSON.stringify(ctx.settings_())); call('set_save', adm, JSON.stringify({ ai: Object.assign({}, st.ai, { enabled: false }) }));
+  cache.put(hk, '0', 90000);
+  fails('ai_make', /متوقف/, ht, HQ('سؤال'));
+  call('set_save', adm, JSON.stringify({ ai: Object.assign({}, st.ai, { enabled: true }) }));
+})();
 console.log('server tests passed:', n);
