@@ -78,4 +78,4 @@ async def main():
         ok(await m.evaluate("!!document.querySelector('.pmark canvas')"), 'app home shows the programme logo')
         await m.screenshot(path=OUT + 'y6_app.png')
         print('ERRORS', [e for e in errs if '404' not in e][:5]); await b.close()
-asyncio.run(main())
+if __name__ == "__main__": asyncio.run(main())

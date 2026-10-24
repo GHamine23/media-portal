@@ -83,7 +83,7 @@ function drawFreeDeco(ctx, W, H, L, T) {
 const FREE_GROUP = { title: 'title', sub: 'sub', who: 'who', time: 'info', place: 'info', note: 'footer', photo: 'photo', logo: 'logo', academy: 'footer', social: 'footer', badge: 'tag', rule: 'deco' };
 const FREE_ICON = { who: 'mic', time: 'moon', place: 'pin' };
 function drawFreeBlocks(ctx, W, H, L, T, d, k, P) {
-  const u = W / 1080;
+  const u = W / 1080, SW = Math.min(W, H);   // الأحجام الأفقية العريضة تُقاس بالارتفاع فلا تتداخل الأسطر
   let lastG = null;
   L.blocks.forEach(function (b, i) {
     const g = FREE_GROUP[b.k] || 'body';
@@ -92,26 +92,26 @@ function drawFreeBlocks(ctx, W, H, L, T, d, k, P) {
     const col = b.role === 'auto' ? onBg(under, T.c.ink) : roleColor(T, b.role, T.c.ink);
     const anchorX = b.align === 'right' ? x + w : b.align === 'center' ? x + w / 2 : x;
     if (b.k === 'card') { ctx.save(); ctx.fillStyle = alpha(roleColor(T, b.fill || 'white', '#ffffff'), b.alpha); if (b.rot) { ctx.translate(x + w / 2, y + h / 2); ctx.rotate(b.rot * Math.PI / 180); ctx.translate(-(x + w / 2), -(y + h / 2)); } rrect(ctx, x, y, w, h, Math.min(w, h) * (b.round || 0.12) * 0.5); ctx.fill(); ctx.restore(); return; }
-    if (b.k === 'number') { const t = b.text || d.badge || ''; if (!t.trim()) return; line(ctx, t, anchorX, y + h / 2, { size: Math.min(h * 0.9, b.size * W * 2.2), color: roleColor(T, b.role === 'auto' ? b.hl : b.role, T.c.a), align: b.align, bold: 1, maxW: w }); return; }
-    if (b.k === 'label') { const t = b.text || ''; if (!t.trim()) return; line(ctx, t, anchorX, y + h / 2, { size: b.size * W, color: col, align: b.align, bold: b.bold, maxW: w }); return; }
-    if (b.k === 'date') { const t = b.text || d.time || ''; if (!t.trim()) return; const fillC = roleColor(T, b.fill || 'a', T.c.a); fillRR(ctx, x, y, w, h, Math.min(w, h) * 0.2, fillC); area(x, y, x + w, y + h); line(ctx, t, x + w / 2, y + h / 2, { size: Math.min(h * 0.5, b.size * W), color: onBg(fillC, T.c.ink), align: 'center', bold: 0.7, maxW: w * 0.9 }); return; }
-    if (b.k === 'quote') { const t = b.text || d.sub || ''; if (!t.trim()) return; line(ctx, '”', anchorX, y, { size: b.size * W * 3, color: alpha(roleColor(T, b.hl, T.c.a), 0.5), align: b.align }); const f0 = fit(ctx, t, { maxW: w, maxH: h, size: b.size * W, lh: 1.5, balance: true, bold: 0.4, maxLines: 5 }); drawFit(ctx, f0, anchorX, y + b.size * W * 0.9, { align: b.align, color: col }); return; }
+    if (b.k === 'number') { const t = b.text || d.badge || ''; if (!t.trim()) return; line(ctx, t, anchorX, y + h / 2, { size: Math.min(h * 0.9, b.size * SW * 2.2), color: roleColor(T, b.role === 'auto' ? b.hl : b.role, T.c.a), align: b.align, bold: 1, maxW: w }); return; }
+    if (b.k === 'label') { const t = b.text || ''; if (!t.trim()) return; line(ctx, t, anchorX, y + h / 2, { size: b.size * SW, color: col, align: b.align, bold: b.bold, maxW: w }); return; }
+    if (b.k === 'date') { const t = b.text || d.time || ''; if (!t.trim()) return; const fillC = roleColor(T, b.fill || 'a', T.c.a); fillRR(ctx, x, y, w, h, Math.min(w, h) * 0.2, fillC); area(x, y, x + w, y + h); line(ctx, t, x + w / 2, y + h / 2, { size: Math.min(h * 0.5, b.size * SW), color: onBg(fillC, T.c.ink), align: 'center', bold: 0.7, maxW: w * 0.9 }); return; }
+    if (b.k === 'quote') { const t = b.text || d.sub || ''; if (!t.trim()) return; line(ctx, '”', anchorX, y, { size: b.size * SW * 3, color: alpha(roleColor(T, b.hl, T.c.a), 0.5), align: b.align }); const f0 = fit(ctx, t, { maxW: w, maxH: h, size: b.size * SW, lh: 1.5, balance: true, bold: 0.4, maxLines: 5 }); drawFit(ctx, f0, anchorX, y + b.size * SW * 0.9, { align: b.align, color: col }); return; }
     if (b.k === 'photo') { if (P.photo && P.photo.im) { if (b.shape === 'circle') { ctx.save(); ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.clip(); drawPhoto(ctx, P.photo.im, x, y, w, h, { z: P.photo.z, ox: P.photo.ox, oy: P.photo.oy, fit: 'cover' }); ctx.restore(); } else if (b.shape === 'arch') { ctx.save(); ctx.beginPath(); ctx.moveTo(x, y + h); ctx.lineTo(x, y + w / 2); ctx.arc(x + w / 2, y + w / 2, w / 2, Math.PI, 0); ctx.lineTo(x + w, y + h); ctx.closePath(); ctx.clip(); drawPhoto(ctx, P.photo.im, x, y, w, h, { z: P.photo.z, ox: P.photo.ox, oy: P.photo.oy, fit: 'cover' }); ctx.restore(); } else if (b.round) { ctx.save(); rrect(ctx, x, y, w, h, Math.min(w, h) * b.round * 0.5); ctx.clip(); drawPhoto(ctx, P.photo.im, x, y, w, h, { z: P.photo.z, ox: P.photo.ox, oy: P.photo.oy, fit: 'cover' }); ctx.restore(); } else drawPhoto(ctx, P.photo.im, x, y, w, h, { z: P.photo.z, ox: P.photo.ox, oy: P.photo.oy, fit: 'cover' }); } return; }
     if (b.k === 'logo') { drawLogo(ctx, T, anchorX, y, w, isDark(under) ? '#ffffff' : 'color', b.align === 'right' ? 'tr' : b.align === 'center' ? 'tc' : 'tl'); return; }
     if (b.k === 'academy') { academy(ctx, alpha(onBg(under, T.c.ink), 0.85), anchorX, y, w, b.align === 'right' ? 'tr' : b.align === 'center' ? 'tc' : 'tl'); return; }
     if (b.k === 'social') { social(ctx, alpha(onBg(under, T.c.ink), 0.75), anchorX, y, w, b.align === 'right' ? 'tr' : b.align === 'center' ? 'tc' : 'tl'); return; }
     if (b.k === 'rule') { if (D()) { ctx.fillStyle = roleColor(T, b.fill || b.hl, T.c.a); fillRR(ctx, x, y, w, Math.max(3 * u, h), h / 2, roleColor(T, b.fill || b.hl, T.c.a)); area(x, y, x + w, y + h); } return; }
-    if (b.k === 'badge') { const t = b.text || d.badge || ''; if (!t.trim()) return; const fillC = roleColor(T, b.fill || 'a', T.c.a); pill(ctx, t, anchorX, y + h / 2, b.size * W * 0.8, fillC, onBg(fillC, T.c.ink), { bold: 0.6 }); return; }
+    if (b.k === 'badge') { const t = b.text || d.badge || ''; if (!t.trim()) return; const fillC = roleColor(T, b.fill || 'a', T.c.a); pill(ctx, t, anchorX, y + h / 2, b.size * SW * 0.8, fillC, onBg(fillC, T.c.ink), { bold: 0.6 }); return; }
     // نص
     const txt = d[b.k]; if (!String(txt || '').trim()) return;
     if (b.k === 'who' || b.k === 'time' || b.k === 'place') {
       const ic = b.icon || FREE_ICON[b.k];
-      if (b.align === 'right') { infoItem(ctx, ic, txt, anchorX, y + h / 2, { size: b.size * W, color: col, iconColor: roleColor(T, b.hl, T.c.a), maxW: w }); return; }
-      line(ctx, txt, anchorX, y + h / 2, { size: b.size * W, color: col, align: b.align, maxW: w, bold: b.bold }); return;
+      if (b.align === 'right') { infoItem(ctx, ic, txt, anchorX, y + h / 2, { size: b.size * SW, color: col, iconColor: roleColor(T, b.hl, T.c.a), maxW: w }); return; }
+      line(ctx, txt, anchorX, y + h / 2, { size: b.size * SW, color: col, align: b.align, maxW: w, bold: b.bold }); return;
     }
     const isT = b.k === 'title';
     if (b.rot) { ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(b.rot * Math.PI / 180); ctx.translate(-(x + w / 2), -(y + h / 2)); }
-    const f = fit(ctx, txt, { maxW: w, maxH: h, size: b.size * W * (isT ? k : 1), lh: isT ? 1.25 : 1.45, balance: true, bold: isT ? Math.max(0.6, b.bold) : b.bold, title: isT, maxLines: isT ? 4 : 6 });
+    const f = fit(ctx, txt, { maxW: w, maxH: h, size: b.size * SW * (isT ? k : 1), lh: isT ? 1.25 : 1.45, balance: true, bold: isT ? Math.max(0.6, b.bold) : b.bold, title: isT, maxLines: isT ? 4 : 6 });
     drawFit(ctx, f, anchorX, y, { align: b.align, color: isT && OV.title ? OV.title : col, hl: roleColor(T, b.hl, T.c.a) });
     if (b.rot) ctx.restore();
   });

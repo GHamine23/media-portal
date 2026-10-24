@@ -232,9 +232,11 @@ TEMPLATES.push(
     let y = (tall ? 150 : 72) * u;
     G(ctx, 'logo'); const lg = drawLogo(ctx, T, W / 2, y, 330 * u, dark ? '#ffffff' : 'color', 'tc'); y += (lg.h || 150 * u) + 46 * sv;
     G(ctx, 'tag'); if (has(d.tag)) { omPillC(ctx, d.tag, W / 2, y + 26 * sv, 30 * sv, gold, '#ffffff'); y += 84 * sv; }
-    const tf = fit(ctx, d.title, { maxW: cw, maxH: 300 * sv, size: 104 * sv * k, lh: 1.22, balance: true, bold: 1, title: true });
+    // يُحجز لبطاقة التفاصيل (أو الصورة) والتذييل مكانهما أولاً، ثم يأخذ العنوان ما بقي
+    const reserve = 300 * sv + ((P.photo && P.photo.im) ? 380 : 400) * sv + (has(d.sub) ? 70 * sv : 0) + 50 * sv;
+    const tf = fit(ctx, d.title, { maxW: cw, maxH: Math.max(110 * sv, Math.min(300 * sv, H - y - reserve)), size: 104 * sv * k, lh: 1.22, balance: true, bold: 1, title: true });
     G(ctx, 'title'); drawFit(ctx, tf, W / 2, y, { align: 'center', color: OV.title || fg }); y += tf.h + 14 * sv;
-    G(ctx, 'sub'); if (has(d.sub)) { const sf = fit(ctx, d.sub, { maxW: cw, size: 36 * sv, lh: 1.4, maxLines: 2 }); drawFit(ctx, sf, W / 2, y, { align: 'center', color: dark ? alpha('#ffffff', 0.8) : alpha(C.ink, 0.75) }); y += sf.h; }
+    G(ctx, 'sub'); if (has(d.sub)) { const sf = fit(ctx, d.sub, { maxW: cw, size: 36 * sv, lh: 1.4, maxLines: (H - y - reserve) > 40 * sv ? 2 : 1 }); drawFit(ctx, sf, W / 2, y, { align: 'center', color: dark ? alpha('#ffffff', 0.8) : alpha(C.ink, 0.75) }); y += sf.h; }
     y += 50 * sv;
     const footH = 300 * sv, by = H - footH;
     const midH = by - y;
@@ -261,7 +263,7 @@ TEMPLATES.push(
         ctx.beginPath(); ctx.arc(xr - 22 * sv, ry - 40 * sv, 24 * sv, 0, Math.PI * 2); ctx.fillStyle = gold; ctx.fill();
         icon(ctx, r[0] === 'user' ? 'mic' : 'cal', xr - 22 * sv, ry - 40 * sv, 28 * sv, dark ? C.teal : '#ffffff');
         line(ctx, r[1], xr - 60 * sv, ry - 40 * sv, { size: 30 * sv, color: dark ? alpha('#ffffff', 0.8) : alpha(C.ink, 0.7), align: 'right', maxW: colW - 90 * u });
-        line(ctx, r[2], xr, ry + 36 * sv, { size: 40 * sv, color: fg, align: 'right', bold: 0.9, title: true, maxW: colW - 80 * u });
+        line(ctx, r[2], xr, ry + 36 * sv, { size: 40 * sv, color: fg, align: 'right', bold: 0.9, title: true, maxW: colW - 80 * u, min: 12 * sv });
       });
       G(ctx, 'time');
       const ty = cy0 + ch * 0.8;
@@ -365,7 +367,7 @@ TEMPLATES.push(
 /* ---------- خ3. تعريف بالبرنامج ---------- */
 {
   id: 'om_info', type: 'cover', name: 'تعريف بالبرنامج', tags: 'خارطة الثغور تعريف ما هو البرنامج محتويات مواد دورات مشاريع مدة', isNew: 1, set: 'omr',
-  sizes: ['post', 'story', 'square'],
+  sizes: ['post', 'story'],
   variants: [{ id: 'paper', name: 'ورق الخريطة', sw: ['#f3efe6', '#273e72', '#bc914c'] }, { id: 'night', name: 'ليل كحلي', sw: ['#16234a', '#ffffff', '#bc914c'] }],
   colorLabels: { bg: 'لون الأرضية', title: 'لون العنوان', accent: 'اللون الذهبي' },
   fields: [
@@ -633,8 +635,21 @@ TEMPLATES.push(
     const dark = isDark(base), fg = dark ? '#ffffff' : C.p;
     const mx = 60 * u, xr = W - mx;
     const hasP = P.photo && P.photo.im;
-    const pw = hasP ? Math.min(W * 0.36, H * 0.8) : 0, ph = Math.min(H - 2 * mx, pw * 1.1);
+    const pw = hasP ? (thin ? H * 0.72 : Math.min(W * 0.36, H * 0.8)) : 0, ph = thin ? pw : Math.min(H - 2 * mx, pw * 1.1);
     G(ctx, 'photo'); if (hasP) omPhotoFrame(ctx, P.photo, mx + 20 * u, (H - ph) / 2, pw, ph, gold, u);
+    if (thin) {
+      // الغلاف العريض: الشعار يميناً في الوسط رأسياً، ثم فاصل ذهبي، ثم العنوان والمقدّم
+      G(ctx, 'logo'); const lgw = Math.min(W * 0.2, H * 0.9); const lg2 = drawLogo(ctx, T, xr, H / 2 - lgw * 0.24, lgw, dark ? '#ffffff' : 'color', 'tr');
+      const sepX = xr - (lg2.w || lgw) - 50 * u; if (D()) { vline(ctx, sepX, H * 0.22, H * 0.78, alpha(gold, 0.8), 2.5 * u); omDiamond(ctx, sepX, H * 0.22, 9 * u, gold); omDiamond(ctx, sepX, H * 0.78, 9 * u, gold); }
+      const tx = sepX - 50 * u, tx0 = hasP ? mx + pw + 70 * u : mx + 40 * u, tw = tx - tx0;
+      const tf0 = fit(ctx, d.title, { maxW: tw, maxH: H * 0.5, size: 66 * u * k, lh: 1.2, balance: true, bold: 1, title: true });
+      const whoH0 = has(d.who) ? 58 * u : 0, tagH0 = has(d.tag) ? 56 * u : 0, tot0 = tagH0 + tf0.h + whoH0;
+      let yy = (H - tot0) / 2;
+      G(ctx, 'tag'); if (tagH0) { const p = pill(ctx, d.tag, tx, yy + 18 * u, 22 * u, gold, '#ffffff', { bold: 0.8 }); if (D()) { ctx.beginPath(); ctx.arc(tx - p.w - 22 * u, yy + 18 * u, 7 * u, 0, Math.PI * 2); ctx.fillStyle = '#e0493b'; ctx.fill(); } yy += tagH0; }
+      G(ctx, 'title'); drawFit(ctx, tf0, tx, yy, { align: 'right', color: OV.title || fg }); yy += tf0.h + 8 * u;
+      G(ctx, 'who'); if (whoH0) { const w = Math.min(tw, textW(ctx, d.who, 28 * u, 0.9, true) + 50 * u); fillRR(ctx, tx - w, yy, w, 50 * u, 12 * u, dark ? 'rgba(255,255,255,0.14)' : alpha(gold, 0.22)); line(ctx, d.who, tx - 25 * u, yy + 25 * u, { size: 28 * u, color: fg, align: 'right', bold: 0.9, title: true, maxW: w - 40 * u }); }
+      return;
+    }
     const x0 = hasP ? mx + pw + 90 * u : mx, cw = xr - x0;
     G(ctx, 'logo'); const lg = drawLogo(ctx, T, xr, mx, thin ? 200 * u : 240 * u, dark ? '#ffffff' : 'color', 'tr');
     const lh = lg.h || 90 * u;

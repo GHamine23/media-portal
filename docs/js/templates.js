@@ -856,7 +856,8 @@ function compFooter(ctx, W, H, u, base) {
 function compText(ctx, W, H, d, T, k, y, u, sv, base) {
   const C = T.c, dark = isDark(base), ink = dark ? '#ffffff' : C.ink;
   G(ctx, 'kicker'); if (has(d.kicker)) { line(ctx, d.kicker, W / 2, y + 26 * sv, { size: 46 * sv, color: ink, align: 'center', bold: 0.3, maxW: W * 0.8 }); y += 82 * sv; }
-  const tf = fit(ctx, d.title, { maxW: W * 0.7, maxH: 230 * sv, size: 88 * sv * k, lh: 1.3, balance: true, bold: 1, title: true });
+  const roomT = H - y - 66 * sv - ((has(d.d1) || has(d.d2)) ? 185 : 70) * sv;   // يبقى للمعلومات والتاريخ مكانها في الأحجام القصيرة
+  const tf = fit(ctx, d.title, { maxW: W * 0.7, maxH: Math.max(70 * sv, Math.min(230 * sv, roomT)), size: 88 * sv * k, lh: 1.3, balance: true, bold: 1, title: true });
   G(ctx, 'title'); drawFit(ctx, tf, W / 2, y, { align: 'center', color: OV.title || (dark ? '#ffffff' : C.s) });
   if (D() && tf.lines.length) {
     const my = y + tf.h / 2;
@@ -865,15 +866,16 @@ function compText(ctx, W, H, d, T, k, y, u, sv, base) {
   }
   y += tf.h + 66 * sv;
   G(ctx, 'info');
-  const s = 40 * sv;
-  const w1 = infoW(ctx, 'moon', d.i1, { size: s }), w2 = infoW(ctx, 'layers', d.i2, { size: s });
-  const gap = 110 * u, tot = w1 + w2 + (w1 && w2 ? gap : 0);
+  let s = 40 * sv;
+  let w1 = infoW(ctx, 'moon', d.i1, { size: s }), w2 = infoW(ctx, 'layers', d.i2, { size: s });
+  const gap = 110 * u; let tot = w1 + w2 + (w1 && w2 ? gap : 0);
+  if (tot > W * 0.9) { const f = Math.max(0.55, (W * 0.9 - gap) / (w1 + w2)); s *= f; w1 *= f; w2 *= f; tot = w1 + w2 + (w1 && w2 ? gap : 0); }
   const x1 = W / 2 + tot / 2, x2 = x1 - (w1 ? w1 + gap : 0);
   infoItem(ctx, 'moon', d.i1, x1, y, { size: s, color: ink, iconColor: dark ? C.pl : C.s });
   infoItem(ctx, 'layers', d.i2, x2, y, { size: s, color: ink, iconColor: dark ? C.pl : C.s });
   G(ctx, 'date');
   if (has(d.d1) || has(d.d2)) {
-    const sx = w2 ? x2 - s * 1.6 : W / 2 + 120 * u;
+    const sx = w2 ? Math.max(W * 0.3, x2 - s * 1.6) : W / 2 + 120 * u;
     icon(ctx, 'down', sx - 24 * u, y + 56 * sv, 36 * sv, C.p);
     line(ctx, d.d1, sx, y + 112 * sv, { size: 30 * sv, color: ink, align: 'right', bold: 0.4, maxW: sx - 40 * u });
     line(ctx, d.d2, sx, y + 158 * sv, { size: 30 * sv, color: ink, align: 'right', bold: 0.4, maxW: sx - 40 * u });

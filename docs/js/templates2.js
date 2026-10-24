@@ -87,14 +87,17 @@ function confetti(ctx, W, H, cols, seed, avoid) {
 function infoCols(ctx, items, cx, y, s, color, iconColor, sep) {
   items = items.filter(function (it) { return has(it.a) || has(it.b); });
   if (!items.length) return 0;
-  const ws = items.map(function (it) { return Math.max(textW(ctx, it.a, s), textW(ctx, it.b, s), s * 1.4); });
-  const gap = s * 1.6, tot = ws.reduce(function (a, b) { return a + b; }, 0) + gap * (items.length - 1);
+  let ws = items.map(function (it) { return Math.max(textW(ctx, it.a, s), textW(ctx, it.b, s), s * 1.4); });
+  let gap = s * 1.6, tot = ws.reduce(function (a, b) { return a + b; }, 0) + gap * (items.length - 1);
+  // نصوص طويلة: تُصغَّر الأعمدة لتبقى في عرض التصميم
+  const room = cx * 2 * 0.9;
+  if (tot > room) { const f = Math.max(0.6, room / tot); s *= f; ws = ws.map(function (w) { return Math.min(w * f, room / items.length); }); gap *= f; tot = ws.reduce(function (a, b) { return a + b; }, 0) + gap * (items.length - 1); }
   let x = cx + tot / 2;
   items.forEach(function (it, i) {
     const xc = x - ws[i] / 2;
     icon(ctx, it.ic, xc, y, s * 1.05, iconColor);
-    line(ctx, it.a, xc, y + s * 1.25, { size: s, color: color, align: 'center' });
-    line(ctx, it.b, xc, y + s * 2.4, { size: s, color: color, align: 'center' });
+    line(ctx, it.a, xc, y + s * 1.25, { size: s, color: color, align: 'center', maxW: ws[i] });
+    line(ctx, it.b, xc, y + s * 2.4, { size: s, color: color, align: 'center', maxW: ws[i] });
     x -= ws[i];
     if (i < items.length - 1) { vline(ctx, x - gap / 2, y - s * 0.4, y + s * 2.8, sep, Math.max(1, s * 0.05)); x -= gap; }
   });
@@ -316,7 +319,7 @@ TEMPLATES.push(
     if (fh) drawLogo(ctx, T, W - 72 * u, H - fh / 2 + 34 * u, 110 * u, onBg(OV.accent || C.p) === '#ffffff' ? '#ffffff' : 'color', 'br');
     else drawLogo(ctx, T, W - 72 * u, 60 * u, 110 * u, isDark(base) ? '#ffffff' : 'color', 'tr');
     const tf = fit(ctx, d.title, { maxW: W * 0.76, maxH: H * 0.22, size: 140 * sv * k, lh: 1.18, balance: true, bold: 0.8, title: true });
-    const it = lines(d.items).slice(0, 8), half = Math.max(1, Math.ceil(it.length / 2)), iS = 32 * sv, hInfo = iS * 3.1, hHead = has(d.head) ? 70 * sv : 0;
+    const it = lines(d.items).slice(0, 8), half = Math.max(1, Math.ceil(it.length / 2)), iS = Math.max(32 * sv, W > H ? 26 * u : 0), hInfo = iS * 3.1, hHead = has(d.head) ? 70 * sv : 0;
     const top = Math.max(fh ? 110 * u : 190 * u, H * 0.08), bottom = H - fh - (fh ? 60 * u : 150 * u);
     const rowH = Math.max(52 * sv, Math.min(78 * sv, (bottom - top - tf.h - hHead - hInfo - 40 * sv) / half)), fs = Math.min(46 * sv, rowH * 0.6), hList = rowH * half;
     const free = Math.max(0, bottom - top - tf.h - hHead - hList - hInfo), gap = Math.min(110 * sv, free / 3);
@@ -693,7 +696,8 @@ TEMPLATES.push(
     if (OV.bg || BGFX) paintBg(ctx, W, H, base);
     else { const g = ctx.createRadialGradient(W * 0.5, H * 0.25, 0, W * 0.5, H * 0.4, H * 0.8); g.addColorStop(0, lighten(base, 0.18)); g.addColorStop(1, lighten(base, -0.15)); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
     storyFrame(ctx, W, H, d, T, base, ac);
-    const tf = fit(ctx, d.title, { maxW: W * 0.78, maxH: H * 0.4, size: 84 * u * k, lh: 1.45, balance: true, bold: 1, title: true });
+    const wide = W > H * 2.5;   // الغلاف العريض: العبارة في الوسط بعيداً عن الوسم والشعار
+    const tf = fit(ctx, d.title, { maxW: wide ? W * 0.52 : W * 0.78, maxH: wide ? H * 0.6 : H * 0.4, size: 84 * u * k, lh: 1.45, balance: true, bold: 1, title: true });
     const y = H * 0.48 - tf.h / 2;
     G(ctx, 'deco'); if (D()) star(ctx, W / 2, y - 60 * u, 18 * u, ac, 0);
     G(ctx, 'title'); drawFit(ctx, tf, W / 2, y, { align: 'center', color: OV.title || fg, hl: ac });
@@ -733,7 +737,7 @@ TEMPLATES.push(
 // إطار القصص: الوسم أعلى اليمين، والحسابات وشعار الأكاديمية أسفل
 function storyFrame(ctx, W, H, d, T, base, ac) {
   const u = W / 1080, dark = isDark(base), fg = onBg(base, '#3a3a3a');
-  G(ctx, 'tag'); if (has(d.tag)) { const f = line(ctx, d.tag, W - 90 * u, 110 * u, { size: 30 * u, color: fg, align: 'right', bold: 0.4 }); ctx.fillStyle = ac; ctx.beginPath(); ctx.arc(W - 90 * u - f.w - 22 * u, 110 * u, 7 * u, 0, Math.PI * 2); ctx.fill(); }
+  G(ctx, 'tag'); if (has(d.tag)) { const f = line(ctx, d.tag, W - 90 * u, 110 * u, { size: 30 * u, color: fg, align: 'right', bold: 0.4, maxW: W > H * 2.5 ? W * 0.17 : W * 0.6 }); ctx.fillStyle = ac; ctx.beginPath(); ctx.arc(W - 90 * u - f.w - 22 * u, 110 * u, 7 * u, 0, Math.PI * 2); ctx.fill(); }
   G(ctx, 'logo'); drawLogo(ctx, T, 90 * u, 80 * u, 110 * u, dark ? '#ffffff' : 'color', 'tl');
   G(ctx, 'footer'); academy(ctx, alpha(fg, 0.8), W - 90 * u, H - 80 * u, 120 * u, 'br'); social(ctx, alpha(fg, 0.65), 90 * u, H - 84 * u, 120 * u, 'bl');
 }
