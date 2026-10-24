@@ -951,7 +951,7 @@ var DEFAULT_SETTINGS = { ai: { enabled: true, model: 'gemini-3.8-flash', perDay:
 function settings_() { var s = readJson_('settings.json', {}); var o = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)); Object.keys(s).forEach(function (k) { o[k] = s[k]; }); return o; }
 // مفاتيح Gemini: مفتاح أساسي GEMINI_KEY وأي عدد من المفاتيح الإضافية في GEMINI_KEYS (من حسابات جوجل أخرى)، تتناوب وتتبادل عند نفاد حصة أحدها
 function geminiKeys_() {
-  var p = props_(), list = (String(p.getProperty('GEMINI_KEYS') || '') + '\n' + String(p.getProperty('GEMINI_KEY') || '')).split(/[\s,;]+/).map(function (k) { return k.trim(); }).filter(function (k) { return /^[\w\-]{20,}$/.test(k); });
+  var p = props_(), list = (String(p.getProperty('GEMINI_KEYS') || '') + '\n' + String(p.getProperty('GEMINI_KEY') || '')).split(/[\s,;]+/).map(function (k) { return k.trim(); }).filter(function (k) { return /^[\w\-.~+\/=:]{20,}$/.test(k); });
   var seen = {}; return list.filter(function (k) { if (seen[k]) return false; seen[k] = true; return true; });
 }
 function hasGemini_() { return geminiKeys_().length > 0; }
@@ -965,7 +965,7 @@ function set_save(token, json) {
     var cur = settings_();
     if (s.ai) cur.ai = { enabled: !!s.ai.enabled, model: clip_(s.ai.model || 'gemini-3.8-flash', 60), fallback: clip_(s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 120), light: clip_(s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite', 60), groqModel: clip_(s.ai.groqModel || 'openai/gpt-oss-120b', 60), cfModel: clip_(s.ai.cfModel || '@cf/openai/gpt-oss-120b', 80), route: (function (r) { var o = {}; Object.keys(r || {}).forEach(function (k) { if (r[k] === 'groq' || r[k] === 'gemini') o[clip_(k, 20)] = r[k]; }); return o; })(s.ai.route), perDay: Math.max(0, Math.min(500, +s.ai.perDay || 0)), pollFallback: s.ai.pollFallback !== false, capPrompt: clip_(s.ai.capPrompt != null ? s.ai.capPrompt : (cur.ai.capPrompt || ''), 4000) };
     // مفاتيح Gemini الإضافية: يلصقها المدير (لا تُعرض بعد الحفظ). سطر أو فاصلة بين كل مفتاح وآخر. نص فارغ يحذفها، و«keep» يبقيها
-    if (s.geminiKeys != null && s.geminiKeys !== 'keep') { var gks = String(s.geminiKeys).split(/[\s,;]+/).map(function (k) { return k.trim(); }).filter(function (k) { return /^[\w\-]{20,}$/.test(k); }); if (gks.length) props_().setProperty('GEMINI_KEYS', gks.join('\n')); else props_().deleteProperty('GEMINI_KEYS'); }
+    if (s.geminiKeys != null && s.geminiKeys !== 'keep') { var gks = String(s.geminiKeys).split(/[\s,;]+/).map(function (k) { return k.trim(); }).filter(function (k) { return /^[\w\-.~+\/=:]{20,}$/.test(k); }); if (gks.length) props_().setProperty('GEMINI_KEYS', gks.join('\n')); else if (String(s.geminiKeys).trim()) throw new Error('لم يُفهم مفتاح Gemini: الصق المفتاح كما نسخته من AI Studio، كل مفتاح في سطر'); else props_().deleteProperty('GEMINI_KEYS'); }
     if (s.uploadsNeedPerm != null) cur.uploadsNeedPerm = !!s.uploadsNeedPerm;
     if (s.maxUploadMb != null) cur.maxUploadMb = Math.max(1, Math.min(20, +s.maxUploadMb || 20));
     if (s.tgToken != null) { var tk = String(s.tgToken).trim(); if (tk) { if (!/^\d+:[\w-]{30,}$/.test(tk)) throw new Error('رمز البوت غير صحيح'); props_().setProperty('TG_TOKEN', tk); } else props_().deleteProperty('TG_TOKEN'); }

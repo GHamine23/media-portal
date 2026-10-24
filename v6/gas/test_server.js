@@ -507,6 +507,11 @@ ok(JSON.parse(call('api_tpl_list', l5.token)).length >= 1, 'v5 still works');
   fails('ai_test', /للمدير العام/, sp);
   call('set_save', adm, JSON.stringify({ cfAccount: '', cfToken: '', groqKey: '' }));
   ok(J('set_get', adm).cfOn === false, 'cloudflare removed');
+  // مفاتيح جوجل الجديدة (AQ. فيها نقطة) تُقبل، والنص الذي لا يُفهم يُرفض بخطأ لا بحذف صامت
+  call('set_save', adm, JSON.stringify({ geminiKeys: 'AQ.Ab8RN6Kx_testKeyWithDots-0123456789' }));
+  ok(J('set_get', adm).aiKeys >= 1, 'AQ.-style gemini key accepted');
+  fails('set_save', /لم يُفهم مفتاح Gemini/, adm, JSON.stringify({ geminiKeys: 'abc' }));
+  ok(J('set_get', adm).aiKeys >= 1, 'bad paste keeps existing keys');
   over = null; GAS._fetch.handler = base;
 })();
 console.log('server tests passed:', n);
