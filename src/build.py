@@ -7,8 +7,8 @@ import base64, hashlib, re, sys, pathlib, shutil
 SRC = pathlib.Path(__file__).resolve().parent
 ROOT = SRC.parent
 FNT, LG, IMG = ROOT / 'assets/fonts', ROOT / 'assets/logos', ROOT / 'assets/img'
-DOCS, DIST = ROOT / 'docs', ROOT / 'dist'
-DOCS.mkdir(exist_ok=True); (DOCS / 'js').mkdir(exist_ok=True); DIST.mkdir(exist_ok=True)
+DOCS, DIST = ROOT / 'docs' / 'v5', ROOT / 'dist'   # بعد إطلاق السادس في الجذر يبقى الخامس في docs/v5
+DOCS.mkdir(parents=True, exist_ok=True); (DOCS / 'js').mkdir(exist_ok=True); DIST.mkdir(exist_ok=True)
 
 def b64(p, mime):
     return 'data:' + mime + ';base64,' + base64.b64encode(p.read_bytes()).decode()

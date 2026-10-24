@@ -388,6 +388,13 @@ ok(J('rv_mine', ut)[0].status === 'new', 'review requested');
 fails('rv_list', /لمدير/, ut);
 ok(J('rv_list', adm, 'new').some(function (x) { return x.id === rq.id && x.ai.score === 72; }), 'admin sees review request');
 ok(/^data:image\/png/.test(call('rv_img', adm, rq.id)), 'admin loads review image');
+{ // المدير العام يصله إشعار بكل طلب مراجعة وبلاغ، وتفاصيله لا تُرسل إلى المتصفح
+  const nl = J('nt_list', adm);
+  ok(nl.some(function (x) { return x.kind === 'review' && /طلب مراجعة تصميم من/.test(x.text) && x.link === '#/admin/reviews'; }), 'super admin notified of review request');
+  ok(nl.some(function (x) { return x.kind === 'fb' && /بلاغ خطأ جديد|اقتراح جديد/.test(x.text) && x.link === '#/admin/feedback'; }), 'super admin notified of feedback');
+  ok(nl.every(function (x) { return !('src' in x); }), 'notification details stay on the server');
+  ok(!J('nt_list', ut).some(function (x) { return x.kind === 'review' && /من أحمد/.test(x.text); }), 'requester not notified of own request');
+}
 J('rv_reply', adm, rq.id, JSON.stringify({ score: 8, notes: 'التسلسل واضح، خفّف عدد الألوان', points: ['كبّر العنوان', 'وحّد المحاذاة'] }));
 const mineRv = J('rv_mine', ut)[0]; ok(mineRv.status === 'done' && mineRv.reply.score === 8 && mineRv.reply.points.length === 2, 'reply delivered');
 ok(J('nt_list', ut).some(function (x) { return x.kind === 'review' && !x.seen; }), 'review notification');
@@ -507,6 +514,14 @@ ok(JSON.parse(call('api_tpl_list', l5.token)).length >= 1, 'v5 still works');
   fails('ai_test', /للمدير العام/, sp);
   call('set_save', adm, JSON.stringify({ cfAccount: '', cfToken: '', groqKey: '' }));
   ok(J('set_get', adm).cfOn === false, 'cloudflare removed');
+  // تلخيص إشعارات المدير بالمساعد: مرة واحدة لكل إشعار
+  call('fb_send', sp, JSON.stringify({ kind: 'bug', text: 'الزر لا يعمل في صفحة التقويم عند السحب' }));
+  let sumCalls = 0;
+  over = function (u) { sumCalls++; const it = []; for (let i = 0; i < 8; i++) it.push({ i: i, sum: 'ملخص ' + i }); const r = JSON.stringify({ items: it }); return /generativelanguage/.test(u) ? gem(r) : oai(r); };
+  const nl1 = J('nt_list', adm), c1n = sumCalls;
+  ok(nl1.some(function (x) { return x.kind === 'fb' && /^ملخص/.test(x.sum || ''); }) && c1n >= 1, 'admin notifications summarized by AI');
+  J('nt_list', adm);
+  ok(sumCalls === c1n, 'summaries cached (no second AI call)');
   // مفاتيح جوجل الجديدة (AQ. فيها نقطة) تُقبل، والنص الذي لا يُفهم يُرفض بخطأ لا بحذف صامت
   call('set_save', adm, JSON.stringify({ geminiKeys: 'AQ.Ab8RN6Kx_testKeyWithDots-0123456789' }));
   ok(J('set_get', adm).aiKeys >= 1, 'AQ.-style gemini key accepted');

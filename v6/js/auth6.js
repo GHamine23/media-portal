@@ -210,7 +210,7 @@ async function showAccount() {
         el('h3', { class: 'acsub', text: 'لون الواجهة' }), accentPicker(function (id, nm) { toast('لون الواجهة: ' + nm); }),
         el('h3', { class: 'acsub', text: 'الحركة في الواجهة' }), motion]),
       inApp ? null : el('div', { class: 'card rv acapp', style: '--d:2' }, [el('h2', { class: 'ch', text: 'تطبيق الجوال' }), el('p', { class: 'muted small', text: 'افتح الرابط من هاتفك، وثبّته على الشاشة الرئيسية.' }),
-        el('div', { class: 'row wrapr' }, [el('a', { class: 'btn dark', href: '../app/', onclick: function () { ls('preferWeb', null); } }, [ico('phone'), 'افتح التطبيق']), el('button', { type: 'button', class: 'btn line', onclick: function (e) { copyText(appUrl); btnDone(e.currentTarget, 'نُسخ الرابط'); } }, [ico('link'), 'انسخ الرابط للهاتف'])])])
+        el('div', { class: 'row wrapr' }, [el('a', { class: 'btn dark', href: appHref(), onclick: function () { ls('preferWeb', null); } }, [ico('phone'), 'افتح التطبيق']), el('button', { type: 'button', class: 'btn line', onclick: function (e) { copyText(appUrl); btnDone(e.currentTarget, 'نُسخ الرابط'); } }, [ico('link'), 'انسخ الرابط للهاتف'])])])
     ]),
     inApp ? null : el('section', { class: 'hsec', id: 'acact' }, [el('div', { class: 'shead' }, [el('div', {}, [H('h2', 'نشاطك'), el('p', { class: 'muted small rv', text: 'أرقام أسبوعك، ومراجعات تصاميمك.' })])]),
       el('div', { class: 'acacts' }, [wkSlot, rvBox])]),

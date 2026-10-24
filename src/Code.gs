@@ -788,7 +788,7 @@ function saveShot_(dataUrl) {
 }
 function fb_store_(a, it) {
   var shot = saveShot_(it.shot), imgs = (it.imgs || []).slice(0, 4).map(saveShot_).filter(Boolean);
-  return withLock_(function () {
+  var res = withLock_(function () {
     var list = readJson_('feedback.json', []);
     var today = list.filter(function (x) { return x.at > now_() - 864e5; }).length;
     if (today > 300) throw new Error('بلاغات كثيرة اليوم، حاول غداً');
@@ -798,8 +798,12 @@ function fb_store_(a, it) {
       uid: a ? a.uid : '', name: a ? a.name : clip_(it.name || 'زائر', 60), status: 'new', reply: '', at: now_(), upd: now_() };
     list.unshift(x); if (list.length > 3000) list.length = 3000;
     writeJson_('feedback.json', list);
-    return JSON.stringify({ id: x.id });
+    return x;
   });
+  var label = ({ bug: 'بلاغ خطأ', idea: 'اقتراح', q: 'سؤال' })[res.kind] || 'ملاحظة';
+  adminNotify_(res.uid, 'fb', label + ' جديد من ' + res.name + ': ' + clip_(res.text, 110), '#/admin/feedback',
+    res.text + (res.page ? '\nالصفحة: ' + res.page : '') + (res.errors.length ? '\nأخطاء: ' + res.errors.slice(0, 3).join(' | ') : ''));
+  return JSON.stringify({ id: res.id });
 }
 // الإصدار الخامس: يُقبل البلاغ حتى بلا دخول (باسم المرسل إن وُجد)
 function api_feedback(token, json) {
@@ -1393,6 +1397,7 @@ function tgSendDue_() {
       writeJson_('tgq.json', q);
     });
     trash.forEach(function (fid) { try { DriveApp.getFileById(fid).setTrashed(true); } catch (e) {} });
+    if (err) adminNotify_(x.uid, 'tgfail', 'فشل نشر مجدول «' + (x.title || 'منشور') + '» (' + (x.name || '') + ')', '#/cal?view=list&status=failed', 'البرنامج: ' + x.program + '\nالخطأ: ' + err);
     ntPush_(x.uid, 'tg', err ? 'تعذّر نشر «' + (x.title || 'منشور') + '» في القناة: ' + clip_(err, 120) : 'نُشر «' + (x.title || 'منشور') + '» في القناة' + (nextRec ? '، والموعد التالي ' + Utilities.formatDate(new Date(nextRec.when), tz_(), 'd/M HH:mm') : ''), err ? '#/cal' : (res && res.link) || '#/cal');
   });
 }
@@ -1556,11 +1561,39 @@ function ensureTriggers_(log) {
 
 /* ================= الإشعارات ================= */
 // notifs.json: { uid: [{id, kind, text, link, at, seen}] } — آخر ٤٠ لكل مستخدم
-function ntPush_(uid, kind, text, link) {
+function ntPush_(uid, kind, text, link, src) {
   if (!uid) return;
-  try { withLock_(function () { var all = readJson_('notifs.json', {}), l = all[uid] = all[uid] || []; l.unshift({ id: uid_(), kind: kind, text: clip_(text, 300), link: clip_(link || '', 200), at: now_(), seen: false }); if (l.length > 40) l.length = 40; writeJson_('notifs.json', all); }); } catch (e) {}
+  try { withLock_(function () { var all = readJson_('notifs.json', {}), l = all[uid] = all[uid] || []; var n = { id: uid_(), kind: kind, text: clip_(text, 300), link: clip_(link || '', 200), at: now_(), seen: false }; if (src) n.src = clip_(src, 1500); l.unshift(n); if (l.length > 40) l.length = 40; writeJson_('notifs.json', all); }); } catch (e) {}
 }
-function nt_list(token) { var a = auth_(token); return JSON.stringify(readJson_('notifs.json', {})[a.uid] || []); }
+function nt_list(token) {
+  var a = auth_(token), list = readJson_('notifs.json', {})[a.uid] || [];
+  // للمدير العام: يلخّص المساعد ما لم يُلخَّص بعد (مرة واحدة لكل إشعار، في طلب واحد)
+  var pend = isSuper_(a) ? list.filter(function (x) { return x.src && !x.sum && !x.sumTried; }).slice(0, 8) : [];
+  if (pend.length) {
+    var sums = {};
+    try { sums = ntSummarize_(a, pend); } catch (e) {}
+    withLock_(function () { var all = readJson_('notifs.json', {}), l = all[a.uid] || []; l.forEach(function (x) { if (pend.some(function (p) { return p.id === x.id; })) { x.sumTried = true; if (sums[x.id]) x.sum = clip_(sums[x.id], 220); } }); writeJson_('notifs.json', all); list = l; });
+  }
+  return JSON.stringify(list.map(function (x) { var o = Object.assign({}, x); delete o.src; delete o.sumTried; return o; }));
+}
+function ntSummarize_(a, items) {
+  var s = settings_(); if (!s.ai || !s.ai.enabled) return {};
+  var req = { kind: 'brief', program: '', temperature: 0.2,
+    system: 'أنت مساعد مدير منصة تصميم. لكل إشعار اكتب تلخيصاً عربياً واحداً قصيراً (حتى ١٤٠ حرفاً): ما الموضوع، وما المطلوب من المدير إن وُجد، وأهميته (عاجل/عادي). بلا مقدمات، ولا تكرر اسم المرسل. أعد JSON فقط.',
+    prompt: JSON.stringify(items.map(function (x, i) { return { i: i, kind: x.kind, title: x.text, details: x.src }; })),
+    schema: { type: 'OBJECT', properties: { items: { type: 'ARRAY', items: { type: 'OBJECT', properties: { i: { type: 'INTEGER' }, sum: { type: 'STRING' } }, required: ['i', 'sum'] } } }, required: ['items'] } };
+  if (!aiChain_(req).length) return {};
+  var out = JSON.parse(geminiCall_(req, { uid: a.uid, name: a.name })), r = {};
+  ((out && out.items) || []).forEach(function (y) { var x = items[+y.i]; if (x && y.sum) r[x.id] = String(y.sum); });
+  return r;
+}
+// كل جديد يهم الإدارة يصل إلى جرس كل مدير عام (عدا صاحب الفعل)، ومعه تفاصيله ليلخّصها المساعد
+function adminNotify_(actorUid, kind, text, link, src) {
+  try {
+    var accs = readJson_('accounts.json', {});
+    Object.keys(accs).forEach(function (k) { var x = accs[k]; if (x && x.role === 'super' && !x.disabled && k !== actorUid) ntPush_(k, kind, text, link, src); });
+  } catch (e) {}
+}
 function nt_seen(token) { var a = auth_(token); return withLock_(function () { var all = readJson_('notifs.json', {}); (all[a.uid] || []).forEach(function (x) { x.seen = true; }); writeJson_('notifs.json', all); return 'ok'; }); }
 
 /* ================= التعليقات على القوالب والتصاميم والنماذج ================= */
@@ -1621,6 +1654,8 @@ function rv_request(token, json) {
       ai: m.ai ? { score: Math.max(0, Math.min(100, +m.ai.score || 0)), summary: clip_(m.ai.summary, 600) } : null, status: 'new', reply: null, at: now_() };
     l.unshift(x); if (l.length > 3000) l.length = 3000; writeJson_('reviews.json', l); return x;
   });
+  adminNotify_(a.uid, 'review', 'طلب مراجعة تصميم من ' + a.name + (r.note ? ': ' + clip_(r.note, 90) : ''), '#/admin/reviews',
+    'البرنامج: ' + pid + (r.tpl ? ' · القالب: ' + r.tpl : '') + (r.note ? '\nملاحظة المصمّم: ' + r.note : '') + (r.ai ? '\nتقييم المصمّم الذكي ' + r.ai.score + '/100: ' + r.ai.summary : ''));
   return JSON.stringify({ id: r.id });
 }
 function rvPub_(x) { var o = Object.assign({}, x); delete o.img; return o; }

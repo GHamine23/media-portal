@@ -86,3 +86,7 @@ app_demo_tags = '<script>window.DEMO = true;</script>\n<script src="../v6/gas/sh
 (D / 'app.html').write_text(app_shell.replace('<!--SCRIPTS-->', app_demo_tags).replace('href="manifest.webmanifest"', 'href="#"'))
 size = sum((OUT / 'js' / n).stat().st_size for n in ORDER)
 print('v6 →', OUT.relative_to(ROOT), '|', size // 1024, 'KB js |', len(ORDER), 'files | api', bool(api_url), '| pitfalls', bad)
+
+# الإطلاق: النسخة السادسة هي الموقع الأساسي (docs/) وتبقى نسخة في docs/v6 للروابط القديمة
+if '--root' not in sys.argv:
+    import subprocess; subprocess.run([sys.executable, __file__, '--root'], check=True)

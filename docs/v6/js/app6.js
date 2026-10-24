@@ -43,7 +43,7 @@ window.addEventListener('hashchange', function () { setTimeout(markNav, 0); });
 // الهاتف يفتح التطبيق مباشرة، إلا من اختار نسخة الويب من التطبيق نفسه
 function isPhone() { try { return matchMedia('(pointer:coarse)').matches && Math.min(screen.width, screen.height) < 600; } catch (e) { return false; } }
 (async function boot() {
-  if (!window.DEMO && !ls('preferWeb') && isPhone() && !/[?&]web=1/.test(location.search)) { location.replace('../app/' + location.hash); return; }
+  if (!window.DEMO && !ls('preferWeb') && isPhone() && !/[?&]web=1/.test(location.search)) { location.replace(appHref() + location.hash); return; }
   setMotion('calm');
   const nm = ls('lastName'); splash(nm ? 'أهلاً بك يا ' + nm + '…' : 'نرحّب بك…');
   const fonts = loadUiFonts().catch(function () {});

@@ -50,7 +50,7 @@ route6(/^\/reviews$/, mwrap('مراجعاتي', showReviews6, { back: '#/more', 
 route6(/^\/more$/, plain(mMore), { page: 'more', noVT: true });
 route6(/^\/(feedback|fb)$/, function () { redirect6('#/account?fb'); }, { page: 'more', noVT: true });
 route6(/^\/news$/, function () { redirect6('#/more'); setTimeout(function () { showNews(); }, 500); }, { page: 'more', noVT: true });
-route6(/^\/admin(?:\/([a-z]+))?$/, function () { location.href = '../v6/#/admin'; }, { page: 'more', noVT: true });
+route6(/^\/admin(?:\/([a-z]+))?$/, function () { location.href = '../#/admin'; }, { page: 'more', noVT: true });
 route6(/.*/, plain(mHome), { page: 'home', noVT: true });
 // اتجاه حركة الشاشة: الرجوع بزر المتصفح يُحرّك العكس
 window.addEventListener('popstate', function () { M.dir = 'back'; });

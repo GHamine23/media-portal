@@ -90,7 +90,7 @@ function mTemplates(tid, type) {
 
 /* ---------- المزيد: الحساب والمظهر والتطبيق ----------
    تصميم خاص بالمنصة (لا نسخة من إعدادات النظام): بطاقة شخصية بلون الواجهة، مربعات ملوّنة للأقسام، وبطاقات للمظهر والتطبيق. */
-function toWeb() { ls('preferWeb', true); const h = location.hash; location.href = '../v6/' + (/^#\/(tpl|more)\b/.test(h) ? '#/' : h || '#/'); }
+function toWeb() { ls('preferWeb', true); const h = location.hash; location.href = '../' + (/^#\/(tpl|more)\b/.test(h) ? '#/' : h || '#/'); }
 function mTile(t, ic, color, href, fn) {
   return el(href ? 'a' : 'button', { class: 'mtile', type: href ? null : 'button', href: href || null, style: '--tc:' + color, onclick: function () { haptic(); M.dir = 'fwd'; if (fn) fn(); } }, [el('span', { class: 'ti' }, [ico(ic)]), el('b', { text: t })]);
 }
@@ -130,7 +130,7 @@ function mMore() {
   const app = mCard('التطبيق', 'phone', [
     isStandalone() ? mLine('التطبيق مثبّت على جهازك', 'يفتح من الشاشة الرئيسية', 'check', null, { badge: '✓' }) : mLine('ثبّت التطبيق على الشاشة الرئيسية', 'يفتح بملء الشاشة وأسرع', 'download', function () { installSheet(); }),
     mLine('انتقل إلى نسخة الويب', 'المحرر الموسّع، ويفتحها هذا الجهاز بعد ذلك', 'globe', toWeb),
-    isAdmin() ? mLine('لوحة الإدارة', 'في نسخة الويب', 'gear', function () { ls('preferWeb', true); location.href = '../v6/#/admin'; }) : null
+    isAdmin() ? mLine('لوحة الإدارة', 'في نسخة الويب', 'gear', function () { ls('preferWeb', true); location.href = '../#/admin'; }) : null
   ]);
   // كلمة المرور في «حسابي» (بطاقة بياناتك)، والخروج هنا
   const bottom = el('div', { class: 'mbtns' }, [

@@ -1,13 +1,13 @@
 {
- "name": "البوابة الإعلامية للبرامج الإلكترونية",
- "short_name": "البوابة الإعلامية",
+ "name": "منصة الأثر الإعلامي",
+ "short_name": "الأثر الإعلامي",
  "lang": "ar",
  "dir": "rtl",
  "start_url": "./",
  "scope": "./",
  "display": "standalone",
- "background_color": "#f3f1ed",
- "theme_color": "#2d4d24",
+ "background_color": "#ffffff",
+ "theme_color": "#ffffff",
  "icons": [
   {
    "src": "icons/icon-192.png",

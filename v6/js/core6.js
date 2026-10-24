@@ -120,6 +120,8 @@ function accentPicker(onPick) {
   return row;
 }
 applyAccent(ls('accent') || 'indigo');
+// رابط التطبيق من أي نسخة من الموقع (الجذر أو v6/)
+function appHref() { return /\/v6\/(index\.html)?$/.test(location.pathname) ? '../app/' : 'app/'; }
 function setMotion(level) { document.documentElement.style.setProperty('--k', level === 'lively' ? '0.8' : level === 'normal' ? '1' : '1.25'); }
 
 /* ---------- الرسائل والنوافذ ---------- */
@@ -208,6 +210,7 @@ const IC = {
   logout: '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>', chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>', flag: '<path d="M5 21V4h11l-2 4 2 4H5"/>', megaphone: '<path d="M4 10v4h3l7 5V5L7 10zM18 9a3 3 0 0 1 0 6"/>',
   history: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>', key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M15 8l2 2"/>',
   prog: '<rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><path d="M17 13v8M13 17h8"/>',
+  expand: '<path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/>',
   zoomin: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M8 11h6M11 8v6"/>', zoomout: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M8 11h6"/>',
   align: '<path d="M4 6h16M7 12h10M5 18h14"/>', front: '<rect x="8" y="8" width="12" height="12" rx="2" fill="currentColor" fill-opacity=".15"/><path d="M4 16V5a1 1 0 0 1 1-1h11"/>', back: '<rect x="4" y="4" width="12" height="12" rx="2"/><path d="M20 8v11a1 1 0 0 1-1 1H8"/>',
   more: '<circle cx="5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="19" cy="12" r="1.4" fill="currentColor"/>',

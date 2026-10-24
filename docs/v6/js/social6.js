@@ -115,7 +115,7 @@ async function showReviews6() {
   list.forEach(function (x) { box.appendChild(reviewCard(x, false)); });
 }
 function reviewCard(x, admin, onDone) {
-  const img = el('div', { class: 'rvimg' }, [el('button', { type: 'button', class: 'btn sm line', text: 'اعرض التصميم', onclick: async function (e) { e.currentTarget.disabled = true; try { const u = await API6.me('rv_img', x.id); rc(img, el('img', { src: u, alt: 'التصميم' })); } catch (er) { toast(er.message); } } })]);
+  const img = el('div', { class: 'rvimg' }, [el('button', { type: 'button', class: 'btn sm line', text: 'اعرض التصميم', onclick: async function (e) { e.currentTarget.disabled = true; try { const u = await API6.me('rv_img', x.id); rc(img, el('img', { src: u, alt: 'التصميم', title: 'اعرضه بحجم كبير', style: 'cursor:zoom-in', onclick: function () { imgViewer(u, x.name ? 'تصميم ' + x.name : 'التصميم'); } }), el('button', { type: 'button', class: 'btn sm tint rvbig', onclick: function () { imgViewer(u, x.name ? 'تصميم ' + x.name : 'التصميم'); } }, [ico('expand'), 'عرض كبير'])); } catch (er) { toast(er.message); } } })]);
   const prog = V6.bundle.programs.find(function (p) { return p.id === x.program; });
   const card = el('div', { class: 'card rvcard' + (x.status === 'done' ? ' done' : '') }, [
     img,
@@ -196,13 +196,13 @@ async function loadNotifs() {
   try { NOTIFS = await API6.me('nt_list'); } catch (e) { NOTIFS = []; }
   const bell = $('#bell'); if (bell && NOTIFS.some(function (x) { return !x.seen; })) bell.classList.add('dot-badge');
 }
-const NT_IC = { comment: 'comment', review: 'review', week: 'chart' };
+const NT_IC = { comment: 'comment', review: 'review', week: 'chart', fb: 'flag', tgfail: 'send', tg: 'send', task: 'check', remind: 'bell' };
 function notifsBlock() {
   if (!NOTIFS.length) return null;
   const unseen = NOTIFS.some(function (x) { return !x.seen; });
   if (unseen) API6.me('nt_seen').catch(function () {});
   const b = el('article', { class: 'nitem first ntbox' }, [el('h4', { text: 'إشعاراتك' }), el('div', { class: 'ntlist' }, NOTIFS.slice(0, 8).map(function (x) {
-    return el('a', { class: 'ntrow' + (x.seen ? '' : ' new'), href: x.link || '#/', onclick: function () { closeModals(); } }, [ico(NT_IC[x.kind] || 'bell'), el('span', { text: x.text }), el('small', { class: 'tiny', text: fmtTime(x.at) })]);
+    return el('a', { class: 'ntrow' + (x.seen ? '' : ' new'), href: x.link || '#/', onclick: function () { closeModals(); } }, [ico(NT_IC[x.kind] || 'bell'), el('span', { class: 'ntt' }, [el('span', { text: x.text }), x.sum ? el('span', { class: 'ntsum' }, [ico('ai'), x.sum]) : null]), el('small', { class: 'tiny', text: fmtTime(x.at) })]);
   }))]);
   NOTIFS.forEach(function (x) { x.seen = true; });
   return b;
@@ -296,4 +296,23 @@ function skillForm(s) {
     s.builtin && s.edited ? el('button', { type: 'button', class: 'btn sm line', text: 'أعدها إلى الأصل', onclick: async function () { try { await API6.me('ai_skill_reset', s.id); toast('أُعيدت'); showAdmin('ai'); } catch (e) { toast(e.message); } } }) : null,
     !s.builtin && s.id ? el('button', { type: 'button', class: 'btn sm line', text: 'احذف', onclick: async function () { try { await API6.me('ai_skill_save', JSON.stringify({ id: s.id, name: s.name, deleted: true })); showAdmin('ai'); } catch (e) { toast(e.message); } } }) : null,
     el('button', { type: 'button', class: 'btn sm dark', text: 'احفظ', onclick: async function () { if (!name.value.trim() || text.value.trim().length < 10) { toast('اكتب الاسم ونص المهارة'); return; } try { await API6.me('ai_skill_save', JSON.stringify({ id: s.id, name: name.value.trim(), kinds: kinds, text: text.value.trim(), on: on.checked })); toast('حُفظت المهارة'); showAdmin('ai'); } catch (e) { toast(e.message); } } })])]);
+}
+
+/* عارض صورة بملء الشاشة: يملأ الشاشة بلا قصّ، ونقرة (أو زر) تكبّره إلى حجمه الحقيقي مع التحريك، وEsc أو ✕ للإغلاق */
+function imgViewer(src, title) {
+  $$('.imgview').forEach(function (x) { x.remove(); });
+  const im = el('img', { src: src, alt: title || '' });
+  const stage = el('div', { class: 'ivstage' }, [im]);
+  let full = false;
+  const zoomBtn = el('button', { type: 'button', class: 'ib', 'aria-label': 'تكبير', title: 'الحجم الحقيقي', onclick: function () { toggle(); } }, [ico('zoomin')]);
+  function toggle(e) { full = !full; wrap.classList.toggle('full', full); rc(zoomBtn, ico(full ? 'zoomout' : 'zoomin')); if (full && e) { const r = im.getBoundingClientRect(); requestAnimationFrame(function () { stage.scrollLeft = (e.clientX - r.left) / r.width * stage.scrollWidth - stage.clientWidth / 2; stage.scrollTop = (e.clientY - r.top) / r.height * stage.scrollHeight - stage.clientHeight / 2; }); } }
+  im.addEventListener('click', function (e) { e.stopPropagation(); toggle(e); });
+  const close = function () { wrap.classList.remove('on'); document.removeEventListener('keydown', key); setTimeout(function () { wrap.remove(); }, 250); };
+  const key = function (e) { if (e.key === 'Escape') close(); };
+  const wrap = el('div', { class: 'imgview', role: 'dialog', 'aria-label': title || 'عرض الصورة' }, [
+    el('div', { class: 'ivbar' }, [el('b', { text: title || '' }), el('span', { class: 'sp' }), zoomBtn, el('a', { class: 'ib', href: src, download: (title || 'design') + '.png', 'aria-label': 'تنزيل', title: 'تنزيل' }, [ico('download')]), el('button', { type: 'button', class: 'ib', 'aria-label': 'إغلاق', onclick: close }, [ico('close')])]),
+    stage]);
+  stage.addEventListener('click', function (e) { if (e.target === stage) close(); });
+  document.addEventListener('keydown', key);
+  document.body.appendChild(wrap); requestAnimationFrame(function () { wrap.classList.add('on'); });
 }
