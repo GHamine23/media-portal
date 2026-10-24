@@ -25,7 +25,7 @@ function buildPanel() {
   p.innerHTML = '';
   p.appendChild(el('div', { class: 'grab', 'aria-hidden': 'true' }));
   const body = el('div', { class: 'pbody' }); p.appendChild(body);
-  ({ content: pContent, tpls: pTpls, text: pText, els: pEls, imgs: pImgs, colors: pColors, fonts: pFonts, layers: pLayers, assist: pAssist, el: pEl, anim: pAnim }[ED.tab] || pContent)(body);
+  ({ content: pContent, tpls: pTpls, text: pText, els: pEls, imgs: pImgs, colors: pColors, fonts: pFonts, layers: pLayers, assist: pAssist, el: pEl, anim: pAnim, bg: pBg }[ED.tab] || pContent)(body);
   if (ED.lastTab !== ED.tab) { body.classList.add('fresh'); Array.prototype.forEach.call(body.children, function (c, i) { c.style.setProperty('--i', Math.min(i, 14)); }); ED.lastTab = ED.tab; }
   p.scrollTop = st;
 }
@@ -187,6 +187,49 @@ function pEls(b) {
   if (typeof mediaPanelSection === 'function') mediaPanelSection(b);
 }
 
+/* ---------- الخلفية: لون، ونقش، وصورة بتحكم كامل ---------- */
+function pBg(b) {
+  const T = S.track, tpl = S.tpl, mine = V6.mine.filter(function (a) { return a.kind === 'image'; });
+  b.appendChild(panelHead('الخلفية', 'لون الخلفية، أو نقش فوقه، أو صورة تتحكم في تكبيرها وموضعها وتعتيمها.'));
+  b.appendChild(el('h4', { class: 'psh', text: 'اللون' }));
+  const sw = el('div', { class: 'bgsw' });
+  const roles = [['', 'تلقائي'], ['paper', 'الورق'], ['warm', 'دافئ'], ['white', 'أبيض'], ['p', 'الأساسي'], ['pd', 'الأساسي الداكن'], ['pl', 'الأساسي الفاتح'], ['s', 'الثانوي'], ['sd', 'الثانوي الداكن'], ['teal', 'الأخضر المزرق'], ['a', 'التمييز'], ['ink', 'الحبر']];
+  roles.forEach(function (r) { const c = r[0] === '' ? '' : r[0] === 'white' ? '#ffffff' : T.c[r[0]]; if (r[0] && !c) return; sw.appendChild(el('button', { type: 'button', class: 'bgsw-b' + ((S.ov.bg || '') === c ? ' on' : ''), title: r[1], 'aria-label': r[1], style: c ? 'background:' + c : '', onclick: function () { if (c) S.ov.bg = c; else delete S.ov.bg; changed6(); buildPanel(); } }, [c ? null : ico('reset')])); });
+  sw.appendChild(colorBtn(S.ov.bg || '', 'لون آخر', function (c) { if (c) S.ov.bg = c; else delete S.ov.bg; redraw(); }, { orig: true, origLabel: 'تلقائي' }));
+  b.appendChild(sw);
+  b.appendChild(el('h4', { class: 'psh', text: 'النقش' }));
+  const cur = (S.bgfx && S.bgfx.p) || 'plain';
+  const g3 = el('div', { class: 'libg patg' }); b.appendChild(g3);
+  BG_PATTERNS.forEach(function (q) {
+    if (q[0] === 'photo') return;
+    const c = el('canvas', { width: 90, height: 112, style: 'width:56px;height:70px' }); const gx = c.getContext('2d'); const sv = BGFX; BGFX = { p: q[0] }; gx.scale(90 / 1080, 112 / 1350); paintBg(gx, 1080, 1350, S.ov.bg || T.c.pd); BGFX = sv;
+    g3.appendChild(el('button', { type: 'button', class: 'libb' + (cur === q[0] ? ' on' : ''), title: q[1], onclick: function () { S.bgfx = q[0] === 'plain' ? null : { p: q[0] }; changed6(); buildPanel(); } }, [c, el('small', { class: 'tiny', text: q[1] })]));
+  });
+  b.appendChild(el('h4', { class: 'psh', text: 'صورة خلفية' }));
+  const isPhoto = S.bgfx && S.bgfx.p === 'photo';
+  const g4 = el('div', { class: 'imgrid' }); b.appendChild(g4);
+  const pick = function (src) { S.bgfx = Object.assign({ p: 'photo', dim: 0.45, tint: 0.25, z: 1, ox: 0, oy: 0, blur: 0 }, isPhoto ? S.bgfx : {}, { p: 'photo', src: src }); changed6(); buildPanel(); };
+  DATE_LIB.concat(mine.map(function (a) { return 'asset:' + a.id; })).forEach(function (n) {
+    const src = n.slice(0, 6) === 'asset:' ? n : 'lib:' + n, a = n.slice(0, 6) === 'asset:' ? V6.assets[n.slice(6)] : null;
+    const bt = el('button', { type: 'button', class: 'imb' + (isPhoto && S.bgfx.src === src ? ' on' : ''), title: a ? a.name : (LIB_NAMES[n] || ''), onclick: function () { pick(src); } });
+    bt.style.backgroundImage = 'url(' + (a ? a.thumb : ASSETS[n]) + ')'; g4.appendChild(bt);
+  });
+  g4.appendChild(uploadBtn('ارفع صورة', function (res) { pick('asset:' + res.id); }));
+  b.appendChild(el('p', { class: 'tiny', text: 'الصور المجانية من تبويب «الصور»: أضف صورة إلى مكتبتك ثم اخترها هنا.' }));
+  if (isPhoto) {
+    const F = S.bgfx;
+    b.appendChild(el('h4', { class: 'psh', text: 'ضبط الصورة' }));
+    b.appendChild(slider('التعتيم بلون الخلفية', F.dim == null ? 0.45 : F.dim, 0, 0.9, 0.05, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { F.dim = v; }));
+    b.appendChild(slider('صبغة الهوية', F.tint == null ? 0.25 : F.tint, 0, 0.6, 0.05, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { F.tint = v; }));
+    b.appendChild(slider('التكبير', F.z || 1, 1, 2.5, 0.05, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { F.z = v; }));
+    b.appendChild(slider('الموضع أفقياً', F.ox || 0, -1, 1, 0.05, function (v) { return v > 0 ? 'يسار' : v < 0 ? 'يمين' : 'وسط'; }, function (v) { F.ox = v; }));
+    b.appendChild(slider('الموضع رأسياً', F.oy || 0, -1, 1, 0.05, function (v) { return v > 0 ? 'أسفل' : v < 0 ? 'أعلى' : 'وسط'; }, function (v) { F.oy = v; }));
+    b.appendChild(slider('التمويه', F.blur || 0, 0, 24, 1, function (v) { return v ? v + 'px' : 'بلا'; }, function (v) { F.blur = v; }));
+    b.appendChild(el('div', { class: 'row wrapr' }, [el('button', { type: 'button', class: 'btn sm line', onclick: function () { S.bgfx = null; changed6(); buildPanel(); } }, [ico('trash'), 'أزل الصورة']), el('button', { type: 'button', class: 'btn sm ghost', onclick: function () { Object.assign(F, { dim: 0.45, tint: 0.25, z: 1, ox: 0, oy: 0, blur: 0 }); changed6(); buildPanel(); } }, ['أعد الضبط'])]));
+  }
+  if (ED.doc.kind === 'deck') b.appendChild(el('button', { type: 'button', class: 'btn sm line', style: 'margin-top:8px', text: 'طبّق هذه الخلفية على كل الشرائح', onclick: function () { commitPage(); const src = ED.doc.pages[ED.cur]; ED.doc.pages.forEach(function (p) { p.ov = Object.assign({}, p.ov, { bg: src.ov.bg }); if (!src.ov.bg) delete p.ov.bg; p.bgfx = src.bgfx ? JSON.parse(JSON.stringify(src.bgfx)) : null; }); loadPage(ED.cur); buildPages(); markDirty(); toast('طُبّقت'); } }));
+}
+
 /* ---------- الصور ---------- */
 function pImgs(b) {
   b.appendChild(panelHead('الصور', 'صور المكتبة وصورك المرفوعة. تُحفظ بجودتها الأصلية.'));
@@ -204,23 +247,7 @@ function pImgs(b) {
   b.appendChild(el('h4', { class: 'psh', text: 'مكتبة البرنامج' }));
   const g2 = el('div', { class: 'imgrid' }); b.appendChild(g2);
   DATE_LIB.forEach(function (n) { const bt = el('button', { type: 'button', class: 'imb', title: LIB_NAMES[n] || '', onclick: function () { addLayer6({ t: 'img', ref: 'lib:' + n, w: 0.55 }); } }); bt.style.backgroundImage = 'url(' + ASSETS[n] + ')'; g2.appendChild(bt); });
-  b.appendChild(el('h4', { class: 'psh', text: 'خلفية التصميم' }));
-  const cur = (S.bgfx && S.bgfx.p) || 'plain';
-  const g3 = el('div', { class: 'libg' }); b.appendChild(g3);
-  BG_PATTERNS.forEach(function (q) {
-    if (q[0] === 'photo') return;
-    const c = el('canvas', { width: 90, height: 112, style: 'width:56px;height:70px' }); const gx = c.getContext('2d'); const sv = BGFX; BGFX = { p: q[0] }; gx.scale(90 / 1080, 112 / 1350); paintBg(gx, 1080, 1350, S.track.c.pd); BGFX = sv;
-    g3.appendChild(el('button', { type: 'button', class: 'libb' + (cur === q[0] ? ' on' : ''), title: q[1], onclick: function () { S.bgfx = q[0] === 'plain' ? null : { p: q[0] }; changed6(); buildPanel(); } }, [c]));
-  });
-  if (S.bgfx && S.bgfx.p === 'photo' || true) {
-    b.appendChild(el('p', { class: 'tiny', text: 'أو اجعل صورة خلفيةً للتصميم:' }));
-    const g4 = el('div', { class: 'imgrid' }); b.appendChild(g4);
-    DATE_LIB.concat(mine.map(function (a) { return 'asset:' + a.id; })).forEach(function (n) {
-      const src = n.slice(0, 6) === 'asset:' ? n : 'lib:' + n, a = n.slice(0, 6) === 'asset:' ? V6.assets[n.slice(6)] : null;
-      const bt = el('button', { type: 'button', class: 'imb' + (S.bgfx && S.bgfx.src === src ? ' on' : ''), onclick: function () { S.bgfx = { p: 'photo', src: src }; changed6(); buildPanel(); } });
-      bt.style.backgroundImage = 'url(' + (a ? a.thumb : ASSETS[n]) + ')'; g4.appendChild(bt);
-    });
-  }
+  b.appendChild(el('p', { class: 'tiny', text: 'خلفية التصميم لها تبويبها الخاص «الخلفية» في الشريط الجانبي.' }));
 }
 
 /* ---------- الألوان ---------- */
@@ -434,7 +461,8 @@ function pEl(b) {
       el('h3', { text: 'إعدادات العنصر' }),
       el('button', { type: 'button', class: 'ib sm nx', title: 'العنصر التالي', 'aria-label': 'العنصر التالي', disabled: idx >= order.length - 1, onclick: function () { jump(1); } }, [ico('chev')])
     ])]));
-  b.appendChild(el('div', { class: 'fld' }, [el('label', { text: 'اسمه' }), el('input', { type: 'text', value: gName(g), oninput: function (e) { renameEl(g, e.target.value); const t = $('.tname'); if (t) t.textContent = gName(g); } })]));
+  b.appendChild(el('div', { class: 'row' }, [el('div', { class: 'fld grow' }, [el('label', { text: 'اسمه' }), el('input', { type: 'text', value: gName(g), oninput: function (e) { renameEl(g, e.target.value); const t = $('.tname'); if (t) t.textContent = gName(g); } })]),
+    el('button', { type: 'button', class: 'btn sm line danger eldel', title: L ? 'حذف العنصر' : 'إزالة العنصر من التصميم (يعود من لوحة الطبقات)', onclick: function () { if (L) { delLayer6(L.id); } else { S.hide['g_' + g] = true; select(null); changed6(); } ED.tab = ED.prevTab || 'layers'; buildRail(); buildPanel(); toast(L ? 'حُذف العنصر' : 'أُزيل العنصر، ويعود من «الطبقات»'); } }, [ico('trash'), L ? 'حذف' : 'إزالة'])]));
   // النصوص
   texts.forEach(function (it) {
     const ph = !it.layer && ED.doc.pages[ED.cur].ph && ED.doc.pages[ED.cur].ph[it.f.k];

@@ -50,7 +50,8 @@ function showHome() {
         el('div', { class: 'searchrow rv', style: '--d:2' }, [ico('search'), search])
       ]),
       clockCard(),
-      aiDesignerBox()
+      aiDesignerBox(),
+      scrollCue()
     ]),
     el('div', { class: 'wrap hgrid2' }, [tipOfDayCard(), wkSlot]),
     el('div', { class: 'wrap' }, [el('section', { class: 'hsec', id: 'modelsec', hidden: true }, [el('div', { class: 'shead' }, [H('h2', 'نماذج جاهزة'), el('a', { class: 'btn sm line', href: '#/mine', onclick: function () { ls('mineTab', 'models'); }, text: 'كل النماذج' })]), stripNav(models)])].concat(idSections).concat([
@@ -63,6 +64,13 @@ function showHome() {
   rotateMessages(msg, src, nm);
 }
 
+/* ---------- إشارة «المزيد في الأسفل»: تظهر حتى يبدأ التمرير ---------- */
+function scrollCue() {
+  const c = el('a', { class: 'scue', href: '#modelsec', 'aria-label': 'انزل إلى الأقسام', onclick: function (e) { e.preventDefault(); const t = document.querySelector('.hgrid2') || document.querySelector('.hsec'); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }, [el('span', { class: 'scue-t', text: 'المزيد في الأسفل' }), el('span', { class: 'scue-m' }, [el('span', { class: 'scue-d' })])]);
+  const on = function () { if (window.scrollY > 80) { c.classList.add('gone'); window.removeEventListener('scroll', on); } };
+  window.addEventListener('scroll', on, { passive: true });
+  return c;
+}
 /* ---------- الأزرار الأربعة داخل كل هوية ---------- */
 function quickCards(tid) {
   return el('div', { class: 'quick' }, [

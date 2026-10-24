@@ -475,7 +475,7 @@ async function aSettings(body) {
       el('div', { class: 'fld' }, [el('label', { text: 'أقصى حجم للملف (ميغابايت)' }), maxMb])]),
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-or' }, [ico('image')]), el('h3', { text: 'صور مجانية (Pixabay / Pexels)' }),
       el('p', { class: 'small ' + (s.pexelsOn || s.pixabayOn ? 'ok' : 'err'), text: s.pixabayOn || s.pexelsOn ? 'مصدر الصور مضبوط: ' + [s.pixabayOn ? 'Pixabay' : '', s.pexelsOn ? 'Pexels' : ''].filter(Boolean).join(' و') + '. الفريق يبحث عن صور مجانية من المحرر.' : 'بلا مفتاح بعد. Pixabay يعطي مفتاحاً مجانياً فوراً.' }),
-      el('div', { class: 'fld' }, [el('label', { text: 'مفتاح Pixabay (يُحفظ في الخادم ولا يُعرض)' }), pbKey, el('small', { text: 'مجاني فوري من pixabay.com/api/docs بعد التسجيل. الصور حتى ١٢٨٠ بكسل، وتطلب من دعم Pixabay «full API access» مجاناً لتصل الأصول الكاملة.' })]),
+      el('div', { class: 'fld' }, [el('label', { text: 'مفتاح Pixabay (يُحفظ في الخادم ولا يُعرض)' }), pbKey, el('small', { text: 'مجاني فوري من pixabay.com/api/docs بعد التسجيل. الصور حتى ١٢٨٠ بكسل، وتطلب من دعم Pixabay «full API access» مجاناً لتصل الأصول الكاملة.' }), el('div', { class: 'row' }, [el('button', { type: 'button', class: 'btn sm line', text: 'اختبر مصدر الصور', onclick: async function (e) { const b = e.currentTarget; b.disabled = true; try { const r = await API6.me('img_test'); toast('يعمل: ' + (r.provider || '') + ' · ' + (r.n != null ? r.n + ' نتيجة تجريبية' : 'مضبوط')); } catch (er) { toast('لا يعمل: ' + er.message); } b.disabled = false; } }), el('small', { class: 'tiny', text: 'احفظ المفتاح أولاً ثم اختبر. إن ظهر 400 فالمفتاح غير صحيح أو الخادم قديم.' })])]),
       el('div', { class: 'fld' }, [el('label', { text: 'مفتاح Pexels (إن توفر؛ إصدار المفاتيح متوقف عندهم حالياً)' }), pxKey]),
       el('div', { class: 'fld' }, [el('label', { text: 'المصدر المفضّل' }), segOf([['', 'تلقائي'], ['pixabay', 'Pixabay'], ['pexels', 'Pexels']], s.imgProvider || '', function (v) { imgProv = v; })]),
       el('p', { class: 'tiny', text: 'الحد المجاني ٢٠٠ بحث في الساعة. الصورة التي يختارها المستخدم تُحفظ بأصلها كاملاً في مكتبته، ويقترحها للبرنامج فتوافق أنت من «الشعارات والصور».' })])
@@ -651,6 +651,8 @@ async function aAI(body) {
 function tgForm(p) {
   const tg = Object.assign({ chat: '', link: '', hashtag: '', sign: '' }, p.tg || {});
   const chatI = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: tg.chat, placeholder: '@channel_username أو -1001234567890' });
+  const chats = Object.assign({}, tg.chats || {});
+  const trackRows = (p.identities || []).map(function (t) { return el('div', { class: 'fld' }, [el('label', { text: t.name }), el('input', { type: 'text', class: 'inp sm', dir: 'ltr', value: chats[t.id] || '', placeholder: 'اتركه فارغاً لاستعمال قناة البرنامج', oninput: function (e) { chats[t.id] = e.target.value.trim(); } })]); });
   const linkI = el('input', { type: 'url', class: 'inp', dir: 'ltr', value: tg.link, placeholder: 'https://…' });
   const hashI = el('input', { type: 'text', class: 'inp', dir: 'auto', value: tg.hashtag, placeholder: 'الأنشطة_التربوية' });
   const signI = el('input', { type: 'text', class: 'inp', dir: 'auto', value: tg.sign, placeholder: 'ننتظركم على خير 🌿' });
@@ -675,10 +677,11 @@ function tgForm(p) {
   modal({ title: 'قناة ' + p.name + ' والنصوص المصاحبة', wide: true, body: [
     el('p', { class: 'tiny', text: 'أضف بوت المنصة مشرفاً في القناة (بصلاحية النشر)، ثم اكتب اسم القناة هنا. كل من له صلاحية «الإرسال» في هذا البرنامج يرسل إليها من المحرر.' }),
     el('div', { class: 'grid two' }, [el('div', { class: 'fld' }, [el('label', { text: 'القناة أو المجموعة' }), chatI]), el('div', { class: 'fld' }, [el('label', { text: 'رابط الحضور أو التسجيل المعتاد {link}' }), linkI]), el('div', { class: 'fld' }, [el('label', { text: 'الوسم المعتاد {hashtag}' }), hashI]), el('div', { class: 'fld' }, [el('label', { text: 'توقيع ختامي {sign}' }), signI])]),
-    el('h4', { class: 'psh', text: 'القوالب الكتابية الخاصة بالبرنامج' }), el('p', { class: 'tiny', text: 'المتغيرات: ' + CAP_VARS.map(function (v) { return '{' + v[0] + '} ' + v[1]; }).join(' · ') + '. والتنسيق بوسوم تليجرام: <b> <i> <u> <blockquote>.' }), capBox,
+    trackRows.length ? el('details', { class: 'capdet' }, [el('summary', { text: 'قناة مختلفة لكل مسار (اختياري)' }), el('p', { class: 'tiny', text: 'إن كان لكل مسار قناته، اكتبها هنا؛ يُرسل المحرر تلقائياً إلى قناة المسار الذي صُمّم له الإعلان، وإلا إلى قناة البرنامج.' }), el('div', { class: 'grid two' }, trackRows)]) : null,
+    el('h4', { class: 'psh', text: 'القوالب الكتابية الخاصة بالبرنامج' }), el('p', { class: 'tiny', text: 'اكتب القالب كما تكتب في تليجرام، وضع الحقول بين قوسين معقوفين فتُملأ من التصميم: ' + CAP_VARS.map(function (v) { return '{' + v[0] + '} ' + v[1]; }).join(' · ') + '. للتنسيق تُقبل وسوم <b> غامق و<u> خط و<blockquote> اقتباس.' }), capBox,
     el('h4', { class: 'psh', text: 'نماذج رسائلكم (يتعلم منها المساعد)' }), samples
   ], acts: [{ t: 'حفظ', cls: 'dark', keep: true, fn: async function (close) {
-    try { await API6.me('prog_save', JSON.stringify({ id: p.id, tg: { chat: chatI.value.trim(), link: linkI.value.trim(), hashtag: hashI.value.trim(), sign: signI.value.trim() }, captions: caps.filter(function (c) { return c.text && c.text.trim(); }), samples: samples.value })); close(); await refreshBundle(); toast('حُفظ'); showAdmin('programs'); }
+    try { await API6.me('prog_save', JSON.stringify({ id: p.id, tg: { chat: chatI.value.trim(), chats: chats, link: linkI.value.trim(), hashtag: hashI.value.trim(), sign: signI.value.trim() }, captions: caps.filter(function (c) { return c.text && c.text.trim(); }), samples: samples.value })); close(); await refreshBundle(); toast('حُفظ'); showAdmin('programs'); }
     catch (e) { toast(e.message); }
   } }, { t: 'إلغاء' }] });
 }

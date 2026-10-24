@@ -586,9 +586,11 @@ function paintBg(ctx, W, H, base) {
   } else if (p === 'girih') { geoGirih(ctx, W, H, alpha(ink, dark ? 0.1 : 0.07), u);
   } else if (p === 'zellij') { geoZellij(ctx, W, H, alpha(ink, dark ? 0.1 : 0.07), u);
   } else if (p === 'photo' && BGFX.im) {
-    drawPhoto(ctx, BGFX.im, 0, 0, W, H, {});
-    ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = lighten(base, 0.25); ctx.fillRect(0, 0, W, H);
-    ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = alpha(base, 0.45); ctx.fillRect(0, 0, W, H);
+    if (BGFX.blur) { ctx.save(); ctx.filter = 'blur(' + (BGFX.blur * u) + 'px)'; drawPhoto(ctx, BGFX.im, -BGFX.blur * u * 2, -BGFX.blur * u * 2, W + BGFX.blur * u * 4, H + BGFX.blur * u * 4, { z: BGFX.z, ox: BGFX.ox, oy: BGFX.oy, fit: 'cover' }); ctx.restore(); }
+    else drawPhoto(ctx, BGFX.im, 0, 0, W, H, { z: BGFX.z, ox: BGFX.ox, oy: BGFX.oy, fit: 'cover' });
+    const tint = BGFX.tint == null ? 0.25 : BGFX.tint, dim = BGFX.dim == null ? 0.45 : BGFX.dim;
+    if (tint > 0) { ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = lighten(base, tint); ctx.fillRect(0, 0, W, H); }
+    ctx.globalCompositeOperation = 'source-over'; if (dim > 0) { ctx.fillStyle = alpha(base, dim); ctx.fillRect(0, 0, W, H); }
   }
   ctx.restore();
   BOXES = save; GBOX = g;

@@ -10,21 +10,24 @@ const REVIEW_SCHEMA = { type: 'OBJECT', properties: {
   score: { type: 'NUMBER' }, verdict: { type: 'STRING' },
   strengths: { type: 'ARRAY', items: { type: 'STRING' } },
   issues: { type: 'ARRAY', items: { type: 'OBJECT', properties: { cat: { type: 'STRING' }, title: { type: 'STRING' }, fix: { type: 'STRING' }, severity: { type: 'STRING' } }, required: ['cat', 'title', 'fix'] } },
-  quick: { type: 'ARRAY', items: { type: 'STRING' } } }, required: ['score', 'verdict', 'issues'] };
+  quick: { type: 'ARRAY', items: { type: 'STRING' } },
+  edits: { type: 'ARRAY', items: { type: 'OBJECT', properties: { target: { type: 'STRING' }, op: { type: 'STRING' }, value: { type: 'STRING' }, why: { type: 'STRING' } }, required: ['target', 'op'] } } }, required: ['score', 'verdict', 'issues'] };
 async function aiReview() {
   if (!aiReady()) { toast('المراجعة الذكية تحتاج صلاحية المساعد'); return; }
-  const body = el('div', { class: 'rvbody' }, [el('div', { class: 'rvwait' }, [loader6('يتأمل المصمّم الذكي تصميمك…', true)])]);
+  const body = el('div', { class: 'rvbody' }, [el('div', { class: 'rvwait' }, [loader6('يتأمل المصمّم الذكي تصميمك…', true), notifyBtn()])]);
   modal({ title: 'مراجعة المصمّم الذكي', wide: true, body: [body], acts: [{ t: 'إغلاق' }] });
   const png = designPNG(1080), sz = SIZES[S.size];
   const sys = ['أنت مصمّم جرافيك عربي خبير ومراجع لطيف صريح. تراجع تصميماً تربوياً لبرنامج «' + (V6.prog ? V6.prog.name : '') + '» بهوية «' + S.track.name + '».',
     'قيّم الصورة المرفقة كما يراها الجمهور على الهاتف. أعطِ score من ١٠٠ بعدل (٨٠+ ممتاز، ٦٠–٧٩ جيد، أقل يحتاج عملاً).',
     'verdict جملة واحدة. strengths من نقطتين إلى ثلاث محددة. issues من مشكلتين إلى خمس مرتبة بالأهمية، لكل واحدة cat من: ' + TIP_CATS.map(function (c) { return c.id; }).join(', ') + '، وtitle قصير، وfix خطوة عملية يفعلها في المحرر (كبّر، قرّب، احذف، غيّر اللون إلى…)، وseverity: high أو mid أو low.',
-    'quick: ثلاثة تحسينات سريعة في دقيقة. لا تعلّق على الشعارات ولا تطلب تغيير هوية البرنامج. اكتب بعربية واضحة قصيرة.'].join('\n');
-  const prompt = 'القالب: ' + S.tpl.name + ' · المقاس: ' + (sz.name || S.size) + ' (' + sz.w + '×' + sz.h + ')\nنصوص التصميم:\n' + (designTexts() || '—');
+    'quick: ثلاثة تحسينات سريعة في دقيقة. لا تعلّق على الشعارات ولا تطلب تغيير هوية البرنامج. اكتب بعربية واضحة قصيرة.',
+    'edits: تعديلات آلية محدودة يمكن للمنصة تطبيقها (حتى ٦)، كل واحد {target: اسم العنصر من القائمة أدناه، op: scale|move|hide|text|accent، value}. scale: نسبة مثل 1.25 أو 0.8؛ move: dx,dy بالبكسل من عرض 1080 مثل "0,-40"؛ hide: إخفاء عنصر زائد؛ text: نص جديد لحقل نصي (قصير)؛ accent: لون سداسي للتمييز. لا تقترح edits إلا إذا كانت آمنة وواضحة.'].join('\n');
+  const groups = Object.keys(LASTG || {}).filter(function (g) { return g !== 'deco'; });
+  const prompt = 'القالب: ' + S.tpl.name + ' · المقاس: ' + (sz.name || S.size) + ' (' + sz.w + '×' + sz.h + ')\nعناصر التصميم (للـedits): ' + groups.map(function (g) { return g + ' = ' + gName(g); }).join('، ') + '\nالحقول النصية: ' + (S.tpl.fields || []).filter(function (f) { return f.k && typeof S.d[f.k] === 'string'; }).map(function (f) { return f.k + ' = ' + f.label; }).join('، ') + '\nنصوص التصميم:\n' + (designTexts() || '—');
   try {
     const raw = await API6.call('ai_make', V6.token, JSON.stringify({ kind: 'review', program: V6.prog.id, system: sys, prompt: prompt, files: [{ mime: 'image/png', b64: png.split(',')[1] }], schema: REVIEW_SCHEMA, temperature: 0.3 }));
     const r = JSON.parse(raw); r.score = Math.max(0, Math.min(100, Math.round(+r.score || 0)));
-    ED.lastReview = r; track('tool', { tool: 'ai_review' });
+    ED.lastReview = r; track('tool', { tool: 'ai_review' }); notifyDone('مراجعة التصميم جاهزة', r.verdict || '');
     paintReview(body, r);
   } catch (e) { rc(body, el('p', { class: 'err', text: e.message })); }
 }
@@ -55,9 +58,27 @@ function paintReview(body, r) {
       ]);
     }))]),
     r.quick && r.quick.length ? el('div', { class: 'rvsec' }, [el('h4', { text: 'في دقيقة' }), el('ol', { class: 'rvquick' }, r.quick.map(function (q) { return el('li', { text: q }); }))]) : null,
+    r.edits && r.edits.length ? el('div', { class: 'rvsec rvedits' }, [el('h4', { text: 'تعديلات يستطيع المساعد تطبيقها' }), el('ul', { class: 'rvquick' }, r.edits.map(function (e) { return el('li', { text: editLabel(e) }); })),
+      el('div', { class: 'row wrapr' }, [el('button', { type: 'button', class: 'btn sm dark', onclick: function () { const n = applyReviewEdits(r.edits); closeModals(); toast(n ? 'طُبّق ' + n + ' تعديلاً. تراجع بـ Ctrl+Z إن لم يعجبك' : 'لم يُطبَّق شيء'); } }, [ico('wand'), 'طبّق التعديلات']), el('small', { class: 'tiny', text: 'الأدق أن تطبّقها بيدك في المحرر؛ هذا تطبيق تقريبي يمكن التراجع عنه.' })])]) : null,
+    aiNotice('هذه المراجعة من المساعد: مفيدة للإرشاد، وقد تخطئ في تقدير التفاصيل. القرار النهائي لعينك.'),
     el('div', { class: 'row wrapr' }, [el('button', { type: 'button', class: 'btn line', onclick: function () { closeModals(); requestReview(r); } }, [ico('review'), 'اطلب رأي إدارة أثر أيضاً']), el('span', { class: 'sp' }), el('button', { type: 'button', class: 'btn sm line', onclick: function () { closeModals(); aiReview(); } }, [ico('reset'), 'راجع مرة أخرى بعد التعديل'])])
   );
   revealAll(body);
+}
+const EDIT_OP_N = { scale: 'تغيير حجم', move: 'تحريك', hide: 'إخفاء', text: 'تغيير نص', accent: 'لون التمييز' };
+function editLabel(e) { return (EDIT_OP_N[e.op] || e.op) + ' «' + gName(e.target) + '»' + (e.value ? ' (' + e.value + ')' : '') + (e.why ? ' — ' + e.why : ''); }
+function applyReviewEdits(edits) {
+  let n = 0; pushUndo6 && pushUndo6(true);
+  (edits || []).slice(0, 6).forEach(function (e) {
+    const g = e.target; if (!g) return;
+    if (e.op === 'scale' && LASTG[g]) { const v = Math.max(0.5, Math.min(2, parseFloat(e.value) || 1)); S.gs = S.gs || {}; S.gs[g] = Object.assign({}, S.gs[g], { s: Math.max(0.4, Math.min(2.5, ((S.gs[g] || {}).s || 1) * v)) }); n++; }
+    else if (e.op === 'move' && LASTG[g]) { const p = String(e.value || '').split(',').map(Number); if (p.length === 2 && isFinite(p[0]) && isFinite(p[1])) { S.pos = S.pos || {}; const ps = S.pos[S.size] = S.pos[S.size] || {}; const o = ps[g] || {}; ps[g] = { dx: (o.dx || 0) + Math.max(-300, Math.min(300, p[0])), dy: (o.dy || 0) + Math.max(-300, Math.min(300, p[1])) }; n++; } }
+    else if (e.op === 'hide' && LASTG[g] && g !== 'title' && g !== 'logo') { S.hide['g_' + g] = true; n++; }
+    else if (e.op === 'text' && e.value && typeof S.d[g] === 'string') { S.d[g] = String(e.value).slice(0, 200); n++; }
+    else if (e.op === 'accent' && /^#[0-9a-f]{6}$/i.test(e.value || '')) { S.ov.accent = e.value; n++; }
+  });
+  if (n) { changed6(); buildPanel(); }
+  return n;
 }
 function closeModals() { $$('.modal').forEach(function (m) { m.remove(); }); }
 

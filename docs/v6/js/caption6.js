@@ -55,65 +55,154 @@ function capPlain(t) { return String(t || '').replace(/<[^>]+>/g, '').replace(/&
 function capTemplates() { const P = V6.prog || {}; return (P.captions || []).map(function (c) { return Object.assign({ own: true }, c); }).concat(CAP_BASE); }
 function canSend() { return V6.me && (V6.me.role !== 'user' || !!(V6.me.perms && V6.me.perms.send)) && V6.settings && V6.settings.tg && V6.prog && V6.prog.tg && V6.prog.tg.chat; }
 
+/* ---------- محرر شبيه بتليجرام: تنسيق بالأزرار بلا وسوم ظاهرة ---------- */
+// وسوم تليجرام → HTML للمحرر (contenteditable)
+function tgToEd(t) { return capToHtml(t).replace(/<a href="([^"]*)"[^>]*>/g, '<a href="$1">'); }
+// HTML المحرر → وسوم تليجرام
+function edToTg(root) {
+  function walk(n) {
+    if (n.nodeType === 3) return n.nodeValue.replace(/ /g, ' ');
+    if (n.nodeType !== 1) return '';
+    const tag = n.tagName.toLowerCase(), inner = Array.prototype.map.call(n.childNodes, walk).join('');
+    if (tag === 'br') return '\n';
+    if (tag === 'b' || tag === 'strong') return inner.trim() ? '<b>' + inner + '</b>' : inner;
+    if (tag === 'i' || tag === 'em') return inner.trim() ? '<i>' + inner + '</i>' : inner;
+    if (tag === 'u') return inner.trim() ? '<u>' + inner + '</u>' : inner;
+    if (tag === 's' || tag === 'strike' || tag === 'del') return inner.trim() ? '<s>' + inner + '</s>' : inner;
+    if (tag === 'code') return '<code>' + inner + '</code>';
+    if (tag === 'a') { const h = n.getAttribute('href') || ''; return /^https?:/.test(h) && inner.trim() ? '<a href="' + h.replace(/"/g, '') + '">' + inner + '</a>' : inner; }
+    if (tag === 'blockquote') return '\n<blockquote>' + inner.replace(/^\n+|\n+$/g, '') + '</blockquote>\n';
+    if (tag === 'div' || tag === 'p') { const isFirst = n === n.parentNode.firstChild && n.parentNode === root; return (isFirst ? '' : '\n') + inner; }
+    if (tag === 'li') return '• ' + inner + '\n';
+    return inner;
+  }
+  return Array.prototype.map.call(root.childNodes, walk).join('').replace(/\n{3,}/g, '\n\n').replace(/^\n+|\n+$/g, '');
+}
+function capEditor(initialTg, onChange) {
+  const ed = el('div', { class: 'caped', contenteditable: 'true', dir: 'auto', role: 'textbox', 'aria-multiline': 'true', 'aria-label': 'نص الرسالة', spellcheck: 'true' });
+  ed.innerHTML = tgToEd(initialTg || '');
+  try { document.execCommand('defaultParagraphSeparator', false, 'div'); } catch (e) {}
+  ed.addEventListener('input', function () { onChange(); });
+  ed.addEventListener('paste', function (e) { e.preventDefault(); const t = (e.clipboardData || window.clipboardData).getData('text/plain'); document.execCommand('insertText', false, t); });
+  function cmd(c, v) { ed.focus(); document.execCommand(c, false, v || null); onChange(); }
+  function quote() {
+    ed.focus(); const sel = window.getSelection(); if (!sel.rangeCount) return;
+    let n = sel.anchorNode; while (n && n !== ed && !(n.nodeType === 1 && n.tagName === 'BLOCKQUOTE')) n = n.parentNode;
+    if (n && n !== ed) { // إزالة الاقتباس
+      const frag = document.createDocumentFragment(); while (n.firstChild) frag.appendChild(n.firstChild); n.parentNode.replaceChild(el('div', {}, [frag]), n);
+    } else document.execCommand('formatBlock', false, 'blockquote');
+    onChange();
+  }
+  function link() {
+    ed.focus(); const sel = window.getSelection(); const txt = sel.toString();
+    const u = el('input', { type: 'url', class: 'inp', dir: 'ltr', placeholder: 'https://…', value: /^https?:/.test(txt) ? txt : '' }), t = el('input', { type: 'text', class: 'inp', dir: 'auto', placeholder: 'النص الظاهر (اختياري)', value: /^https?:/.test(txt) ? '' : txt });
+    const range = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+    modal({ title: 'إدراج رابط', body: [el('div', { class: 'fld' }, [el('label', { text: 'الرابط' }), u]), el('div', { class: 'fld' }, [el('label', { text: 'النص' }), t])], acts: [{ t: 'أدرج', cls: 'dark', fn: function () {
+      const href = u.value.trim(); if (!/^https?:\/\//.test(href)) { toast('اكتب رابطاً يبدأ بـ https://'); return; }
+      ed.focus(); if (range) { const s2 = window.getSelection(); s2.removeAllRanges(); s2.addRange(range); }
+      const a = el('a', { href: href, text: t.value.trim() || href });
+      if (range && !range.collapsed) range.deleteContents(); (range || document.createRange()).insertNode(a); onChange();
+    } }, { t: 'إلغاء' }] });
+  }
+  const bar = el('div', { class: 'row capfmt', role: 'toolbar', 'aria-label': 'تنسيق' }, [
+    el('button', { type: 'button', class: 'ib sm', title: 'غامق (Ctrl+B)', onmousedown: function (e) { e.preventDefault(); }, onclick: function () { cmd('bold'); } }, [el('b', { text: 'B' })]),
+    el('button', { type: 'button', class: 'ib sm', title: 'مائل (Ctrl+I)', onmousedown: function (e) { e.preventDefault(); }, onclick: function () { cmd('italic'); } }, [el('i', { text: 'I' })]),
+    el('button', { type: 'button', class: 'ib sm', title: 'تحته خط (Ctrl+U)', onmousedown: function (e) { e.preventDefault(); }, onclick: function () { cmd('underline'); } }, [el('u', { text: 'U' })]),
+    el('button', { type: 'button', class: 'ib sm', title: 'مشطوب', onmousedown: function (e) { e.preventDefault(); }, onclick: function () { cmd('strikeThrough'); } }, [el('s', { text: 'S' })]),
+    el('button', { type: 'button', class: 'ib sm', title: 'اقتباس', onmousedown: function (e) { e.preventDefault(); }, onclick: quote }, ['❝']),
+    el('button', { type: 'button', class: 'ib sm', title: 'رابط', onmousedown: function (e) { e.preventDefault(); }, onclick: link }, [ico('link')]),
+    el('button', { type: 'button', class: 'ib sm', title: 'إزالة التنسيق', onmousedown: function (e) { e.preventDefault(); }, onclick: function () { cmd('removeFormat'); } }, ['✕'])
+  ]);
+  return { ed: ed, bar: bar, get: function () { return edToTg(ed); }, set: function (tg) { ed.innerHTML = tgToEd(tg || ''); onChange(); } };
+}
+
 /* ---------- نافذة النص المصاحب ---------- */
 function captionDialog() {
   if (!ED.doc) return;
   commitPage();
   const kindGuess = { ann: 'ann', comp: 'comp', thanks: 'thanks', quote: 'quote', daily: 'daily', cover: 'ann', yt: 'ann', social: 'ann' }[S.tpl.type] || 'ann';
   let date = new Date(), tplId = (ls('capTpl') || {})[S.tpl.type] || (capTemplates().find(function (c) { return c.kind === kindGuess; }) || CAP_BASE[0]).id;
-  const ta = el('textarea', { rows: '9', dir: 'auto', class: 'capta', 'aria-label': 'النص المصاحب' });
-  const prev = el('div', { class: 'tgprev' }), cnt = el('span', { class: 'tiny' });
+  let vars = capVars(date), manual = false;
+  const prev = el('div', { class: 'tgprev' }), cnt = el('span', { class: 'tiny capcnt' });
   const img = el('img', { class: 'tgimg', alt: '' }); try { img.src = ED.snapshot(700); } catch (e) {}
   const sel = el('select', { class: 'inp sm', 'aria-label': 'القالب الكتابي' }, capTemplates().map(function (c) { return el('option', { value: c.id, text: (c.own ? '★ ' : '') + c.name + ' · ' + ((CAP_KINDS.find(function (k) { return k[0] === c.kind; }) || [])[1] || ''), selected: c.id === tplId }); }));
-  const dateI = el('input', { type: 'date', class: 'inp sm', value: date.toISOString().slice(0, 10), 'aria-label': 'تاريخ الفعالية', onchange: function (e) { const p = e.target.value.split('-').map(Number); if (p[0]) { date = new Date(p[0], p[1] - 1, p[2], 12); apply(); } } });
-  function apply() { const c = capTemplates().find(function (x) { return x.id === sel.value; }) || CAP_BASE[0]; ta.value = capFill(c.text, capVars(date)); render(); }
-  function render() { prev.innerHTML = capToHtml(ta.value); const n = capPlain(ta.value).length; cnt.textContent = n + ' / 1024' + (n > 1024 ? ' — طويل، يقصّه تليجرام' : ''); cnt.classList.toggle('over', n > 1024); }
-  sel.onchange = function () { tplId = sel.value; const m = ls('capTpl') || {}; m[S.tpl.type] = tplId; ls('capTpl', m); apply(); };
-  ta.addEventListener('input', render);
-  const wrap = function (tag) { const s = ta.selectionStart, e = ta.selectionEnd, v = ta.value; ta.value = v.slice(0, s) + '<' + tag + '>' + v.slice(s, e) + '</' + tag + '>' + v.slice(e); ta.focus(); ta.setSelectionRange(s + tag.length + 2, e + tag.length + 2); render(); };
-  const fmt = el('div', { class: 'row capfmt' }, [
-    el('button', { type: 'button', class: 'ib sm', title: 'غامق', onclick: function () { wrap('b'); } }, [el('b', { text: 'ب' })]),
-    el('button', { type: 'button', class: 'ib sm', title: 'مائل', onclick: function () { wrap('i'); } }, [el('i', { text: 'م' })]),
-    el('button', { type: 'button', class: 'ib sm', title: 'تحته خط', onclick: function () { wrap('u'); } }, [el('u', { text: 'خ' })]),
-    el('button', { type: 'button', class: 'ib sm', title: 'اقتباس', onclick: function () { wrap('blockquote'); } }, ['❝']),
-    el('span', { class: 'sp' }),
-    aiReady() ? el('button', { type: 'button', class: 'btn sm line', onclick: async function (e) { const b = e.currentTarget; b.disabled = true; try { ta.value = await captionAI(ta.value, sel.value, date); render(); toast('صاغه المساعد، عدّل ما شئت'); } catch (er) { toast(er.message); } b.disabled = false; } }, [ico('ai'), 'صِغه بالذكاء']) : null,
-    el('button', { type: 'button', class: 'btn sm ghost', text: 'أعد من القالب', onclick: apply })
-  ]);
-  apply();
-  let mode = ls('tgMode') || 'both';
+  const dateI = el('input', { type: 'date', class: 'inp sm', value: date.toISOString().slice(0, 10), 'aria-label': 'تاريخ الفعالية', onchange: function (e) { const p = e.target.value.split('-').map(Number); if (p[0]) { date = new Date(p[0], p[1] - 1, p[2], 12); const t = dateTokens(date, 0); vars.wd = t.wd; vars.hijri = t.hd + ' ' + t.hm; vars.greg = t.gd + ' ' + t.gm; drawFields(); fromFields(); } } });
+  const E = capEditor('', render);
+  const fieldsBox = el('div', { class: 'capfields' });
+  function curTpl() { return capTemplates().find(function (x) { return x.id === sel.value; }) || CAP_BASE[0]; }
+  function drawFields() {
+    const used = []; String(curTpl().text).replace(/\{(\w+)\}/g, function (_, k) { if (used.indexOf(k) < 0) used.push(k); });
+    fieldsBox.replaceChildren(el('div', { class: 'row' }, [el('b', { text: 'املأ الحقول' }), el('small', { class: 'tiny', text: 'ما يُترك فارغاً يُحذف سطره من الرسالة' })]),
+      el('div', { class: 'capfgrid' }, used.filter(function (k) { return ['wd', 'hijri', 'greg'].indexOf(k) < 0; }).map(function (k) {
+        const lab = (CAP_VARS.find(function (v) { return v[0] === k; }) || [k, k])[1], long = ['body', 'quote', 'sub'].indexOf(k) >= 0;
+        const inp = el(long ? 'textarea' : 'input', Object.assign({ class: 'inp sm', dir: k === 'link' ? 'ltr' : 'auto', 'aria-label': lab, oninput: function (e) { vars[k] = e.target.value; fromFields(); } }, long ? { rows: '2' } : { type: 'text' }));
+        inp.value = vars[k] || '';
+        return el('div', { class: 'fld' }, [el('label', { text: lab }), inp]);
+      })));
+  }
+  function fromFields() { if (manual && !confirmReset()) return; manual = false; E.set(capFill(curTpl().text, vars)); }
+  function confirmReset() { return true; }
+  function render() { const tg = E.get(); prev.innerHTML = capToHtml(tg); const n = capPlain(tg).length; cnt.textContent = n + ' / 1024' + (n > 1024 ? ' — طويل، يقصّه تليجرام' : ''); cnt.classList.toggle('over', n > 1024); }
+  E.ed.addEventListener('input', function () { manual = true; });
+  sel.onchange = function () { tplId = sel.value; const m = ls('capTpl') || {}; m[S.tpl.type] = tplId; ls('capTpl', m); manual = false; drawFields(); fromFields(); };
+  drawFields(); fromFields();
+  const tools = el('div', { class: 'row wrapr' }, [
+    aiReady() ? el('button', { type: 'button', class: 'btn sm line', onclick: async function (e) { const b = e.currentTarget; b.disabled = true; const old = b.textContent; b.replaceChildren(el('span', { class: 'spin' }), ' يصوغ…'); try { E.set(await captionAI(E.get(), sel.value, date, vars)); manual = true; toast('صاغه المساعد، راجعه وعدّل ما شئت'); } catch (er) { toast(er.message); } b.disabled = false; b.replaceChildren(ico('ai'), old); } }, [ico('ai'), 'صِغه بالذكاء']) : null,
+    el('button', { type: 'button', class: 'btn sm ghost', text: 'أعد من القالب', onclick: function () { manual = false; fromFields(); } }),
+    el('span', { class: 'sp' }), cnt]);
+  // المعاينة: فاتحة افتراضياً، وداكنة اختياراً
+  let theme = ls('tgTheme') || 'light';
+  const bubbleWrap = el('div', { class: 'tgwrap ' + theme }, [el('div', { class: 'tgbubble' }, [img, prev, el('span', { class: 'tgtime', text: new Intl.DateTimeFormat('ar', { hour: 'numeric', minute: '2-digit' }).format(new Date()) })])]);
+  const themeSeg = segOf([['light', 'فاتح'], ['dark', 'داكن']], theme, function (v) { theme = v; ls('tgTheme', v); bubbleWrap.className = 'tgwrap ' + v; });
+  // الإرسال والجدولة
+  let mode = ls('tgMode') || 'both', whenMode = 'now';
   const modeSeg = segOf([['both', 'صورة + الملف الأصلي'], ['photo', 'صورة فقط'], ['doc', 'الملف الأصلي فقط']], mode, function (v) { mode = v; ls('tgMode', v); });
-  const whenI = el('input', { type: 'datetime-local', class: 'inp sm', 'aria-label': 'موعد النشر' });
+  const dI = el('input', { type: 'date', class: 'inp sm', 'aria-label': 'تاريخ النشر', min: new Date().toISOString().slice(0, 10) }), tI = el('input', { type: 'time', class: 'inp sm', value: '08:00', 'aria-label': 'وقت النشر' });
+  function whenMs() { if (whenMode === 'now') return 0; if (!dI.value) return -1; const p = dI.value.split('-').map(Number), q = (tI.value || '08:00').split(':').map(Number); return new Date(p[0], p[1] - 1, p[2], q[0], q[1]).getTime(); }
+  function preset(days, hm) { const d = new Date(); d.setDate(d.getDate() + days); dI.value = d.toISOString().slice(0, 10); tI.value = hm; }
+  const schedBox = el('div', { class: 'capwhen', hidden: true }, [el('div', { class: 'row wrapr' }, [dI, tI]), el('div', { class: 'row wrapr' }, [
+    el('button', { type: 'button', class: 'btn sm ghost', text: 'غداً ٨ ص', onclick: function () { preset(1, '08:00'); } }),
+    el('button', { type: 'button', class: 'btn sm ghost', text: 'غداً ٨ م', onclick: function () { preset(1, '20:00'); } }),
+    el('button', { type: 'button', class: 'btn sm ghost', text: 'بعد ساعة', onclick: function () { const d = new Date(Date.now() + 3600000); dI.value = d.toISOString().slice(0, 10); tI.value = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); } })])]);
+  const whenSeg = segOf([['now', 'الآن'], ['later', 'في موعد']], whenMode, function (v) { whenMode = v; schedBox.hidden = v !== 'later'; sendBtn.replaceChildren(ico(v === 'later' ? 'cal' : 'share'), v === 'later' ? 'جدول النشر' : 'أرسل الآن'); });
   const sendBtn = el('button', { type: 'button', class: 'btn dark' }, [ico('share'), 'أرسل الآن']);
-  const schedBtn = el('button', { type: 'button', class: 'btn line' }, [ico('cal'), 'جدوله']);
-  async function send(when) {
-    const btn = when ? schedBtn : sendBtn; btn.disabled = true; sendBtn.disabled = schedBtn.disabled = true;
+  const ok = canSend();
+  const why = ok ? '' : (!(V6.settings && V6.settings.tg) ? 'بوت تليجرام غير مضبوط بعد: يضيف المشرف رمز البوت من الإعدادات، ثم يصبح الإرسال المباشر متاحاً هنا.'
+    : !(V6.prog && V6.prog.tg && (V6.prog.tg.chat || (V6.prog.tg.chats && S.track && V6.prog.tg.chats[S.track.id]))) ? 'لم يحدد المشرف قناة هذا البرنامج أو المسار بعد (من «البرامج والهويات»).'
+    : 'الإرسال إلى القناة يحتاج صلاحية «الإرسال» من مشرف البرنامج.');
+  if (!ok) { sendBtn.disabled = true; sendBtn.title = why; }
+  async function send() {
+    const when = whenMs(); if (when < 0 || (when && when < Date.now() + 60000)) { toast('اختر موعداً في المستقبل'); dI.focus(); return; }
+    if (!when && !(await ask('إرسال إلى القناة', 'يُنشر التصميم مع هذا النص في قناة ' + V6.prog.name + (S.track ? ' (' + S.track.name + ')' : '') + ' الآن.', 'أرسل'))) return;
+    sendBtn.disabled = true;
     try {
       await ensureFonts(fontsOfState(snap()));
       const c = document.createElement('canvas'); renderTo(c, S.tpl, S.size, snap(), S.track, 2);
       const png = c.toDataURL('image/png').split(',')[1];
-      const r = await API6.me('tg_send', JSON.stringify({ program: V6.prog.id, name: ED.doc.name, caption: ta.value, png: mode === 'doc' ? '' : png, file: mode === 'photo' ? '' : png, fileName: fileName6('png'), fileMime: 'image/png', mode: mode, when: when || 0 }));
+      const r = await API6.me('tg_send', JSON.stringify({ program: V6.prog.id, track: S.track && S.track.id, name: ED.doc.name, caption: E.get(), png: mode === 'doc' ? '' : png, file: mode === 'photo' ? '' : png, fileName: fileName6('png'), fileMime: 'image/png', mode: mode, when: when || 0 }));
       track('tg', { tool: when ? 'schedule' : 'send' }); archive6('share');
-      if (r.queued) toast('جُدول النشر في ' + fmtTime(r.when)); else toast('أُرسل إلى القناة' + (r.link ? '' : ''));
+      if (r.queued) toast('جُدول النشر في ' + fmtTime(r.when)); else toast('أُرسل إلى القناة');
       if (r.link) modal({ title: 'أُرسل إلى القناة', body: [el('p', { class: 'muted', text: 'المنشور في قناة ' + V6.prog.name + ':' }), linkRow('رابط المنشور', r.link)], acts: [{ t: 'حسناً', cls: 'dark' }] });
     } catch (e) { toast(e.message); }
-    sendBtn.disabled = schedBtn.disabled = false;
+    sendBtn.disabled = false;
   }
-  sendBtn.onclick = function () { ask('إرسال إلى القناة', 'يُنشر التصميم مع هذا النص في قناة ' + V6.prog.name + ' الآن.', 'أرسل').then(function (y) { if (y) send(0); }); };
-  schedBtn.onclick = function () { const w = whenI.value ? new Date(whenI.value).getTime() : 0; if (!w || w < Date.now() + 60000) { toast('اختر موعداً في المستقبل'); whenI.focus(); return; } send(w); };
-  const sendBox = canSend() ? el('div', { class: 'capsend' }, [el('h4', { class: 'psh', text: 'الإرسال إلى قناة ' + V6.prog.name }), modeSeg, el('div', { class: 'row wrapr' }, [sendBtn, whenI, schedBtn])])
-    : el('p', { class: 'tiny', text: V6.settings && V6.settings.tg ? (V6.prog && V6.prog.tg && V6.prog.tg.chat ? 'الإرسال إلى القناة يحتاج صلاحية «الإرسال» من مشرف البرنامج. انسخ النص وأرسله بنفسك.' : 'لم يحدد المشرف قناة البرنامج بعد. انسخ النص وأرسله بنفسك.') : 'بوت تليجرام غير مضبوط بعد. انسخ النص وأرسله بنفسك.' });
-  modal({ title: 'النص المصاحب للإعلان', wide: true, body: [
+  sendBtn.onclick = send;
+  const sendBox = el('div', { class: 'capsend' }, [el('div', { class: 'row' }, [el('h4', { class: 'psh', text: 'النشر في قناة ' + (V6.prog ? V6.prog.name : '') }), el('span', { class: 'sp' }), whenSeg]), schedBox, modeSeg,
+    el('div', { class: 'row wrapr' }, [sendBtn, el('button', { type: 'button', class: 'btn line', onclick: function () { copyText(capPlain(E.get())); } }, [ico('copy'), 'انسخ النص']), el('button', { type: 'button', class: 'btn sm ghost', title: 'للصق في بوت أو أداة تقبل وسوم HTML', onclick: function () { copyText(E.get()); } }, ['نسخ بالتنسيق'])]),
+    ok ? el('small', { class: 'tiny', text: 'يُرسل البوت التصميم والنص إلى القناة مباشرة، أو في الموعد الذي تحدده.' }) : el('small', { class: 'tiny warnline', text: why + ' حتى ذلك الحين: انسخ النص وأرسله بنفسك.' })]);
+  modal({ title: 'النص المصاحب والنشر', wide: true, body: [
     el('div', { class: 'capgrid' }, [
-      el('div', { class: 'capl' }, [el('div', { class: 'row wrapr' }, [sel, dateI]), fmt, ta, el('div', { class: 'row' }, [cnt, el('span', { class: 'sp' }), el('button', { type: 'button', class: 'btn sm line', onclick: function () { copyText(capToTgMarkdownless(ta.value)); } }, [ico('copy'), 'نسخ النص']), el('button', { type: 'button', class: 'btn sm ghost', title: 'بوسوم التنسيق كما يقبلها بوت تليجرام', onclick: function () { copyText(ta.value); } }, ['نسخ بالوسوم'])]), sendBox]),
-      el('div', { class: 'capr' }, [el('div', { class: 'tgbubble' }, [img, prev, el('span', { class: 'tgtime', text: new Intl.DateTimeFormat('ar', { hour: 'numeric', minute: '2-digit' }).format(new Date()) })]), el('p', { class: 'tiny', text: 'هكذا تظهر الرسالة في تليجرام تقريباً.' })])
+      el('div', { class: 'capl' }, [el('div', { class: 'row wrapr' }, [el('div', { class: 'fld grow' }, [el('label', { text: 'القالب الكتابي' }), sel]), el('div', { class: 'fld' }, [el('label', { text: 'تاريخ الفعالية' }), dateI])]), fieldsBox,
+        el('div', { class: 'capedwrap' }, [E.bar, E.ed]), tools, sendBox]),
+      el('div', { class: 'capr' }, [el('div', { class: 'row' }, [el('b', { text: 'المعاينة' }), el('span', { class: 'sp' }), themeSeg]), bubbleWrap, el('p', { class: 'tiny', text: 'هكذا تظهر الرسالة في تليجرام تقريباً.' })])
     ])
   ], acts: [{ t: 'إغلاق' }] });
+  setTimeout(render, 0);
 }
 // للنسخ واللصق اليدوي في تليجرام: نزيل الوسوم ونبقي النص (تليجرام الهاتف يطبّق التنسيق من قائمته)
 function capToTgMarkdownless(t) { return capPlain(t); }
-async function captionAI(current, tplId, date) {
-  const P = V6.prog || {}, vars = capVars(date), c = capTemplates().find(function (x) { return x.id === tplId; });
+async function captionAI(current, tplId, date, vars0) {
+  const P = V6.prog || {}, vars = vars0 || capVars(date), c = capTemplates().find(function (x) { return x.id === tplId; });
   const system = ['أنت محرر رسائل قناة تليجرام لبرنامج تربوي عربي. اكتب نصاً مصاحباً لتصميم إعلان، بالعربية الفصيحة السهلة، بأسلوب رسائل البرنامج التالية.',
     'التنسيق: وسوم تليجرام فقط: <b> <i> <u> <blockquote>، وأسطر فارغة بين الفقرات، ورموز تعبيرية قليلة في أول السطر كما في النماذج. لا تتجاوز ٩٠٠ حرف.',
     'لا تخترع معلومة لم تُعطَ: لا وقتاً ولا مكاناً ولا رابطاً ولا اسماً. اترك ما لم يُعطَ. يمكنك إضافة اقتباس قصير موثوق (آية أو حديث صحيح أو حكمة) مناسب للموضوع إن لم يُعطَ اقتباس، مع نسبته باختصار.',

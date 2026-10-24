@@ -39,12 +39,13 @@ async def main():
         ok(await pg.evaluate("(S.layers||[]).some(l=>l.t==='ticon'&&l.ref==='building-mosque')"), 'tabler icon layer added')
         await pg.screenshot(path=OUT + 'o1_qr_icon.png')
         # الزخارف الهندسية
-        await pg.evaluate("openTab('imgs'); void 0"); await pg.wait_for_timeout(600)
+        await pg.evaluate("openTab('bg'); void 0"); await pg.wait_for_timeout(600)
         ok(await pg.query_selector('#e_panel .libb[title="نجمة ثمانية"]') is not None and await pg.query_selector('#e_panel .libb[title="زليج"]') is not None, 'geometric patterns offered')
         await pg.click('#e_panel .libb[title="نجمة ثمانية"]'); await pg.wait_for_timeout(500)
         ok(await pg.evaluate("S.bgfx && S.bgfx.p") == 'star8', 'star8 background applied')
         await pg.screenshot(path=OUT + 'o2_geo.png')
         # الصور المجانية
+        await pg.evaluate("openTab('imgs'); void 0"); await pg.wait_for_timeout(600)
         pt = await pg.inner_text('#e_panel')
         ok('صور مجانية' in pt and 'Pexels' in pt, 'free images section with attribution')
         await pg.click('#e_panel button:has-text("اقترح")'); await pg.wait_for_timeout(1500)

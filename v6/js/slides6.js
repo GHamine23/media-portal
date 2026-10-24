@@ -333,8 +333,8 @@ function lessonCard(T) {
   const ai = aiReady();
   const btn = el('button', { type: 'button', class: 'btn dark', onclick: async function () {
     if (!ta.value.trim() && !pdf) { toast('الصق نصاً أو اختر ملفاً'); return; }
-    btn.disabled = true; btn.replaceChildren(el('span', { class: 'spin' }), ' يقرأ المساعد ويرتّب…');
-    try { const o = await outlineAI(ta.value, pdf, T); outlineDialog(o, T); } catch (er) { toast(er.message); }
+    btn.disabled = true; btn.replaceChildren(el('span', { class: 'spin' }), ' يقرأ المساعد ويرتّب…'); if (!btn.parentNode.querySelector('.notifyrow')) btn.parentNode.appendChild(notifyBtn());
+    try { const o = await outlineAI(ta.value, pdf, T); notifyDone('مخطط العرض جاهز', 'راجعه ثم ابنِ الشرائح'); outlineDialog(o, T); } catch (er) { toast(er.message); }
     btn.disabled = false; btn.replaceChildren(ico('ai'), 'رتّبه عرضاً');
   } }, [ico('ai'), 'رتّبه عرضاً']);
   return el('div', { class: 'card rv', style: '--d:2' }, [el('span', { class: 'icon-tile t-pu' }, [ico('ai')]), el('h3', { text: 'من درس إلى عرض بالذكاء' }),
@@ -373,7 +373,7 @@ function outlineDialog(o, T) {
     list.appendChild(el('button', { type: 'button', class: 'btn sm line', onclick: function () { secs.push({ title: 'قسم جديد', points: '', on: true }); draw(); } }, [ico('plus'), 'قسم']));
   }
   draw();
-  modal({ title: 'مخطط العرض: راجعه وعدّله', wide: true, body: [el('div', { class: 'grid two' }, [el('div', { class: 'fld' }, [el('label', { text: 'عنوان العرض' }), titleI]), el('div', { class: 'fld' }, [el('label', { text: 'سطر تحته' }), subI])]), list],
+  modal({ title: 'مخطط العرض: راجعه وعدّله', wide: true, body: [aiNotice('المخطط من المساعد وقد يسقط نقطة أو يسيء فهم أخرى؛ راجعه وعدّله قبل البناء.'), el('div', { class: 'grid two' }, [el('div', { class: 'fld' }, [el('label', { text: 'عنوان العرض' }), titleI]), el('div', { class: 'fld' }, [el('label', { text: 'سطر تحته' }), subI])]), list],
     acts: [{ t: 'ابنِ الشرائح', cls: 'dark', fn: function () {
       const slides = [{ tpl: 'sl_cover', d: { title: titleI.value, sub: subI.value } }];
       secs.filter(function (s) { return s.on; }).forEach(function (s, i) {

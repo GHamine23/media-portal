@@ -6,6 +6,8 @@ const MK_TONE = [['calm', 'هادئة'], ['bold', 'حماسية'], ['formal', '�
 const MK_SIZE = [['post', 'منشور'], ['square', 'مربع'], ['story', 'قصة'], ['yt', 'غلاف يوتيوب'], ['banner', 'غلاف استمارة']];
 const DIRECTIONS = [['calm', 'هادئ', 'مساحات بيضاء واسعة، لون واحد غامق للعنوان، زخرفة قليلة'], ['bold', 'جريء', 'خلفية داكنة أو ملوّنة بالكامل، عنوان ضخم، تباين قوي'], ['classic', 'كلاسيكي', 'إطار وتوازن متماثل، عناصر مرتبة في الوسط، وقار']];
 let MK_LAST = null;
+try { MK_LAST = JSON.parse(sessionStorage.getItem('mk_last') || 'null'); } catch (e) {}
+function mkKeep() { MK_LAST = JSON.parse(JSON.stringify(MK)); MK_LAST.keptAt = Date.now(); try { sessionStorage.setItem('mk_last', JSON.stringify(MK_LAST)); } catch (e) {} }
 let MK = { text: '', tid: '', type: '', aud: '', tone: '', size: '', who: '', time: '', place: '', date: '', title: '', creative: false, results: null, dir: 0 };
 function aiReady() { const a = V6.settings && V6.settings.ai; return !!(a && a.enabled && a.ready && can('ai')); }
 function mkSave() { ls('make', { text: MK.text, tid: MK.tid, type: MK.type, aud: MK.aud, tone: MK.tone, size: MK.size, who: MK.who, time: MK.time, place: MK.place, date: MK.date, title: MK.title, creative: MK.creative }); }
@@ -20,7 +22,8 @@ function showMake6() {
   if (/creative=1/.test(qs)) MK.creative = true;
   if (!TRACKS[MK.tid]) MK.tid = ls('lastTrack') && TRACKS[ls('lastTrack')] ? ls('lastTrack') : tracks[0].id;
   if (!canSocial() && MK.type === 'social') MK.type = '';
-  if (MK_LAST && MK_LAST.results && /back=1/.test(qs)) { Object.assign(MK, MK_LAST); MK.step = 'results'; }
+  // الاقتراحات الأخيرة تبقى ٤٠ دقيقة: الرجوع بزر المتصفح أو من المحرر يعيدها كاملة
+  if (MK_LAST && MK_LAST.results && Date.now() - (MK_LAST.keptAt || 0) < 40 * 60000 && !/new=1|creative=1/.test(qs) && (!qTid || qTid[1] === MK_LAST.tid)) { Object.assign(MK, MK_LAST); MK.step = 'results'; }
   else { MK.step = 'idea'; MK.results = null; }
   renderMake();
 }
@@ -48,7 +51,16 @@ function mkIdea(body) {
   };
   body.appendChild(el('div', { class: 'card mkform rv' }, [
     el('div', { class: 'fld' }, [el('label', { for: 'mk_text', text: 'ما الذي تريد تصميمه؟ اكتبه بكلماتك' }), ta, el('small', { text: 'اكتب ما تعرفه: الموضوع، والمقدّم، والموعد، والمكان. وما لا تذكره نسألك عنه أو نتركه خانة تكملها. لا تكتب بيانات شخصية للطلاب.' })]),
-    el('div', { class: 'row wrapr mkopts' }, [el('div', { class: 'fld' }, [el('label', { for: 'mk_tid', text: 'الهوية' }), idSel])]),
+    el('div', { class: 'row wrapr mkopts' }, [el('div', { class: 'fld' }, [el('label', { for: 'mk_tid', text: 'الهوية' }), idSel]), ai ? el('button', { type: 'button', class: 'btn sm line mkbrief', title: 'يعيد المساعد صياغة وصفك وصفاً أوضح وأغنى للتصميم', onclick: async function (e) {
+      const b = e.currentTarget; if (ta.value.trim().length < 4) { toast('اكتب فكرتك أولاً'); ta.focus(); return; } b.disabled = true; const old = b.textContent; b.replaceChildren(el('span', { class: 'spin' }), ' يحسّن الوصف…');
+      try {
+        const raw = await API6.call('ai_make', V6.token, JSON.stringify({ kind: 'brief', program: V6.prog.id, system: 'أنت مدير إبداعي عربي. يكتب المستخدم فكرة إعلان بكلمات قليلة، فتعيد صياغتها وصفاً تصميمياً واضحاً في ٣ إلى ٥ أسطر: ما الحدث ولمن، والشعور المطلوب، والعنوان المقترح (قصير بكلمة مميزة)، والعناصر البصرية المناسبة (لون غالب من الهوية، زخرفة، صورة أو بلا)، وما يجب إبرازه أولاً. لا تخترع معلومات غير مذكورة (مواعيد وأسماء)، واترك مكانها سؤالاً قصيراً بين قوسين. أعد JSON: brief.', prompt: 'الفكرة: ' + ta.value.trim() + '\nالهوية: ' + (TRACKS[MK.tid] ? TRACKS[MK.tid].full : ''), schema: { type: 'OBJECT', properties: { brief: { type: 'STRING' } }, required: ['brief'] }, temperature: 0.7 }));
+        const br = JSON.parse(raw).brief; if (!br) throw new Error('لم يُعد المساعد وصفاً');
+        const box = el('div', { class: 'card flat mkbriefbox rv in-view' }, [el('div', { class: 'row' }, [ico('ai'), el('b', { text: 'وصف محسّن' })]), el('p', { text: br }), el('div', { class: 'row wrapr' }, [el('button', { type: 'button', class: 'btn sm dark', onclick: function () { ta.value = br; MK.text = br; mkSave(); box.remove(); toast('استُعمل الوصف المحسّن'); } }, ['استعمله']), el('button', { type: 'button', class: 'btn sm ghost', onclick: function () { box.remove(); } }, ['تجاهل'])])]);
+        ta.parentNode.appendChild(box); track('tool', { tool: 'brief' });
+      } catch (er) { toast(er.message); }
+      b.disabled = false; b.replaceChildren(ico('wand'), old);
+    } }, [ico('wand'), 'حسّن وصفي بالذكاء']) : null]),
     el('div', { class: 'row wrapr' }, [el('button', { type: 'button', class: 'btn dark lg', onclick: function () { go1(false); } }, [ico('ai'), 'التالي']), el('button', { type: 'button', class: 'btn line lg', onclick: function () { go1(true); } }, [ico('wand'), 'دعه يبدع']), ai ? el('span', { class: 'tiny', id: 'mk_quota' }) : null])
   ]));
   if (ai) API6.me('ai_status').then(function (s) { const q = $('#mk_quota'); if (q && s.perDay) q.textContent = 'استعملت ' + s.used + ' من ' + s.perDay + ' اليوم'; }).catch(function () {});
@@ -154,24 +166,31 @@ async function mkGenerate(body) {
     const t0 = Date.now(), secs = el('b', { text: '0' });
     const skipBtn = el('button', { type: 'button', class: 'btn sm line', hidden: true, onclick: function () { if (skip) skip(); } }, ['لا تنتظر: اعرض اقتراحات سريعة الآن']);
     body.appendChild(el('div', { class: 'boot mkwait' }, [loader6('يصمّم المساعد ' + (dirs.length > 1 ? 'ثلاثة اتجاهات' : 'اقتراحاتك') + '…'),
-      el('p', { class: 'small muted' }, ['مرّ ', secs, ' ثانية. عادةً يستغرق المساعد من ٢٠ إلى ٦٠ ثانية.']), skipBtn]));
+      el('p', { class: 'small muted' }, ['مرّ ', secs, ' ثانية. ' + (dirs.length > 1 ? 'الاتجاهات تظهر تباعاً كلما جهز أحدها.' : 'عادةً من ١٠ إلى ٤٠ ثانية.')]), notifyBtn(), skipBtn]));
     const tick = setInterval(function () { const n = Math.round((Date.now() - t0) / 1000); secs.textContent = String(n); if (n >= 12) skipBtn.hidden = false; if (!document.body.contains(secs)) clearInterval(tick); }, 1000);
     const skipP = new Promise(function (ok) { skip = function () { ok({ skipped: true, designs: [] }); }; });
     const limit = new Promise(function (ok) { setTimeout(function () { ok({ timeout: true, designs: [] }); }, 90000); });
-    results = await Promise.all(dirs.map(function (d) {
+    let shown = false; results = dirs.map(function () { return null; });
+    const showPartial = function () {
+      // أول اتجاه يجهز يُعرض فوراً، والباقي يُحدَّث في مكانه
+      if (!shown) { shown = true; clearInterval(tick); MK.results = results.map(function (r, k) { return r || { pending: true, designs: [] }; }); MK.step = 'results'; MK.dir = results.findIndex(Boolean); renderMake(); }
+      else { MK.results = results.map(function (r) { return r || { pending: true, designs: [] }; }); const grid = $('.tgrid'); if (grid && MK.step === 'results') renderMake(); }
+    };
+    await Promise.all(dirs.map(function (d, k) {
       return Promise.race([makeAI(T, d).catch(function (e) { return { error: e.message, designs: [] }; }), skipP, limit]).then(function (r) {
-        if (r && r.designs && r.designs.length) return r;
-        const loc = makeLocal(T, d); loc.why = r && r.error ? r.error : r && r.timeout ? 'تأخر المساعد' : ''; return loc;
+        if (!(r && r.designs && r.designs.length)) { const loc = makeLocal(T, d); loc.why = r && r.error ? r.error : r && r.timeout ? 'تأخر المساعد' : ''; r = loc; }
+        results[k] = r; showPartial();
       });
     }));
     clearInterval(tick);
-    const why = results.map(function (r) { return r.why; }).filter(Boolean)[0];
+    const why = results.map(function (r) { return r && r.why; }).filter(Boolean)[0];
     if (why) toast((/تأخر/.test(why) ? 'تأخر المساعد، فعرضنا اقتراحات سريعة' : 'تعذّر المساعد: ' + why) + '. جرّب «اقتراحات أخرى» بعد قليل.');
   } else {
     body.appendChild(el('div', { class: 'boot' }, [loader6('نجهّز الاقتراحات…')]));
     results = dirs.map(function (d) { return makeLocal(T, d); });
   }
-  MK.results = results; MK.step = 'results'; MK.dir = 0; MK_LAST = JSON.parse(JSON.stringify(MK));
+  MK.results = results; MK.step = 'results'; if (!aiReady()) MK.dir = 0; mkKeep();
+  notifyDone('اقتراحات المصمّم الذكي جاهزة', (results[0] && results[0].designs.length) + ' تصميماً بانتظارك');
   track('make', { tool: aiReady() ? 'ai' : 'local' });
   renderMake();
 }
@@ -179,18 +198,21 @@ function mkResults(body) {
   const T = trackOf(MK.tid), res = MK.results || [];
   const tabs = MK.creative ? segOf(DIRECTIONS.map(function (d) { return [d[0], d[1]]; }), DIRECTIONS[MK.dir][0], function (v) { MK.dir = DIRECTIONS.findIndex(function (d) { return d[0] === v; }); fill(); }) : null;
   const top = el('div', { class: 'row wrapr mkres-h' }, [H('h2', MK.creative ? 'ثلاثة اتجاهات، اختر ما يعجبك' : 'اقتراحاتنا، كلها قابلة للتعديل'), el('span', { class: 'sp' }), tabs,
+    el('button', { type: 'button', class: 'btn ghost', onclick: function () { MK.results = null; MK_LAST = null; try { sessionStorage.removeItem('mk_last'); } catch (e) {} MK.step = 'idea'; renderMake(); } }, ['فكرة جديدة']),
     el('button', { type: 'button', class: 'btn line', onclick: function () { MK.step = 'ask'; MK.results = null; renderMake(); } }, ['غيّر الإجابات']),
     el('button', { type: 'button', class: 'btn dark', onclick: function () { mkGenerate(body); } }, [ico('ai'), 'اقتراحات أخرى'])]);
   body.appendChild(top);
+  body.appendChild(aiNotice('الاقتراحات أولية من المساعد وقد تخطئ في التفاصيل: راجع النصوص والمواعيد، وعدّل ما شئت في المحرر.'));
   const grid = el('div', { class: 'tgrid' }); body.appendChild(grid);
   function fill() {
     grid.innerHTML = '';
     const r = res[MK.dir] || res[0] || { designs: [] };
+    if (r.pending) { grid.appendChild(el('div', { class: 'boot', style: 'grid-column:1/-1' }, [loader6('هذا الاتجاه ما زال يُصمَّم…', true)])); return; }
     if (r.error) grid.appendChild(el('p', { class: 'err', text: r.error }));
     if (r.missing && r.missing.length) grid.appendChild(el('div', { class: 'card flat mkask', style: 'grid-column:1/-1' }, [el('b', { text: 'لإكمال الإعلان:' }), el('span', { text: ' ' + r.missing.join('، ') + '. اكتبها في التصميم مباشرة.' })]));
     r.designs.forEach(function (dz, i) {
       const tpl = TEMPLATES.find(function (t) { return t.id === dz.tpl; }); if (!tpl) return;
-      grid.appendChild(el('button', { type: 'button', class: 'tcard6 hover-lift rv', style: '--d:' + (i % 8), onclick: function () { MK_LAST = JSON.parse(JSON.stringify(MK)); ls('makePick', { tid: T.id, page: dz.page, back: true }); go('#/e/' + T.id + '/' + tpl.id + '?make'); } },
+      grid.appendChild(el('button', { type: 'button', class: 'tcard6 hover-lift rv', style: '--d:' + (i % 8), onclick: function () { mkKeep(); ls('makePick', { tid: T.id, page: dz.page, back: true }); go('#/e/' + T.id + '/' + tpl.id + '?make'); } },
         [el('div', { class: 'tthumb' }, [tplThumb(tpl, T, dz.page.size, 300, dz.page), dz.free ? el('span', { class: 'pill pu tnew', text: 'تصميم جديد' }) : null]), el('div', { class: 'tmeta6' }, [el('b', { text: dz.free ? 'تصميم من هوية ' + T.name : tpl.name }), el('span', { class: 'tiny', text: dz.note || '' })])]));
     });
     if (!r.designs.length) grid.appendChild(el('p', { class: 'empty', text: 'لم نجد اقتراحاً. جرّب نوعاً آخر.' }));

@@ -40,7 +40,7 @@ async def main():
         await pg.screenshot(path=OUT + 'k3_free_editor.png')
         # بالمساعد (محاكى)
         await pg.evaluate("GAS._props.GEMINI_KEY='k'; " + MOCK + "; void 0"); await pg.evaluate("refreshBundle()"); await pg.wait_for_timeout(1500)
-        await pg.goto(URL + '#/make'); await pg.wait_for_timeout(1000); await clean(pg)
+        await pg.goto(URL + '#/make?new=1'); await pg.wait_for_timeout(1000); await clean(pg)
         await pg.fill('#mk_text', 'لقاء أسري عن البيوت المطمئنة'); await pg.click('.mkform .btn.dark'); await pg.wait_for_timeout(2500)
         q = await pg.inner_text('.mkwiz h2'); ok('لمن' in q, 'AI intake: type known from AI, asks audience: ' + q)
         await pg.click('.mkctl .btn.ghost:nth-of-type(1)') if False else None
@@ -52,7 +52,7 @@ async def main():
         await pg.screenshot(path=OUT + 'k4_ai_results.png', full_page=True)
         # دعه يبدع: ثلاثة اتجاهات
         await pg.goto(URL + '#/make?creative=1'); await pg.wait_for_timeout(1000); await clean(pg)
-        await pg.click('.mkform .btn.line'); await pg.wait_for_timeout(2500)
+        await pg.click('.mkform .btn.line.lg'); await pg.wait_for_timeout(2500)
         if await pg.query_selector('.mkwiz'): await pg.click('.chips .chip:nth-child(1)'); await pg.wait_for_timeout(4000)
         ok(await pg.evaluate("document.querySelectorAll('.mkres-h .seg button').length") == 3, 'creative mode shows three directions')
         await pg.screenshot(path=OUT + 'k5_creative.png')

@@ -115,7 +115,7 @@ function apiFns_() {
     cl_list: cl_list, cl_save: cl_save, set_get: set_get, set_save: set_save, audit_list: audit_list,
     ai_make: ai_make, ai_status: ai_status, ai_log: ai_log,
     tg_test: tg_test, tg_send: tg_send, tg_queue: tg_queue, tg_cancel: tg_cancel, me_profile: me_profile, font_family: font_family,
-    img_search: img_search, img_pick: img_pick,
+    img_search: img_search, img_test: img_test, img_pick: img_pick,
     cm_list: cm_list, cm_add: cm_add, cm_del: cm_del, cm_counts: cm_counts, nt_list: nt_list, nt_seen: nt_seen,
     rv_request: rv_request, rv_list: rv_list, rv_mine: rv_mine, rv_img: rv_img, rv_reply: rv_reply,
     me_week: me_week, wk_admin: wk_admin, ai_skills: ai_skills, ai_skill_save: ai_skill_save, ai_skill_reset: ai_skill_reset, img_requests: img_requests, img_decide: img_decide, quran_find: quran_find, hadith_find: hadith_find
@@ -434,7 +434,7 @@ function prog_save(token, json) {
     if (p.block) cur.block = { fonts: (p.block.fonts || []).filter(fam).slice(0, 200), logos: (p.block.logos || []).map(function (k) { return clip_(k, 60); }).slice(0, 200) };   // ما لا يظهر لمستخدمي البرنامج
     if (p.editLevel != null) cur.editLevel = EDIT_LEVELS[p.editLevel] ? p.editLevel : 'full';
     if (p.fonts) cur.fonts = { title: clip_(p.fonts.title, 60), body: clip_(p.fonts.body, 60) };
-    if (p.tg) cur.tg = { chat: clip_(String(p.tg.chat || '').trim(), 80), link: clip_(p.tg.link, 300), hashtag: clip_(String(p.tg.hashtag || '').replace(/^#/, ''), 60), sign: clip_(p.tg.sign, 120) };
+    if (p.tg) { var chats = {}; Object.keys(p.tg.chats || {}).forEach(function (k) { var v = clip_(String(p.tg.chats[k] || '').trim(), 80); if (v) chats[clip_(k, 40)] = v; }); cur.tg = { chat: clip_(String(p.tg.chat || '').trim(), 80), chats: chats, link: clip_(p.tg.link, 300), hashtag: clip_(String(p.tg.hashtag || '').replace(/^#/, ''), 60), sign: clip_(p.tg.sign, 120) }; }
     if (p.captions) cur.captions = p.captions.slice(0, 40).map(function (c) { return { id: clip_(c.id || uid_(), 20), name: clip_(c.name, 60), kind: clip_(c.kind || 'ann', 20), text: clip_(c.text, 2000) }; });
     if (p.samples != null) cur.samples = clip_(p.samples, 30000);   // نماذج رسائل البرنامج التي يتعلم منها المساعد
     if (isSuper_(me)) { if (p.order != null) cur.order = +p.order || 0; if (p.active != null) cur.active = !!p.active; }
@@ -1112,13 +1112,13 @@ function tg_test(token) {
   var me = tgCall_('getMe', {});
   return JSON.stringify({ username: me.username, name: me.first_name });
 }
-function tgChatOf_(pid) { var p = progs_().filter(function (x) { return x.id === pid; })[0]; var ch = p && p.tg && p.tg.chat; if (!ch) throw new Error('لم يحدد مشرف البرنامج قناة تليجرام بعد'); return ch; }
+function tgChatOf_(pid, track) { var p = progs_().filter(function (x) { return x.id === pid; })[0]; var ch = (p && p.tg && p.tg.chats && track && p.tg.chats[track]) || (p && p.tg && p.tg.chat); if (!ch) throw new Error('لم يحدد مشرف البرنامج قناة تليجرام بعد'); return ch; }
 function canSend_(a, pid) { return adminOf_(a, pid) || (inProg_(a, pid) && perm_(a, 'send')); }
 // payload: {program, caption, png (base64 بلا رأس), file (base64 الملف الأصلي، اختياري), fileName, fileMime, mode: photo|doc|both, when (ms، اختياري للجدولة), name}
 function tg_send(token, json) {
   var a = auth_(token), o = JSON.parse(json), pid = o.program;
   if (!canSend_(a, pid)) throw new Error('الإرسال إلى القناة يحتاج صلاحية «الإرسال» من المشرف');
-  var chat = tgChatOf_(pid), cap = clip_(String(o.caption || ''), 1024), mode = ['photo', 'doc', 'both'].indexOf(o.mode) >= 0 ? o.mode : 'both';
+  var chat = tgChatOf_(pid, clip_(o.track || '', 40)), cap = clip_(String(o.caption || ''), 1024), mode = ['photo', 'doc', 'both'].indexOf(o.mode) >= 0 ? o.mode : 'both';
   if (!o.png && !o.file) throw new Error('لا تصميم للإرسال');
   if ((o.png || '').length > 14 * 1024 * 1024 || (o.file || '').length > 68 * 1024 * 1024) throw new Error('الملف أكبر من حد تليجرام (١٠ ميغابايت للصورة، ٥٠ للملف)');
   var when = +o.when || 0;
@@ -1668,7 +1668,7 @@ function img_search(token, q, page, orient) {
     var url = 'https://api.pexels.com/v1/search?query=' + encodeURIComponent(q) + '&per_page=24&page=' + (Math.max(1, +page || 1)) + (orient ? '&orientation=' + encodeURIComponent(orient) : '') + (/[؀-ۿ]/.test(q) ? '&locale=ar-SA' : '');
     res = UrlFetchApp.fetch(url, { headers: { Authorization: props_().getProperty('PEXELS_KEY') }, muteHttpExceptions: true });
     if (res.getResponseCode() === 429) throw new Error('بلغنا حد البحث هذه الساعة؛ جرّب بعد قليل');
-    if (res.getResponseCode() !== 200) throw new Error('تعذّر البحث عن الصور (' + res.getResponseCode() + ')');
+    if (res.getResponseCode() !== 200) throw new Error('تعذّر البحث في Pexels (' + res.getResponseCode() + '): ' + clip_(res.getContentText().replace(/<[^>]+>/g, ' ').trim(), 120));
     var j = JSON.parse(res.getContentText());
     out = { provider: 'pexels', total: j.total_results || 0, page: j.page || 1, photos: (j.photos || []).map(function (p) {
       return { id: p.id, w: p.width, h: p.height, thumb: p.src.medium, big: p.src.large2x, orig: p.src.original, by: p.photographer, byUrl: p.photographer_url, url: p.url, alt: clip_(p.alt, 160), color: p.avg_color };
@@ -1678,7 +1678,7 @@ function img_search(token, q, page, orient) {
     var url2 = 'https://pixabay.com/api/?key=' + encodeURIComponent(props_().getProperty('PIXABAY_KEY')) + '&q=' + encodeURIComponent(q) + '&image_type=photo&safesearch=true&per_page=24&page=' + (Math.max(1, +page || 1)) + '&orientation=' + o2 + (/[؀-ۿ]/.test(q) ? '&lang=ar' : '');
     res = UrlFetchApp.fetch(url2, { muteHttpExceptions: true });
     if (res.getResponseCode() === 429) throw new Error('بلغنا حد البحث هذه الدقيقة؛ جرّب بعد قليل');
-    if (res.getResponseCode() !== 200) throw new Error('تعذّر البحث عن الصور (' + res.getResponseCode() + ')');
+    if (res.getResponseCode() !== 200) throw new Error('تعذّر البحث في Pixabay (' + res.getResponseCode() + '): ' + clip_(res.getContentText().replace(/<[^>]+>/g, ' ').trim(), 120));
     var j2 = JSON.parse(res.getContentText());
     out = { provider: 'pixabay', total: j2.totalHits || 0, page: Math.max(1, +page || 1), photos: (j2.hits || []).map(function (p) {
       return { id: p.id, w: p.imageWidth, h: p.imageHeight, thumb: String(p.webformatURL || '').replace('_640', '_340'), big: p.largeImageURL, orig: p.fullHDURL || p.imageURL || p.largeImageURL, by: p.user, byUrl: 'https://pixabay.com/users/' + encodeURIComponent(p.user) + '-' + p.user_id + '/', url: p.pageURL, alt: clip_(p.tags, 160), color: '' };
@@ -1687,6 +1687,7 @@ function img_search(token, q, page, orient) {
   var txt = JSON.stringify(out); if (txt.length < 90000) c.put(ck, txt, 3600);
   return txt;
 }
+function img_test(token) { var a = auth_(token); needAdmin_(a); var prov = imgProvider_(); var r = JSON.parse(img_search(token, 'nature', 1, '')); return JSON.stringify({ provider: prov, total: r.total, n: r.photos.length }); }
 // حفظ صورة بأصلها الكامل في مكتبة المستخدم (أو البرنامج إن كان مشرفه)، واختيارياً طلب إضافتها لمكتبة البرنامج
 function img_pick(token, json) {
   var a = auth_(token), m = JSON.parse(json);
@@ -1772,9 +1773,9 @@ function quranSurahs_() {
 function hadith_find(token, q) {
   auth_(token); q = clip_(q, 120).trim(); if (!q) throw new Error('اكتب كلمات من الحديث');
   var c = CacheService.getScriptCache(), ck = 'hd:' + Utilities.base64EncodeWebSafe(q).slice(0, 200), hit = c.get(ck); if (hit) return hit;
-  var r = UrlFetchApp.fetch('https://dorar.net/dorar_api.json?skey=' + encodeURIComponent(q), { muteHttpExceptions: true });
-  if (r.getResponseCode() !== 200) throw new Error('تعذّر الوصول إلى الدرر السنية');
-  var html = ''; try { html = JSON.parse(r.getContentText()).ahadith.result || ''; } catch (e) { throw new Error('رد غير مفهوم من الدرر السنية'); }
+  var r; try { r = UrlFetchApp.fetch('https://dorar.net/dorar_api.json?skey=' + encodeURIComponent(q), { muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AtharPlatform/6.0)' } }); } catch (e) { throw new Error('تعذّر الوصول إلى الدرر السنية: ' + clip_(String(e && e.message || e), 120)); }
+  if (r.getResponseCode() !== 200) throw new Error('تعذّر الوصول إلى الدرر السنية (' + r.getResponseCode() + ')');
+  var html = ''; try { html = JSON.parse(r.getContentText()).ahadith.result || ''; } catch (e) { throw new Error('رد غير مفهوم من الدرر السنية: ' + clip_(r.getContentText().replace(/\s+/g, ' '), 100)); }
   var strip = function (h) { return String(h || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#039;|&#39;/g, "'").replace(/\s+/g, ' ').trim(); };
   var fields = function (info) { var o = {}, re2 = /(خلاصة حكم المحدث|الصفحة أو الرقم|الراوي|المحدث|المصدر|التخريج)\s*:/g, hits = [], h; while ((h = re2.exec(info))) hits.push({ k: h[1], s: h.index, e: h.index + h[0].length }); hits.forEach(function (x, idx) { o[x.k] = info.slice(x.e, idx + 1 < hits.length ? hits[idx + 1].s : info.length).replace(/[|•]/g, ' ').trim(); }); return o; };
   // كل نتيجة: كتلة نص الحديث ثم كتلة معلوماته. نقسم على كتل المعلومات ونأخذ آخر كتلة حديث قبل كل واحدة

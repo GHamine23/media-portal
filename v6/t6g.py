@@ -31,7 +31,7 @@ async def main():
         await pg.goto(URL + '#/e/ithmar/ann_cards'); await pg.wait_for_timeout(2500); await clean(pg)
         await pg.fill('#f6_title', 'لقاء *الأسبوع*'); await pg.fill('#f6_when', 'الأحد 8:00م') if await pg.query_selector('#f6_when') else None
         await pg.click('#e_cap'); await pg.wait_for_timeout(800)
-        cap = await pg.evaluate("document.querySelector('.capta').value")
+        cap = await pg.evaluate("edToTg(document.querySelector('.caped'))")
         ok('لقاء الأسبوع' in cap and 'https://example.org/join' in cap and '#الأنشطة_التربوية' in cap, 'caption filled from design + program: ' + cap.replace('\n', ' | ')[:120])
         ok(await pg.evaluate("document.querySelector('.tgprev b') !== null"), 'telegram preview renders bold')
         await pg.screenshot(path=OUT + 'm2_caption.png')
@@ -43,7 +43,8 @@ async def main():
         # جدولة
         await pg.click('#e_cap'); await pg.wait_for_timeout(600)
         import datetime; when = (datetime.datetime.now() + datetime.timedelta(days=2)).strftime('%Y-%m-%dT10:30')
-        await pg.fill('.capsend input[type=datetime-local]', when); await pg.click('.capsend .btn.line'); await pg.wait_for_timeout(3000)
+        await pg.click('.capsend .seg button:has-text("في موعد")'); await pg.wait_for_timeout(200)
+        await pg.fill('.capwhen input[type=date]', when.split('T')[0]); await pg.fill('.capwhen input[type=time]', when.split('T')[1]); await pg.click('.capsend .btn.dark'); await pg.wait_for_timeout(3000)
         ok('جُدول' in await pg.inner_text('body'), 'scheduled toast'); await clean(pg)
         await pg.goto(URL + '#/'); await pg.wait_for_timeout(2500); await clean(pg)
         ok(await pg.evaluate("document.querySelectorAll('.cal6 .cd.has').length") == 1 and 'منشورات مجدولة' in await pg.inner_text('.clock6'), 'calendar shows the scheduled post')
@@ -56,7 +57,7 @@ async def main():
         await pg.fill('#lg_id', 'ahmad'); await pg.fill('#lg_pw', 'Ahmad#2026'); await pg.click('.lgform button[type=submit]'); await pg.wait_for_selector('#top:not([hidden])', timeout=60000); await pg.wait_for_timeout(1500); await clean(pg)
         await pg.goto(URL + '#/e/ithmar/ann_cards'); await pg.wait_for_timeout(2500); await clean(pg)
         await pg.click('#e_cap'); await pg.wait_for_timeout(600)
-        ok(await pg.query_selector('.capsend') is None and 'صلاحية' in await pg.inner_text('.modal'), 'no send without permission')
+        ok(await pg.evaluate("document.querySelector('.capsend .btn.dark').disabled") and 'صلاحية' in await pg.inner_text('.capsend'), 'no send without permission: button disabled with explanation')
         print('ERRORS', [e for e in errs if '404' not in e][:8])
         await b.close()
 asyncio.run(main())

@@ -75,7 +75,7 @@ function renderTo(canvas, tpl, sizeKey, st, T, scale, collect) {
   CUR_T = T2;
   OFF = (st.pos && st.pos[sizeKey]) || {};
   GHIDE = {}; Object.keys(hide).forEach(function (k) { if (k.slice(0, 2) === 'g_' && hide[k]) GHIDE[k.slice(2)] = 1; });
-  BGFX = st.bgfx ? { p: st.bgfx.p, im: st.bgfx.src ? (photoOf({ src: st.bgfx.src, z: 1 }) || {}).im : null } : null;
+  BGFX = st.bgfx ? { p: st.bgfx.p, im: st.bgfx.src ? (photoOf({ src: st.bgfx.src, z: 1 }) || {}).im : null, z: st.bgfx.z || 1, ox: st.bgfx.ox || 0, oy: st.bgfx.oy || 0, dim: st.bgfx.dim == null ? 0.45 : +st.bgfx.dim, tint: st.bgfx.tint == null ? 0.25 : +st.bgfx.tint, blur: +st.bgfx.blur || 0 } : null;
   const P = {};
   tpl.fields.forEach(function (f) { if (f.kind === 'image') P[f.k] = photoOf(d[f.k]); });
   // تنسيق كل عنصر وحده. والعنصر المكبَّر يُكبَّر حول مركزه، فنقيس المراكز أولاً برسم سريع بلا تكبير

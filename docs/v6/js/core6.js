@@ -183,7 +183,7 @@ const IC = {
   archive: '<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/>',
   model: '<path d="M6 3h12v18l-6-4-6 4z"/>',
   pack: '<path d="M12 3 3 7.5v9L12 21l9-4.5v-9z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
-  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>', review: '<path d="M12 3l2.4 1.7 2.9-.2.9 2.8 2.4 1.7-1 2.7 1 2.7-2.4 1.7-.9 2.8-2.9-.2L12 21l-2.4-1.7-2.9.2-.9-2.8-2.4-1.7 1-2.7-1-2.7 2.4-1.7.9-2.8 2.9.2z"/><path d="m9 12 2 2 4-4"/>', comment: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>', play: '<path d="M7 4v16l13-8z"/>'
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>', link: '<path d="M9 15l6-6M11 6l.5-.5a5 5 0 0 1 7 7l-.5.5M13 18l-.5.5a5 5 0 0 1-7-7l.5-.5"/>', review: '<path d="M12 3l2.4 1.7 2.9-.2.9 2.8 2.4 1.7-1 2.7 1 2.7-2.4 1.7-.9 2.8-2.9-.2L12 21l-2.4-1.7-2.9.2-.9-2.8-2.4-1.7 1-2.7-1-2.7 2.4-1.7.9-2.8 2.9.2z"/><path d="m9 12 2 2 4-4"/>', comment: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>', play: '<path d="M7 4v16l13-8z"/>'
 };
 function ico(name, cls) {
   const s = document.createElementNS('http:\/\/www.w3.org/2000/svg', 'svg');
@@ -193,6 +193,18 @@ function ico(name, cls) {
   s.innerHTML = IC[name] || IC.info; return s;
 }
 
+/* ---------- شريط تقدّم القراءة: يُظهر أن في الصفحة مزيداً ---------- */
+(function () {
+  let bar = null;
+  function tick() {
+    if (!bar) { bar = document.createElement('div'); bar.id = 'rprog'; document.body.appendChild(bar); }
+    const h = document.documentElement, max = h.scrollHeight - h.clientHeight;
+    const inEditor = document.body.classList.contains('in-editor') || location.hash.indexOf('#/e/') === 0 || location.hash.indexOf('#/present') === 0;
+    if (max < 240 || inEditor) { bar.classList.remove('on'); return; }
+    bar.classList.add('on'); bar.style.width = Math.min(100, Math.round(h.scrollTop / max * 100)) + '%';
+  }
+  window.addEventListener('scroll', tick, { passive: true }); window.addEventListener('hashchange', function () { setTimeout(tick, 400); }); window.addEventListener('load', function () { setTimeout(tick, 600); });
+})();
 /* ---------- الإحصاءات: أحداث مجمّعة تُرسل كل نصف دقيقة ---------- */
 const EVQ = [];
 function track(e, extra) { if (!V6.token) return; EVQ.push(Object.assign({ e: e, p: V6.prog ? V6.prog.id : '' }, extra || {})); if (EVQ.length >= 40) flushEv(); }
@@ -240,3 +252,32 @@ function stripNav(strip) {
   new MutationObserver(upd).observe(strip, { childList: true }); setTimeout(upd, 50);
   return w;
 }
+
+/* ---------- التنبيه عند انتهاء ما ينتظره المستخدم: صوت قصير وإشعار نظام (إن أذن) ---------- */
+function chime6() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; const ac = chime6.ac || (chime6.ac = new AC()); if (ac.state === 'suspended') ac.resume();
+    [[880, 0], [1174.66, 0.12], [1567.98, 0.24]].forEach(function (n) { const o = ac.createOscillator(), g = ac.createGain(); o.type = 'sine'; o.frequency.value = n[0]; g.gain.setValueAtTime(0.0001, ac.currentTime + n[1]); g.gain.exponentialRampToValueAtTime(0.18, ac.currentTime + n[1] + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + n[1] + 0.5); o.connect(g); g.connect(ac.destination); o.start(ac.currentTime + n[1]); o.stop(ac.currentTime + n[1] + 0.55); });
+  } catch (e) {}
+}
+function notifyOn() { return ls('notify') !== false; }
+async function askNotify() {
+  if (!('Notification' in window)) { toast('المتصفح لا يدعم الإشعارات، لكن الصوت يعمل'); ls('notify', true); return true; }
+  if (Notification.permission === 'granted') { ls('notify', true); return true; }
+  if (Notification.permission === 'denied') { toast('الإشعارات ممنوعة في إعدادات المتصفح لهذا الموقع. الصوت يعمل'); ls('notify', true); return true; }
+  const p = await Notification.requestPermission(); ls('notify', true); return p === 'granted';
+}
+function notifyDone(title, body) {
+  if (!notifyOn()) return;
+  chime6();
+  if (document.visibilityState === 'visible') { toast(title); return; }
+  try { if ('Notification' in window && Notification.permission === 'granted') { const n = new Notification(title, { body: body || '', icon: 'assets/pwa/icon-192.png', tag: 'athar' }); n.onclick = function () { window.focus(); n.close(); }; } } catch (e) {}
+}
+// زر في شاشات الانتظار: «نبّهني عند الانتهاء»
+function notifyBtn() {
+  const granted = 'Notification' in window && Notification.permission === 'granted';
+  const b = el('button', { type: 'button', class: 'btn sm ' + (granted || !('Notification' in window) ? 'ghost' : 'line'), onclick: async function () { const ok = await askNotify(); b.replaceChildren(ico('bell'), ok ? 'سننبّهك بصوت وإشعار عند الانتهاء' : 'سننبّهك بصوت عند الانتهاء'); b.className = 'btn sm ghost'; chime6(); } },
+    [ico('bell'), granted ? 'سننبّهك بصوت وإشعار عند الانتهاء' : 'نبّهني عند الانتهاء (صوت وإشعار)']);
+  return el('div', { class: 'row wrapr notifyrow' }, [b, el('small', { class: 'tiny', text: 'يمكنك الانتقال إلى تبويب آخر ريثما ينتهي.' })]);
+}
+function aiNotice(text) { return el('div', { class: 'ainote' }, [ico('info'), el('span', { text: text || 'نتائج المساعد أولية وقد تخطئ؛ راجعها قبل الاعتماد.' })]); }
