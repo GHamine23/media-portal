@@ -957,7 +957,9 @@ function geminiKeys_() {
 function hasGemini_() { return geminiKeys_().length > 0; }
 function aiAny_(s) { var h = aiHave_(); return !!(h.gemini || h.groq || h.cf || (s.ai && s.ai.pollFallback !== false)); }
 function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: aiAny_(s), vision: hasGemini_(), capPrompt: (s.ai && s.ai.capPrompt) || '' }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN'), pexels: true, imgKeys: { pixabay: !!props_().getProperty('PIXABAY_KEY'), pexels: !!props_().getProperty('PEXELS_KEY') }, tgKnown: (s.tgKnown || []).length }; }
-function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.aiKey = hasGemini_(); s.aiKeys = geminiKeys_().length; s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); s.pixabayOn = !!props_().getProperty('PIXABAY_KEY'); s.groqOn = !!props_().getProperty('GROQ_KEY'); s.cfOn = !!(props_().getProperty('CF_ACCOUNT') && props_().getProperty('CF_TOKEN')); s.routeDefault = AI_ROUTE_DEFAULT; return JSON.stringify(s); }
+// بصمة نسخة الخادم: يضعها البناء، ويقارنها الموقع ليخبر المدير إن كان الخادم المنشور أقدم
+var SRV_VER = 'e6408c11';
+function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.srvVer = SRV_VER; s.aiKey = hasGemini_(); s.aiKeys = geminiKeys_().length; s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); s.pixabayOn = !!props_().getProperty('PIXABAY_KEY'); s.groqOn = !!props_().getProperty('GROQ_KEY'); s.cfOn = !!(props_().getProperty('CF_ACCOUNT') && props_().getProperty('CF_TOKEN')); s.routeDefault = AI_ROUTE_DEFAULT; return JSON.stringify(s); }
 function set_save(token, json) {
   var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
   var s = JSON.parse(json);
@@ -1093,7 +1095,10 @@ function oaiCall_(cfg, req, who, why) {
   var out = '';
   try {
     for (var attempt = 0; attempt < 3; attempt++) {
-      var res = UrlFetchApp.fetch(cfg.url, { method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true, headers: cfg.key ? { Authorization: 'Bearer ' + cfg.key } : {} });
+      var res;
+      // أخطاء الشبكة العابرة في جوجل (مثل «Address unavailable») تُعاد مرة بعد ثانية
+      try { res = UrlFetchApp.fetch(cfg.url, { method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true, headers: cfg.key ? { Authorization: 'Bearer ' + cfg.key } : {} }); }
+      catch (ne) { if (attempt < 2) { Utilities.sleep(1000); continue; } throw ne; }
       var code = res.getResponseCode();
       // المخطط الصارم قد يُرفض لبعض الصيغ: نعيد بلا صرامة
       if (code === 400 && strict) { strict = false; body.response_format.json_schema = { name: 'athar', strict: false, schema: js }; continue; }

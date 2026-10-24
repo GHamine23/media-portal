@@ -28,6 +28,9 @@ for name in ORDER6:
     js = parts[name]
     if '</script' in js.lower(): bad += 1; print('SCRIPT CLOSE in', name)
 def ver(t): return hashlib.sha1(t.encode()).hexdigest()[:10]
+# بصمة الخادم المتوقعة (تطابق ما يضعه build_gs.py في server/Code.gs)
+SRV = hashlib.sha1((SRC / 'Code.gs').read_text().encode()).hexdigest()[:8]
+parts['admin6.js'] = parts['admin6.js'].replace('/*SRV_VER*/', SRV)
 for n in ORDER: (OUT / 'js' / n).write_text(parts[n])
 shell = (V6 / 'shell.html').read_text()
 css = (V6 / 'style6.css').read_text()

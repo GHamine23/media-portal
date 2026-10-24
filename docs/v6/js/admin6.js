@@ -484,6 +484,9 @@ async function aSettings(body) {
   const clearKeys = el('input', { type: 'checkbox' });
   const pollOn = el('input', { type: 'checkbox', checked: s.ai.pollFallback !== false });
   const capPrompt = el('textarea', { class: 'inp', rows: '4', dir: 'auto', placeholder: 'مثال: ابدأ كل رسالة بسطر ترحيبي قصير، واختم بالوسم ورابط القناة. لا تستعمل أكثر من رمزين تعبيريين. نبرة هادئة محفّزة.', 'aria-label': 'تعليمات النص المصاحب' }); capPrompt.value = s.ai.capPrompt || '';
+  // هل الخادم المنشور هو نفسه نسخة الموقع؟ (يمنع حيرة «حفظتُ ولم يتغير شيء»)
+  const SRV_EXPECT = 'e6408c11', srvOk = !!s.srvVer && s.srvVer === SRV_EXPECT;
+  body.appendChild(el('div', { class: 'srvver ' + (srvOk ? 'ok' : 'old') }, [ico(srvOk ? 'check' : 'info'), el('span', { text: srvOk ? 'الخادم محدَّث ويطابق نسخة الموقع.' : 'الخادم المنشور أقدم من الموقع: بعض الإعدادات لن تُحفظ أو لن تعمل. الصق server/Code.gs في Apps Script، ثم «إدارة عمليات النشر» ← تعديل النشر الحالي ← «إصدار جديد» ← نشر.' }), el('small', { dir: 'ltr', text: (s.srvVer || '—') + ' / ' + SRV_EXPECT })]));
   body.appendChild(el('div', { class: 'grid two' }, [
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-pu' }, [ico('ai')]), el('h3', { text: 'اصنع إعلانك بالذكاء' }),
       el('p', { class: 'small ' + (s.aiKey ? 'ok' : 'err'), text: s.aiKey ? (s.aiKeys > 1 ? s.aiKeys + ' مفاتيح Gemini مضبوطة: تتناوب في الطلبات، وإذا بلغ أحدها حدّه انتقل الخادم إلى التالي تلقائياً.' : 'مفتاح Gemini مضبوط في الخادم.') : 'لم يُضبط مفتاح Gemini بعد (الصقه في خصائص السكربت، أو أضف مفاتيح هنا).' }),

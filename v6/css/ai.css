@@ -37,3 +37,6 @@
 .aitrow.bad{background:#fdecec;color:#a12a2a}
 .aitrow.off{color:var(--mut,#707070)}
 .mknote:empty{display:none}.mknote .mkask{margin-bottom:14px}.mknote .err{margin:0 0 10px}
+.srvver{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-radius:14px;padding:12px 14px;margin-bottom:14px;font-size:15px}
+.srvver svg{width:20px;height:20px;flex:none}.srvver small{margin-inline-start:auto;color:var(--ink3);font-size:12px}
+.srvver.ok{background:var(--gr-t);color:#1f7a44}.srvver.old{background:var(--rd-t);color:#a33232}

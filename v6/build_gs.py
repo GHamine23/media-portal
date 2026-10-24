@@ -34,7 +34,9 @@ var('baloo', 'بالو بهايجان', 'baloobhaijaan2', 'BalooBhaijaan2[wght].
 var('vazir', 'وزير متن', 'vazirmatn', 'Vazirmatn[wght].ttf', '100 900')
 var('rubik', 'روبيك', 'rubik', 'Rubik[wght].ttf', '300 900')
 var('handjet', 'هاندجت', 'handjet', 'Handjet[ELGR,ELSH,wght].ttf', '100 900')
-out = src.replace('/*SEED_IDENTITIES*/[]', json.dumps(ids, ensure_ascii=False)).replace('/*OPEN_FONTS*/[]', json.dumps(fonts, ensure_ascii=False))
+import hashlib
+SRV = hashlib.sha1(src.encode()).hexdigest()[:8]
+out = src.replace('/*SRV_VER*/', SRV).replace('/*SEED_IDENTITIES*/[]', json.dumps(ids, ensure_ascii=False)).replace('/*OPEN_FONTS*/[]', json.dumps(fonts, ensure_ascii=False))
 assert '/*SEED' not in out and '/*OPEN_FONTS' not in out
 (ROOT / 'server').mkdir(exist_ok=True)
 (ROOT / 'server/Code.gs').write_text(out)
