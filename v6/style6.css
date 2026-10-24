@@ -784,38 +784,7 @@ svg.flip{transform:scaleX(-1)}
 
 .routes{display:grid;gap:6px}.routerow{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px}.routerow .seg{flex:none}
 
-/* ===== حركات دخول العناصر في العرض الحي ===== */
-.pstage .pan{animation-duration:var(--dur,.7s);animation-fill-mode:both;animation-timing-function:cubic-bezier(.22,1,.36,1);pointer-events:none}
-.an-fade{animation-name:anFade}.an-up{animation-name:anUp}.an-down{animation-name:anDown}.an-right{animation-name:anRight}.an-left{animation-name:anLeft}
-.an-zoom{animation-name:anZoom}.an-pop{animation-name:anPop;animation-timing-function:cubic-bezier(.34,1.56,.64,1)}.an-blur{animation-name:anBlur}
-.an-flip{animation-name:anFlip}.an-wipe{animation-name:anWipe}.an-drop{animation-name:anDrop;animation-timing-function:cubic-bezier(.34,1.4,.64,1)}.an-spin{animation-name:anSpin}
-.an-glow{animation-name:anGlow}
-@keyframes anFade{from{opacity:0}to{opacity:1}}
-@keyframes anUp{from{opacity:0;transform:translateY(6%)}to{opacity:1;transform:none}}
-@keyframes anDown{from{opacity:0;transform:translateY(-6%)}to{opacity:1;transform:none}}
-@keyframes anRight{from{opacity:0;transform:translateX(8%)}to{opacity:1;transform:none}}
-@keyframes anLeft{from{opacity:0;transform:translateX(-8%)}to{opacity:1;transform:none}}
-@keyframes anZoom{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
-@keyframes anPop{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:none}}
-@keyframes anBlur{from{opacity:0;filter:blur(18px)}to{opacity:1;filter:blur(0)}}
-@keyframes anFlip{from{opacity:0;transform:perspective(1200px) rotateX(-70deg)}to{opacity:1;transform:none}}
-@keyframes anWipe{from{clip-path:inset(0 0 0 100%)}to{clip-path:inset(0)}}
-@keyframes anDrop{from{opacity:0;transform:translateY(-14%)}to{opacity:1;transform:none}}
-@keyframes anSpin{from{opacity:0;transform:rotate(-8deg) scale(.8)}to{opacity:1;transform:none}}
-@keyframes anGlow{0%{opacity:0;filter:brightness(2.4) blur(6px)}60%{opacity:1;filter:brightness(1.4) blur(0)}100%{opacity:1;filter:none}}
-/* لوحة الحركة في المحرر */
-.anstyles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.anst{border:1px solid var(--line);border-radius:12px;background:var(--bg2);padding:8px 6px 6px;display:grid;justify-items:center;gap:4px;cursor:pointer;transition:border-color .2s,transform .25s var(--spring)}
-.anst.on{border-color:var(--ink);background:#fff;box-shadow:var(--sh1)}.anst:hover{transform:translateY(-2px)}
-.anst i{display:block;width:34px;height:20px;border-radius:6px;background:linear-gradient(90deg,#7a5cff,#f29e4c);animation-duration:1.6s;animation-iteration-count:infinite;animation-timing-function:cubic-bezier(.22,1,.36,1)}
-.anst:hover i,.anst.on i{animation-name:inherit}
-.anst small{font-size:11.5px;color:var(--ink2)}
-.anst.an-fade i{animation-name:anFade}.anst.an-up i{animation-name:anUp}.anst.an-down i{animation-name:anDown}.anst.an-right i{animation-name:anRight}.anst.an-left i{animation-name:anLeft}.anst.an-zoom i{animation-name:anZoom}.anst.an-pop i{animation-name:anPop}.anst.an-blur i{animation-name:anBlur}.anst.an-flip i{animation-name:anFlip}.anst.an-wipe i{animation-name:anWipe}.anst.an-drop i{animation-name:anDrop}.anst.an-spin i{animation-name:anSpin}.anst.an-glow i{animation-name:anGlow}
-.anst.an-none i{animation:none;opacity:.35}
-.anrow{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:var(--bg2);font-size:13px}
-.anrow select{font:inherit;font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:4px 6px;background:#fff}
-.anrow .tog{font-size:12px}
-.anlist{display:grid;gap:6px}
+/* حركات العرض الحي ولوحة الحركة: v6/css/slides.css */
 .e-present{background:linear-gradient(135deg,#7a5cff,#5b3df5);color:#fff;border:0}.e-present:hover{filter:brightness(1.08)}
 .e-present svg{color:#fff}
 
