@@ -40,9 +40,9 @@ async def main():
         ok(await pg.evaluate("ED.doc.kind") == 'deck' and n == 8 and 'sl_quiz' in tpls and 'sl_quote' in tpls, 'deck built from outline (%d slides): %s' % (n, ','.join(tpls)))
         await pg.screenshot(path=OUT + 'n3_deck.png')
         # لوحة العناصر: قسم الوسائط للعرض
-        await pg.evaluate("openTab('els'); void 0"); await pg.wait_for_timeout(600)
+        await pg.evaluate("openTab('imgs'); void 0"); await pg.wait_for_timeout(600)   # الوسائط صارت مع الصور في «الوسائط»
         pt = await pg.inner_text('#e_panel')
-        ok('وسائط للعرض الحي' in pt and 'رابط يوتيوب' in pt, 'media section in elements panel')
+        ok('وسائط للعرض الحي' in pt and 'رابط يوتيوب' in pt, 'media section in «الوسائط» panel')
         # رابط يوتيوب → طبقة yt
         await pg.evaluate("window.__pt = promptText; window.promptText = (function () { let n = 0; return async function () { n++; return n === 1 ? 'https://youtu.be/dQw4w9WgXcQ' : 'مقطع الدرس'; }; })(); void 0")
         await pg.click('#e_panel button:has-text("رابط يوتيوب")'); await pg.wait_for_timeout(800)

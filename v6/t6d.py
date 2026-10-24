@@ -39,7 +39,7 @@ async def main():
         ok(await pg.evaluate("Object.keys(TRACKS).join(',')") == 'ithmar', 'user sees only his identity: ' + await pg.evaluate("Object.keys(TRACKS).join(',')"))
         await pg.goto(URL + '#/e/ithmar/ann_photo'); await pg.wait_for_timeout(3000); await clean(pg)
         tabs = await pg.evaluate("Array.from(document.querySelectorAll('#e_rail button')).map(b=>b.dataset.tab).join(',')")
-        ok(tabs == 'content,tpls,imgs', 'content-only rail: ' + tabs)
+        ok(tabs == 'content,tpls,imgs,pub', 'content-only rail (+ publishing): ' + tabs)
         ok(await pg.evaluate("ED.locked && !Object.values(ED.proxies)[0].draggable()"), 'elements locked')
         sizes = await pg.evaluate("Array.from(document.querySelectorAll('#e_size option')).map(o=>o.textContent).join(',')")
         ok('غلاف يوتيوب' in sizes, 'youtube size offered: ' + sizes)
@@ -48,7 +48,7 @@ async def main():
         fonts = await pg.evaluate("fontChoices()")
         ok(len(fonts['ident']) >= 1 and all(f not in fonts['general'] for f in fonts['ident']), 'identity fonts listed first: ' + str(fonts['ident']))
         # الاسم والصورة
-        await pg.goto(URL + '#/account'); await pg.wait_for_timeout(1500)
+        await pg.evaluate("ED.leaveOK=true"); await pg.goto(URL + '#/account'); await pg.wait_for_timeout(1500)
         await pg.fill('#pf_name', 'أحمد الجديد')
         await pg.set_input_files('.pfcard input[type=file]', _R + '/v6/brand/png/icon-192.png'); await pg.wait_for_timeout(800)
         await pg.click('.pfcard .btn.dark'); await pg.wait_for_timeout(1500)

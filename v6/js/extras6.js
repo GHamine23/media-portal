@@ -27,7 +27,7 @@ function freeImagesSection(b) {
   b.appendChild(el('p', { class: 'tiny', text: 'ابحث في ملايين الصور الحرة، أو ولّد صورة من وصفك. ما تختاره يُحفظ بجودته الكاملة في مكتبتك مع اسم صاحبه.' }));
   const keyed = V6.settings && V6.settings.imgKeys && (V6.settings.imgKeys.pixabay || V6.settings.imgKeys.pexels);
   let src = ls('imgSrc') || 'openverse'; if (src === 'keyed' && !keyed) src = 'openverse';
-  const q = el('input', { type: 'search', class: 'inp sm', placeholder: 'ابحث: mosque, nature, book…', 'aria-label': 'بحث عن صورة' });
+  const q = el('input', { type: 'search', class: 'inp sm', placeholder: 'كلمة إنجليزية: mosque, book…', 'aria-label': 'بحث عن صورة' });
   let orient = sizeOrient();
   const res = el('div', { class: 'pxgrid' }), more = el('button', { type: 'button', class: 'btn sm line', text: 'المزيد', hidden: true });
   const suggest = el('label', { class: 'tog tiny' }, [el('input', { type: 'checkbox', id: 'px_sug' }), el('span', { text: 'اقترحها لمكتبة البرنامج' })]);
