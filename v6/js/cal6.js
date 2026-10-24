@@ -332,7 +332,7 @@ function calHomeWidget() {
     const items = CAL.posts.filter(function (x) { return x.status === 'queued' && x.when >= now - 600000; }).map(function (x) { return { kind: 'post', t: x.when, x: x }; })
       .concat(CAL.tasks.filter(function (t) { return t.status !== 'done' && (t.mine || t.to === '') ; }).map(function (t) { return { kind: 'task', t: t.due || now + 1e12, x: t }; }))
       .sort(function (a, b) { return a.t - b.t; }).slice(0, 4);
-    box.appendChild(el('div', { class: 'row' }, [el('h3', { class: 'psh', text: 'القادم في التقويم' }), el('span', { class: 'sp' }), el('a', { class: 'btn sm ghost', href: '#/cal', text: 'التقويم والمهام' })]));
+    box.appendChild(el('div', { class: 'row' }, [el('h2', { class: 'psh', text: 'القادم في التقويم' }), el('span', { class: 'sp' }), el('a', { class: 'btn sm ghost', href: '#/cal', text: 'التقويم والمهام' })]));
     if (!items.length) { box.appendChild(el('p', { class: 'tiny', text: 'لا منشورات مجدولة ولا مهام مفتوحة.' })); return; }
     items.forEach(function (it, i) {
       if (it.kind === 'post') { const x = it.x; const th = el('span', { class: 'cthumb', 'data-id': x.id }); box.appendChild(el('button', { type: 'button', class: 'prow6 rv', style: '--d:' + i, onclick: function () { go('#/cal?post=' + x.id); } }, [th, el('div', { class: 'grow' }, [el('b', { text: x.title || 'منشور' }), el('span', { class: 'tiny', text: fmtTime(x.when) + (x.repeat ? ' · ' + repeatLabel(x.repeat) : '') })]), ico('send')])); }

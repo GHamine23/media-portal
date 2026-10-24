@@ -4,21 +4,37 @@ const ADMIN_TABS = [
   ['assets', 'الشعارات والصور', 'image', 0], ['fonts', 'الخطوط', 'font', 0], ['models', 'النماذج والقوالب', 'model', 0], ['reviews', 'مراجعة التصاميم', 'review', 0], ['week', 'أسبوع الفريق', 'chart', 0], ['ai', 'الذكاء الاصطناعي', 'sparkles', 0], ['tg', 'منشورات القناة', 'send', 0], ['feedback', 'البلاغات', 'flag', 0], ['broadcasts', 'رسائل للمستخدمين', 'megaphone', 0],
   ['changelog', 'سجل التحديثات', 'history', 1], ['settings', 'الإعدادات', 'gear', 1], ['audit', 'سجل النشاط', 'shield', 1]
 ];
+// الأقسام نفسها مجمّعة بحسب الغرض، فيجد المشرف ما يريد دون أن يقرأ القائمة كلها. الروابط (#/admin/…) لم تتغير
+const ADMIN_GROUPS = [['المتابعة', ['overview', 'week', 'archive', 'audit']], ['الفريق', ['accounts', 'reviews', 'feedback']], ['الهوية والمحتوى', ['programs', 'assets', 'fonts', 'models']], ['النشر والتواصل', ['tg', 'broadcasts', 'changelog']], ['النظام', ['ai', 'settings']]];
+function adminNav(tabs, tab) {
+  const byId = {}; tabs.forEach(function (t) { byId[t[0]] = t; });
+  const seen = {}, kids = [];
+  const link = function (t) { seen[t[0]] = 1; return el('a', { href: '#/admin/' + t[0], class: t[0] === tab ? 'on' : '', 'aria-current': t[0] === tab ? 'page' : null }, [ico(t[2]), el('span', { text: t[1] })]); };
+  ADMIN_GROUPS.forEach(function (g) {
+    const list = g[1].map(function (id) { return byId[id]; }).filter(Boolean); if (!list.length) return;
+    kids.push(el('div', { class: 'agrp' }, [el('span', { class: 'agh', text: g[0] })].concat(list.map(link))));
+  });
+  const rest = tabs.filter(function (t) { return !seen[t[0]]; }); // قسم جديد لم يُصنَّف بعد يظهر في الآخر ولا يضيع
+  if (rest.length) kids.push(el('div', { class: 'agrp' }, rest.map(link)));
+  return el('nav', { class: 'anav grouped', 'aria-label': 'أقسام الإدارة' }, kids);
+}
 function myAdminProgs() { return V6.bundle.programs.filter(function (p) { return isSuper() || (V6.me.role === 'sup' && V6.me.programs.indexOf(p.id) >= 0); }); }
 function showAdmin(tab) {
   if (!isAdmin()) return go('#/');
   tab = tab || 'overview';
   const tabs = ADMIN_TABS.filter(function (t) { return !t[3] || isSuper(); });
   if (!tabs.some(function (t) { return t[0] === tab; })) tab = 'overview';
-  document.title = 'الإدارة';
+  document.title = 'الإدارة — ' + (tabs.find(function (t) { return t[0] === tab; }) || [0, ''])[1];
   const body = el('div', { class: 'abody', id: 'abody' });
   view(el('div', { class: 'wrap page admin' }, [
     el('div', { class: 'phead' }, [el('span', { class: 'eyebrow', text: isSuper() ? 'المدير العام' : 'مشرف ' + myAdminProgs().map(function (p) { return p.name; }).join('، ') }), H('h1', 'لوحة الإدارة')]),
     el('div', { class: 'alay' }, [
-      el('nav', { class: 'anav', 'aria-label': 'أقسام الإدارة' }, tabs.map(function (t) { return el('a', { href: '#/admin/' + t[0], class: t[0] === tab ? 'on' : '' }, [ico(t[2]), el('span', { text: t[1] })]); })),
+      adminNav(tabs, tab),
       body
     ])
   ]));
+  // على الشاشة الضيقة يصير التنقل شريطاً أفقياً: نُظهر القسم الحالي فيه
+  const an = $('.anav'), on = an && $('a.on', an); if (on && an.scrollWidth > an.clientWidth + 4) an.scrollLeft += on.getBoundingClientRect().left - an.getBoundingClientRect().left - (an.clientWidth - on.offsetWidth) / 2;
   ({ reviews: aReviews, week: aWeek, overview: aOverview, archive: aArchive, models: aModels, ai: aAI, tg: aTg, accounts: aAccounts, programs: aPrograms, assets: aAssets, fonts: aFonts, feedback: aFeedback, broadcasts: aBroadcasts, changelog: aChangelog, settings: aSettings, audit: aAudit }[tab])(body);
 }
 function aHead(body, title, note, acts) { body.appendChild(el('div', { class: 'ahead' }, [el('div', {}, [el('h2', { text: title }), note ? el('p', { class: 'muted small', text: note }) : null]), el('div', { class: 'row wrapr' }, acts || [])])); }

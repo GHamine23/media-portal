@@ -123,7 +123,7 @@ function profileCard() {
     try { newPic = await squareThumb(f, 256); setPic(newPic); } catch (er) { toast('تعذّرت قراءة الصورة'); }
   } });
   const save = async function (o) { try { const r = await API6.me('me_profile', JSON.stringify(o)); V6.me.name = r.name; V6.me.avatar = r.avatar; V6.me.hasAvatar = r.hasAvatar; buildTop(); toast('حُفظ'); } catch (e) { toast(e.message); } };
-  return el('div', { class: 'card rv pfcard' }, [el('h3', { text: 'اسمك وصورتك' }),
+  return el('div', { class: 'card rv pfcard' }, [el('h2', { class: 'ch', text: 'اسمك وصورتك' }),
     el('div', { class: 'row pfrow' }, [pic, el('div', { class: 'col' }, [
       el('button', { type: 'button', class: 'btn sm line', onclick: function () { file.click(); } }, [ico('upload'), 'اختر صورة']),
       el('button', { type: 'button', class: 'btn sm ghost', text: 'بلا صورة', onclick: function () { newPic = ''; setPic(''); } }), file])]),
@@ -148,35 +148,35 @@ async function logout() {
   if (typeof ED !== 'undefined' && ED.open) ED.leaveOK = true; flushEv(); try { await API6.call('auth_logout', V6.token); } catch (e) {} V6.token = ''; ls('token', null); V6.me = null; go('#/login'); }
 async function savePrefs6(patch) { V6.me.prefs = Object.assign({}, V6.me.prefs || {}, patch); try { await API6.call('prefs_save', V6.token, JSON.stringify(V6.me.prefs)); } catch (e) {} }
 
-/* ---------- الرأس ---------- */
+/* ---------- الرأس ----------
+   كل وجهة في مكان واحد: الأقسام في شريط التنقل، وما يخصك (حسابك ونشاطك) في قائمة صورتك.
+   على الشاشات الضيقة يختفي شريط التنقل، فتنتقل أقسامه إلى أعلى قائمة الصورة. */
+function navItems() {
+  return [['#/', 'home', 'الرئيسية', 'home'], ['#/make', 'make', 'اصنع إعلانك', 'ai'], ['#/mine', 'mine', 'تصاميمي', 'heart'], ['#/cal', 'cal', 'التقويم', 'cal'], ['#/tips', 'tips', 'نصائح', 'star'],
+    isAdmin() ? ['#/admin', 'admin', 'الإدارة', 'gear'] : null].filter(Boolean);
+}
+function navHidden() { const n = $('#top .nav'); return !n || n.getBoundingClientRect().width === 0; }
 function buildTop() {
   const top = $('#top'); top.hidden = false; top.innerHTML = '';
-  const nav = el('nav', { class: 'nav', 'aria-label': 'التنقل' }, [
-    el('a', { href: '#/', 'data-r': 'home', text: 'الرئيسية' }),
-    el('a', { href: '#/mine', 'data-r': 'mine', text: 'تصاميمي' }),
-    el('a', { href: '#/make', 'data-r': 'make', text: 'اصنع إعلانك' }),
-    el('a', { href: '#/cal', 'data-r': 'cal', text: 'التقويم' }),
-    el('a', { href: '#/tips', 'data-r': 'tips', text: 'نصائح' }),
-    isAdmin() ? el('a', { href: '#/admin', 'data-r': 'admin', text: 'الإدارة' }) : null
-  ]);
+  const nav = el('nav', { class: 'nav', 'aria-label': 'التنقل' }, navItems().map(function (n) { return el('a', { href: n[0], 'data-r': n[1], text: n[2] }); }));
   const progs = V6.bundle.programs;
   const psw = el('button', { type: 'button', class: 'prog-sw', id: 'progsw', 'aria-label': 'تبديل البرنامج', onclick: function () {
     if (progs.length < 2) return;
     popMenu(psw, [{ hd: 'برامجك' }].concat(progs.map(function (p) { return { t: p.name, sw: p.color, fn: async function () { await useProgram(p.id); buildTop(); go('#/'); toast('انتقلت إلى ' + p.name); } }; })));
   } }, [el('i', { style: 'background:' + (V6.prog ? V6.prog.color : '#000') }), el('span', { text: V6.prog ? V6.prog.name : 'لا برنامج' }), progs.length > 1 ? ico('chevd') : null]);
-  const bell = el('button', { type: 'button', class: 'ib', id: 'bell', title: 'ما الجديد', 'aria-label': 'ما الجديد', onclick: showNews }, [ico('bell')]);
-  const fb = el('button', { type: 'button', class: 'ib', id: 'fbbtn', title: 'أبلغ عن مشكلة أو اقترح فكرة', 'aria-label': 'ملاحظة', onclick: function () { showFeedback6(); } }, [ico('chat')]);
-  const av = el('button', { type: 'button', class: 'avatar', id: 'avatar', 'aria-label': 'حسابك', text: V6.me.avatar ? '' : String(V6.me.name || '؟').trim().replace(/^(أ\.|د\.|م\.)\s*/, '').slice(0, 1), onclick: function () {
-    popMenu(av, [{ hd: V6.me.name + ' · ' + (V6.me.roleName || '') },
-      { t: 'حسابي', ic: 'user', href: '#/account' },
-      { t: 'تصاميمي', ic: 'grid', href: '#/mine' },
-      { t: 'التقويم والمهام', ic: 'cal', href: '#/cal' },
-      { t: 'أسبوعي في أثر', ic: 'chart', href: '#/week' },
-      { t: 'مراجعاتي', ic: 'review', href: '#/reviews' },
-      isAdmin() ? { t: 'لوحة الإدارة', ic: 'gear', href: '#/admin' } : null,
-      { t: 'ملاحظة للفريق', ic: 'chat', fn: function () { showFeedback6(); } },
-      { t: 'جولة تعريفية', ic: 'play', fn: function () { maybeTour(document.body.dataset.page || 'home', true); } },
-      '-', { t: 'خروج', ic: 'logout', fn: logout }].filter(Boolean));
+  const bell = el('button', { type: 'button', class: 'ib', id: 'bell', title: 'الإشعارات وما الجديد', 'aria-label': 'الإشعارات وما الجديد', onclick: function () { showNews(); } }, [ico('bell')]);
+  const fb = el('button', { type: 'button', class: 'ib', id: 'fbbtn', title: 'أبلغ عن مشكلة أو اقترح فكرة', 'aria-label': 'ملاحظة للفريق', onclick: function () { showFeedback6(); } }, [ico('chat')]);
+  const av = el('button', { type: 'button', class: 'avatar', id: 'avatar', 'aria-label': 'حسابك', 'aria-haspopup': 'menu', text: V6.me.avatar ? '' : String(V6.me.name || '؟').trim().replace(/^(أ\.|د\.|م\.)\s*/, '').slice(0, 1), onclick: function () {
+    const narrow = navHidden(), fbHidden = !$('#fbbtn') || $('#fbbtn').getBoundingClientRect().width === 0;
+    popMenu(av, [{ hd: V6.me.name + ' · ' + (V6.me.roleName || '') }]
+      .concat(narrow ? navItems().map(function (n) { return { t: n[2], ic: n[3], href: n[0] }; }).concat(['-']) : [])
+      .concat([
+        { t: 'حسابي', ic: 'user', href: '#/account' },
+        { t: 'أسبوعي في أثر', ic: 'chart', href: '#/week' },
+        { t: 'مراجعاتي', ic: 'review', href: '#/reviews' },
+        fbHidden ? { t: 'ملاحظة للفريق', ic: 'chat', fn: function () { showFeedback6(); } } : null,
+        { t: 'جولة تعريفية', ic: 'play', fn: function () { maybeTour(document.body.dataset.page || 'home', true); } },
+        '-', { t: 'خروج', ic: 'logout', fn: logout }]).filter(Boolean));
   } });
   if (V6.me.avatar) av.appendChild(el('img', { src: V6.me.avatar, alt: '' }));
   top.appendChild(el('div', { class: 'wrap in' }, [
@@ -184,40 +184,57 @@ function buildTop() {
   ]));
   markNav();
 }
-function markNav() { const pg = document.body.dataset.page || ''; $$('.nav a').forEach(function (a) { a.classList.toggle('on', a.dataset.r === pg); }); }
+// الصفحات الشخصية (الحساب، أسبوعي، مراجعاتي) تُعلَّم على الصورة لأنها من قائمتها
+function markNav() { const pg = document.body.dataset.page || ''; $$('.nav a').forEach(function (a) { a.classList.toggle('on', a.dataset.r === pg); }); const av = $('#avatar'); if (av) av.classList.toggle('on', pg === 'account'); }
 window.addEventListener('scroll', function () { const t = $('#top'); if (t) t.classList.toggle('scrolled', scrollY > 4); }, { passive: true });
 
-/* ---------- حسابي ---------- */
+/* ---------- حسابي: كل ما يخصك في صفحة واحدة ----------
+   ملفك، والمظهر، ونشاطك (أسبوعك ومراجعاتك وملاحظاتك)، وتطبيق الجوال. في التطبيق المظهر وأسبوعي ومراجعاتي في «المزيد» فلا تتكرر هنا. */
 async function showAccount() {
-  const me = V6.me;
+  const me = V6.me, inApp = document.body.classList.contains('mapp');
   const motion = segOf([['calm', 'هادئة'], ['normal', 'متوسطة'], ['lively', 'حيوية']], (me.prefs && me.prefs.motion) || 'calm', function (v) { setMotion(v); savePrefs6({ motion: v }); toast('حُفظ'); });
   const fbList = el('div', { class: 'fblist' }, [el('div', { class: 'skel', style: 'height:80px' })]);
-  view(el('div', { class: 'wrap page' }, [
+  const rvBox = el('a', { class: 'card acrv rv hover-lift', href: '#/reviews', style: '--d:1' }, [el('span', { class: 'icon-tile t-or' }, [ico('review')]), el('h3', { text: 'مراجعاتي' }), el('p', { class: 'muted small', text: 'رأي إدارة أثر في تصاميمك.' })]);
+  const wkSlot = el('div', { class: 'acwk' }); weekMiniCard().then(function (c) { wkSlot.appendChild(c); });
+  const appUrl = location.origin + location.pathname.replace(/v6\/?(index\.html)?$/, '') + 'app/';
+  view(el('div', { class: 'wrap page acpage' }, [
     el('div', { class: 'phead' }, [H('h1', 'حسابي'), el('p', { class: 'muted rv', text: me.name + ' · ' + (me.roleName || '') + (me.email ? ' · ' + me.email : '') })]),
-    el('div', { class: 'grid two' }, [
+    el('div', { class: 'grid two acgrid' }, [
       profileCard(),
-      el('div', { class: 'card rv' }, [el('h3', { text: 'بياناتك' }),
+      el('div', { class: 'card rv' }, [el('h2', { class: 'ch', text: 'بياناتك' }),
         el('dl', { class: 'kv' }, [el('dt', { text: 'اسم المستخدم' }), el('dd', { dir: 'auto', text: me.username }), el('dt', { text: 'البرامج' }), el('dd', { text: (me.programsInfo || []).map(function (p) { return p.name; }).join('، ') || '—' }),
-          el('dt', { text: 'الصلاحيات' }), el('dd', { text: permsText(me) })]),
-        el('div', { class: 'row' }, [el('a', { class: 'btn dark', href: '#/password', text: 'تغيير كلمة المرور' })])]),
-      el('div', { class: 'card rv', style: '--d:1' }, [el('h3', { text: 'لون الواجهة' }), el('p', { class: 'muted small', text: 'يلوّن الأزرار والتحديد والروابط في الموقع والتطبيق، ويتبعك على كل أجهزتك.' }), accentPicker(function (id, nm) { toast('لون الواجهة: ' + nm); })]),
-      el('div', { class: 'card rv', style: '--d:1' }, [el('h3', { text: 'الحركة في الواجهة' }), el('p', { class: 'muted small', text: 'اختر شدة الحركة التي تريحك.' }), motion]),
-      el('div', { class: 'card rv', style: '--d:2' }, [el('h3', { text: 'تطبيق الجوال' }), el('p', { class: 'muted small', text: 'للهاتف واجهة خاصة بروح التطبيقات: المحرر والتصميم ظاهر دائماً، والتقويم والنشر. افتح الرابط من هاتفك وثبّته على الشاشة الرئيسية.' }), el('div', { class: 'row wrapr' }, [el('a', { class: 'btn dark', href: '../app/', onclick: function () { ls('preferWeb', null); } }, [ico('phone'), 'افتح التطبيق']), el('button', { type: 'button', class: 'btn line', onclick: function (e) { copyText(location.origin + location.pathname.replace(/v6\/?$/, '') + 'app/'); btnDone(e.currentTarget, 'نُسخ الرابط'); } }, [ico('link'), 'انسخ الرابط للهاتف'])])]),
-      el('div', { class: 'card rv', style: '--d:3' }, [el('h3', { text: 'أين تذهب تصاميمك' }), el('p', { class: 'muted small', text: 'ما تحفظه يبقى في حسابك، ولا يراه فريقك إلا إن شاركته. وكل تصميم تنزّله أو تشاركه تُحفظ نسخة منه في أرشيف البرنامج، يطّلع عليها مشرف البرنامج ومدير المنصة.' })])
+          el('dt', { text: 'الصلاحيات' }), el('dd', { text: permsText(me) }),
+          el('dt', { text: 'تصاميمك' }), el('dd', { class: 'small', text: 'لك وحدك حتى تشاركها. وما تنزّله أو تشاركه تُحفظ نسخته في أرشيف البرنامج لمشرفه.' })]),
+        el('div', { class: 'row' }, [el('a', { class: 'btn dark', href: '#/password' }, [ico('key'), 'تغيير كلمة المرور'])])]),
+      inApp ? null : el('div', { class: 'card rv aclook', style: '--d:1' }, [el('h2', { class: 'ch', text: 'المظهر' }), el('p', { class: 'muted small', text: 'يتبعك على كل أجهزتك، في الموقع والتطبيق.' }),
+        el('h3', { class: 'acsub', text: 'لون الواجهة' }), accentPicker(function (id, nm) { toast('لون الواجهة: ' + nm); }),
+        el('h3', { class: 'acsub', text: 'الحركة في الواجهة' }), motion]),
+      inApp ? null : el('div', { class: 'card rv acapp', style: '--d:2' }, [el('h2', { class: 'ch', text: 'تطبيق الجوال' }), el('p', { class: 'muted small', text: 'افتح الرابط من هاتفك، وثبّته على الشاشة الرئيسية.' }),
+        el('div', { class: 'row wrapr' }, [el('a', { class: 'btn dark', href: '../app/', onclick: function () { ls('preferWeb', null); } }, [ico('phone'), 'افتح التطبيق']), el('button', { type: 'button', class: 'btn line', onclick: function (e) { copyText(appUrl); btnDone(e.currentTarget, 'نُسخ الرابط'); } }, [ico('link'), 'انسخ الرابط للهاتف'])])])
     ]),
-    el('h2', { class: 'sh rv', text: 'ملاحظاتي وبلاغاتي' }), fbList
+    inApp ? null : el('section', { class: 'hsec', id: 'acact' }, [el('div', { class: 'shead' }, [el('div', {}, [H('h2', 'نشاطك'), el('p', { class: 'muted small rv', text: 'أرقام أسبوعك، ومراجعات تصاميمك.' })])]),
+      el('div', { class: 'acacts' }, [wkSlot, rvBox])]),
+    el('section', { class: 'hsec', id: 'acfb' }, [el('div', { class: 'shead' }, [el('div', {}, [H('h2', 'ملاحظاتي وبلاغاتي'), el('p', { class: 'muted small rv', text: 'ما أرسلته للفريق، وحالته وردّه.' })]),
+      el('button', { type: 'button', class: 'btn sm line', onclick: function () { showFeedback6(); } }, [ico('chat'), 'ملاحظة جديدة'])]), fbList])
   ]));
+  if (/[?&]fb\b/.test(location.hash)) setTimeout(function () { const t = $('#acfb'); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 400);
+  API6.me('rv_mine').then(function (list) {
+    const open = list.filter(function (x) { return x.status !== 'done'; }).length, done = list.length - open;
+    const p = rvBox.querySelector('p'); if (!p) return;
+    p.textContent = list.length ? [done ? done + ' رُدّ عليها' : '', open ? open + ' تنتظر المراجعة' : ''].filter(Boolean).join(' · ') : 'لم تطلب مراجعة بعد؛ تطلبها من زر «مراجعة» في المحرر.';
+  }).catch(function () {});
   try {
     const list = await API6.me('fb_mine');
     fbList.innerHTML = '';
-    if (!list.length) { fbList.appendChild(el('p', { class: 'empty', text: 'لم ترسل ملاحظة بعد. زر الملاحظة في أعلى كل صفحة.' })); return; }
+    if (!list.length) { fbList.appendChild(el('p', { class: 'empty', text: 'لم ترسل ملاحظة بعد.' })); return; }
     list.forEach(function (x) { fbList.appendChild(fbCard(x, false)); });
+    revealAll(fbList);
   } catch (e) { fbList.innerHTML = ''; fbList.appendChild(el('p', { class: 'err', text: e.message })); }
 }
 function permsText(me) {
   if (me.role !== 'user') return 'كل الصلاحيات في برامجك';
-  const n = { social: 'مواقع التواصل', ai: 'المساعد', upload: 'رفع الصور', fonts: 'رفع الخطوط', slides: 'الشرائح' };
-  const on = Object.keys(me.perms || {}).filter(function (k) { return me.perms[k]; }).map(function (k) { return n[k]; });
+  const n = { social: 'مواقع التواصل', ai: 'المساعد', upload: 'رفع الصور', fonts: 'رفع الخطوط', slides: 'الشرائح', send: 'الإرسال إلى القناة' };
+  const on = Object.keys(me.perms || {}).filter(function (k) { return me.perms[k]; }).map(function (k) { return n[k]; }).filter(Boolean);
   return on.length ? on.join('، ') : 'الأساسية';
 }
 const FB_ST = { 'new': ['وصل', 'bl'], work: ['قيد العمل', 'or'], done: ['تم', 'gr'], wont: ['لن يُنفّذ', ''] };

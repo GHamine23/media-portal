@@ -114,7 +114,7 @@ async def main():
         await pg.click('.msheet .sacts .btn:has-text("اخرج وأبقِه مسودة")'); await pg.wait_for_timeout(1200)
         ok(await pg.evaluate("!ED.open && location.hash.indexOf('#/e/')<0"), 'leave keeping draft exits the editor')
         await pg.goto(APP + '#/more'); await pg.wait_for_timeout(1200)
-        ok(await pg.evaluate("!!document.querySelector('.mpro') && document.querySelectorAll('.mtile').length===6 && !document.querySelector('.mgroup')"), 'more screen: own design (profile card, tiles, cards)')
+        ok(await pg.evaluate("!!document.querySelector('.mpro') && document.querySelectorAll('.mtile').length===4 && !document.querySelector('.mgroup')"), 'more screen: own design (profile card, tiles, cards)')
         await pg.click('.acsw[aria-label="فيروزي"]'); await pg.wait_for_timeout(1500)
         ok(await pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--ac').trim()") == '#0d8478', 'accent picker recolors the interface')
         ok(await pg.evaluate("API6.me('auth_me').then(m=>m.prefs&&m.prefs.accent)") == 'teal', 'accent saved to account prefs')

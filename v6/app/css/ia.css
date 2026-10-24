@@ -1,0 +1,6 @@
+/* ===== التطبيق (ia): زر الخروج وحده بعرض كامل، وحسابي بلا تكرار المظهر ===== */
+.mbtns{grid-template-columns:1fr}
+body.mapp .acacts{grid-template-columns:1fr}
+body.mapp .card > h2.ch{font-size:18px}
+.mtiles.four{grid-template-columns:repeat(2,1fr)}
+.mtiles.four .mtile{flex-direction:row;align-items:center;min-height:68px}

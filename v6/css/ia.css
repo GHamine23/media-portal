@@ -1,0 +1,62 @@
+/* ===== بنية الموقع والصفحات العامة (ia): الرأس، حسابي، الرئيسية، الإدارة ===== */
+/* عناوين البطاقات صارت h2 لترتيب العناوين (h1 ← h2)، بالمظهر نفسه */
+.card > h2.ch{font-size:19px;margin-bottom:8px;font-weight:500}
+.card .acsub{font-family:var(--ft);font-size:14.5px;font-weight:500;color:var(--ac-ink);margin:16px 0 8px}
+.card .acsub:first-of-type{margin-top:6px}
+
+/* الرأس: الصورة تُعلَّم حين تكون في صفحاتك الشخصية */
+.avatar{transition:box-shadow .25s var(--ease)}
+.avatar.on{box-shadow:0 0 0 3px var(--ac-t2,rgba(0,0,0,.15))}
+
+/* رابط العودة إلى «حسابي» من أسبوعي ومراجعاتي */
+.crumb{display:inline-flex;align-items:center;gap:4px;align-self:flex-start;color:var(--ac-ink);text-decoration:none;font-size:14.5px;padding:4px 10px 4px 12px;border-radius:99px;background:var(--ac-t);transition:background .2s}
+.crumb:hover{background:var(--ac-t2)}
+.crumb svg{width:16px;height:16px}
+
+/* الرئيسية: «القادم في التقويم» في عمود التحية بجانب الساعة، فلا فراغ تحتها */
+.hero2{align-items:stretch}
+.hero2 .hgreet{justify-content:flex-start}
+.hero2 .hup{margin-top:auto;width:100%;max-width:640px;background:var(--ac-bg,#fafafa);border-radius:var(--r2);box-shadow:0 0 0 1px var(--ac-t,var(--line));padding:12px 14px}
+.hero2 .hup .calmini{display:flex;flex-direction:column;gap:2px}
+.hero2 .hup .calmini > .row{align-items:center;margin-bottom:2px}
+.hero2 .hup .psh{margin:0;color:var(--ac-ink);font-weight:600;font-size:15px}
+.hero2 .hup .calmini > p.tiny{margin:2px 0 0}
+.hero2 .hup .prow6:hover{background:#fff}
+.hero2 .clock6{align-self:start}
+@media (max-width:900px){.hero2 .hup{margin-top:4px;max-width:none}}
+
+/* أسبوعك في أثر: بلون الواجهة بدل الأسود */
+.wkmini{background:linear-gradient(150deg,var(--ac2,#141414),var(--ac,#2b2440) 75%,var(--ac3,#2b2440))}
+.wkmini::after{background:radial-gradient(circle,rgba(255,255,255,.22),transparent 70%)}
+
+/* طرق البدء في صفحة الهوية: ثلاث بطاقات */
+.quick{grid-template-columns:repeat(3,1fr)}
+@media (max-width:900px){.quick{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:600px){.quick{gap:8px;padding:8px;margin-top:14px}.qcard{flex-direction:column;align-items:center;text-align:center;gap:8px;padding:12px 6px}.qcard b{font-size:16px}.qcard span:not(.icon-tile){display:none}}
+
+/* الهويات على الشاشات الصغيرة: عمودان بدل قائمة طويلة */
+@media (max-width:600px){.idgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.idlogo{height:104px;padding:14px}.idlogo img{max-height:72px}.idcard .idmeta{flex-direction:column;align-items:flex-start;gap:6px;padding:10px 12px}.idcard .idmeta b{font-size:15px}}
+
+/* حسابي */
+.grid.two.acgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:760px){.grid.two.acgrid{grid-template-columns:1fr}}
+.acacts{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:16px;align-items:stretch}
+.acacts .wkmini{height:100%}
+.acrv{display:flex;flex-direction:column;gap:8px;text-decoration:none;color:inherit;align-items:flex-start}
+.acrv h3{margin:4px 0 0}
+.acrv p{margin:0}
+.acpage .hsec .shead p{margin:4px 0 0}
+@media (max-width:760px){.acacts{grid-template-columns:1fr}}
+
+/* لوحة الإدارة: الأقسام مجمّعة بعناوين صغيرة */
+.anav.grouped{gap:12px}
+.agrp{display:flex;flex-direction:column;gap:2px}
+.agh{font-size:12.5px;font-weight:600;color:var(--ac-ink,var(--ink3));padding:4px 12px 2px;opacity:.85}
+@media (max-width:900px){
+  .anav.grouped{flex-direction:row;gap:6px;overflow-x:auto;scrollbar-width:thin}
+  .agrp{flex-direction:row;gap:2px;flex:none;padding-inline-end:6px;border-inline-end:1px solid var(--line)}
+  .agrp:last-child{border:0}
+  .agh{display:none}
+}
+.wkmini .wkmore{color:#fff;opacity:.92}
+.wkmini .wknums small{opacity:.85}

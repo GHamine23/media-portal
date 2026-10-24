@@ -198,7 +198,7 @@ function tipOfDayCard() {
   let off = 0, cur = tipOfDay(0);
   const box = el('section', { class: 'tipday rv', 'aria-live': 'polite' });
   function paint(dir) {
-    const C = tipCat(cur.c), R = TIP_REFS[cur.ref] || {};
+    const C = tipCat(cur.c);
     const card = el('div', { class: 'tipinner' + (dir ? ' in-' + dir : ''), style: '--tc:' + C.c }, [
       tipDemo(cur.c),
       el('div', { class: 'tiptext' }, [
@@ -209,7 +209,6 @@ function tipOfDayCard() {
           el('button', { type: 'button', class: 'ib sm', 'aria-label': 'السابقة', onclick: function () { off--; cur = tipOfDay(off); paint('r'); } }, [ico('chev', 'flip')]),
           el('button', { type: 'button', class: 'ib sm', 'aria-label': 'التالية', onclick: function () { off++; cur = tipOfDay(off); paint('l'); } }, [ico('chev')]),
           el('span', { class: 'sp' }),
-          el('small', { class: 'tiny tipref', text: R.n ? 'مبدأ من ' + R.n : '' }),
           el('a', { class: 'btn sm line', href: '#/tips', text: 'كل النصائح (' + TIPS.length + ')' })
         ])
       ])
@@ -238,7 +237,7 @@ function showTips6(cat) {
       const items = list.filter(function (t) { return t.c === C.id; }); if (!items.length) return;
       const R = TIP_REFS[C.ref] || {};
       grid.appendChild(el('section', { class: 'tipsec', style: '--tc:' + C.c }, [
-        el('header', { class: 'tipsechead' }, [tipDemo(C.id, 'sm'), el('div', {}, [el('h2', { text: C.n }), el('p', { class: 'muted small', text: C.d }), el('small', { class: 'tiny', text: 'المرجع: ' + R.n + ' — ' + R.a })])]),
+        el('header', { class: 'tipsechead' }, [tipDemo(C.id, 'sm'), el('div', {}, [el('h2', { text: C.n }), el('p', { class: 'muted small', text: C.d }), el('small', { class: 'tiny tipsref', text: 'من ' + R.a })])]),
         el('div', { class: 'tipcards' }, items.map(function (t, i) {
           return el('article', { class: 'tipcard rv', style: '--d:' + Math.min(i, 8) }, [
             el('div', { class: 'row' }, [el('span', { class: 'tipnum', text: String(i + 1) }), t.src ? el('span', { class: 'pill pu', text: 'جديدة' }) : null]),
@@ -253,10 +252,9 @@ function showTips6(cat) {
   }
   view(el('div', { class: 'wrap page' }, [
     el('div', { class: 'phead tiphero' }, [el('span', { class: 'eyebrow', text: 'مرجع التصميم' }), H('h1', 'نصائح التصميم'),
-      el('p', { class: 'muted rv', text: TIPS.length + ' نصيحة عملية في مبادئ التصميم وجمالياته، لا تتعلق ببرنامج بعينه. مبنية على أشهر مراجع التصميم، وتُضاف نصائح جديدة كل أسبوع.' }),
+      el('p', { class: 'muted rv', text: TIPS.length + ' نصيحة عملية في مبادئ التصميم، تُضاف إليها نصائح جديدة كل أسبوع.' }),
       el('div', { class: 'searchrow' }, [ico('search'), search])]),
-    chips, grid,
-    el('p', { class: 'tiny tipsrc', text: 'المراجع: ' + Object.keys(TIP_REFS).map(function (k) { return TIP_REFS[k].n + ' (' + TIP_REFS[k].a + ')'; }).join('، ') + '. الصياغة للمنصة.' })
+    chips, grid
   ]));
   fill();
 }

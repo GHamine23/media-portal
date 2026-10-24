@@ -23,7 +23,7 @@ async def main():
         await pg.fill('.aita', 'ورشة عن إدارة الوقت'); await pg.keyboard.press('Enter'); await pg.wait_for_timeout(1200)
         ok((await pg.evaluate("location.hash")).startswith('#/make') and (await pg.evaluate("document.getElementById('mk_text').value")) == 'ورشة عن إدارة الوقت', 'AI box hands the idea to make page')
         await pg.goto(URL + '#/g/ithmar'); await pg.wait_for_timeout(2000)
-        ok(await pg.evaluate("document.querySelectorAll('.quick .qcard').length") == 4, 'quick cards inside identity page')
+        ok(await pg.evaluate("document.querySelectorAll('.quick .qcard').length") == 3, 'quick cards inside identity page (make, blank, slides)')
         await pg.screenshot(path=OUT + 'g2_gallery.png')
         # save, share with coedit
         await pg.goto(URL + '#/e/ithmar/ann_cards'); await pg.wait_for_timeout(2500); await clean(pg)
