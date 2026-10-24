@@ -109,7 +109,7 @@ function layerH(L) {
   if (L.t === 'text') return b ? (b.y1 - b.y0) : 40;
   let ar = 1;
   if (L.t === 'sticker') ar = (STICKERS[L.ref] && STICKERS[L.ref].ar) || 1;
-  else if (L.t === 'logo') { const k = L.ref === 'track' ? S.track.logo : L.ref; const im = IMG[k]; if (im) ar = srcH(im) / srcW(im); }
+  else if (L.t === 'logo') { const k = L.ref === 'track' ? logoKey(S.track) : L.ref; const im = IMG[k]; if (im) ar = srcH(im) / srcW(im); }
   else if (L.t === 'img') { const im = layerImg(L); if (im) ar = srcH(im) / srcW(im); }
   return L.w * sz.w * ar;
 }

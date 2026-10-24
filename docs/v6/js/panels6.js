@@ -285,6 +285,7 @@ function pColors(b) {
   ['bg', 'title', 'accent'].forEach(function (key) {
     b.appendChild(el('div', { class: 'crow6' }, [el('span', { text: labels[key] }), colorBtn(S.ov[key] || '', labels[key], function (c) { if (c) S.ov[key] = c; else delete S.ov[key]; redraw(); }, { orig: true, origLabel: 'تلقائي' })]));
   });
+  if (hasLogoOpts()) logoOptions(b);
   if (ED.doc.kind === 'deck') b.appendChild(el('button', { type: 'button', class: 'btn sm line', text: 'طبّق هذه الألوان على كل الشرائح', onclick: function () { commitPage(); const src = ED.doc.pages[ED.cur]; ED.doc.pages.forEach(function (p) { p.variant = src.variant; p.ov = Object.assign({}, src.ov); }); buildPages(); markDirty(); toast('طُبّقت'); } }));
 }
 
@@ -449,6 +450,38 @@ function pLayers(b) {
 }
 
 /* ---------- إعدادات عنصر واحد (يفتحها القلم) ---------- */
+/* ---------- شعار الهوية ودفعتها في هذا التصميم: نسخة الشعار ولونه ورقم الدفعة ---------- */
+function hasLogoOpts(T) { T = T || S.track; return !!(T && T.logo && ((T.logos && T.logos.length > 1) || T.lgo)); }
+function setLg(k, v) { S.lg = Object.assign({}, S.lg || {}); if (v === undefined) delete S.lg[k]; else S.lg[k] = v; if (!Object.keys(S.lg).length) S.lg = null; }
+function logoOptions(b) {
+  const T = S.track; if (!T || !T.logo) return;
+  const o = lgoOf(T, S.lg), box = el('div', { class: 'lgopts' });
+  box.appendChild(el('h4', { class: 'psh', text: 'شعار ' + (T.name || 'الهوية') + ' في هذا التصميم' }));
+  // نسخ الشعار (الأشكال)
+  const vers = (T.logos && T.logos.length ? T.logos : [[T.logo, 'الأساسي']]).filter(function (l) { return IMG[l[0]]; });
+  if (vers.length > 1) {
+    const cur = o.v || T.logo;
+    box.appendChild(el('span', { class: 'tiny', text: 'شكل الشعار' }));
+    box.appendChild(el('div', { class: 'lgvers' }, vers.map(function (l) {
+      const bt = el('button', { type: 'button', class: 'lgver' + (l[0] === cur ? ' on' : ''), title: l[1], 'aria-label': l[1], 'aria-pressed': l[0] === cur ? 'true' : 'false', onclick: function () { setLg('v', l[0] === T.logo ? undefined : l[0]); changed6(); buildPanel(); } }, [el('img', { src: ASSETS[l[0]], alt: '' }), el('span', { text: l[1] })]);
+      return bt;
+    })));
+  }
+  box.appendChild(el('div', { class: 'crow6' }, [el('span', { text: 'لون الشعار' }), colorBtn(o.col || '', 'لون الشعار', function (c) { setLg('col', c || ''); redraw(); changed6(); }, { orig: true, origLabel: 'الأصلي' })]));
+  // الدفعة
+  const num = el('input', { type: 'text', class: 'inp sm lgnum', value: o.n || '', placeholder: 'مثل: ٤', 'aria-label': 'رقم الدفعة', maxlength: '12', oninput: function (e) { setLg('n', e.target.value.trim()); if (e.target.value.trim()) { setLg('show', true); showT.checked = true; } redraw(); clearTimeout(ED.lgT); ED.lgT = setTimeout(function () { changed6(true); }, 500); } });
+  const showT = el('input', { type: 'checkbox', checked: !!(o.show && o.n), onchange: function (e) { setLg('show', e.target.checked); changed6(); } });
+  box.appendChild(el('label', { class: 'tog' }, [showT, el('span', { text: 'رقم الدفعة على الشعار' })]));
+  box.appendChild(el('div', { class: 'row wrapr lgbatch' }, [num, el('span', { class: 'tiny', text: 'لونه' }), colorBtn(o.ncol || '', 'لون رقم الدفعة', function (c) { setLg('ncol', c || ''); redraw(); changed6(); }, { orig: true, origLabel: 'تلقائي' })]));
+  box.appendChild(slider('حجم الرقم', o.s, 0.1, 0.8, 0.01, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { setLg('s', v); }));
+  box.appendChild(el('div', { class: 'row wrapr' }, [
+    slider('موضعه أفقياً', o.x, -0.2, 1.2, 0.01, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { setLg('x', v); }),
+    slider('موضعه رأسياً', o.y, -0.2, 1.2, 0.01, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { setLg('y', v); })]));
+  if (S.lg) box.appendChild(el('button', { type: 'button', class: 'btn sm ghost', onclick: function () { S.lg = null; changed6(); buildPanel(); } }, [ico('reset'), 'كما ضبطها المشرف']));
+  if (ED.doc.kind === 'deck') box.appendChild(el('button', { type: 'button', class: 'btn sm line', text: 'طبّق على كل الشرائح', onclick: function () { commitPage(); const lg = ED.doc.pages[ED.cur].lg; ED.doc.pages.forEach(function (p) { p.lg = lg ? Object.assign({}, lg) : null; }); markDirty(); toast('طُبّق'); } }));
+  b.appendChild(box);
+}
+
 function openElPanel(g) {
   ED.elG = g; ED.prevTab = ED.tab === 'el' ? ED.prevTab : ED.tab; ED.tab = 'el';
   if (S.sel !== g) select(g);
@@ -516,6 +549,7 @@ function pEl(b) {
   else if (L && L.t !== 'img') { cols.appendChild(el('span', { class: 'tiny', text: 'اللون' })); cols.appendChild(colorBtn(L.c === 'color' ? '' : (L.c || ''), 'اللون', function (c) { L.c = c || (L.t === 'logo' ? 'color' : ''); redraw(); }, { orig: L.t === 'logo', origLabel: 'الأصلي' })); }
   else if (!L && texts.length) { cols.appendChild(el('span', { class: 'tiny', text: 'لون النص' })); cols.appendChild(colorBtn(st.c || '', 'لون النص', function (c) { setGs(g, 'c', c); redraw(); }, { orig: true })); cols.appendChild(el('span', { class: 'tiny', text: 'التمييز والأيقونات' })); cols.appendChild(colorBtn(st.h || '', 'لون التمييز والأيقونات', function (c) { setGs(g, 'h', c); redraw(); }, { orig: true })); }
   if (cols.children.length) b.appendChild(cols);
+  if ((g === 'logo' || (L && L.t === 'logo' && L.ref === 'track')) && S.track && S.track.logo) logoOptions(b);
   // الترتيب والموضع
   b.appendChild(el('h4', { class: 'psh', text: 'الترتيب والموضع' }));
   b.appendChild(el('div', { class: 'row wrapr' }, [

@@ -34,6 +34,14 @@
 - `v6/js/kb6.js`: دليل معرفة المنصة (KB_SECTIONS, KB_FAQ, KB_CLIPS, kbContext) يعتمد عليه المساعد؛ اختبار t6v يتحقق أن كل «تسمية» موجودة حرفياً في الواجهة — حدّث الدليل مع كل تغيير في التسميات.
 - `v6/js/guide6.js`: صفحة «دليل أثر» (#/guide)، مقدمات أول زيارة لكل قسم، ومساعد «اسأل أثر» (kind 'help' بلا صلاحية ai، حد ٤٠ يومياً، تصعيد إلى الإشراف عبر fb_send q).
 
+## ١ز) مشروع العمر وطقم «خارطة الثغور» (٢٤ أكتوبر، ليلاً)
+- **الدفعات بلا نسخ هوية**: الهوية تحمل `lgo` (رقم الدفعة `n`، إظهاره `show`، موضعه `x/y` نسبةً من الشعار، حجمه `s`، لونه `ncol`، لون الشعار الافتراضي `col`) و`logos` نسخ الشعار. في المحرك: `LGO`/`lgoOf(T, st.lg)`/`logoKey(T)`/`batchMark()` في `engine.js`؛ كل `drawLogo` يرسم الرقم تلقائياً. التصميم يحمل اختياره في الصفحة `lg` (`snap()`/`loadPage`). لوحة المحرر: `logoOptions()` في `panels6.js` تظهر في «الألوان» وفي إعدادات عنصر الشعار متى كان للهوية نسخ أو دفعة (`hasLogoOpts`). الإدارة: `identityLogoBox()` في نموذج الهوية.
+- **شعار البرنامج في الرئيسية**: `progMark()`/`progLogoCanvas()` في `home6.js` (الموقع والتطبيق)، من `program.logo` (أو شعار الهوية الوحيدة) مع `program.tagline`؛ تُضبط من إعدادات البرنامج. CSS في `v6/css/progmark.css`.
+- **أطقم القوالب**: `src/templates3.js` (ثمانية قوالب `set:'omr'`: om_meet, om_table, om_info, om_cert, om_notice, om_event, om_badge, om_yt) + `TPL_SETS` + `ID_PRESETS` (لوحة ألوان خارطة الثغور في نموذج الهوية). تظهر فقط إن كان `program.sets` يحوي `omr` (`setOn()` في `home6.js`؛ خانة في إعدادات البرنامج). الخادم يقبل `sets`, `logo`, `tagline`, و`lgo` في الهوية (`cleanLgo_`).
+- أدوات الطقم البصرية: `omBase` (ورق خريطة/ليل كحلي/زجاج)، `omMapLines`، `omTorn`، `omNight`، `omGlass`، `omPillC`، `omDiamond`، `omLeader`، `omClockGhost`، `omWaves`، `omPhotoFrame`.
+- اختبارات: `v6/t6y.py` (الدفعة والشعار والرئيسية والطقم)، ومعاينة بصرية `v6/omr_render.py` (تقرأ الشعارات من مجلد العمل المؤقت `OMR_LOGOS`؛ الشعارات لا تُرفع إلى المستودع).
+- `fontOf` صار آمناً لبرنامج بلا خطوط (`FONT_NONE`).
+
 ## ١هـ) الإطلاق (٢٤ أكتوبر ٢٠٢٦)
 - السادس هو الموقع الأساسي: `python3 v6/build6.py` يبني `docs/v6/` ثم يعيد البناء بـ`--root` إلى `docs/` تلقائياً. الخامس صار في `docs/v5/` (`src/build.py`).
 - `appHref()` في core6.js يعطي رابط التطبيق من الجذر أو من v6/. التطبيق يعود إلى الويب على `../` (الجذر).

@@ -41,11 +41,13 @@ function G(ctx, name) {
 }
 function gStyle() { return CUR_G && GST[CUR_G] ? GST[CUR_G] : null; }
 
+const FONT_NONE = { name: 'خط النظام', w: { l: 'sans-serif', r: 'sans-serif', m: 'sans-serif|500', b: 'sans-serif|700', k: 'sans-serif|900' }, fake: false };
 function wkOf(bold) { return !bold ? 'r' : bold <= 0.45 ? 'm' : bold <= 0.92 ? 'b' : 'k'; }
 // الخط والوزن والحدّ لنص معيّن
 function fontOf(role, bold) {
   const gs = gStyle();
-  const set = (gs && gs.f && FONTS[gs.f]) || FONTS[FS[role === 'title' ? 'title' : 'body']] || FONTS.tajarib;
+  // برنامج بلا خطوط بعد: أي خط مسجّل، وإلا خط النظام، فلا يتعطل الرسم
+  const set = (gs && gs.f && FONTS[gs.f]) || FONTS[FS[role === 'title' ? 'title' : 'body']] || FONTS.tajarib || FONTS[Object.keys(FONTS)[0]] || FONT_NONE;
   let wk = wkOf(bold);
   if (role === 'title' && FS.tw) wk = FS.tw;
   const fake = set.fake ? ({ l: 0, r: 0, m: 0.25, b: 0.6, k: 1 }[wk]) : 0;
@@ -120,9 +122,51 @@ function placeImg(ctx, src, x, y, w, anchor, kind) {
 // شعار المسار: color = الأصل، أو أي لون للنسخة أحادية اللون
 function drawLogo(ctx, T, x, y, w, mode, anchor) {
   if (HIDE.logo) return { x: x, y: y, w: 0, h: 0 };
-  const src = mode === 'color' ? IMG[T.logo] : tinted(T.logo, mode);
+  const L = LGO || {}, key = logoKey(T);
+  if (mode === 'color' && L.col) mode = L.col;   // لون الشعار الذي اختاره التصميم يحل محل الأصلي، ويبقى الأبيض على الداكن
+  const src = mode === 'color' ? IMG[key] : tinted(key, mode);
   if (src) { const ar = srcW(src) / srcH(src); w = Math.min(w, w * 0.62 * ar); }   // الشعار الطويل يأخذ ارتفاعاً معقولاً
-  return placeImg(ctx, src, x, y, w, anchor || 'tr', 'logo');
+  const r = placeImg(ctx, src, x, y, w, anchor || 'tr', 'logo');
+  if (src && L.show && L.n) batchMark(ctx, T, r, mode, L);
+  return r;
+}
+/* شعار الهوية ودفعتها: نسخة واحدة من الهوية، ويختار التصميم نسخة الشعار ولونه ورقم الدفعة.
+   T.lgo إعدادات الهوية (يضعها المشرف)، و st.lg اختيار التصميم نفسه */
+let LGO = null;
+const LGO_DEF = { n: '', show: false, x: 0.1, y: 0.12, s: 0.3, ncol: '', col: '', v: '' };
+function lgoOf(T, lg) {
+  const o = Object.assign({}, LGO_DEF, (T && T.lgo) || {}, lg || {});
+  if (o.v && T && o.v !== T.logo && !(T.logos || []).some(function (l) { return l[0] === o.v; })) o.v = '';
+  return o;
+}
+function logoKey(T) { return LGO && LGO.v && IMG[LGO.v] ? LGO.v : T.logo; }
+// لون الرقم التلقائي على الشعار الملوّن: لون التمييز، إلا إن كان ما حوله من الشعار بلونه فالأساسي
+const NUMCOL = {};
+function rgbOf(h) { h = String(h || '').replace('#', ''); if (h.length === 3) h = h.replace(/./g, '$&$&'); const n = parseInt(h, 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function autoNumCol(T, L) {
+  const key = logoKey(T), a = T.c.a || T.c.s || '#c08f4e', p = T.c.p || '#222222', id = key + '|' + L.x + '|' + L.y + '|' + L.s + '|' + a + p;
+  if (NUMCOL[id]) return NUMCOL[id];
+  const im = IMG[key]; if (!im) return a;
+  try {
+    const W = 200, H = Math.max(1, Math.round(W * srcH(im) / srcW(im))), c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d'); g.drawImage(im, 0, 0, W, H);
+    const r = Math.max(2, H * (+L.s || 0.3) * 0.6), cx = W * (+L.x || 0), cy = H * (+L.y || 0);
+    const x0 = Math.max(0, Math.floor(cx - r)), y0 = Math.max(0, Math.floor(cy - r)), x1 = Math.min(W, Math.ceil(cx + r)), y1 = Math.min(H, Math.ceil(cy + r));
+    if (x1 <= x0 || y1 <= y0) return (NUMCOL[id] = a);
+    const d = g.getImageData(x0, y0, x1 - x0, y1 - y0).data, ac = rgbOf(a), pc = rgbOf(p); let na = 0, np = 0;
+    for (let i = 0; i < d.length; i += 4) { if (d[i + 3] < 90) continue; const da = Math.abs(d[i] - ac[0]) + Math.abs(d[i + 1] - ac[1]) + Math.abs(d[i + 2] - ac[2]), dp = Math.abs(d[i] - pc[0]) + Math.abs(d[i + 1] - pc[1]) + Math.abs(d[i + 2] - pc[2]); if (da < dp) na++; else np++; }
+    return (NUMCOL[id] = na > np && na > 6 ? p : a);
+  } catch (e) { return a; }
+}
+// رقم الدفعة على الشعار: موضعه نسبة من عرض الشعار وارتفاعه، وحجمه نسبة من ارتفاعه
+function batchMark(ctx, T, r, mode, L) {
+  const size = Math.max(6, r.h * (+L.s || 0.3));
+  const col = L.ncol || (mode === 'color' ? autoNumCol(T, L) : mode);
+  const set = FONTS[FS.title] || FONTS[Object.keys(FONTS)[0]], fam = set ? (set.w.b || set.w.r) : 'tj_r';
+  ctx.save(); ctx.font = F(size, fam); ctx.direction = 'rtl'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = col;
+  const cx = r.x + r.w * (+L.x || 0), cy = r.y + r.h * (+L.y || 0);
+  ctx.fillText(String(L.n), cx, cy);
+  ctx.restore();
 }
 function academy(ctx, color, x, y, w, anchor) { if (HIDE.academy) return { w: 0, h: 0 }; return placeImg(ctx, tinted('academy', color), x, y, w, anchor, 'academy'); }
 function social(ctx, color, x, y, w, anchor) { if (HIDE.social) return { w: 0, h: 0 }; return placeImg(ctx, tinted('social', color), x, y, w, anchor, 'social'); }

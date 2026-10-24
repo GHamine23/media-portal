@@ -435,6 +435,9 @@ function prog_save(token, json) {
     if (p.block) cur.block = { fonts: (p.block.fonts || []).filter(fam).slice(0, 200), logos: (p.block.logos || []).map(function (k) { return clip_(k, 60); }).slice(0, 200) };   // ما لا يظهر لمستخدمي البرنامج
     if (p.editLevel != null) cur.editLevel = EDIT_LEVELS[p.editLevel] ? p.editLevel : 'full';
     if (p.fonts) cur.fonts = { title: clip_(p.fonts.title, 60), body: clip_(p.fonts.body, 60) };
+    if (p.logo != null) cur.logo = clip_(p.logo, 60);   // شعار البرنامج في الرئيسية
+    if (p.sets) cur.sets = p.sets.filter(function (x) { return /^[a-z0-9_]{2,20}$/.test(x); }).slice(0, 20);   // أطقم القوالب المفعّلة
+    if (p.tagline != null) cur.tagline = clip_(p.tagline, 60);   // سطر تحت الشعار، مثل: الدفعة الرابعة
     if (p.tg) { var chats = {}; Object.keys(p.tg.chats || {}).forEach(function (k) { var v = clip_(String(p.tg.chats[k] || '').trim(), 80); if (v) chats[clip_(k, 40)] = v; }); cur.tg = { chat: clip_(String(p.tg.chat || '').trim(), 80), chats: chats, link: clip_(p.tg.link, 300), hashtag: clip_(String(p.tg.hashtag || '').replace(/^#/, ''), 60), sign: clip_(p.tg.sign, 120), capPrompt: clip_(p.tg.capPrompt != null ? p.tg.capPrompt : ((cur.tg || {}).capPrompt || ''), 4000), titles: (function (t) { var o = {}; Object.keys(t || {}).forEach(function (k) { var v = clip_(String(t[k] || '').trim(), 80); if (v) o[clip_(k, 80)] = v; }); return o; })(p.tg.titles || (cur.tg || {}).titles) }; }
     if (p.captions) cur.captions = p.captions.slice(0, 40).map(function (c) { return { id: clip_(c.id || uid_(), 20), name: clip_(c.name, 60), kind: clip_(c.kind || 'ann', 20), text: clip_(c.text, 2000) }; });
     if (p.samples != null) cur.samples = clip_(p.samples, 30000);   // نماذج رسائل البرنامج التي يتعلم منها المساعد
@@ -450,7 +453,14 @@ function cleanIdentity_(t) {
   keys.forEach(function (k) { var v = t.c && t.c[k]; c[k] = /^#[0-9a-f]{6}$/i.test(v || '') ? v.toLowerCase() : '#888888'; });
   if (!/^[a-z0-9_\-]{2,30}$/.test(t.id || '')) throw new Error('معرّف الهوية حروف إنجليزية صغيرة وأرقام');
   return { id: t.id, group: t.group === 'track' ? 'track' : 'act', name: clip_(t.name, 60), full: clip_(t.full || t.name, 80), desc: clip_(t.desc, 200),
-    logo: clip_(t.logo, 60), logos: Array.isArray(t.logos) ? t.logos.slice(0, 8).map(function (l) { return [clip_(l[0], 60), clip_(l[1], 40)]; }) : null, c: c };
+    logo: clip_(t.logo, 60), logos: Array.isArray(t.logos) ? t.logos.slice(0, 8).map(function (l) { return [clip_(l[0], 60), clip_(l[1], 40)]; }) : null, c: c, lgo: cleanLgo_(t.lgo) };
+}
+// إعدادات شعار الهوية ودفعتها: رقم الدفعة وظهوره وموضعه وحجمه، ولون الرقم ولون الشعار الافتراضيان
+function cleanLgo_(o) {
+  if (!o || typeof o !== 'object') return null;
+  var hex = /^#[0-9a-f]{6}$/i, num = function (v, a, b, d) { v = +v; return isFinite(v) ? Math.max(a, Math.min(b, v)) : d; };
+  return { n: clip_(String(o.n == null ? '' : o.n), 12), show: !!o.show, x: num(o.x, -0.5, 1.5, 0.1), y: num(o.y, -0.5, 1.5, 0.12), s: num(o.s, 0.05, 1, 0.3),
+    ncol: hex.test(o.ncol || '') ? o.ncol.toLowerCase() : '', col: hex.test(o.col || '') ? o.col.toLowerCase() : '' };
 }
 function prog_del(token, id) {
   var me = auth_(token); if (!isSuper_(me)) throw new Error('حذف البرامج للمدير العام');
@@ -962,7 +972,7 @@ function hasGemini_() { return geminiKeys_().length > 0; }
 function aiAny_(s) { var h = aiHave_(); return !!(h.gemini || h.groq || h.cf || (s.ai && s.ai.pollFallback !== false)); }
 function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: aiAny_(s), vision: hasGemini_(), capPrompt: (s.ai && s.ai.capPrompt) || '' }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN'), pexels: true, imgKeys: { pixabay: !!props_().getProperty('PIXABAY_KEY'), pexels: !!props_().getProperty('PEXELS_KEY') }, tgKnown: (s.tgKnown || []).length }; }
 // بصمة نسخة الخادم: يضعها البناء، ويقارنها الموقع ليخبر المدير إن كان الخادم المنشور أقدم
-var SRV_VER = '5a532b23';
+var SRV_VER = '8d75a589';
 function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.srvVer = SRV_VER; s.aiKey = hasGemini_(); s.aiKeys = geminiKeys_().length; s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); s.pixabayOn = !!props_().getProperty('PIXABAY_KEY'); s.groqOn = !!props_().getProperty('GROQ_KEY'); s.cfOn = !!(props_().getProperty('CF_ACCOUNT') && props_().getProperty('CF_TOKEN')); s.routeDefault = AI_ROUTE_DEFAULT; return JSON.stringify(s); }
 function set_save(token, json) {
   var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');

@@ -221,7 +221,12 @@ function progForm(p) {
   const isNew = !p; p = p || { id: '', name: '', desc: '', color: '#171717', features: { social: true, slides: true, ai: true }, active: true };
   const idI = el('input', { type: 'text', id: 'pg_id', dir: 'ltr', value: p.id, disabled: !isNew, placeholder: 'مثل: alim' }), nameI = el('input', { type: 'text', id: 'pg_name', value: p.name }), descI = el('input', { type: 'text', id: 'pg_desc', value: p.desc || '' });
   const colI = el('input', { type: 'color', id: 'pg_col', value: p.color || '#171717' });
+  const plogos = Object.keys(V6.assets).map(function (k) { return V6.assets[k]; }).filter(function (a) { return a.kind === 'logo' && a.program === p.id && a.key; });
+  const plogoSel = el('select', { class: 'inp', id: 'pg_logo' }, [el('option', { value: '', text: 'تلقائي: شعار الهوية إن كانت واحدة' })].concat(plogos.map(function (a) { return el('option', { value: a.key, text: a.name, selected: a.key === p.logo }); })));
+  const tagI = el('input', { type: 'text', id: 'pg_tag', value: p.tagline || '', placeholder: 'مثل: الدفعة الرابعة' });
   const f = Object.assign({ social: true, slides: true, ai: true }, p.features || {});
+  const sets = (p.sets || []).slice();
+  const setsBox = typeof TPL_SETS === 'undefined' || !TPL_SETS.length ? null : el('div', { class: 'fld' }, [el('label', { text: 'أطقم القوالب الإضافية' })].concat(TPL_SETS.map(function (q) { return el('label', { class: 'tog' }, [el('input', { type: 'checkbox', checked: sets.indexOf(q[0]) >= 0, onchange: function (e) { const i = sets.indexOf(q[0]); if (e.target.checked && i < 0) sets.push(q[0]); if (!e.target.checked && i >= 0) sets.splice(i, 1); } }), el('span', {}, [q[1], el('small', { class: 'tiny', text: ' — ' + q[2] })])]); })));
   const tg = function (k, t) { return el('label', { class: 'tog' }, [el('input', { type: 'checkbox', checked: f[k] !== false, onchange: function (e) { f[k] = e.target.checked; } }), el('span', { text: t })]); };
   let active = p.active !== false, lvl = p.editLevel || 'full';
   const msg = el('p', { class: 'err' });
@@ -229,13 +234,15 @@ function progForm(p) {
     el('div', { class: 'grid two' }, [el('div', { class: 'fld' }, [el('label', { for: 'pg_name', text: 'الاسم' }), nameI]), el('div', { class: 'fld' }, [el('label', { for: 'pg_id', text: 'المعرّف (حروف إنجليزية)' }), idI])]),
     el('div', { class: 'fld' }, [el('label', { for: 'pg_desc', text: 'وصف قصير' }), descI]),
     el('div', { class: 'fld' }, [el('label', { for: 'pg_col', text: 'لون البرنامج في المنصة' }), colI]),
+    el('div', { class: 'grid two' }, [el('div', { class: 'fld' }, [el('label', { for: 'pg_logo', text: 'شعار البرنامج في الرئيسية' }), plogoSel]), el('div', { class: 'fld' }, [el('label', { for: 'pg_tag', text: 'سطر تحت الشعار (اختياري)' }), tagI])]),
     el('div', { class: 'checks' }, [tg('social', 'قوالب مواقع التواصل (لمن له صلاحيتها)'), tg('slides', 'الشرائح'), tg('ai', 'اصنع إعلانك بالذكاء')]),
+    setsBox,
     el('div', { class: 'fld' }, [el('label', { text: 'درجة تعديل المستخدمين في القوالب' }), segOf([['content', EDIT_N.content], ['style', EDIT_N.style], ['full', EDIT_N.full]], lvl, function (v) { lvl = v; }),
       el('p', { class: 'tiny', text: 'تنطبق على كل مستخدمي البرنامج، إلا من حدّدت له درجة أخرى في حسابه. المشرفون يعدّلون كل شيء.' })]),
     isSuper() && !isNew ? el('label', { class: 'tog' }, [el('input', { type: 'checkbox', checked: active, onchange: function (e) { active = e.target.checked; } }), el('span', { text: 'البرنامج مفعّل' })]) : null,
     msg
   ], acts: [{ t: 'حفظ', cls: 'dark', keep: true, fn: async function (close) {
-    try { await API6.me('prog_save', JSON.stringify({ id: idI.value.trim().toLowerCase(), name: nameI.value.trim(), desc: descI.value, color: colI.value, features: f, active: active, identities: p.identities || [], editLevel: lvl })); close(); await refreshBundle(); toast('حُفظ'); showAdmin('programs'); }
+    try { await API6.me('prog_save', JSON.stringify({ id: idI.value.trim().toLowerCase(), name: nameI.value.trim(), desc: descI.value, color: colI.value, features: f, active: active, identities: p.identities || [], editLevel: lvl, logo: plogoSel.value, tagline: tagI.value.trim(), sets: sets })); close(); await refreshBundle(); toast('حُفظ'); showAdmin('programs'); }
     catch (e) { msg.textContent = e.message; }
   } }, { t: 'إلغاء' }] });
 }
@@ -259,14 +266,18 @@ function identityForm(p, t) {
   const base = [el('input', { type: 'color', value: t.c.p, 'aria-label': 'أساسي' }), el('input', { type: 'color', value: t.c.s, 'aria-label': 'ثانوي' }), el('input', { type: 'color', value: t.c.a, 'aria-label': 'تمييز' })];
   const logos = Object.keys(V6.assets).map(function (k) { return V6.assets[k]; }).filter(function (a) { return a.kind === 'logo' && (a.program === p.id || a.scope === 'global') && a.key; });
   const logoSel = el('select', { class: 'inp', 'aria-label': 'الشعار' }, [el('option', { value: '', text: 'بلا شعار (يُرفع من «الشعارات والصور»)' })].concat(logos.map(function (a) { return el('option', { value: a.key, text: a.name + ' (' + a.key + ')', selected: a.key === t.logo }); })));
+  const lgBox = identityLogoBox(t, logos, logoSel);
   const msg = el('p', { class: 'err' });
   modal({ title: isNew ? 'هوية جديدة في ' + p.name : t.name, wide: true, body: [
     el('div', { class: 'grid three' }, [el('div', { class: 'fld' }, [el('label', { text: 'الاسم المختصر' }), nameI]), el('div', { class: 'fld' }, [el('label', { text: 'الاسم الكامل (يظهر في القوالب)' }), fullI]), el('div', { class: 'fld' }, [el('label', { text: 'المعرّف' }), idI])]),
     el('div', { class: 'row wrapr' }, [el('div', { class: 'fld' }, [el('label', { text: 'النوع' }), segOf([['track', 'مسار'], ['act', 'نشاط أو هوية']], group, function (v) { group = v; })]), el('div', { class: 'fld', style: 'flex:1' }, [el('label', { text: 'الشعار' }), logoSel])]),
+    typeof ID_PRESETS === 'undefined' || !ID_PRESETS.length ? null : el('div', { class: 'row wrapr' }, [el('span', { class: 'tiny', text: 'لوحات جاهزة:' })].concat(ID_PRESETS.map(function (q) { return el('button', { type: 'button', class: 'btn sm line', onclick: function () { t.c = Object.assign({}, q[2]); paint(); toast('طُبّقت لوحة ' + q[1].split(':')[0]); } }, [el('span', { class: 'sw' }, ['pd', 'p', 's', 'a', 'paper'].map(function (k) { return el('i', { style: 'background:' + q[2][k] }); })), q[1]]); }))),
     el('div', { class: 'card flat' }, [el('b', { text: 'ألوان سريعة' }), el('p', { class: 'tiny', text: 'اختر ثلاثة ألوان، ونشتق منها الدرجات كلها. ثم عدّل أي درجة بيدك.' }), el('div', { class: 'row' }, base.concat([el('button', { type: 'button', class: 'btn sm dark', text: 'اشتق الدرجات', onclick: function () { t.c = deriveColors(base[0].value, base[1].value, base[2].value); paint(); } })]))]),
+    lgBox.el,
     colorRows, el('b', { text: 'معاينة' }), prev, msg
   ], acts: [{ t: 'حفظ الهوية', cls: 'dark', keep: true, fn: async function (close) {
     t.id = idI.value.trim().toLowerCase(); t.name = nameI.value.trim(); t.full = fullI.value.trim() || t.name; t.group = group; t.logo = logoSel.value;
+    lgBox.collect();
     if (!t.id || !t.name) { msg.textContent = 'اكتب الاسم والمعرّف'; return; }
     const ids = (p.identities || []).filter(function (x) { return x.id !== t.id; });
     if (isNew && (p.identities || []).some(function (x) { return x.id === t.id; })) { msg.textContent = 'المعرّف مستعمل'; return; }
@@ -276,6 +287,53 @@ function identityForm(p, t) {
     catch (e) { msg.textContent = e.message; }
   } }, isNew ? null : { t: 'حذف الهوية', cls: 'danger', keep: true, fn: async function (close) { if (!(await ask('حذف الهوية', 'تختفي من قائمة الهويات، وتبقى التصاميم المحفوظة بها.', 'حذف', true))) return; try { await API6.me('prog_save', JSON.stringify(Object.assign({}, p, { identities: p.identities.filter(function (x) { return x.id !== t.id; }) }))); close(); await refreshBundle(); showAdmin('programs'); } catch (e) { msg.textContent = e.message; } } }, { t: 'إلغاء' }] });
   paint();
+}
+
+/* نسخ الشعار (الأشكال والألوان المرسومة) ورقم الدفعة: هوية واحدة لكل البرنامج، والدفعات خيارات لا نسخ */
+function identityLogoBox(t, logos, logoSel) {
+  const vers = {}; (t.logos || []).forEach(function (l) { vers[l[0]] = l[1]; });
+  const o = Object.assign({ n: '', show: false, x: 0.1, y: 0.12, s: 0.3, ncol: '', col: '' }, t.lgo || {});
+  const cv = el('canvas', { class: 'lgprev', width: 520, height: 300 });
+  function draw() {
+    const g = cv.getContext('2d'); g.clearRect(0, 0, cv.width, cv.height);
+    const key = logoSel.value, im = IMG[key];
+    if (!im) { g.fillStyle = '#999'; g.font = '16px sans-serif'; g.textAlign = 'center'; g.fillText('اختر شعار الهوية لتظهر المعاينة', cv.width / 2, cv.height / 2); return; }
+    const pad = 40, W = cv.width - pad * 2, ar = srcH(im) / srcW(im), w = Math.min(W, (cv.height - pad * 2) / ar), h = w * ar, x = (cv.width - w) / 2, y = (cv.height - h) / 2;
+    const T = { logo: key, c: t.c };
+    const mode = o.col || 'color', src = mode === 'color' ? im : tinted(key, mode);
+    g.drawImage(src, x, y, w, h);
+    if (o.show && o.n) batchMark(g, T, { x: x, y: y, w: w, h: h }, mode, o);
+  }
+  logoSel.addEventListener('change', draw);
+  const list = el('div', { class: 'lgvlist' }, logos.length ? logos.map(function (a) {
+    const lab = el('input', { type: 'text', class: 'inp sm', value: vers[a.key] || '', placeholder: 'اسم النسخة', 'aria-label': 'اسم النسخة', oninput: function (e) { if (vers[a.key] != null) vers[a.key] = e.target.value; } });
+    const chk = el('input', { type: 'checkbox', checked: vers[a.key] != null, onchange: function (e) { if (e.target.checked) vers[a.key] = lab.value || a.name; else delete vers[a.key]; if (e.target.checked && !lab.value) lab.value = a.name; } });
+    const th = el('span', { class: 'lgvth' }); if (ASSETS[a.key]) th.style.backgroundImage = 'url(' + ASSETS[a.key] + ')';
+    return el('label', { class: 'lgvrow' }, [chk, th, lab]);
+  }) : [el('p', { class: 'tiny', text: 'ارفع نسخ الشعار أولاً من «الشعارات والصور».' })]);
+  const num = function (lbl, k, min, max) { const out = el('b', { text: Math.round(o[k] * 100) + '٪' }); return el('label', { class: 'sld6' }, [el('span', { class: 'sl' }, [lbl, out]), el('input', { type: 'range', min: String(min), max: String(max), step: '0.01', value: String(o[k]), oninput: function (e) { o[k] = +e.target.value; out.textContent = Math.round(o[k] * 100) + '٪'; draw(); } })]); };
+  const colIn = function (k, lbl) { const on = el('input', { type: 'checkbox', checked: !!o[k], onchange: function (e) { o[k] = e.target.checked ? ci.value : ''; draw(); } }); const ci = el('input', { type: 'color', value: o[k] || (k === 'ncol' ? t.c.a : t.c.p), oninput: function (e) { if (on.checked) { o[k] = e.target.value; draw(); } } }); return el('label', { class: 'tog sm' }, [on, el('span', { text: lbl }), ci]); };
+  const box = el('div', { class: 'card flat lgadm' }, [
+    el('b', { text: 'نسخ الشعار والدفعة' }),
+    el('p', { class: 'tiny', text: 'هوية واحدة لكل الدفعات: اختر نسخ الشعار التي يتنقّل بينها المستخدم (الأشكال والألوان)، واضبط رقم الدفعة الحالية مرة واحدة فيظهر في كل القوالب. ويستطيع المستخدم إخفاءه أو تغييره في تصميمه.' }),
+    list,
+    el('div', { class: 'grid two' }, [
+      el('div', {}, [
+        el('label', { class: 'tog' }, [el('input', { type: 'checkbox', checked: !!o.show, onchange: function (e) { o.show = e.target.checked; draw(); } }), el('span', { text: 'أظهر رقم الدفعة على الشعار' })]),
+        el('div', { class: 'fld' }, [el('label', { text: 'رقم الدفعة الحالية' }), el('input', { type: 'text', class: 'inp sm', value: o.n, maxlength: '12', placeholder: 'مثل: ٤', oninput: function (e) { o.n = e.target.value.trim(); draw(); } })]),
+        num('موضع الرقم أفقياً', 'x', -0.2, 1.2), num('موضع الرقم رأسياً', 'y', -0.2, 1.2), num('حجم الرقم', 's', 0.1, 0.8),
+        colIn('ncol', 'لون الرقم (وإلا لون التمييز)'), colIn('col', 'لون الشعار الافتراضي (وإلا الأصلي)')
+      ]),
+      el('div', {}, [el('span', { class: 'tiny', text: 'معاينة الشعار' }), cv])
+    ])
+  ]);
+  setTimeout(draw, 0);
+  return { el: box, collect: function () {
+    const keys = Object.keys(vers).filter(function (k) { return logos.some(function (a) { return a.key === k; }); });
+    t.logos = keys.length > 1 ? keys.map(function (k) { return [k, vers[k] || k]; }) : null;
+    if (t.logos && t.logo && !t.logos.some(function (l) { return l[0] === t.logo; })) t.logos.unshift([t.logo, 'الأساسي']);
+    t.lgo = (o.n || o.show || o.col || o.ncol) ? { n: o.n, show: !!o.show, x: o.x, y: o.y, s: o.s, ncol: o.ncol, col: o.col } : null;
+  } };
 }
 
 /* ---------- الشعارات والصور ---------- */
@@ -493,7 +551,7 @@ async function aSettings(body) {
   const pollOn = el('input', { type: 'checkbox', checked: s.ai.pollFallback !== false });
   const capPrompt = el('textarea', { class: 'inp', rows: '4', dir: 'auto', placeholder: 'مثال: ابدأ كل رسالة بسطر ترحيبي قصير، واختم بالوسم ورابط القناة. لا تستعمل أكثر من رمزين تعبيريين. نبرة هادئة محفّزة.', 'aria-label': 'تعليمات النص المصاحب' }); capPrompt.value = s.ai.capPrompt || '';
   // هل الخادم المنشور هو نفسه نسخة الموقع؟ (يمنع حيرة «حفظتُ ولم يتغير شيء»)
-  const SRV_EXPECT = '5a532b23', srvOk = !!s.srvVer && s.srvVer === SRV_EXPECT;
+  const SRV_EXPECT = '8d75a589', srvOk = !!s.srvVer && s.srvVer === SRV_EXPECT;
   body.appendChild(el('div', { class: 'srvver ' + (srvOk ? 'ok' : 'old') }, [ico(srvOk ? 'check' : 'info'), el('span', { text: srvOk ? 'الخادم محدَّث ويطابق نسخة الموقع.' : 'الخادم المنشور أقدم من الموقع: بعض الإعدادات لن تُحفظ أو لن تعمل. الصق server/Code.gs في Apps Script، ثم «إدارة عمليات النشر» ← تعديل النشر الحالي ← «إصدار جديد» ← نشر.' }), el('small', { dir: 'ltr', text: (s.srvVer || '—') + ' / ' + SRV_EXPECT })]));
   body.appendChild(el('div', { class: 'grid two' }, [
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-pu' }, [ico('ai')]), el('h3', { text: 'اصنع إعلانك بالذكاء' }),

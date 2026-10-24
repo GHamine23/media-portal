@@ -1786,6 +1786,32 @@ body.in-editor .gx-intro{top:calc(var(--top) + 12px);bottom:auto}
 .imgview.full .ivstage img{max-width:none;max-height:none;cursor:zoom-out}
 .rvimg{position:relative}.rvimg .rvbig{position:absolute;bottom:8px;left:8px;box-shadow:var(--sh1);background:#fff}
 
+/* ===== progmark.css ===== */
+/* شعار البرنامج المفتوح في الرئيسية */
+.pmark { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 22px 12px; margin: 0 0 14px; border-radius: 22px;
+  background: radial-gradient(120% 140% at 85% 0%, color-mix(in srgb, var(--pm-ac) 18%, transparent), transparent 60%), var(--pm-bg);
+  border: 1px solid color-mix(in srgb, var(--pm-ink) 14%, transparent); box-shadow: 0 10px 30px -18px color-mix(in srgb, var(--pm-ink) 60%, transparent); position: relative; max-width: 100%; }
+.pmark::after { content: ''; position: absolute; inset-inline: 22%; bottom: -1px; height: 3px; border-radius: 3px; background: var(--pm-ac); }
+.pmark-cv { display: block; max-width: 100%; height: auto; }
+.pmark-tag { font-weight: 700; font-size: .92rem; color: var(--pm-ink); letter-spacing: 0; }
+.pmark-m { padding: 10px 16px 9px; margin-bottom: 10px; border-radius: 18px; }
+.pmark-m .pmark-tag { font-size: .82rem; }
+/* خيارات شعار الهوية ودفعتها في المحرر */
+.lgopts { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line, #e6e6e6); display: grid; gap: 8px; }
+.lgvers { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.lgver { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; border-radius: 12px; border: 1.5px solid var(--line, #e3e3e3); background: #f7f5f0; cursor: pointer; font: inherit; font-size: .78rem; }
+.lgver img { width: 100%; height: 46px; object-fit: contain; }
+.lgver.on { border-color: var(--ac, #222); box-shadow: 0 0 0 3px var(--ac-soft, rgba(0,0,0,.08)); }
+.lgbatch { align-items: center; gap: 8px; }
+.lgbatch .lgnum { width: 110px; flex: none; text-align: center; }
+/* لوحة الإدارة: نسخ الشعار والدفعة */
+.lgadm { display: grid; gap: 10px; }
+.lgvlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.lgvrow { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line, #e6e6e6); border-radius: 10px; background: #faf9f6; }
+.lgvth { width: 64px; height: 36px; flex: none; background: center/contain no-repeat; }
+.lgvrow .inp { min-width: 0; flex: 1; }
+.lgprev { width: 100%; max-width: 360px; height: auto; background: #f4f1ea; border-radius: 12px; display: block; }
+
 /* ===== slides.css ===== */
 /* ===== الشرائح: حركة العناصر، والانتقال بين الشرائح، والعرض الحي، ولوحة الحركة، وإعدادات الوسائط ===== */
 
@@ -2315,12 +2341,13 @@ body.mapp .card > h2.ch{font-size:18px}
 <nav class="mtab" id="mtab" hidden aria-label="التنقل"></nav>
 <script src="../v6/js/config.js?v=b79cfa4c64"></script>
 <script src="../v6/js/konva.min.js?v=65c5c4e432"></script>
-<script src="../v6/js/engine.js?v=5088b85303"></script>
+<script src="../v6/js/engine.js?v=96d52953a4"></script>
 <script src="../v6/js/identities.js?v=867f3e03db"></script>
 <script src="../v6/js/templates.js?v=786a7dfb20"></script>
 <script src="../v6/js/templates2.js?v=421638ff17"></script>
-<script src="../v6/js/core5.js?v=0e2a105a42"></script>
-<script src="../v6/js/studio.js?v=c5a1dcdb47"></script>
+<script src="../v6/js/templates3.js?v=6e9c4efd16"></script>
+<script src="../v6/js/core5.js?v=b68a7f39c2"></script>
+<script src="../v6/js/studio.js?v=5584a29b23"></script>
 <script src="../v6/js/slides.js?v=849b6bf589"></script>
 <script src="../v6/js/qr.js?v=4c79be1679"></script>
 <script src="../v6/js/ticons.js?v=d1041b1786"></script>
@@ -2329,14 +2356,14 @@ body.mapp .card > h2.ch{font-size:18px}
 <script src="../v6/js/freetpl6.js?v=ec4f7b8631"></script>
 <script src="../v6/js/assets6.js?v=f312f9f69f"></script>
 <script src="../v6/js/auth6.js?v=9fd9b378fe"></script>
-<script src="../v6/js/home6.js?v=c3a0c51477"></script>
+<script src="../v6/js/home6.js?v=e7391a5141"></script>
 <script src="../v6/js/updates6.js?v=1210eaa02d"></script>
 <script src="../v6/js/motion6.js?v=4223fd5d34"></script>
 <script src="../v6/js/kb6.js?v=8f7305f987"></script>
 <script src="../v6/js/guide6.js?v=c4636f695a"></script>
-<script src="../v6/js/editor6.js?v=0f2a69f94e"></script>
-<script src="../v6/js/panels6.js?v=5fac37dece"></script>
-<script src="../v6/js/docs6.js?v=4267431cfc"></script>
+<script src="../v6/js/editor6.js?v=98b024a235"></script>
+<script src="../v6/js/panels6.js?v=f29dcfa1f5"></script>
+<script src="../v6/js/docs6.js?v=4d6eed33c7"></script>
 <script src="../v6/js/make6.js?v=a6b2855dcb"></script>
 <script src="../v6/js/caption6.js?v=ee66ba7087"></script>
 <script src="../v6/js/cal6.js?v=5d32d6c604"></script>
@@ -2345,9 +2372,9 @@ body.mapp .card > h2.ch{font-size:18px}
 <script src="../v6/js/tips6.js?v=86b4f361a7"></script>
 <script src="../v6/js/social6.js?v=05c796e7ed"></script>
 <script src="../v6/js/mine6.js?v=564318db7d"></script>
-<script src="../v6/js/admin6.js?v=508c252288"></script>
+<script src="../v6/js/admin6.js?v=5c0488c7e7"></script>
 <script src="js/ios6.js?v=ecfe87f0a7"></script>
-<script src="js/mscreens.js?v=0a8472fc3a"></script>
+<script src="js/mscreens.js?v=1b4058442c"></script>
 <script src="js/meditor.js?v=4f86563dec"></script>
 <script src="js/minstall.js?v=33b66e5b2a"></script>
 <script src="js/mapp.js?v=330e8a0c99"></script>

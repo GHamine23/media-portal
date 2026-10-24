@@ -1,0 +1,24 @@
+/* شعار البرنامج المفتوح في الرئيسية */
+.pmark { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 22px 12px; margin: 0 0 14px; border-radius: 22px;
+  background: radial-gradient(120% 140% at 85% 0%, color-mix(in srgb, var(--pm-ac) 18%, transparent), transparent 60%), var(--pm-bg);
+  border: 1px solid color-mix(in srgb, var(--pm-ink) 14%, transparent); box-shadow: 0 10px 30px -18px color-mix(in srgb, var(--pm-ink) 60%, transparent); position: relative; max-width: 100%; }
+.pmark::after { content: ''; position: absolute; inset-inline: 22%; bottom: -1px; height: 3px; border-radius: 3px; background: var(--pm-ac); }
+.pmark-cv { display: block; max-width: 100%; height: auto; }
+.pmark-tag { font-weight: 700; font-size: .92rem; color: var(--pm-ink); letter-spacing: 0; }
+.pmark-m { padding: 10px 16px 9px; margin-bottom: 10px; border-radius: 18px; }
+.pmark-m .pmark-tag { font-size: .82rem; }
+/* خيارات شعار الهوية ودفعتها في المحرر */
+.lgopts { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line, #e6e6e6); display: grid; gap: 8px; }
+.lgvers { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.lgver { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; border-radius: 12px; border: 1.5px solid var(--line, #e3e3e3); background: #f7f5f0; cursor: pointer; font: inherit; font-size: .78rem; }
+.lgver img { width: 100%; height: 46px; object-fit: contain; }
+.lgver.on { border-color: var(--ac, #222); box-shadow: 0 0 0 3px var(--ac-soft, rgba(0,0,0,.08)); }
+.lgbatch { align-items: center; gap: 8px; }
+.lgbatch .lgnum { width: 110px; flex: none; text-align: center; }
+/* لوحة الإدارة: نسخ الشعار والدفعة */
+.lgadm { display: grid; gap: 10px; }
+.lgvlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.lgvrow { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line, #e6e6e6); border-radius: 10px; background: #faf9f6; }
+.lgvth { width: 64px; height: 36px; flex: none; background: center/contain no-repeat; }
+.lgvrow .inp { min-width: 0; flex: 1; }
+.lgprev { width: 100%; max-width: 360px; height: auto; background: #f4f1ea; border-radius: 12px; display: block; }

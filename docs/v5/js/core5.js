@@ -62,7 +62,7 @@ function snap() {
   const d = {}; Object.keys(S.d).forEach(function (k) { const x = S.d[k]; d[k] = x && typeof x === 'object' ? Object.assign({}, x) : x; });
   return { d: d, size: S.size, variant: S.variant, k: S.k, hide: Object.assign({}, S.hide), ov: Object.assign({}, S.ov),
     pos: JSON.parse(JSON.stringify(S.pos || {})), gs: JSON.parse(JSON.stringify(S.gs || {})), layers: (S.layers || []).map(function (L) { return Object.assign({}, L); }), bgfx: S.bgfx ? Object.assign({}, S.bgfx) : null,
-    names: Object.assign({}, S.names || {}), front: (S.front || []).slice() };
+    names: Object.assign({}, S.names || {}), front: (S.front || []).slice(), fs: S.fs ? Object.assign({}, S.fs) : null, lg: S.lg ? Object.assign({}, S.lg) : null };
 }
 
 let LASTT = {};   // النصوص المرسومة في كل عنصر في آخر رسم للمعاينة
@@ -78,6 +78,8 @@ function photoOf(v) {
 
 /* الرسم: st = {d, variant, k, hide, ov} */
 function renderTo(canvas, tpl, sizeKey, st, T, scale, collect) {
+  // تصميم له خطوط عامة خاصة (fs): نرسمه بها ثم نعيد الخط الحالي
+  if (st && st.fs && typeof FS !== 'undefined' && (st.fs.title !== FS.title || st.fs.body !== FS.body) && !renderTo._in) { const keep = { title: FS.title, body: FS.body, tw: FS.tw }; FS.title = st.fs.title || FS.title; FS.body = st.fs.body || FS.body; FS.tw = st.fs.tw || ''; renderTo._in = true; try { return renderTo(canvas, tpl, sizeKey, st, T, scale, collect); } finally { renderTo._in = false; FS.title = keep.title; FS.body = keep.body; FS.tw = keep.tw; } }
   const sz = SIZES[sizeKey];
   canvas.width = Math.round(sz.w * scale); canvas.height = Math.round(sz.h * scale);
   const ctx = canvas.getContext('2d');
@@ -87,6 +89,7 @@ function renderTo(canvas, tpl, sizeKey, st, T, scale, collect) {
   const d = {};
   Object.keys(st.d).forEach(function (k) { d[k] = hide['f_' + k] ? (typeof st.d[k] === 'boolean' ? false : (st.d[k] && typeof st.d[k] === 'object' ? null : '')) : st.d[k]; });
   HIDE = { logo: !!hide.logo, academy: !!hide.academy, social: !!hide.social, deco: !!hide.deco };
+  LGO = typeof lgoOf === 'function' ? lgoOf(T, st.lg) : null;
   OV = { bg: ov.bg || '', title: ov.title || '' };
   const T2 = ov.accent ? Object.assign({}, T, { c: Object.assign({}, T.c, { a: ov.accent, a2: ov.accent }) }) : T;
   CUR_T = T2;
@@ -128,7 +131,7 @@ function renderTo(canvas, tpl, sizeKey, st, T, scale, collect) {
   catch (e) { console.error(e); SOLO = null; G(ctx, null); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#b00'; ctx.font = '20px sans-serif'; ctx.fillText('خطأ في القالب: ' + e.message, 10, 30); }
   const gb = GBOX;
   if (collect) LASTT = GTXT || {};
-  HIDE = {}; OV = {}; OFF = {}; GHIDE = {}; GST = {}; PIV = {}; GTXT = null; BGFX = null; GBOX = null; CUR_G = null; CUR_O = null; CUR_S = null;
+  HIDE = {}; LGO = null; OV = {}; OFF = {}; GHIDE = {}; GST = {}; PIV = {}; GTXT = null; BGFX = null; GBOX = null; CUR_G = null; CUR_O = null; CUR_S = null;
   return gb;
 }
 

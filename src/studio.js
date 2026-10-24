@@ -84,7 +84,7 @@ function drawLayer(ctx, W, H, L, T) {
   } else {
     let ar = 1, src = null;
     if (L.t === 'sticker') ar = (STICKERS[L.ref] && STICKERS[L.ref].ar) || 1;
-    if (L.t === 'logo') { const k = L.ref === 'track' ? T.logo : L.ref; const mask = k === 'academy' || k === 'social'; src = (!mask && (!L.c || L.c === 'color')) ? IMG[k] : tinted(k, L.c && L.c !== 'color' ? L.c : '#2b2b2b'); if (src) ar = srcH(src) / srcW(src); }
+    if (L.t === 'logo') { const k = L.ref === 'track' ? logoKey(T) : L.ref; const mask = k === 'academy' || k === 'social'; src = (!mask && (!L.c || L.c === 'color')) ? IMG[k] : tinted(k, L.c && L.c !== 'color' ? L.c : '#2b2b2b'); if (src) ar = srcH(src) / srcW(src); }
     if (L.t === 'img') { src = layerImg(L); if (src) ar = srcH(src) / srcW(src); }
     if (L.t === 'video') { src = L.poster ? layerImg({ t: 'img', ref: L.poster }) : null; ar = src ? srcH(src) / srcW(src) : 9 / 16; }
     if (L.t === 'yt') ar = ({ '9:16': 16 / 9, '4:3': 3 / 4, '1:1': 1 })[L.ar] || 9 / 16;

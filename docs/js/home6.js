@@ -4,7 +4,9 @@ function redirect6(h) { history.replaceState(null, '', h); render(); }
 function firstName(n) { return String(n || '').trim().replace(/^(أ\.|د\.|م\.|الأستاذ|الأستاذة)\s*/, '').split(/\s+/)[0] || ''; }
 function tracksOf(group) { return Object.keys(TRACKS).map(function (k) { return TRACKS[k]; }).filter(function (t) { return !group || t.group === group; }); }
 // القوالب المتاحة لهذا المستخدم: مواقع التواصل لمن له صلاحيتها
-function visibleTpls() { return TEMPLATES.filter(function (t) { return !t.hidden && t.type !== 'slide' && (canSocial() || t.type !== 'social'); }); }
+// طقم قوالب (t.set) يظهر في البرامج التي فعّله المشرف فيها فقط
+function setOn(t) { if (!t.set) return true; const P = typeof V6 !== 'undefined' && V6.prog; return !!(P && P.sets && P.sets.indexOf(t.set) >= 0); }
+function visibleTpls() { return TEMPLATES.filter(function (t) { return !t.hidden && t.type !== 'slide' && setOn(t) && (canSocial() || t.type !== 'social'); }); }
 function sizesFor(tpl) { const s = tpl.sizes.filter(function (z) { return canSocial() || z !== 'story'; }); return s.length ? s : tpl.sizes.slice(0, 1); }
 
 // رسم مصغّر عند ظهور البطاقة فقط، فلا تتأخر الصفحة
@@ -61,6 +63,7 @@ function showHome() {
   view(
     el('section', { class: 'hero hero2 wrap' }, [
       el('div', { class: 'hgreet' }, [
+        progMark(P),
         el('span', { class: 'eyebrow rv', text: timeGreeting(nm) + ' · ' + P.name }),
         msg, src,
         el('div', { class: 'searchrow rv', style: '--d:2' }, [ico('search'), search]),
@@ -80,6 +83,40 @@ function showHome() {
   );
   loadRecent(recent);
   rotateMessages(msg, src, nm);
+}
+
+/* ---------- شعار البرنامج المفتوح في الرئيسية: الشعار الذي اختاره المشرف (أو شعار هويته الوحيدة) مع رقم الدفعة ---------- */
+function progLogoInfo(P) {
+  P = P || V6.prog; if (!P) return null;
+  const ids = P.identities || [];
+  let key = P.logo && IMG[P.logo] ? P.logo : '';
+  if (!key && ids.length === 1 && IMG[ids[0].logo]) key = ids[0].logo;
+  if (!key) return null;
+  const T = TRACKS[(ids.find(function (t) { return t.logo === key || (t.logos || []).some(function (l) { return l[0] === key; }); }) || {}).id] || null;
+  return { key: key, T: T };
+}
+function progLogoCanvas(P, wCss) {
+  const inf = progLogoInfo(P); if (!inf) return null;
+  const im = IMG[inf.key], ar = srcH(im) / srcW(im), dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = wCss * dpr, pad = W * 0.06, H = W * ar + pad * 2;
+  const cv = el('canvas', { class: 'pmark-cv', width: Math.round(W + pad * 2), height: Math.round(H), role: 'img', 'aria-label': 'شعار ' + P.name });
+  const ctx = cv.getContext('2d'); ctx.imageSmoothingQuality = 'high';
+  const T = inf.T ? Object.assign({}, inf.T, { logo: inf.key }) : { logo: inf.key, c: { a: P.color || '#c08f4e', s: P.color || '#c08f4e' } };
+  LGO = lgoOf(T, null);
+  try {
+    const L = LGO, mode = L.col || 'color', src = mode === 'color' ? im : tinted(inf.key, mode);
+    placeImg(ctx, src, pad, pad, W, 'tl');
+    if (L.show && L.n) batchMark(ctx, T, { x: pad, y: pad, w: W, h: W * ar }, mode, L);
+  } finally { LGO = null; }
+  cv.style.width = Math.round((W + pad * 2) / dpr) + 'px';
+  return cv;
+}
+function progMark(P, cls) {
+  P = P || V6.prog; const cv = P && progLogoCanvas(P, cls === 'm' ? 200 : 300); if (!cv) return null;
+  const T = (progLogoInfo(P) || {}).T, paper = (T && T.c && (T.c.warm || T.c.paper)) || '#f6f3ec';
+  return el('div', { class: 'pmark rv' + (cls ? ' pmark-' + cls : ''), style: '--pm-bg:' + paper + ';--pm-ac:' + ((T && T.c && T.c.a) || P.color || '#c08f4e') + ';--pm-ink:' + ((T && T.c && T.c.p) || P.color || '#222') }, [
+    cv, P.tagline ? el('span', { class: 'pmark-tag', text: P.tagline }) : null
+  ]);
 }
 
 /* ---------- دعوة إلى تطبيق الجوال (تظهر على الشاشات الصغيرة في الموقع) ---------- */
