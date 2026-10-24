@@ -6,8 +6,8 @@ from t6 import setup, URL, OUT
 from t6y import make_omr
 from PIL import Image
 from playwright.async_api import async_playwright
-O = OUT + ('omr_p/' if os.environ.get('PHOTO') else 'omr/'); os.makedirs(O, exist_ok=True)
-JS = """async function(ids){ const out={}; const T=trackOf('khartah');
+O = OUT + (os.environ.get('OUTDIR') or ('omr_p/' if os.environ.get('PHOTO') else 'omr/')); os.makedirs(O, exist_ok=True)
+JS = """async function(ids){ const out={}; const T=trackOf(window.__tid||'khartah');
   await document.fonts.ready;
   for (const tpl of TEMPLATES.filter(t=>ids.indexOf(t.id)>=0)) {
     for (const v of tpl.variants) for (const sz of tpl.sizes) {
@@ -23,6 +23,7 @@ async def main():
         await pg.evaluate("useProgram('omr')"); await pg.wait_for_timeout(2500)
         await pg.evaluate("ensureFonts([FS.title, FS.body])"); await pg.wait_for_timeout(800)
         if os.environ.get('PHOTO'): await pg.evaluate('window.__photo=1')
+        if os.environ.get('TID'): await pg.evaluate("tid => { window.__tid = tid; return useProgram('academy') }", os.environ['TID']); await pg.wait_for_timeout(2000)
         out = await pg.evaluate('(' + JS + ')', ids)
         by = {}
         for k, v in out.items():
