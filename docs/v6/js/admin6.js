@@ -409,7 +409,7 @@ function bcForm(b) {
   const untilI = el('input', { type: 'date', class: 'inp', value: b.until ? new Date(b.until).toISOString().slice(0, 10) : '', 'aria-label': 'تنتهي في' });
   let kind = b.kind, active = b.active !== false;
   const progs = el('div', { class: 'checks' }, myAdminProgs().map(function (p) { return el('label', { class: 'tog' }, [el('input', { type: 'checkbox', value: p.id, checked: (b.programs || []).indexOf(p.id) >= 0 }), el('span', { text: p.name })]); }));
-  modal({ title: b.id ? 'تعديل الرسالة' : 'رسالة جديدة', body: [tI, bI, el('div', { class: 'fld' }, [el('label', { text: 'الشكل' }), segOf([['banner', 'شريط أعلى الصفحة'], ['modal', 'نافذة مرة واحدة'], ['tip', 'نصيحة في «ما الجديد»']], kind, function (v) { kind = v; })]),
+  modal({ title: b.id ? 'تعديل الرسالة' : 'رسالة جديدة', body: [withEmoji(tI), withEmoji(bI), el('div', { class: 'fld' }, [el('label', { text: 'الشكل' }), segOf([['banner', 'شريط أعلى الصفحة'], ['modal', 'نافذة مرة واحدة'], ['tip', 'نصيحة في «ما الجديد»']], kind, function (v) { kind = v; })]),
     el('div', { class: 'fld' }, [el('label', { text: isSuper() ? 'البرامج (لا شيء = الجميع)' : 'البرامج' }), progs]), lI, el('div', { class: 'fld' }, [el('label', { text: 'تختفي بعد (اختياري)' }), untilI]),
     el('label', { class: 'tog' }, [el('input', { type: 'checkbox', checked: active, onchange: function (e) { active = e.target.checked; } }), el('span', { text: 'ظاهرة' })])],
   acts: [{ t: 'نشر', cls: 'dark', fn: async function () { try { await API6.me('bc_save', JSON.stringify({ id: b.id, title: tI.value, body: bI.value, kind: kind, link: lI.value, programs: $$('input:checked', progs).map(function (i) { return i.value; }), until: untilI.value ? new Date(untilI.value + 'T23:59:59').getTime() : 0, active: active })); toast('نُشرت'); loadNews(); showAdmin('broadcasts'); } catch (e) { toast(e.message); } } }, { t: 'إلغاء' }] });
@@ -452,14 +452,22 @@ async function aSettings(body) {
   const pbKey = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.pixabayOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'مفتاح Pixabay', 'aria-label': 'مفتاح Pixabay' });
   const pxKey = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.pexelsOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'مفتاح Pexels', 'aria-label': 'مفتاح Pexels' });
   const upPerm = el('input', { type: 'checkbox', checked: !!s.uploadsNeedPerm }), maxMb = el('input', { type: 'number', class: 'inp', min: '1', max: '20', value: String(s.maxUploadMb || 20), 'aria-label': 'أقصى حجم' });
+  const gKeys = el('textarea', { class: 'inp mono', rows: '3', dir: 'ltr', autocomplete: 'off', placeholder: s.aiKeys > 1 ? '•••••••• (' + (s.aiKeys - 1) + ' مفاتيح إضافية محفوظة؛ اترك الحقل فارغاً لإبقائها، أو الصق القائمة الجديدة كاملة)' : 'AIzaSy… (مفتاح في كل سطر)', 'aria-label': 'مفاتيح Gemini الإضافية' });
+  const clearKeys = el('input', { type: 'checkbox' });
+  const pollOn = el('input', { type: 'checkbox', checked: s.ai.pollFallback !== false });
+  const capPrompt = el('textarea', { class: 'inp', rows: '4', dir: 'auto', placeholder: 'مثال: ابدأ كل رسالة بسطر ترحيبي قصير، واختم بالوسم ورابط القناة. لا تستعمل أكثر من رمزين تعبيريين. نبرة هادئة محفّزة.', 'aria-label': 'تعليمات النص المصاحب' }); capPrompt.value = s.ai.capPrompt || '';
   body.appendChild(el('div', { class: 'grid two' }, [
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-pu' }, [ico('ai')]), el('h3', { text: 'اصنع إعلانك بالذكاء' }),
-      el('p', { class: 'small ' + (s.aiKey ? 'ok' : 'err'), text: s.aiKey ? 'مفتاح Gemini مضبوط في الخادم.' : 'لم يُضبط مفتاح Gemini بعد (خطوة في محرر Apps Script).' }),
+      el('p', { class: 'small ' + (s.aiKey ? 'ok' : 'err'), text: s.aiKey ? (s.aiKeys > 1 ? s.aiKeys + ' مفاتيح Gemini مضبوطة: تتناوب في الطلبات، وإذا بلغ أحدها حدّه انتقل الخادم إلى التالي تلقائياً.' : 'مفتاح Gemini مضبوط في الخادم.') : 'لم يُضبط مفتاح Gemini بعد (الصقه في خصائص السكربت، أو أضف مفاتيح هنا).' }),
       el('label', { class: 'tog' }, [aiOn, el('span', { text: 'مفعّل' })]),
+      el('div', { class: 'fld' }, [el('label', { text: 'مفاتيح Gemini إضافية (من حسابات جوجل أخرى) — تُحفظ في الخادم ولا تُعرض' }), gKeys, el('small', { text: 'كل مفتاح في سطر. الحصة المجانية لكل مفتاح على حدة، فكل حساب جوجل إضافي يضاعف ما يمكن طلبه يومياً. المفتاح الأساسي GEMINI_KEY يبقى كما هو.' }), s.aiKeys > 1 ? el('label', { class: 'tog tiny' }, [clearKeys, el('span', { text: 'احذف المفاتيح الإضافية المحفوظة' })]) : null]),
       el('div', { class: 'fld' }, [el('label', { text: 'النموذج' }), model, el('small', { text: 'أقوى نموذج مجاني الآن: gemini-3.8-flash' })]),
       el('div', { class: 'fld' }, [el('label', { text: 'نموذج المهام الخفيفة' }), lightM, el('small', { text: 'فهم الفكرة والنص المصاحب والتصحيح والمخطط وتقرير الأسبوع. حصته المجانية ٥٠٠ طلب يومياً، بينما النموذج الأقوى ٢٠ فقط.' })]),
       el('div', { class: 'fld' }, [el('label', { text: 'نماذج احتياطية عند ازدحام جوجل' }), fbm, el('small', { text: 'يُعيد المحاولة ثم ينتقل إليها بالترتيب. افصل بينها بفاصلة.' })]),
       el('div', { class: 'fld' }, [el('label', { text: 'حد الطلبات لكل مستخدم يومياً' }), perDay]),
+      el('label', { class: 'tog' }, [pollOn, el('span', { text: 'مساعد احتياطي مجاني للنصوص حين تنفد الحصص (Pollinations، بلا مفتاح)' })]),
+      el('small', { class: 'tiny', text: 'يُستعمل فقط إن تعطل Gemini وGroq معاً، وللمهام النصية دون الصور. لا تُرسل إليه بيانات شخصية.' }),
+      el('div', { class: 'fld' }, [el('label', { text: 'كيف يصوغ المساعد النص المصاحب للتصاميم (لكل البرامج)' }), withEmoji(capPrompt), el('small', { text: 'تعليمات ثابتة تُضاف إلى كل طلب صياغة. ولكل برنامج تعليماته الخاصة من «البرامج والهويات ← قناة تليجرام».' })]),
       el('p', { class: 'tiny', text: 'في الخطة المجانية تستعمل جوجل الطلبات لتحسين منتجاتها، فلا تُرسل بيانات شخصية للطلاب. والمساعد لمن منحته صلاحيته.' })]),
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-bl' }, [ico('ai')]), el('h3', { text: 'توزيع المهام بين المساعدين' }),
       el('p', { class: 'small ' + (s.groqOn ? 'ok' : 'err'), text: s.groqOn ? 'مفتاح Groq مضبوط: المهام النصية تذهب إليه، وما يحتاج رؤية الصور يبقى مع Gemini.' : 'بلا مفتاح Groq: كل المهام على Gemini. المفتاح مجاني من console.groq.com/keys (ألف طلب يومياً، ولا يُدرَّب على بياناتكم).' }),
@@ -473,17 +481,18 @@ async function aSettings(body) {
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-bl' }, [ico('upload')]), el('h3', { text: 'الرفع' }),
       el('label', { class: 'tog' }, [upPerm, el('span', { text: 'رفع الصور يحتاج صلاحية' })]),
       el('div', { class: 'fld' }, [el('label', { text: 'أقصى حجم للملف (ميغابايت)' }), maxMb])]),
-    el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-or' }, [ico('image')]), el('h3', { text: 'صور مجانية (Pixabay / Pexels)' }),
-      el('p', { class: 'small ' + (s.pexelsOn || s.pixabayOn ? 'ok' : 'err'), text: s.pixabayOn || s.pexelsOn ? 'مصدر الصور مضبوط: ' + [s.pixabayOn ? 'Pixabay' : '', s.pexelsOn ? 'Pexels' : ''].filter(Boolean).join(' و') + '. الفريق يبحث عن صور مجانية من المحرر.' : 'بلا مفتاح بعد. Pixabay يعطي مفتاحاً مجانياً فوراً.' }),
+    el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-or' }, [ico('image')]), el('h3', { text: 'الصور المجانية والمولّدة' }),
+      el('p', { class: 'small ok', text: 'يعمل بلا أي مفتاح: Openverse (ملايين الصور بتراخيص المشاع الإبداعي) وويكيميديا، وتوليد الصور بالذكاء عبر Pollinations. ' + (s.pixabayOn || s.pexelsOn ? 'ومعها مصدر إضافي مضبوط: ' + [s.pixabayOn ? 'Pixabay' : '', s.pexelsOn ? 'Pexels' : ''].filter(Boolean).join(' و') + '.' : 'ويمكن إضافة Pixabay أو Pexels اختياراً.') }),
       el('div', { class: 'fld' }, [el('label', { text: 'مفتاح Pixabay (يُحفظ في الخادم ولا يُعرض)' }), pbKey, el('small', { text: 'مجاني فوري من pixabay.com/api/docs بعد التسجيل. الصور حتى ١٢٨٠ بكسل، وتطلب من دعم Pixabay «full API access» مجاناً لتصل الأصول الكاملة.' }), el('div', { class: 'row' }, [el('button', { type: 'button', class: 'btn sm line', text: 'اختبر مصدر الصور', onclick: async function (e) { const b = e.currentTarget; b.disabled = true; try { const r = await API6.me('img_test'); toast('يعمل: ' + (r.provider || '') + ' · ' + (r.n != null ? r.n + ' نتيجة تجريبية' : 'مضبوط')); } catch (er) { toast('لا يعمل: ' + er.message); } b.disabled = false; } }), el('small', { class: 'tiny', text: 'احفظ المفتاح أولاً ثم اختبر. إن ظهر 400 فالمفتاح غير صحيح أو الخادم قديم.' })])]),
       el('div', { class: 'fld' }, [el('label', { text: 'مفتاح Pexels (إن توفر؛ إصدار المفاتيح متوقف عندهم حالياً)' }), pxKey]),
-      el('div', { class: 'fld' }, [el('label', { text: 'المصدر المفضّل' }), segOf([['', 'تلقائي'], ['pixabay', 'Pixabay'], ['pexels', 'Pexels']], s.imgProvider || '', function (v) { imgProv = v; })]),
-      el('p', { class: 'tiny', text: 'الحد المجاني ٢٠٠ بحث في الساعة. الصورة التي يختارها المستخدم تُحفظ بأصلها كاملاً في مكتبته، ويقترحها للبرنامج فتوافق أنت من «الشعارات والصور».' })])
+      el('div', { class: 'fld' }, [el('label', { text: 'المصدر المفضّل حين يبحث الخادم' }), segOf([['', 'تلقائي'], ['openverse', 'Openverse'], ['pixabay', 'Pixabay'], ['pexels', 'Pexels']], s.imgProvider || '', function (v) { imgProv = v; })]),
+      el('p', { class: 'tiny', text: 'الصورة التي يختارها المستخدم تُحفظ بأصلها كاملاً في مكتبته مع اسم المصوّر ورخصته، ويقترحها للبرنامج فتوافق أنت من «الشعارات والصور».' })])
   ]));
-  body.appendChild(el('button', { type: 'button', class: 'btn dark', text: 'حفظ الإعدادات', onclick: async function () {
-    const o = { ai: { enabled: aiOn.checked, model: model.value.trim(), fallback: fbm.value.trim(), light: lightM.value.trim(), groqModel: groqM.value.trim(), route: route, perDay: +perDay.value }, uploadsNeedPerm: upPerm.checked, maxUploadMb: +maxMb.value }; if (tgTok.value.trim()) o.tgToken = tgTok.value.trim(); if (pxKey.value.trim()) o.pexelsKey = pxKey.value.trim(); if (pbKey.value.trim()) o.pixabayKey = pbKey.value.trim(); o.imgProvider = imgProv; if (groqTok.value.trim()) o.groqKey = groqTok.value.trim();
-    try { await API6.me('set_save', JSON.stringify(o)); toast('حُفظت'); await refreshBundle(); showAdmin('settings'); } catch (e) { toast(e.message); }
-  } }));
+  body.appendChild(el('button', { type: 'button', class: 'btn dark', onclick: function (e) {
+    const o = { ai: { enabled: aiOn.checked, model: model.value.trim(), fallback: fbm.value.trim(), light: lightM.value.trim(), groqModel: groqM.value.trim(), route: route, perDay: +perDay.value, capPrompt: capPrompt.value.trim(), pollFallback: pollOn.checked }, uploadsNeedPerm: upPerm.checked, maxUploadMb: +maxMb.value }; if (tgTok.value.trim()) o.tgToken = tgTok.value.trim(); if (pxKey.value.trim()) o.pexelsKey = pxKey.value.trim(); if (pbKey.value.trim()) o.pixabayKey = pbKey.value.trim(); o.imgProvider = imgProv; if (groqTok.value.trim()) o.groqKey = groqTok.value.trim();
+    if (gKeys.value.trim()) o.geminiKeys = gKeys.value.trim(); else if (clearKeys.checked) o.geminiKeys = '';
+    return withBusy(e.currentTarget, async function () { await API6.me('set_save', JSON.stringify(o)); await refreshBundle(); }, { busy: 'نحفظ…', done: 'حُفظت الإعدادات' }).then(function () { setTimeout(function () { showAdmin('settings'); }, 900); }).catch(function () {});
+  } }, [ico('check'), 'حفظ الإعدادات']));
 }
 
 /* ---------- سجل النشاط ---------- */
@@ -649,10 +658,29 @@ async function aAI(body) {
 
 /* ---------- قناة تليجرام والنصوص المصاحبة لبرنامج ---------- */
 function tgForm(p) {
-  const tg = Object.assign({ chat: '', link: '', hashtag: '', sign: '' }, p.tg || {});
+  const tg = Object.assign({ chat: '', link: '', hashtag: '', sign: '', capPrompt: '', titles: {} }, p.tg || {});
+  const titles = Object.assign({}, tg.titles || {});
   const chatI = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: tg.chat, placeholder: '@channel_username أو -1001234567890' });
   const chats = Object.assign({}, tg.chats || {});
-  const trackRows = (p.identities || []).map(function (t) { return el('div', { class: 'fld' }, [el('label', { text: t.name }), el('input', { type: 'text', class: 'inp sm', dir: 'ltr', value: chats[t.id] || '', placeholder: 'اتركه فارغاً لاستعمال قناة البرنامج', oninput: function (e) { chats[t.id] = e.target.value.trim(); } })]); });
+  const trackInputs = {};
+  const trackRows = (p.identities || []).map(function (t) { const i = el('input', { type: 'text', class: 'inp sm', dir: 'ltr', value: chats[t.id] || '', placeholder: 'اتركه فارغاً لاستعمال قناة البرنامج', oninput: function (e) { chats[t.id] = e.target.value.trim(); } }); trackInputs[t.id] = i; return el('div', { class: 'fld' }, [el('label', { text: t.name }), i]); });
+  // القنوات والمجموعات التي أُضيف إليها البوت: يكتشفها الخادم من تحديثات تليجرام، فتُختار بنقرة
+  const known = el('div', { class: 'knownchats' });
+  function chatLabel(c) { return (c.title || c.username || c.id) + (c.username ? ' · ' + c.username : '') + (c.type === 'channel' ? ' · قناة' : ' · مجموعة'); }
+  function drawKnown(list) {
+    known.innerHTML = '';
+    if (!list.length) { known.appendChild(el('p', { class: 'tiny', text: 'لم يُعثر على قنوات بعد. أضف البوت مشرفاً في القناة (أو عضواً في المجموعة) ثم اضغط «ابحث عن القنوات».' })); return; }
+    list.forEach(function (c) {
+      const id = c.username || String(c.id);
+      known.appendChild(el('div', { class: 'kchat' }, [el('div', { class: 'grow' }, [el('b', { text: c.title || c.username || c.id }), el('span', { class: 'tiny', dir: 'ltr', text: (c.username ? c.username + ' · ' : '') + c.id + (c.status ? ' · ' + ({ administrator: 'البوت مشرف', member: 'البوت عضو', creator: 'البوت مالك' }[c.status] || c.status) : '') })]),
+        el('button', { type: 'button', class: 'btn sm line', onclick: function (e) { chatI.value = id; titles[id] = c.title || ''; btnDone(e.currentTarget, 'اختيرت'); flashOk(chatI); } }, ['قناة البرنامج']),
+        trackRows.length ? el('button', { type: 'button', class: 'ib sm', title: 'لمسار معيّن', 'aria-label': 'لمسار معيّن', onclick: function (e) { popMenu(e.currentTarget, (p.identities || []).map(function (t) { return { t: t.name, fn: function () { trackInputs[t.id].value = id; chats[t.id] = id; titles[id] = c.title || ''; flashOk(trackInputs[t.id]); } }; })); } }, [ico('more')]) : null]));
+    });
+  }
+  API6.me('tg_known').then(drawKnown).catch(function () { drawKnown([]); });
+  const discover = el('button', { type: 'button', class: 'btn sm dark', onclick: function (e) { return withBusy(e.currentTarget, async function () { const r = await API6.me('tg_discover'); drawKnown(r.list); if (!r.found) throw new Error('لا جديد في تحديثات البوت: أضفه إلى القناة الآن ثم أعد المحاولة (تليجرام يحتفظ بالتحديثات ٢٤ ساعة)'); }, { busy: 'نبحث…', done: 'وُجدت قنوات' }); } }, [ico('search'), 'ابحث عن القنوات']);
+  const check = el('button', { type: 'button', class: 'btn sm line', onclick: function (e) { const v = chatI.value.trim(); if (!v) { chatI.focus(); return; } return withBusy(e.currentTarget, async function () { const r = await API6.me('tg_chat_check', v); titles[v] = r.title || ''; if (!r.canPost) throw new Error('البوت يصل إلى «' + (r.title || v) + '» لكنه ليس مشرفاً بصلاحية النشر' + (r.status ? ' (حاله: ' + r.status + ')' : '')); toast('«' + (r.title || v) + '»: البوت مشرف ويستطيع النشر' + (r.members ? ' · ' + r.members + ' عضواً' : '')); }, { busy: 'نفحص…', done: 'يستطيع النشر' }); } }, [ico('shield'), 'افحص القناة']);
+  const capPromptI = el('textarea', { rows: '3', dir: 'auto', placeholder: 'مثال: ابدأ بالبسملة، واذكر رابط التسجيل في سطر مستقل، واختم بـ«ننتظركم»، ولا تزد على ثلاثة رموز تعبيرية.' }); capPromptI.value = tg.capPrompt || '';
   const linkI = el('input', { type: 'url', class: 'inp', dir: 'ltr', value: tg.link, placeholder: 'https://…' });
   const hashI = el('input', { type: 'text', class: 'inp', dir: 'auto', value: tg.hashtag, placeholder: 'الأنشطة_التربوية' });
   const signI = el('input', { type: 'text', class: 'inp', dir: 'auto', value: tg.sign, placeholder: 'ننتظركم على خير 🌿' });
@@ -666,7 +694,7 @@ function tgForm(p) {
         el('input', { type: 'text', class: 'inp sm', value: c.name, placeholder: 'اسم القالب', oninput: function (e) { c.name = e.target.value; } }),
         el('select', { class: 'inp sm', onchange: function (e) { c.kind = e.target.value; } }, CAP_KINDS.map(function (k) { return el('option', { value: k[0], text: k[1], selected: k[0] === c.kind }); })),
         el('button', { type: 'button', class: 'ib sm', 'aria-label': 'حذف', onclick: function () { caps.splice(i, 1); drawCaps(); } }, [ico('trash')]),
-        el('textarea', { rows: '5', dir: 'auto', class: 'captext', oninput: function (e) { c.text = e.target.value; } }, [c.text || ''])
+        (function () { const ta = el('textarea', { rows: '5', dir: 'auto', class: 'captext', oninput: function (e) { c.text = e.target.value; } }, [c.text || '']); const w = withEmoji(ta); w.classList.add('captext'); return w; })()
       ]));
     });
     capBox.appendChild(el('div', { class: 'row wrapr' }, [
@@ -676,20 +704,23 @@ function tgForm(p) {
   drawCaps();
   modal({ title: 'قناة ' + p.name + ' والنصوص المصاحبة', wide: true, body: [
     el('p', { class: 'tiny', text: 'أضف بوت المنصة مشرفاً في القناة (بصلاحية النشر)، ثم اكتب اسم القناة هنا. كل من له صلاحية «الإرسال» في هذا البرنامج يرسل إليها من المحرر.' }),
-    el('div', { class: 'grid two' }, [el('div', { class: 'fld' }, [el('label', { text: 'القناة أو المجموعة' }), chatI]), el('div', { class: 'fld' }, [el('label', { text: 'رابط الحضور أو التسجيل المعتاد {link}' }), linkI]), el('div', { class: 'fld' }, [el('label', { text: 'الوسم المعتاد {hashtag}' }), hashI]), el('div', { class: 'fld' }, [el('label', { text: 'توقيع ختامي {sign}' }), signI])]),
+    el('div', { class: 'fld' }, [el('label', { text: 'القنوات والمجموعات التي فيها البوت' }), known, el('div', { class: 'row wrapr' }, [discover, check]), el('small', { text: 'يكتشف الخادم ما أُضيف إليه البوت خلال آخر ٢٤ ساعة. وإن كانت القناة قديمة اكتب اسمها واضغط «افحص».' })]),
+    el('div', { class: 'grid two' }, [el('div', { class: 'fld' }, [el('label', { text: 'القناة أو المجموعة' }), chatI]), el('div', { class: 'fld' }, [el('label', { text: 'رابط الحضور أو التسجيل المعتاد {link}' }), linkI]), el('div', { class: 'fld' }, [el('label', { text: 'الوسم المعتاد {hashtag}' }), hashI]), el('div', { class: 'fld' }, [el('label', { text: 'توقيع ختامي {sign}' }), withEmoji(signI)])]),
     trackRows.length ? el('details', { class: 'capdet' }, [el('summary', { text: 'قناة مختلفة لكل مسار (اختياري)' }), el('p', { class: 'tiny', text: 'إن كان لكل مسار قناته، اكتبها هنا؛ يُرسل المحرر تلقائياً إلى قناة المسار الذي صُمّم له الإعلان، وإلا إلى قناة البرنامج.' }), el('div', { class: 'grid two' }, trackRows)]) : null,
     el('h4', { class: 'psh', text: 'القوالب الكتابية الخاصة بالبرنامج' }), el('p', { class: 'tiny', text: 'اكتب القالب كما تكتب في تليجرام، وضع الحقول بين قوسين معقوفين فتُملأ من التصميم: ' + CAP_VARS.map(function (v) { return '{' + v[0] + '} ' + v[1]; }).join(' · ') + '. للتنسيق تُقبل وسوم <b> غامق و<u> خط و<blockquote> اقتباس.' }), capBox,
+    el('h4', { class: 'psh', text: 'كيف يصوغ المساعد النص المصاحب لهذا البرنامج' }), el('p', { class: 'tiny', text: 'تعليمات ثابتة تُضاف إلى كل طلب صياغة لتصاميم هذا البرنامج (فوق تعليمات المنصة العامة). وللمستخدم أن يوجّه المساعد لكل رسالة على حدة.' }), withEmoji(capPromptI),
     el('h4', { class: 'psh', text: 'نماذج رسائلكم (يتعلم منها المساعد)' }), samples
-  ], acts: [{ t: 'حفظ', cls: 'dark', keep: true, fn: async function (close) {
-    try { await API6.me('prog_save', JSON.stringify({ id: p.id, tg: { chat: chatI.value.trim(), chats: chats, link: linkI.value.trim(), hashtag: hashI.value.trim(), sign: signI.value.trim() }, captions: caps.filter(function (c) { return c.text && c.text.trim(); }), samples: samples.value })); close(); await refreshBundle(); toast('حُفظ'); showAdmin('programs'); }
-    catch (e) { toast(e.message); }
+  ], acts: [{ t: 'حفظ', cls: 'dark', keep: true, fn: function (close) {
+    const b = $$('.modal .acts .btn.dark').pop();
+    withBusy(b, async function () { await API6.me('prog_save', JSON.stringify({ id: p.id, tg: { chat: chatI.value.trim(), chats: chats, link: linkI.value.trim(), hashtag: hashI.value.trim(), sign: signI.value.trim(), capPrompt: capPromptI.value.trim(), titles: titles }, captions: caps.filter(function (c) { return c.text && c.text.trim(); }), samples: samples.value })); await refreshBundle(); }, { busy: 'نحفظ…', done: 'حُفظ' }).then(function () { setTimeout(function () { close(); showAdmin('programs'); }, 600); }).catch(function () {});
+    return false;
   } }, { t: 'إلغاء' }] });
 }
 /* ---------- منشورات القناة: المرسل والمجدول ---------- */
 const TG_ST = { queued: ['مجدول', 'bl'], sent: ['أُرسل', 'gr'], failed: ['فشل', 'rd'], cancelled: ['أُلغي', ''] };
 async function aTg(body) {
   let prog = '';
-  aHead(body, 'منشورات القناة', 'ما أُرسل إلى قنوات تليجرام من المنصة وما جُدول. القناة والقوالب الكتابية تُضبط من «البرامج والهويات»، ورمز البوت من الإعدادات.', [progSelect('', true, function (v) { prog = v; load(); })]);
+  aHead(body, 'منشورات القناة', 'ما أُرسل إلى قنوات تليجرام من المنصة وما جُدول. القناة والقوالب الكتابية تُضبط من «البرامج والهويات»، ورمز البوت من الإعدادات. التعديل والنقل والتكرار من «التقويم والمهام».', [el('a', { class: 'btn dark', href: '#/cal' }, [ico('cal'), 'التقويم والمهام']), progSelect('', true, function (v) { prog = v; load(); })]);
   const box = el('div'); body.appendChild(box);
   async function load() {
     box.innerHTML = ''; const sk = loading(box);

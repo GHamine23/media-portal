@@ -154,6 +154,7 @@ function buildTop() {
     el('a', { href: '#/', 'data-r': 'home', text: 'الرئيسية' }),
     el('a', { href: '#/mine', 'data-r': 'mine', text: 'تصاميمي' }),
     el('a', { href: '#/make', 'data-r': 'make', text: 'اصنع إعلانك' }),
+    el('a', { href: '#/cal', 'data-r': 'cal', text: 'التقويم' }),
     el('a', { href: '#/tips', 'data-r': 'tips', text: 'نصائح' }),
     isAdmin() ? el('a', { href: '#/admin', 'data-r': 'admin', text: 'الإدارة' }) : null
   ]);
@@ -168,6 +169,7 @@ function buildTop() {
     popMenu(av, [{ hd: V6.me.name + ' · ' + (V6.me.roleName || '') },
       { t: 'حسابي', ic: 'user', href: '#/account' },
       { t: 'تصاميمي', ic: 'grid', href: '#/mine' },
+      { t: 'التقويم والمهام', ic: 'cal', href: '#/cal' },
       { t: 'أسبوعي في أثر', ic: 'chart', href: '#/week' },
       { t: 'مراجعاتي', ic: 'review', href: '#/reviews' },
       isAdmin() ? { t: 'لوحة الإدارة', ic: 'gear', href: '#/admin' } : null,

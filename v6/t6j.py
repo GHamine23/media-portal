@@ -19,7 +19,7 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(); pg = await b.new_page(viewport={'width': 1440, 'height': 900})
         errs = await setup(pg)
-        await pg.evaluate("GAS._props.GEMINI_KEY='k'; " + MOCK + "; void 0"); await pg.evaluate("refreshBundle()"); await pg.wait_for_timeout(1200)
+        await pg.evaluate("GAS._props.GEMINI_KEY='k-demo-AIzaSy0123456789abcdefghijklmnop'; " + MOCK + "; void 0"); await pg.evaluate("refreshBundle()"); await pg.wait_for_timeout(1200)
         # الرئيسية: نصيحة اليوم وأسبوعك
         await pg.goto(URL + '#/'); await pg.wait_for_timeout(2500); await clean(pg)
         ok(await pg.query_selector('.tipday .tdemo') is not None and 'نصيحة اليوم' in await pg.inner_text('.tipday'), 'home shows animated tip of the day')

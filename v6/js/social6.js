@@ -166,7 +166,7 @@ async function commentsDialog(t) {
     try { const c = await API6.me('cm_add', JSON.stringify({ target: t.target, program: V6.prog.id, text: v })); ta.value = ''; list.querySelector('.empty') && list.querySelector('.empty').remove(); list.appendChild(cmRow(c)); list.scrollTop = list.scrollHeight; setCmCount(1); track('tool', { tool: 'comment' }); } catch (e) { toast(e.message); }
   };
   ta.addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) send(); });
-  modal({ title: 'التعليقات', wide: true, body: [el('p', { class: 'tiny muted', text: t.title + ' · يراها أعضاء برنامجك' }), list, el('div', { class: 'cmform' }, [ta, el('button', { type: 'button', class: 'btn dark', onclick: send }, [ico('send'), 'علّق'])])], acts: [{ t: 'إغلاق' }] });
+  modal({ title: 'التعليقات', wide: true, body: [el('p', { class: 'tiny muted', text: t.title + ' · يراها أعضاء برنامجك' }), list, el('div', { class: 'cmform' }, [withEmoji(ta), el('button', { type: 'button', class: 'btn dark', onclick: send }, [ico('send'), 'علّق'])])], acts: [{ t: 'إغلاق' }] });
   function cmRow(c) {
     const row = el('div', { class: 'cmrow' + (c.mine ? ' mine' : '') }, [el('div', { class: 'cmav', text: String(c.name || '؟').trim().replace(/^(أ\.|د\.|م\.)\s*/, '').slice(0, 1) }), el('div', { class: 'cmbody' }, [el('div', { class: 'row' }, [el('b', { text: c.name }), el('span', { class: 'tiny', text: fmtTime(c.at) }), el('span', { class: 'sp' }),
       c.canDel ? el('button', { type: 'button', class: 'ib sm', 'aria-label': 'حذف', onclick: async function () { try { await API6.me('cm_del', c.id); row.remove(); setCmCount(-1); } catch (e) { toast(e.message); } } }, [ico('trash')]) : null]), el('p', { text: c.text })])]);

@@ -50,8 +50,7 @@ function showHome() {
         el('div', { class: 'searchrow rv', style: '--d:2' }, [ico('search'), search])
       ]),
       clockCard(),
-      aiDesignerBox(),
-      scrollCue()
+      aiDesignerBox()
     ]),
     el('div', { class: 'wrap hgrid2' }, [tipOfDayCard(), wkSlot]),
     el('div', { class: 'wrap' }, [el('section', { class: 'hsec', id: 'modelsec', hidden: true }, [el('div', { class: 'shead' }, [H('h2', 'نماذج جاهزة'), el('a', { class: 'btn sm line', href: '#/mine', onclick: function () { ls('mineTab', 'models'); }, text: 'كل النماذج' })]), stripNav(models)])].concat(idSections).concat([
@@ -203,7 +202,7 @@ function clockCard() {
     days.forEach(function (q) {
       const isT = q.dt.toDateString() === today.toDateString(), fri = q.dt.getDay() === 5, key = q.dt.toDateString();
       const other = mode === 'g' ? hijriParts(q.dt).d : q.dt.getDate(), n = (POSTS_BY_DAY[key] || []).length;
-      cal.appendChild(el('span', { class: 'cd' + (isT ? ' today' : '') + (fri ? ' fri' : '') + (n ? ' has' : ''), title: (n ? n + ' منشور مجدول · ' : '') + (mode === 'g' ? other + ' ' + hijriMonthName(q.dt) : q.dt.toLocaleDateString('ar-u-nu-latn', { day: 'numeric', month: 'long' })) }, [String(q.n), n ? el('i', { class: 'pdot6' }) : null]));
+      cal.appendChild(el('a', { href: '#/cal?d=' + localISO(q.dt), class: 'cd' + (isT ? ' today' : '') + (fri ? ' fri' : '') + (n ? ' has' : ''), title: (n ? n + ' منشور مجدول · ' : '') + (mode === 'g' ? other + ' ' + hijriMonthName(q.dt) : q.dt.toLocaleDateString('ar-u-nu-latn', { day: 'numeric', month: 'long' })) }, [String(q.n), n ? el('i', { class: 'pdot6' }) : null]));
     });
   }
   const seg = segOf([['h', 'هجري'], ['g', 'ميلادي']], mode, function (v) { mode = v; off = 0; ls('calMode', v); grid(); });
@@ -218,15 +217,9 @@ function clockCard() {
     el('details', { class: 'cdet', open: innerWidth > 700 }, [el('summary', { text: 'التقويم' }), el('div', { class: 'chead' }, [nav, seg]), cal])
   ]);
   const t = setInterval(function () { if (!card.isConnected) { clearInterval(t); return; } tick(); }, 15000);
-  // المنشورات المجدولة إلى القناة تظهر في التقويم وتحته
-  const plist = el('div', { class: 'plist6' }); card.appendChild(plist);
-  loadPosts(function (list) {
-    grid();
-    const up = list.filter(function (x) { return x.status === 'queued'; }).sort(function (a, b) { return a.when - b.when; }).slice(0, 4);
-    if (!up.length) return;
-    plist.appendChild(el('h4', { class: 'psh', text: 'منشورات مجدولة إلى القناة' }));
-    up.forEach(function (x) { plist.appendChild(el('div', { class: 'prow6' }, [el('span', { class: 'tiny', text: fmtTime(x.when) }), el('b', { text: x.title || 'منشور' }), x.mine || isAdmin() ? el('button', { type: 'button', class: 'ib sm', title: 'إلغاء', 'aria-label': 'إلغاء', onclick: async function () { if (!(await ask('إلغاء النشر', '«' + (x.title || 'المنشور') + '» لن يُرسل.', 'إلغاء النشر', true))) return; try { await API6.me('tg_cancel', x.id); POSTS = null; toast('أُلغي'); go('#/'); } catch (e) { toast(e.message); } } }, [ico('close')]) : null])); });
-  });
+  // المنشورات المجدولة والمهام القادمة تحت التقويم، من قسم «التقويم والمهام»
+  if (V6.settings && V6.settings.tg) { card.appendChild(calHomeWidget()); calLoad().then(grid).catch(function () {}); }
+  else card.appendChild(calHomeWidget());
   return card;
 }
 let POSTS = null, POSTS_BY_DAY = {};

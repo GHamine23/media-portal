@@ -18,11 +18,11 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(); pg = await b.new_page(viewport={'width': 1440, 'height': 900})
         errs = await setup(pg)
-        await pg.evaluate("GAS._props.GEMINI_KEY='k'; " + MOCK + "; void 0"); await pg.evaluate("refreshBundle()"); await pg.wait_for_timeout(1200)
+        await pg.evaluate("GAS._props.GEMINI_KEY='k-demo-AIzaSy0123456789abcdefghijklmnop'; " + MOCK + "; void 0"); await pg.evaluate("refreshBundle()"); await pg.wait_for_timeout(1200)
         # الإعدادات: مفتاح Pexels
         await pg.goto(URL + '#/admin/settings'); await pg.wait_for_timeout(1500)
         await pg.fill('input[aria-label="مفتاح Pexels"]', 'PXDEMOKEY'); await pg.click('#abody > .btn.dark'); await pg.wait_for_timeout(1800)
-        ok('مصدر الصور مضبوط' in await pg.inner_text('#abody'), 'pexels key saved')
+        ok('Pexels' in await pg.inner_text('#abody') and 'بلا أي مفتاح' in await pg.inner_text('#abody'), 'pexels key saved as extra source')
         # المحرر: العناصر — QR وأيقونات
         await pg.goto(URL + '#/e/ithmar/ann_cards'); await pg.wait_for_timeout(2500); await clean(pg)
         await pg.evaluate("openTab('els'); void 0"); await pg.wait_for_timeout(600)
@@ -47,7 +47,7 @@ async def main():
         # الصور المجانية
         await pg.evaluate("openTab('imgs'); void 0"); await pg.wait_for_timeout(600)
         pt = await pg.inner_text('#e_panel')
-        ok('صور مجانية' in pt and 'Pexels' in pt, 'free images section with attribution')
+        ok('صور مجانية' in pt and 'Openverse' in pt and 'توليد بالذكاء' in pt, 'free images section with sources + AI generation')
         await pg.click('#e_panel button:has-text("اقترح")'); await pg.wait_for_timeout(1500)
         ok(await pg.evaluate("document.querySelector('#e_panel input[aria-label=\"بحث عن صورة\"]').value") == 'mosque sunrise' and await pg.evaluate("document.querySelectorAll('#e_panel .pxb').length") == 3, 'AI suggested query + results')
         await pg.check('#px_sug'); await pg.click('#e_panel .pxb'); await pg.wait_for_timeout(2500)
@@ -68,9 +68,12 @@ async def main():
         ttl = await pg.evaluate("S.d.title"); ok(ttl.startswith('﴿'), 'ayah inserted into the selected field: ' + ttl)
         await clean(pg)
         await pg.evaluate("select(null); void 0"); await pg.click('#e_panel button:has-text("آية أو حديث موثّق")'); await pg.wait_for_timeout(400)
-        await pg.click('.modal .seg button:has-text("حديث")'); await pg.fill('.modal input[aria-label="بحث"]', 'يحب إذا عمل'); await pg.keyboard.press('Enter'); await pg.wait_for_timeout(1200)
+        await pg.click('.modal .seg button:has-text("حديث")'); await pg.fill('.modal input[aria-label="بحث"]', 'الأعمال بالنيات'); await pg.keyboard.press('Enter'); await pg.wait_for_timeout(2500)
+        vt = await pg.inner_text('.modal .vlist')
+        ok('صحيح البخاري' in vt and 'الْأَعْمَالُ' in vt and 'صحيح' in vt, 'hadith from sunnah source with grade and book')
+        await pg.click('.modal .seg button:has-text("الدرر السنية")'); await pg.fill('.modal input[aria-label="بحث"]', 'يحب إذا عمل'); await pg.keyboard.press('Enter'); await pg.wait_for_timeout(1200)
         rows = await pg.evaluate("document.querySelectorAll('.modal .vrow').length")
-        ok(rows == 1 and 'حسن' in await pg.inner_text('.modal .vlist'), 'hadith: only sahih/hasan shown by default')
+        ok(rows == 1 and 'حسن' in await pg.inner_text('.modal .vlist'), 'dorar: only sahih/hasan shown by default')
         await pg.check('.modal .tog input[type=checkbox]'); await pg.wait_for_timeout(200)
         ok(await pg.evaluate("document.querySelectorAll('.modal .vrow').length") == 2, 'weak shown on request')
         await pg.click('.modal .vrow .btn.dark'); await pg.wait_for_timeout(500)

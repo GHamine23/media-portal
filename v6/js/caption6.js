@@ -111,12 +111,45 @@ function capEditor(initialTg, onChange) {
     el('button', { type: 'button', class: 'ib sm', title: 'مشطوب', onmousedown: function (e) { e.preventDefault(); }, onclick: function () { cmd('strikeThrough'); } }, [el('s', { text: 'S' })]),
     el('button', { type: 'button', class: 'ib sm', title: 'اقتباس', onmousedown: function (e) { e.preventDefault(); }, onclick: quote }, ['❝']),
     el('button', { type: 'button', class: 'ib sm', title: 'رابط', onmousedown: function (e) { e.preventDefault(); }, onclick: link }, [ico('link')]),
-    el('button', { type: 'button', class: 'ib sm', title: 'إزالة التنسيق', onmousedown: function (e) { e.preventDefault(); }, onclick: function () { cmd('removeFormat'); } }, ['✕'])
+    el('button', { type: 'button', class: 'ib sm', title: 'إزالة التنسيق', onmousedown: function (e) { e.preventDefault(); }, onclick: function () { cmd('removeFormat'); } }, ['✕']),
+    el('span', { class: 'sp' }),
+    emojiBtn(ed)
   ]);
   return { ed: ed, bar: bar, get: function () { return edToTg(ed); }, set: function (tg) { ed.innerHTML = tgToEd(tg || ''); onChange(); } };
 }
 
-/* ---------- نافذة النص المصاحب ---------- */
+/* ---------- نافذة النص المصاحب والنشر ----------
+   العمود الأيمن: القالب الكتابي والحقول والمحرر. العمود الأيسر: المعاينة ثم صندوق النشر (ظاهر دائماً بلا تمرير).
+   زر الإرسال يحكي حاله: «أرسل الآن» ← مشغول ← «✓ أُرسل»، و«جدول النشر» ← «✓ جُدول في…» ويبقى كذلك، فإن غيّرت الموعد أو النص عاد زراً «حدّث الجدولة». */
+const REPEAT_N = { day: 'كل يوم', week: 'كل أسبوع', month: 'كل شهر' };
+function repeatLabel(r) { if (!r) return ''; const base = REPEAT_N[r.every] || ''; const n = r.n > 1 ? (r.every === 'day' ? 'كل ' + r.n + ' أيام' : r.every === 'week' ? 'كل ' + r.n + ' أسابيع' : 'كل ' + r.n + ' أشهر') : base; return n + (r.count ? ' · ' + r.count + ' مرات' : '') + (r.until ? ' · حتى ' + fmtDate(r.until) : ''); }
+// محرر التكرار (يُستعمل هنا وفي التقويم): يعيد {node, get()}
+function repeatEditor(initial, onChange) {
+  const r = Object.assign({ every: '', n: 1, until: 0, count: 0 }, initial || {});
+  const every = el('select', { class: 'inp sm', 'aria-label': 'التكرار' }, [['', 'بلا تكرار'], ['day', 'كل يوم'], ['week', 'كل أسبوع'], ['month', 'كل شهر']].map(function (o) { return el('option', { value: o[0], text: o[1], selected: o[0] === r.every }); }));
+  const n = el('input', { type: 'number', class: 'inp sm', min: '1', max: '12', value: String(r.n || 1), 'aria-label': 'كل كم' });
+  const endMode = el('select', { class: 'inp sm', 'aria-label': 'ينتهي' }, [['never', 'بلا نهاية'], ['count', 'بعد عدد مرات'], ['until', 'حتى تاريخ']].map(function (o) { return el('option', { value: o[0], text: o[1], selected: (r.count ? 'count' : r.until ? 'until' : 'never') === o[0] }); }));
+  const cnt = el('input', { type: 'number', class: 'inp sm', min: '2', max: '365', value: String(r.count || 4), 'aria-label': 'عدد المرات' });
+  const until = el('input', { type: 'date', class: 'inp sm', value: r.until ? localISO(new Date(r.until)) : '', 'aria-label': 'حتى تاريخ' });
+  const detail = el('div', { class: 'row wrapr repdetail' });
+  const summary = el('small', { class: 'tiny repsum' });
+  function get() {
+    if (!every.value) return null;
+    const o = { every: every.value, n: Math.max(1, Math.min(12, +n.value || 1)), until: 0, count: 0 };
+    if (endMode.value === 'count') o.count = Math.max(2, Math.min(365, +cnt.value || 2));
+    if (endMode.value === 'until' && until.value) { const d = fromISO(until.value, '23:59'); if (d) o.until = d.getTime(); }
+    return o;
+  }
+  function draw() {
+    const on = !!every.value; detail.hidden = !on; detail.innerHTML = '';
+    if (on) { [el('span', { class: 'tiny', text: 'كل' }), n, el('span', { class: 'tiny', text: every.value === 'day' ? 'يوم' : every.value === 'week' ? 'أسبوع' : 'شهر' }), el('span', { class: 'tiny', text: '·' }), endMode, endMode.value === 'count' ? cnt : null, endMode.value === 'until' ? until : null].forEach(function (x) { if (x) detail.appendChild(x); }); }
+    const g = get(); summary.textContent = g ? 'يُنشر ' + repeatLabel(g) + '، ويظهر كل موعد في التقويم' : '';
+    if (onChange) onChange(g);
+  }
+  [every, n, endMode, cnt, until].forEach(function (x) { x.addEventListener('change', draw); x.addEventListener('input', function () { const g = get(); summary.textContent = g ? 'يُنشر ' + repeatLabel(g) : ''; if (onChange) onChange(g); }); });
+  draw();
+  return { node: el('div', { class: 'repbox' }, [el('div', { class: 'row wrapr' }, [ico('history'), every]), detail, summary]), get: get };
+}
 function captionDialog() {
   if (!ED.doc) return;
   commitPage();
@@ -126,7 +159,8 @@ function captionDialog() {
   const prev = el('div', { class: 'tgprev' }), cnt = el('span', { class: 'tiny capcnt' });
   const img = el('img', { class: 'tgimg', alt: '' }); try { img.src = ED.snapshot(700); } catch (e) {}
   const sel = el('select', { class: 'inp sm', 'aria-label': 'القالب الكتابي' }, capTemplates().map(function (c) { return el('option', { value: c.id, text: (c.own ? '★ ' : '') + c.name + ' · ' + ((CAP_KINDS.find(function (k) { return k[0] === c.kind; }) || [])[1] || ''), selected: c.id === tplId }); }));
-  const dateI = el('input', { type: 'date', class: 'inp sm', value: date.toISOString().slice(0, 10), 'aria-label': 'تاريخ الفعالية', onchange: function (e) { const p = e.target.value.split('-').map(Number); if (p[0]) { date = new Date(p[0], p[1] - 1, p[2], 12); const t = dateTokens(date, 0); vars.wd = t.wd; vars.hijri = t.hd + ' ' + t.hm; vars.greg = t.gd + ' ' + t.gm; drawFields(); fromFields(); } } });
+  const dateI = el('input', { type: 'date', class: 'inp sm', value: localISO(date), 'aria-label': 'تاريخ الفعالية', onchange: function (e) { const d = fromISO(e.target.value, '12:00'); if (d) { date = d; const t = dateTokens(date, 0); vars.wd = t.wd; vars.hijri = t.hd + ' ' + t.hm; vars.greg = t.gd + ' ' + t.gm; drawFields(); fromFields(); } } });
+  let bubbleWrap = null, ready = false;   // تُعرَّف لاحقاً؛ render يُستدعى مبكراً
   const E = capEditor('', render);
   const fieldsBox = el('div', { class: 'capfields' });
   function curTpl() { return capTemplates().find(function (x) { return x.id === sel.value; }) || CAP_BASE[0]; }
@@ -137,78 +171,125 @@ function captionDialog() {
         const lab = (CAP_VARS.find(function (v) { return v[0] === k; }) || [k, k])[1], long = ['body', 'quote', 'sub'].indexOf(k) >= 0;
         const inp = el(long ? 'textarea' : 'input', Object.assign({ class: 'inp sm', dir: k === 'link' ? 'ltr' : 'auto', 'aria-label': lab, oninput: function (e) { vars[k] = e.target.value; fromFields(); } }, long ? { rows: '2' } : { type: 'text' }));
         inp.value = vars[k] || '';
-        return el('div', { class: 'fld' }, [el('label', { text: lab }), inp]);
+        return el('div', { class: 'fld' }, [el('label', { text: lab }), k === 'link' ? inp : withEmoji(inp, { sm: true })]);
       })));
   }
-  function fromFields() { if (manual && !confirmReset()) return; manual = false; E.set(capFill(curTpl().text, vars)); }
-  function confirmReset() { return true; }
-  function render() { const tg = E.get(); prev.innerHTML = capToHtml(tg); const n = capPlain(tg).length; cnt.textContent = n + ' / 1024' + (n > 1024 ? ' — طويل، يقصّه تليجرام' : ''); cnt.classList.toggle('over', n > 1024); }
+  function fromFields() { manual = false; E.set(capFill(curTpl().text, vars)); }
+  const LIMIT = 1024;
+  function render() {
+    const tg = E.get(); prev.innerHTML = capToHtml(tg); const n = capPlain(tg).length;
+    cnt.textContent = n + ' / ' + LIMIT + (n > LIMIT ? ' — طويل: يُرسل نصاً مستقلاً تحت الصورة تلقائياً (حتى ٤٠٩٦)' : '');
+    cnt.classList.toggle('over', n > LIMIT); cnt.classList.toggle('err', n > 4096);
+    if (bubbleWrap) bubbleWrap.classList.toggle('split', n > LIMIT);
+    if (ready) dirty();
+  }
   E.ed.addEventListener('input', function () { manual = true; });
   sel.onchange = function () { tplId = sel.value; const m = ls('capTpl') || {}; m[S.tpl.type] = tplId; ls('capTpl', m); manual = false; drawFields(); fromFields(); };
   drawFields(); fromFields();
+  // توجيه المساعد: تعليمات لهذه المرة، فوق تعليمات البرنامج/المنصة الثابتة (من الإدارة)
+  const P = V6.prog || {}, fixedPrompt = (P.tg && P.tg.capPrompt) || (V6.settings && V6.settings.ai && V6.settings.ai.capPrompt) || '';
+  const guide = el('textarea', { rows: '2', class: 'inp sm', dir: 'auto', placeholder: 'توجيه للمساعد هذه المرة (اختياري): مثلاً «اجعلها قصيرة وحماسية، وابدأ بسؤال»' });
+  const guideBox = el('details', { class: 'capguide' }, [el('summary', {}, [ico('ai'), 'كيف يصوغ المساعد؟']), withEmoji(guide, { sm: true }),
+    el('small', { class: 'tiny', text: fixedPrompt ? 'تعليمات البرنامج الثابتة: ' + fixedPrompt.slice(0, 160) + (fixedPrompt.length > 160 ? '…' : '') : (isAdmin() ? 'يمكنك كتابة تعليمات ثابتة لأسلوب الرسائل من «البرامج والهويات ← القناة».' : 'تعليمات الأسلوب الثابتة يكتبها مشرف البرنامج.') })]);
   const tools = el('div', { class: 'row wrapr' }, [
-    aiReady() ? el('button', { type: 'button', class: 'btn sm line', onclick: async function (e) { const b = e.currentTarget; b.disabled = true; const old = b.textContent; b.replaceChildren(el('span', { class: 'spin' }), ' يصوغ…'); try { E.set(await captionAI(E.get(), sel.value, date, vars)); manual = true; toast('صاغه المساعد، راجعه وعدّل ما شئت'); } catch (er) { toast(er.message); } b.disabled = false; b.replaceChildren(ico('ai'), old); } }, [ico('ai'), 'صِغه بالذكاء']) : null,
+    aiReady() ? el('button', { type: 'button', class: 'btn sm line', onclick: function (e) { return withBusy(e.currentTarget, async function () { E.set(await captionAI(E.get(), sel.value, date, vars, guide.value.trim())); manual = true; toast('صاغه المساعد، راجعه وعدّل ما شئت'); }, { busy: 'يصوغ…', done: 'صيغ' }); } }, [ico('ai'), 'صِغه بالذكاء']) : null,
     el('button', { type: 'button', class: 'btn sm ghost', text: 'أعد من القالب', onclick: function () { manual = false; fromFields(); } }),
     el('span', { class: 'sp' }), cnt]);
   // المعاينة: فاتحة افتراضياً، وداكنة اختياراً
   let theme = ls('tgTheme') || 'light';
-  const bubbleWrap = el('div', { class: 'tgwrap ' + theme }, [el('div', { class: 'tgbubble' }, [img, prev, el('span', { class: 'tgtime', text: new Intl.DateTimeFormat('ar', { hour: 'numeric', minute: '2-digit' }).format(new Date()) })])]);
-  const themeSeg = segOf([['light', 'فاتح'], ['dark', 'داكن']], theme, function (v) { theme = v; ls('tgTheme', v); bubbleWrap.className = 'tgwrap ' + v; });
+  bubbleWrap = el('div', { class: 'tgwrap ' + theme }, [el('div', { class: 'tgbubble' }, [img, prev, el('span', { class: 'tgtime', text: new Intl.DateTimeFormat('ar', { hour: 'numeric', minute: '2-digit' }).format(new Date()) })]), el('p', { class: 'tiny splitnote', text: 'النص أطول من حد الوصف؛ يُرسل رسالةً ثانية تحت الصورة.' })]);
+  const themeSeg = segOf([['light', 'فاتح'], ['dark', 'داكن']], theme, function (v) { theme = v; ls('tgTheme', v); bubbleWrap.className = 'tgwrap ' + v + (bubbleWrap.classList.contains('split') ? ' split' : ''); });
   // الإرسال والجدولة
-  let mode = ls('tgMode') || 'both', whenMode = 'now';
-  const modeSeg = segOf([['both', 'صورة + الملف الأصلي'], ['photo', 'صورة فقط'], ['doc', 'الملف الأصلي فقط']], mode, function (v) { mode = v; ls('tgMode', v); });
-  const dI = el('input', { type: 'date', class: 'inp sm', 'aria-label': 'تاريخ النشر', min: new Date().toISOString().slice(0, 10) }), tI = el('input', { type: 'time', class: 'inp sm', value: '08:00', 'aria-label': 'وقت النشر' });
-  function whenMs() { if (whenMode === 'now') return 0; if (!dI.value) return -1; const p = dI.value.split('-').map(Number), q = (tI.value || '08:00').split(':').map(Number); return new Date(p[0], p[1] - 1, p[2], q[0], q[1]).getTime(); }
-  function preset(days, hm) { const d = new Date(); d.setDate(d.getDate() + days); dI.value = d.toISOString().slice(0, 10); tI.value = hm; }
+  let mode = ls('tgMode') || 'both', whenMode = 'now', scheduled = null;   // scheduled: {id, when} بعد الجدولة
+  const modeSeg = segOf([['both', 'صورة + الملف الأصلي'], ['photo', 'صورة فقط'], ['doc', 'الملف الأصلي فقط']], mode, function (v) { mode = v; ls('tgMode', v); dirty(); });
+  const dI = el('input', { type: 'date', class: 'inp sm', 'aria-label': 'تاريخ النشر', min: localISO() }), tI = el('input', { type: 'time', class: 'inp sm', value: '08:00', 'aria-label': 'وقت النشر' });
+  [dI, tI].forEach(function (x) { x.addEventListener('change', dirty); x.addEventListener('input', dirty); });
+  function whenMs() { if (whenMode === 'now') return 0; if (!dI.value) return -1; const d = fromISO(dI.value, tI.value || '08:00'); return d ? d.getTime() : -1; }
+  function preset(days, hm) { const d = new Date(); d.setDate(d.getDate() + days); dI.value = localISO(d); tI.value = hm; dirty(); }
+  const rep = repeatEditor(null, function () { dirty(); });
   const schedBox = el('div', { class: 'capwhen', hidden: true }, [el('div', { class: 'row wrapr' }, [dI, tI]), el('div', { class: 'row wrapr' }, [
     el('button', { type: 'button', class: 'btn sm ghost', text: 'غداً ٨ ص', onclick: function () { preset(1, '08:00'); } }),
     el('button', { type: 'button', class: 'btn sm ghost', text: 'غداً ٨ م', onclick: function () { preset(1, '20:00'); } }),
-    el('button', { type: 'button', class: 'btn sm ghost', text: 'بعد ساعة', onclick: function () { const d = new Date(Date.now() + 3600000); dI.value = d.toISOString().slice(0, 10); tI.value = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); } })])]);
-  const whenSeg = segOf([['now', 'الآن'], ['later', 'في موعد']], whenMode, function (v) { whenMode = v; schedBox.hidden = v !== 'later'; sendBtn.replaceChildren(ico(v === 'later' ? 'cal' : 'share'), v === 'later' ? 'جدول النشر' : 'أرسل الآن'); });
+    el('button', { type: 'button', class: 'btn sm ghost', text: 'بعد ساعة', onclick: function () { const d = new Date(Date.now() + 3600000); dI.value = localISO(d); tI.value = localHM(d); dirty(); } })]), rep.node]);
+  const whenSeg = segOf([['now', 'الآن'], ['later', 'في موعد']], whenMode, function (v) { whenMode = v; schedBox.hidden = v !== 'later'; if (v === 'later' && !dI.value) preset(1, '08:00'); scheduled = null; sent = false; refreshBtn(); });
   const sendBtn = el('button', { type: 'button', class: 'btn dark' }, [ico('share'), 'أرسل الآن']);
+  const after = el('div', { class: 'row wrapr capafter', hidden: true });
+  let sent = false, lastSig = '';
+  function sig() { return [whenMs(), E.get(), mode, JSON.stringify(rep.get())].join('|'); }
+  function refreshBtn() {
+    btnReset(sendBtn); sendBtn.classList.remove('done');
+    if (scheduled && sig() === lastSig) { btnDone(sendBtn, 'جُدول في ' + fmtTime(scheduled.when), 0, true); return; }
+    if (sent && sig() === lastSig) { btnDone(sendBtn, 'أُرسل إلى القناة', 0, true); return; }
+    if (scheduled) { sendBtn.replaceChildren(ico('cal'), 'حدّث الجدولة'); return; }
+    sendBtn.replaceChildren(ico(whenMode === 'later' ? 'cal' : 'share'), whenMode === 'later' ? 'جدول النشر' : (sent ? 'أرسل مرة أخرى' : 'أرسل الآن'));
+  }
+  function dirty() { if (!ready || sendBtn._busyRun) return; refreshBtn(); }
   const ok = canSend();
   const why = ok ? '' : (!(V6.settings && V6.settings.tg) ? 'بوت تليجرام غير مضبوط بعد: يضيف المشرف رمز البوت من الإعدادات، ثم يصبح الإرسال المباشر متاحاً هنا.'
     : !(V6.prog && V6.prog.tg && (V6.prog.tg.chat || (V6.prog.tg.chats && S.track && V6.prog.tg.chats[S.track.id]))) ? 'لم يحدد المشرف قناة هذا البرنامج أو المسار بعد (من «البرامج والهويات»).'
     : 'الإرسال إلى القناة يحتاج صلاحية «الإرسال» من مشرف البرنامج.');
   if (!ok) { sendBtn.disabled = true; sendBtn.title = why; }
+  const chatOf = function () { const tg = V6.prog.tg || {}; const c = (tg.chats && S.track && tg.chats[S.track.id]) || tg.chat || ''; return (tg.titles && tg.titles[c]) || c; };
+  function thumbB64() { try { const c = document.createElement('canvas'); renderTo(c, S.tpl, S.size, snap(), S.track, 320 / SIZES[S.size].w); return c.toDataURL('image/jpeg', 0.72).split(',')[1]; } catch (e) { return ''; } }
   async function send() {
     const when = whenMs(); if (when < 0 || (when && when < Date.now() + 60000)) { toast('اختر موعداً في المستقبل'); dI.focus(); return; }
+    if (capPlain(E.get()).length > 4096) { toast('النص أطول من حد تليجرام (٤٠٩٦ حرفاً)'); return; }
+    const repeat = whenMode === 'later' ? rep.get() : null;
+    // تعديل جدولة قائمة: نحدّث الموعد والنص والتكرار بلا إعادة رفع
+    if (scheduled && when) {
+      await withBusy(sendBtn, async function () { await API6.me('tg_update', JSON.stringify({ id: scheduled.id, when: when, caption: E.get(), mode: mode, repeat: repeat })); scheduled.when = when; lastSig = sig(); POSTS = null; }, { busy: 'نحدّث…', done: 'حُدّثت: ' + fmtTime(when), keep: true });
+      showAfter(when); return;
+    }
     if (!when && !(await ask('إرسال إلى القناة', 'يُنشر التصميم مع هذا النص في قناة ' + V6.prog.name + (S.track ? ' (' + S.track.name + ')' : '') + ' الآن.', 'أرسل'))) return;
-    sendBtn.disabled = true;
-    try {
+    await withBusy(sendBtn, async function () {
       await ensureFonts(fontsOfState(snap()));
       const c = document.createElement('canvas'); renderTo(c, S.tpl, S.size, snap(), S.track, 2);
       const png = c.toDataURL('image/png').split(',')[1];
-      const r = await API6.me('tg_send', JSON.stringify({ program: V6.prog.id, track: S.track && S.track.id, name: ED.doc.name, caption: E.get(), png: mode === 'doc' ? '' : png, file: mode === 'photo' ? '' : png, fileName: fileName6('png'), fileMime: 'image/png', mode: mode, when: when || 0 }));
-      track('tg', { tool: when ? 'schedule' : 'send' }); archive6('share');
-      if (r.queued) toast('جُدول النشر في ' + fmtTime(r.when)); else toast('أُرسل إلى القناة');
-      if (r.link) modal({ title: 'أُرسل إلى القناة', body: [el('p', { class: 'muted', text: 'المنشور في قناة ' + V6.prog.name + ':' }), linkRow('رابط المنشور', r.link)], acts: [{ t: 'حسناً', cls: 'dark' }] });
-    } catch (e) { toast(e.message); }
-    sendBtn.disabled = false;
+      const r = await API6.me('tg_send', JSON.stringify({ program: V6.prog.id, track: S.track && S.track.id, name: ED.doc.name, item: ED.doc.id || '', caption: E.get(), png: mode === 'doc' ? '' : png, file: mode === 'photo' ? '' : png, fileName: fileName6('png'), fileMime: 'image/png', mode: mode, when: when || 0, repeat: repeat, thumb: thumbB64() }));
+      track('tg', { tool: when ? 'schedule' : 'send' }); archive6('share'); POSTS = null;
+      if (r.queued) { scheduled = { id: r.id, when: r.when }; sent = false; } else { sent = true; scheduled = null; if (r.link) lastLink = r.link; }
+      lastSig = sig();
+      notifyDone(r.queued ? 'جُدول النشر' : 'أُرسل إلى القناة', r.queued ? fmtTime(r.when) : '');
+      showAfter(r.queued ? r.when : 0, r.link, r.next);
+    }, { busy: when ? 'نجدول…' : 'نرسل…', done: when ? 'جُدول في ' + fmtTime(when) : 'أُرسل إلى القناة', keep: true });
   }
-  sendBtn.onclick = send;
-  const sendBox = el('div', { class: 'capsend' }, [el('div', { class: 'row' }, [el('h4', { class: 'psh', text: 'النشر في قناة ' + (V6.prog ? V6.prog.name : '') }), el('span', { class: 'sp' }), whenSeg]), schedBox, modeSeg,
-    el('div', { class: 'row wrapr' }, [sendBtn, el('button', { type: 'button', class: 'btn line', onclick: function () { copyText(capPlain(E.get())); } }, [ico('copy'), 'انسخ النص']), el('button', { type: 'button', class: 'btn sm ghost', title: 'للصق في بوت أو أداة تقبل وسوم HTML', onclick: function () { copyText(E.get()); } }, ['نسخ بالتنسيق'])]),
-    ok ? el('small', { class: 'tiny', text: 'يُرسل البوت التصميم والنص إلى القناة مباشرة، أو في الموعد الذي تحدده.' }) : el('small', { class: 'tiny warnline', text: why + ' حتى ذلك الحين: انسخ النص وأرسله بنفسك.' })]);
-  modal({ title: 'النص المصاحب والنشر', wide: true, body: [
+  let lastLink = '';
+  function showAfter(when, link, next) {
+    after.hidden = false; after.innerHTML = '';
+    [ico('check', 'okc'), el('span', { class: 'small', text: when ? 'في التقويم: ' + fmtTime(when) + (next ? ' · التالي ' + fmtTime(next) : '') : 'نُشر في قناة ' + V6.prog.name + (next ? ' · التالي ' + fmtTime(next) : '') }),
+      el('a', { class: 'btn sm line', href: '#/cal' + (when ? '?d=' + localISO(new Date(when)) : ''), onclick: function () { closeAll(); } }, [ico('cal'), 'افتح التقويم']),
+      link ? el('a', { class: 'btn sm ghost', href: link, target: '_blank', rel: 'noopener' }, [ico('link'), 'رابط المنشور']) : null,
+      when && scheduled ? el('button', { type: 'button', class: 'btn sm ghost', onclick: async function () { if (!(await ask('إلغاء الجدولة', 'لن يُنشر هذا المنشور.', 'ألغِ', true))) return; try { await API6.me('tg_cancel', scheduled.id); scheduled = null; POSTS = null; after.hidden = true; refreshBtn(); toast('أُلغيت الجدولة'); } catch (e) { toast(e.message); } } }, ['إلغاء الجدولة']) : null].forEach(function (x) { if (x) after.appendChild(x); });
+    flashOk(after);
+  }
+  let closeAll = function () {};
+  sendBtn.onclick = function () { return send(); };
+  const sendBox = el('div', { class: 'capsend' }, [el('div', { class: 'row' }, [el('h4', { class: 'psh', text: 'النشر في ' + (chatOf() || 'القناة') }), el('span', { class: 'sp' }), whenSeg]), schedBox, modeSeg,
+    el('div', { class: 'row wrapr' }, [sendBtn, el('button', { type: 'button', class: 'btn line', onclick: function (e) { copyText(capPlain(E.get())); btnDone(e.currentTarget, 'نُسخ'); } }, [ico('copy'), 'انسخ النص']), el('button', { type: 'button', class: 'btn sm ghost', title: 'للصق في بوت أو أداة تقبل وسوم HTML', onclick: function (e) { copyText(E.get()); btnDone(e.currentTarget, 'نُسخ'); } }, ['نسخ بالتنسيق'])]),
+    after,
+    ok ? el('small', { class: 'tiny', text: 'يُرسل البوت التصميم والنص إلى القناة مباشرة أو في الموعد الذي تحدده، ويظهر كل مجدول في «التقويم والمهام».' }) : el('small', { class: 'tiny warnline', text: why + ' حتى ذلك الحين: انسخ النص وأرسله بنفسك.' })]);
+  const m = modal({ title: 'النص المصاحب والنشر', wide: true, body: [
     el('div', { class: 'capgrid' }, [
       el('div', { class: 'capl' }, [el('div', { class: 'row wrapr' }, [el('div', { class: 'fld grow' }, [el('label', { text: 'القالب الكتابي' }), sel]), el('div', { class: 'fld' }, [el('label', { text: 'تاريخ الفعالية' }), dateI])]), fieldsBox,
-        el('div', { class: 'capedwrap' }, [E.bar, E.ed]), tools, sendBox]),
-      el('div', { class: 'capr' }, [el('div', { class: 'row' }, [el('b', { text: 'المعاينة' }), el('span', { class: 'sp' }), themeSeg]), bubbleWrap, el('p', { class: 'tiny', text: 'هكذا تظهر الرسالة في تليجرام تقريباً.' })])
+        el('div', { class: 'capedwrap' }, [E.bar, E.ed]), tools, guideBox]),
+      el('div', { class: 'capr' }, [el('div', { class: 'row' }, [el('b', { text: 'المعاينة' }), el('span', { class: 'sp' }), themeSeg]), bubbleWrap, sendBox])
     ])
   ], acts: [{ t: 'إغلاق' }] });
+  closeAll = m.close; ready = true; refreshBtn();
   setTimeout(render, 0);
 }
 // للنسخ واللصق اليدوي في تليجرام: نزيل الوسوم ونبقي النص (تليجرام الهاتف يطبّق التنسيق من قائمته)
 function capToTgMarkdownless(t) { return capPlain(t); }
-async function captionAI(current, tplId, date, vars0) {
+async function captionAI(current, tplId, date, vars0, guide) {
   const P = V6.prog || {}, vars = vars0 || capVars(date), c = capTemplates().find(function (x) { return x.id === tplId; });
+  const fixed = (P.tg && P.tg.capPrompt) || (V6.settings && V6.settings.ai && V6.settings.ai.capPrompt) || '';
   const system = ['أنت محرر رسائل قناة تليجرام لبرنامج تربوي عربي. اكتب نصاً مصاحباً لتصميم إعلان، بالعربية الفصيحة السهلة، بأسلوب رسائل البرنامج التالية.',
     'التنسيق: وسوم تليجرام فقط: <b> <i> <u> <blockquote>، وأسطر فارغة بين الفقرات، ورموز تعبيرية قليلة في أول السطر كما في النماذج. لا تتجاوز ٩٠٠ حرف.',
     'لا تخترع معلومة لم تُعطَ: لا وقتاً ولا مكاناً ولا رابطاً ولا اسماً. اترك ما لم يُعطَ. يمكنك إضافة اقتباس قصير موثوق (آية أو حديث صحيح أو حكمة) مناسب للموضوع إن لم يُعطَ اقتباس، مع نسبته باختصار.',
+    fixed ? 'تعليمات البرنامج الثابتة لأسلوب الرسائل (التزم بها): ' + fixed.slice(0, 4000) : '',
     P.samples ? 'نماذج من رسائل البرنامج (تعلّم منها الأسلوب والبنية):\n' + P.samples.slice(0, 12000) : 'نموذج للأسلوب:\n' + CAP_BASE[0].text + '\n' + CAP_BASE[3].text,
     c ? 'القالب الكتابي المختار (التزم ببنيته): ' + c.text : ''].filter(Boolean).join('\n\n');
-  const prompt = 'معلومات التصميم:\n' + Object.keys(vars).filter(function (k) { return vars[k]; }).map(function (k) { return k + ': ' + vars[k]; }).join('\n') + (current ? '\n\nالمسودة الحالية (حسّنها وأكملها):\n' + current : '');
+  const prompt = 'معلومات التصميم:\n' + Object.keys(vars).filter(function (k) { return vars[k]; }).map(function (k) { return k + ': ' + vars[k]; }).join('\n') + (guide ? '\n\nتوجيه خاص بهذه الرسالة من المستخدم (له الأولوية): ' + guide.slice(0, 600) : '') + (current ? '\n\nالمسودة الحالية (حسّنها وأكملها):\n' + current : '');
   const raw = await API6.call('ai_make', V6.token, JSON.stringify({ kind: 'caption', program: P.id, system: system, prompt: prompt, schema: { type: 'OBJECT', properties: { caption: { type: 'STRING' } }, required: ['caption'] }, temperature: 0.7 }));
   const r = JSON.parse(raw); if (!r.caption) throw new Error('لم يُعد المساعد نصاً');
   return String(r.caption).replace(/<(?!\/?(b|i|u|s|code|blockquote|a)\b)[^>]*>/g, '').trim();

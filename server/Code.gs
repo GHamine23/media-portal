@@ -114,7 +114,8 @@ function apiFns_() {
     bc_list: bc_list, bc_all: bc_all, bc_save: bc_save, bc_del: bc_del,
     cl_list: cl_list, cl_save: cl_save, set_get: set_get, set_save: set_save, audit_list: audit_list,
     ai_make: ai_make, ai_status: ai_status, ai_log: ai_log,
-    tg_test: tg_test, tg_send: tg_send, tg_queue: tg_queue, tg_cancel: tg_cancel, me_profile: me_profile, font_family: font_family,
+    tg_test: tg_test, tg_send: tg_send, tg_queue: tg_queue, tg_cancel: tg_cancel, tg_update: tg_update, tg_requeue: tg_requeue, tg_thumbs: tg_thumbs, tg_discover: tg_discover, tg_chat_check: tg_chat_check, tg_known: tg_known,
+    task_list: task_list, task_save: task_save, task_done: task_done, task_del: task_del, me_profile: me_profile, font_family: font_family,
     img_search: img_search, img_test: img_test, img_pick: img_pick,
     cm_list: cm_list, cm_add: cm_add, cm_del: cm_del, cm_counts: cm_counts, nt_list: nt_list, nt_seen: nt_seen,
     rv_request: rv_request, rv_list: rv_list, rv_mine: rv_mine, rv_img: rv_img, rv_reply: rv_reply,
@@ -434,7 +435,7 @@ function prog_save(token, json) {
     if (p.block) cur.block = { fonts: (p.block.fonts || []).filter(fam).slice(0, 200), logos: (p.block.logos || []).map(function (k) { return clip_(k, 60); }).slice(0, 200) };   // ما لا يظهر لمستخدمي البرنامج
     if (p.editLevel != null) cur.editLevel = EDIT_LEVELS[p.editLevel] ? p.editLevel : 'full';
     if (p.fonts) cur.fonts = { title: clip_(p.fonts.title, 60), body: clip_(p.fonts.body, 60) };
-    if (p.tg) { var chats = {}; Object.keys(p.tg.chats || {}).forEach(function (k) { var v = clip_(String(p.tg.chats[k] || '').trim(), 80); if (v) chats[clip_(k, 40)] = v; }); cur.tg = { chat: clip_(String(p.tg.chat || '').trim(), 80), chats: chats, link: clip_(p.tg.link, 300), hashtag: clip_(String(p.tg.hashtag || '').replace(/^#/, ''), 60), sign: clip_(p.tg.sign, 120) }; }
+    if (p.tg) { var chats = {}; Object.keys(p.tg.chats || {}).forEach(function (k) { var v = clip_(String(p.tg.chats[k] || '').trim(), 80); if (v) chats[clip_(k, 40)] = v; }); cur.tg = { chat: clip_(String(p.tg.chat || '').trim(), 80), chats: chats, link: clip_(p.tg.link, 300), hashtag: clip_(String(p.tg.hashtag || '').replace(/^#/, ''), 60), sign: clip_(p.tg.sign, 120), capPrompt: clip_(p.tg.capPrompt != null ? p.tg.capPrompt : ((cur.tg || {}).capPrompt || ''), 4000), titles: (function (t) { var o = {}; Object.keys(t || {}).forEach(function (k) { var v = clip_(String(t[k] || '').trim(), 80); if (v) o[clip_(k, 80)] = v; }); return o; })(p.tg.titles || (cur.tg || {}).titles) }; }
     if (p.captions) cur.captions = p.captions.slice(0, 40).map(function (c) { return { id: clip_(c.id || uid_(), 20), name: clip_(c.name, 60), kind: clip_(c.kind || 'ann', 20), text: clip_(c.text, 2000) }; });
     if (p.samples != null) cur.samples = clip_(p.samples, 30000);   // نماذج رسائل البرنامج التي يتعلم منها المساعد
     if (isSuper_(me)) { if (p.order != null) cur.order = +p.order || 0; if (p.active != null) cur.active = !!p.active; }
@@ -845,6 +846,7 @@ function fileDataUrl_(fid) { var b = DriveApp.getFileById(fid).getBlob(); return
 /* ================= الإحصاءات =================
    stats_YYYY-MM.json: { days: { 'YYYY-MM-DD': { برنامج: {ev: {}, tpl: {}, tool: {}, users: {uid: n}} } } }
    أعداد فقط: لا نصوص ولا محتوى تصاميم */
+function tz_() { try { return Session.getScriptTimeZone() || 'Asia/Riyadh'; } catch (e) { return 'Asia/Riyadh'; } }
 function monthKey_(t) { return Utilities.formatDate(new Date(t), 'Asia/Riyadh', 'yyyy-MM'); }
 function dayKey_(t) { return Utilities.formatDate(new Date(t), 'Asia/Riyadh', 'yyyy-MM-dd'); }
 function bump_(o, k, n) { if (!k) return; k = clip_(k, 60); o[k] = (o[k] || 0) + (n || 1); }
@@ -947,21 +949,29 @@ function cl_save(token, json) {
 }
 var DEFAULT_SETTINGS = { ai: { enabled: true, model: 'gemini-3.8-flash', perDay: 20 }, uploadsNeedPerm: false, maxUploadMb: 20 };
 function settings_() { var s = readJson_('settings.json', {}); var o = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)); Object.keys(s).forEach(function (k) { o[k] = s[k]; }); return o; }
-function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: !!(props_().getProperty('GEMINI_KEY') || props_().getProperty('GROQ_KEY')) }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN'), pexels: !!(props_().getProperty('PEXELS_KEY') || props_().getProperty('PIXABAY_KEY')) }; }
-function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.aiKey = !!props_().getProperty('GEMINI_KEY'); s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); s.pixabayOn = !!props_().getProperty('PIXABAY_KEY'); s.groqOn = !!props_().getProperty('GROQ_KEY'); s.routeDefault = AI_ROUTE_DEFAULT; return JSON.stringify(s); }
+// مفاتيح Gemini: مفتاح أساسي GEMINI_KEY وأي عدد من المفاتيح الإضافية في GEMINI_KEYS (من حسابات جوجل أخرى)، تتناوب وتتبادل عند نفاد حصة أحدها
+function geminiKeys_() {
+  var p = props_(), list = (String(p.getProperty('GEMINI_KEYS') || '') + '\n' + String(p.getProperty('GEMINI_KEY') || '')).split(/[\s,;]+/).map(function (k) { return k.trim(); }).filter(function (k) { return /^[\w\-]{20,}$/.test(k); });
+  var seen = {}; return list.filter(function (k) { if (seen[k]) return false; seen[k] = true; return true; });
+}
+function hasGemini_() { return geminiKeys_().length > 0; }
+function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: !!(hasGemini_() || props_().getProperty('GROQ_KEY') || s.ai.pollFallback !== false), vision: hasGemini_(), capPrompt: (s.ai && s.ai.capPrompt) || '' }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN'), pexels: true, imgKeys: { pixabay: !!props_().getProperty('PIXABAY_KEY'), pexels: !!props_().getProperty('PEXELS_KEY') }, tgKnown: (s.tgKnown || []).length }; }
+function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.aiKey = hasGemini_(); s.aiKeys = geminiKeys_().length; s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); s.pixabayOn = !!props_().getProperty('PIXABAY_KEY'); s.groqOn = !!props_().getProperty('GROQ_KEY'); s.routeDefault = AI_ROUTE_DEFAULT; return JSON.stringify(s); }
 function set_save(token, json) {
   var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
   var s = JSON.parse(json);
   return withLock_(function () {
     var cur = settings_();
-    if (s.ai) cur.ai = { enabled: !!s.ai.enabled, model: clip_(s.ai.model || 'gemini-3.8-flash', 60), fallback: clip_(s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 120), light: clip_(s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite', 60), groqModel: clip_(s.ai.groqModel || 'openai/gpt-oss-120b', 60), route: (function (r) { var o = {}; Object.keys(r || {}).forEach(function (k) { if (r[k] === 'groq' || r[k] === 'gemini') o[clip_(k, 20)] = r[k]; }); return o; })(s.ai.route), perDay: Math.max(0, Math.min(500, +s.ai.perDay || 0)) };
+    if (s.ai) cur.ai = { enabled: !!s.ai.enabled, model: clip_(s.ai.model || 'gemini-3.8-flash', 60), fallback: clip_(s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 120), light: clip_(s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite', 60), groqModel: clip_(s.ai.groqModel || 'openai/gpt-oss-120b', 60), route: (function (r) { var o = {}; Object.keys(r || {}).forEach(function (k) { if (r[k] === 'groq' || r[k] === 'gemini') o[clip_(k, 20)] = r[k]; }); return o; })(s.ai.route), perDay: Math.max(0, Math.min(500, +s.ai.perDay || 0)), pollFallback: s.ai.pollFallback !== false, capPrompt: clip_(s.ai.capPrompt != null ? s.ai.capPrompt : (cur.ai.capPrompt || ''), 4000) };
+    // مفاتيح Gemini الإضافية: يلصقها المدير (لا تُعرض بعد الحفظ). سطر أو فاصلة بين كل مفتاح وآخر. نص فارغ يحذفها، و«keep» يبقيها
+    if (s.geminiKeys != null && s.geminiKeys !== 'keep') { var gks = String(s.geminiKeys).split(/[\s,;]+/).map(function (k) { return k.trim(); }).filter(function (k) { return /^[\w\-]{20,}$/.test(k); }); if (gks.length) props_().setProperty('GEMINI_KEYS', gks.join('\n')); else props_().deleteProperty('GEMINI_KEYS'); }
     if (s.uploadsNeedPerm != null) cur.uploadsNeedPerm = !!s.uploadsNeedPerm;
     if (s.maxUploadMb != null) cur.maxUploadMb = Math.max(1, Math.min(20, +s.maxUploadMb || 20));
     if (s.tgToken != null) { var tk = String(s.tgToken).trim(); if (tk) { if (!/^\d+:[\w-]{30,}$/.test(tk)) throw new Error('رمز البوت غير صحيح'); props_().setProperty('TG_TOKEN', tk); } else props_().deleteProperty('TG_TOKEN'); }
     if (s.sendNeedsApproval != null) cur.sendNeedsApproval = !!s.sendNeedsApproval;
     if (s.groqKey != null) { var gk = String(s.groqKey).trim(); if (gk) props_().setProperty('GROQ_KEY', gk); else props_().deleteProperty('GROQ_KEY'); }
     if (s.pixabayKey != null) { var pbk = String(s.pixabayKey).trim(); if (pbk) props_().setProperty('PIXABAY_KEY', pbk); else props_().deleteProperty('PIXABAY_KEY'); }
-    if (s.imgProvider != null) cur.imgProvider = s.imgProvider === 'pixabay' ? 'pixabay' : s.imgProvider === 'pexels' ? 'pexels' : '';
+    if (s.imgProvider != null) cur.imgProvider = ['pixabay', 'pexels', 'openverse'].indexOf(s.imgProvider) >= 0 ? s.imgProvider : '';
     if (s.pexelsKey != null) { var pk = String(s.pexelsKey).trim(); if (pk) props_().setProperty('PEXELS_KEY', pk); else props_().deleteProperty('PEXELS_KEY'); }
     writeJson_('settings.json', cur); audit_(a, 'غيّر الإعدادات', ''); return JSON.stringify(cur);
   });
@@ -974,7 +984,7 @@ function audit_list(token) { var a = auth_(token); if (!isSuper_(a)) throw new E
 function ai_status(token) {
   var a = auth_(token), s = settings_();
   var used = +(CacheService.getScriptCache().get('ai:' + a.uid + ':' + dayKey_(now_())) || 0);
-  return JSON.stringify({ enabled: !!s.ai.enabled && !!(props_().getProperty('GEMINI_KEY') || props_().getProperty('GROQ_KEY')) && perm_(a, 'ai'), perDay: s.ai.perDay, used: used, allowed: perm_(a, 'ai') });
+  return JSON.stringify({ enabled: !!s.ai.enabled && !!(hasGemini_() || props_().getProperty('GROQ_KEY') || s.ai.pollFallback !== false) && perm_(a, 'ai'), perDay: s.ai.perDay, used: used, allowed: perm_(a, 'ai') });
 }
 
 // نداء Gemini الأساسي (يستعمله ai_make والتقارير الأسبوعية). يسجّل كل طلب في ailog
@@ -983,14 +993,40 @@ function ai_status(token) {
 var AI_ROUTE_DEFAULT = { intake: 'groq', caption: 'groq', outline: 'groq', imgq: 'groq', week: 'groq', weekly: 'groq', design: 'groq', creative: 'groq', spell: 'groq', review: 'gemini' };
 function aiRoute_(kind) { var s = settings_(), r = (s.ai && s.ai.route) || {}; return r[kind] || AI_ROUTE_DEFAULT[kind] || 'gemini'; }
 function geminiCall_(req, who) {
-  var hasGroq = !!props_().getProperty('GROQ_KEY'), hasGem = !!props_().getProperty('GEMINI_KEY');
+  var hasGroq = !!props_().getProperty('GROQ_KEY'), hasGem = hasGemini_();
   var textOnly = !(req.files || []).length, useGroq = hasGroq && textOnly && (aiRoute_(req.kind) === 'groq' || !hasGem);
-  if (useGroq) {
-    try { return groqCall_(req, who); } catch (e) { if (!hasGem) throw e; }
-    return geminiOnly_(req, who);
+  var primary = function () {
+    if (useGroq) {
+      try { return groqCall_(req, who); } catch (e) { if (!hasGem) throw e; }
+      return geminiOnly_(req, who);
+    }
+    try { return geminiOnly_(req, who); }
+    catch (e) { if (hasGroq && textOnly && /مزدحمة|مشغول|429|503|حدّها/.test(e.message)) return groqCall_(req, who); throw e; }
+  };
+  try { return primary(); }
+  catch (e) {
+    // الملاذ الأخير للنصوص: Pollinations (مجاني بلا مفتاح) حتى لا يتوقف العمل حين تنفد الحصص
+    if (textOnly && settings_().ai.pollFallback !== false && !/صلاحية|متوقف|حد اليوم/.test(e.message)) { try { return pollCall_(req, who, e.message); } catch (e2) {} }
+    throw e;
   }
-  try { return geminiOnly_(req, who); }
-  catch (e) { if (hasGroq && textOnly && /مزدحمة|مشغول|429|503/.test(e.message)) return groqCall_(req, who); throw e; }
+}
+function pollCall_(req, who, why) {
+  var body = { model: 'openai', temperature: req.temperature != null ? +req.temperature : 0.8, messages: [{ role: 'system', content: clip_(req.system, 30000) + (req.schema ? '\n\nأعد JSON فقط يطابق هذا المخطط بدقة: ' + JSON.stringify(toJsonSchema_(req.schema)) : '') }, { role: 'user', content: clip_(req.prompt, 60000) }] };
+  if (req.schema) body.response_format = { type: 'json_object' };
+  var t0 = now_(), log = { t: t0, uid: who.uid, name: who.name, program: clip_(req.program || '', 30), kind: clip_(req.kind || 'design', 20), inChars: String(req.prompt || '').length, files: 0, model: 'pollinations', ok: false, ms: 0, outChars: 0, err: '', q: clip_(String(req.prompt || '').replace(/\s+/g, ' '), 140), fallbackFrom: clip_(why || '', 80) };
+  var out = '';
+  try {
+    var res = UrlFetchApp.fetch('https://text.pollinations.ai/openai', { method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true });
+    if (res.getResponseCode() >= 300) throw new Error('تعذّر الوصول إلى المساعد الاحتياطي (' + res.getResponseCode() + ')');
+    var j = JSON.parse(res.getContentText());
+    out = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content || '';
+    if (req.schema) { var m = String(out).match(/\{[\s\S]*\}/); out = m ? m[0] : out; JSON.parse(out); }
+    if (!out) throw new Error('لم يُعد المساعد الاحتياطي نتيجة');
+    log.ok = true; log.outChars = out.length;
+  } catch (e) { log.err = clip_(String(e && e.message || e), 160); }
+  log.ms = now_() - t0; aiLog_(log);
+  if (!log.ok) throw new Error(log.err);
+  return out;
 }
 // تحويل مخطط Gemini (OBJECT/STRING…) إلى JSON Schema المعتاد
 function toJsonSchema_(sc) {
@@ -1031,8 +1067,21 @@ function groqCall_(req, who) {
 }
 
 // نداء Gemini وحده (مع إعادة المحاولة والنماذج الاحتياطية)
+// أي المفاتيح نبدأ به؟ تناوب دائري بين المفاتيح لتوزيع الحمل، وتخطّي ما بلغ حدّه (مسجّل في الذاكرة المؤقتة)
+function geminiKeyOrder_(keys, model) {
+  var c = CacheService.getScriptCache(), i = (+(c.get('gk_rr') || 0)) % keys.length; try { c.put('gk_rr', String(i + 1), 21600); } catch (e) {}
+  var order = []; for (var k = 0; k < keys.length; k++) order.push(keys[(i + k) % keys.length]);
+  var fresh = order.filter(function (key) { return !c.get('gk_bad:' + model + ':' + keyTag_(key)); });
+  return fresh.length ? fresh : order;   // إن بدت كلها محجوبة نجرّبها على كل حال (قد يكون الحجب انتهى)
+}
+function keyTag_(key) { return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, key)).slice(0, 10); }
+function geminiMarkBad_(key, model, txt) {
+  // حد الدقيقة: نحجبه ٦٥ ثانية. حد اليوم: حتى منتصف الليل بتوقيت المحيط الهادئ (حيث تُصفَّر حصة جوجل)، وأقصى الذاكرة ٦ ساعات
+  var daily = /PerDay|per day|daily|quota exceeded for metric.*day/i.test(txt || ''), ttl = daily ? 21600 : 65;
+  try { CacheService.getScriptCache().put('gk_bad:' + model + ':' + keyTag_(key), '1', ttl); } catch (e) {}
+}
 function geminiOnly_(req, who) {
-  var s = settings_(), key = props_().getProperty('GEMINI_KEY'); if (!key) throw new Error('لم يُضبط مفتاح المساعد بعد');
+  var s = settings_(), keys = geminiKeys_(); if (!keys.length) throw new Error('لم يُضبط مفتاح المساعد بعد');
   var parts = [{ text: clip_(req.prompt, 60000) }];
   (req.files || []).slice(0, 3).forEach(function (f) { if (f && f.b64 && /^(application\/pdf|image\/(png|jpeg|webp)|text\/plain)$/.test(f.mime || '') && f.b64.length < 28 * 1024 * 1024) parts.push({ inlineData: { mimeType: f.mime, data: f.b64 } }); });
   var body = { contents: [{ role: 'user', parts: parts }],
@@ -1046,25 +1095,34 @@ function geminiOnly_(req, who) {
   var t0 = now_(), log = { t: t0, uid: who.uid, name: who.name, program: clip_(req.program || '', 30), kind: clip_(req.kind || 'design', 20), inChars: parts[0].text.length, files: parts.length - 1, model: model, ok: false, ms: 0, outChars: 0, err: '', q: clip_(String(req.prompt || '').replace(/\s+/g, ' '), 90) };
   // ازدحام جوجل (503/500/429) مؤقت: نعيد المحاولة مرة بعد ثانيتين، ثم ننتقل إلى نموذج احتياطي
   var models = [model].concat(String(s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite').split(',').map(function (m) { return m.trim().replace(/[^\w.\-]/g, ''); }).filter(function (m) { return m && m !== model; }));
-  var out = '', tries = 0, lastCode = 0;
+  var out = '', tries = 0, lastCode = 0, quotaHits = 0;
+  // لكل نموذج: نجرّب المفاتيح بالتناوب؛ ٤٢٩ (حد الحصة) ينقلنا إلى المفتاح التالي فوراً، وازدحام جوجل (٥٠٠/٥٠٣) يُعاد مرة ثم ننتقل إلى النموذج الاحتياطي
   outer: for (var mi = 0; mi < models.length; mi++) {
-    for (var attempt = 0; attempt < (mi === 0 ? 2 : 1); attempt++) {
-      tries++;
-      try {
-        var res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + models[mi] + ':generateContent', {
-          method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true, headers: { 'x-goog-api-key': key } });
-        var code = res.getResponseCode(), txt = res.getContentText(); lastCode = code;
-        if (code === 503 || code === 500 || code === 429 || code === 504) { if (now_() - t0 > 70000) break outer; if (attempt === 0 && mi === 0) Utilities.sleep(2000); continue; }
-        if (code >= 300) { log.err = 'تعذّر الوصول إلى المساعد (' + code + ')'; if (code === 404 && mi < models.length - 1) break; break outer; }
-        var j = JSON.parse(txt), part = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
-        out = (part || []).map(function (p) { return p.text || ''; }).join('');
-        if (!out) { log.err = 'لم يُعد المساعد نتيجة. أعد صياغة طلبك.'; break outer; }
-        log.ok = true; log.outChars = out.length; log.model = models[mi]; log.err = ''; break outer;
-      } catch (e) { log.err = clip_(String(e && e.message || e), 160); }
+    var order = geminiKeyOrder_(keys, models[mi]), busyRetried = false;
+    for (var ki = 0; ki < order.length; ki++) {
+      var key = order[ki];
+      for (var attempt = 0; attempt < 2; attempt++) {
+        tries++;
+        if (now_() - t0 > 75000) break outer;
+        try {
+          var res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + models[mi] + ':generateContent', {
+            method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true, headers: { 'x-goog-api-key': key } });
+          var code = res.getResponseCode(), txt = res.getContentText(); lastCode = code;
+          if (code === 429) { quotaHits++; geminiMarkBad_(key, models[mi], txt); break; }   // المفتاح التالي
+          if (code === 503 || code === 500 || code === 504) { if (!busyRetried) { busyRetried = true; Utilities.sleep(2000); continue; } break; }
+          if (code === 400 || code === 403) { if (/API key|API_KEY_INVALID|PERMISSION_DENIED/i.test(txt)) { geminiMarkBad_(key, models[mi], 'daily'); log.err = 'أحد مفاتيح Gemini غير صالح'; break; } log.err = 'تعذّر الوصول إلى المساعد (' + code + ')'; break outer; }
+          if (code >= 300) { log.err = 'تعذّر الوصول إلى المساعد (' + code + ')'; if (code === 404) break; break outer; }
+          var j = JSON.parse(txt), part = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
+          out = (part || []).map(function (p) { return p.text || ''; }).join('');
+          if (!out) { log.err = 'لم يُعد المساعد نتيجة. أعد صياغة طلبك.'; break outer; }
+          log.ok = true; log.outChars = out.length; log.model = models[mi]; log.key = ki + 1; log.err = ''; break outer;
+        } catch (e) { log.err = clip_(String(e && e.message || e), 160); break; }
+      }
+      if (lastCode === 404) break;   // النموذج غير موجود: لا فائدة من بقية المفاتيح
     }
   }
-  if (!log.ok && !log.err) log.err = lastCode === 429 ? 'المساعد مشغول الآن (حد الخطة المجانية). حاول بعد دقيقة.' : 'خوادم جوجل مزدحمة الآن (' + lastCode + '). حاول بعد قليل.';
-  log.tries = tries;
+  if (!log.ok && (!log.err || lastCode === 429 || lastCode >= 500)) log.err = lastCode === 429 ? (keys.length > 1 ? 'كل مفاتيح Gemini (' + keys.length + ') بلغت حدّها الآن. حاول بعد دقيقة.' : 'المساعد مشغول الآن (حد الخطة المجانية). حاول بعد دقيقة.') : lastCode >= 500 ? 'خوادم جوجل مزدحمة الآن (' + lastCode + '). حاول بعد قليل.' : (log.err || 'تعذّر الوصول إلى المساعد');
+  log.tries = tries; if (quotaHits) log.quota = quotaHits;
   log.ms = now_() - t0;
   aiLog_(log);
   if (!log.ok) throw new Error(log.err);
@@ -1074,10 +1132,11 @@ function ai_make(token, json) {
   var a = auth_(token), s = settings_();
   if (!s.ai.enabled) throw new Error('المساعد متوقف الآن');
   if (!perm_(a, 'ai')) throw new Error('المساعد يحتاج صلاحية من مشرف البرنامج');
-  if (!props_().getProperty('GEMINI_KEY') && !props_().getProperty('GROQ_KEY')) throw new Error('لم يُضبط مفتاح المساعد بعد');
+  var req = JSON.parse(json);   // {kind, system, prompt, schema, temperature, files: [{mime, b64}]}
+  var textOnly = !(req.files || []).length;
+  if (!hasGemini_() && !props_().getProperty('GROQ_KEY') && !(textOnly && s.ai.pollFallback !== false)) throw new Error(textOnly ? 'لم يُضبط مفتاح المساعد بعد' : 'هذه المهمة تحتاج مفتاح Gemini (يرى الصور)؛ لم يُضبط بعد');
   var c = CacheService.getScriptCache(), ck = 'ai:' + a.uid + ':' + dayKey_(now_()), used = +(c.get(ck) || 0);
   if (!isSuper_(a) && used >= s.ai.perDay) throw new Error('بلغت حد اليوم (' + s.ai.perDay + ' طلباً). جرّب غداً.');
-  var req = JSON.parse(json);   // {kind, system, prompt, schema, temperature, files: [{mime, b64}]}
   req.system = String(req.system || '') + skillsFor_(req.kind || 'design');
   var out = geminiCall_(req, { uid: a.uid, name: a.name });
   c.put(ck, String(used + 1), 90000);
@@ -1115,37 +1174,75 @@ function tg_test(token) {
 function tgChatOf_(pid, track) { var p = progs_().filter(function (x) { return x.id === pid; })[0]; var ch = (p && p.tg && p.tg.chats && track && p.tg.chats[track]) || (p && p.tg && p.tg.chat); if (!ch) throw new Error('لم يحدد مشرف البرنامج قناة تليجرام بعد'); return ch; }
 function canSend_(a, pid) { return adminOf_(a, pid) || (inProg_(a, pid) && perm_(a, 'send')); }
 // payload: {program, caption, png (base64 بلا رأس), file (base64 الملف الأصلي، اختياري), fileName, fileMime, mode: photo|doc|both, when (ms، اختياري للجدولة), name}
+// التكرار: {every: day|week|month, n: كل كم (١-١٢), until: آخر موعد (ms) أو ٠, count: عدد المرات الباقية (٠ = بلا حد)}
+function cleanRepeat_(r) {
+  if (!r || ['day', 'week', 'month'].indexOf(r.every) < 0) return null;
+  return { every: r.every, n: Math.max(1, Math.min(12, Math.round(+r.n || 1))), until: Math.max(0, +r.until || 0), count: Math.max(0, Math.min(365, Math.round(+r.count || 0))) };
+}
+function nextRepeat_(when, r) {
+  var d = new Date(when), n = r.n || 1;
+  if (r.every === 'day') d.setDate(d.getDate() + n); else if (r.every === 'week') d.setDate(d.getDate() + 7 * n); else if (r.every === 'month') { var day = d.getDate(); d.setDate(1); d.setMonth(d.getMonth() + n); var last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); d.setDate(Math.min(day, last)); } else return 0;
+  var t = d.getTime(); if (r.until && t > r.until) return 0; return t;
+}
+function tgPub_(x, a) { var o = Object.assign({}, x); delete o.pngId; delete o.fileId; delete o.thumbId; delete o.uid; o.mine = x.uid === a.uid; o.hasThumb = !!x.thumbId; o.canEdit = x.uid === a.uid || adminOf_(a, x.program); return o; }
 function tg_send(token, json) {
   var a = auth_(token), o = JSON.parse(json), pid = o.program;
   if (!canSend_(a, pid)) throw new Error('الإرسال إلى القناة يحتاج صلاحية «الإرسال» من المشرف');
-  var chat = tgChatOf_(pid, clip_(o.track || '', 40)), cap = clip_(String(o.caption || ''), 1024), mode = ['photo', 'doc', 'both'].indexOf(o.mode) >= 0 ? o.mode : 'both';
+  var chat = tgChatOf_(pid, clip_(o.track || '', 40)), cap = clip_(String(o.caption || ''), 4096), mode = ['photo', 'doc', 'both'].indexOf(o.mode) >= 0 ? o.mode : 'both';
   if (!o.png && !o.file) throw new Error('لا تصميم للإرسال');
   if ((o.png || '').length > 14 * 1024 * 1024 || (o.file || '').length > 68 * 1024 * 1024) throw new Error('الملف أكبر من حد تليجرام (١٠ ميغابايت للصورة، ٥٠ للملف)');
-  var when = +o.when || 0;
-  if (when > now_() + 60000) {
-    var dir = sub_('tg'), rec = { id: uid_(), program: pid, chat: chat, uid: a.uid, name: a.name, title: clip_(o.name, 80), caption: cap, mode: mode, when: when, at: now_(), status: 'queued' };
+  var when = +o.when || 0, repeat = cleanRepeat_(o.repeat), dir = sub_('tg');
+  var rec = { id: uid_(), program: pid, track: clip_(o.track || '', 40), chat: chat, uid: a.uid, name: a.name, title: clip_(o.name, 80), caption: cap, mode: mode, when: when > now_() + 60000 ? when : now_(), at: now_(), status: 'queued', item: clip_(o.item || '', 40) };
+  if (repeat) rec.repeat = repeat;
+  // مصغّر للتقويم (JPEG صغير) يُحفظ ملفاً حتى لا يثقل ملف الطابور
+  if (o.thumb && /^[A-Za-z0-9+\/=]+$/.test(o.thumb) && o.thumb.length < 120000) { try { rec.thumbId = dir.createFile(Utilities.newBlob(Utilities.base64Decode(o.thumb), 'image/jpeg', 'tg_' + rec.id + '_thumb.jpg')).getId(); } catch (e) {} }
+  if (when > now_() + 60000 || repeat) {
     if (o.png) rec.pngId = dir.createFile(Utilities.newBlob(Utilities.base64Decode(o.png), 'image/png', 'tg_' + rec.id + '.png')).getId();
     if (o.file) rec.fileId = dir.createFile(Utilities.newBlob(Utilities.base64Decode(o.file), clip_(o.fileMime || 'image/png', 60), clip_(o.fileName || ('design_' + rec.id + '.png'), 100))).getId();
+  }
+  if (when > now_() + 60000) {
     withLock_(function () { var q = readJson_('tgq.json', []); q.unshift(rec); if (q.length > 500) q.length = 500; writeJson_('tgq.json', q); });
-    audit_(a, 'جدول منشوراً', rec.title + ' · ' + pid);
-    return JSON.stringify({ id: rec.id, queued: true, when: when });
+    audit_(a, 'جدول منشوراً', rec.title + ' · ' + pid + (repeat ? ' · متكرر' : ''));
+    return JSON.stringify({ id: rec.id, queued: true, when: when, repeat: repeat });
   }
   var sent = tgDeliver_(chat, cap, mode, o.png ? Utilities.newBlob(Utilities.base64Decode(o.png), 'image/png', 'design.png') : null, o.file ? Utilities.newBlob(Utilities.base64Decode(o.file), clip_(o.fileMime || 'image/png', 60), clip_(o.fileName || 'design.png', 100)) : null);
-  withLock_(function () { var q = readJson_('tgq.json', []); q.unshift({ id: uid_(), program: pid, chat: chat, uid: a.uid, name: a.name, title: clip_(o.name, 80), caption: cap, mode: mode, when: now_(), at: now_(), status: 'sent', msg: sent.msg }); if (q.length > 500) q.length = 500; writeJson_('tgq.json', q); });
+  rec.status = 'sent'; rec.msg = sent.msg; rec.link = sent.link; rec.sentAt = now_();
+  var nextRec = repeat ? tgNextOf_(rec) : null;
+  withLock_(function () { var q = readJson_('tgq.json', []); if (nextRec) q.unshift(nextRec); q.unshift(rec); if (q.length > 500) q.length = 500; writeJson_('tgq.json', q); });
   audit_(a, 'أرسل إلى القناة', clip_(o.name, 80) + ' · ' + pid);
+  sent.id = rec.id; if (nextRec) sent.next = nextRec.when;
   return JSON.stringify(sent);
 }
+// النسخة التالية من منشور متكرر: السجل نفسه بموعد جديد، وتشترك في ملفات الصورة
+function tgNextOf_(x) {
+  var r = x.repeat; if (!r) return null;
+  if (r.count === 1) return null;
+  var t = nextRepeat_(x.when, r); if (!t) return null;
+  var n = Object.assign({}, x, { id: uid_(), when: t, at: now_(), status: 'queued', seriesId: x.seriesId || x.id, repeat: Object.assign({}, r, { count: r.count ? r.count - 1 : 0 }) });
+  delete n.msg; delete n.link; delete n.err; delete n.sentAt;
+  return n;
+}
+// طول نص تليجرام يُحسب بلا الوسوم. حدّ الوصف تحت الصورة ١٠٢٤، وحدّ الرسالة ٤٠٩٦
+function tgLen_(cap) { return String(cap || '').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').length; }
 function tgDeliver_(chat, cap, mode, pngBlob, fileBlob) {
-  var out = { msg: 0 };
-  if (mode !== 'doc' && pngBlob) { var r1 = tgCall_('sendPhoto', { chat_id: chat, photo: pngBlob, caption: cap, parse_mode: 'HTML' }); out.msg = r1.message_id; }
-  if (mode !== 'photo') { var fb = fileBlob || pngBlob; var r2 = tgCall_('sendDocument', { chat_id: chat, document: fb, caption: mode === 'doc' ? cap : 'الملف بجودته الكاملة', parse_mode: 'HTML' }); if (!out.msg) out.msg = r2.message_id; }
+  var out = { msg: 0 }, longCap = tgLen_(cap) > 1000, capOnMedia = longCap ? '' : cap;
+  if (mode !== 'doc' && pngBlob) { var r1 = tgCall_('sendPhoto', { chat_id: chat, photo: pngBlob, caption: capOnMedia, parse_mode: 'HTML' }); out.msg = r1.message_id; }
+  if (mode !== 'photo') { var fb = fileBlob || pngBlob; var r2 = tgCall_('sendDocument', { chat_id: chat, document: fb, caption: mode === 'doc' ? capOnMedia : 'الملف بجودته الكاملة', parse_mode: 'HTML' }); if (!out.msg) out.msg = r2.message_id; }
+  // النص الطويل يُرسل رسالةً تالية تردّ على الصورة فلا يُقصّ
+  if (longCap && cap) { var p3 = { chat_id: chat, text: clip_(cap, 4096), parse_mode: 'HTML', link_preview_options: JSON.stringify({ is_disabled: true }) }; if (out.msg) p3.reply_to_message_id = out.msg; var r3 = tgCall_('sendMessage', p3); out.textMsg = r3.message_id; out.split = true; }
   if (/^@/.test(chat) && out.msg) out.link = 'https://t.me/' + chat.slice(1) + '/' + out.msg;
   return out;
 }
 function tg_queue(token, program) {
   var a = auth_(token);
-  return JSON.stringify(readJson_('tgq.json', []).filter(function (x) { return (!program || x.program === program) && (adminOf_(a, x.program) || x.uid === a.uid || inProg_(a, x.program)); }).slice(0, 100)
-    .map(function (x) { var o = Object.assign({}, x); delete o.pngId; delete o.fileId; delete o.uid; o.mine = x.uid === a.uid; return o; }));
+  return JSON.stringify(readJson_('tgq.json', []).filter(function (x) { return (!program || x.program === program) && (adminOf_(a, x.program) || x.uid === a.uid || inProg_(a, x.program)); }).slice(0, 300)
+    .map(function (x) { return tgPub_(x, a); }));
+}
+// مصغّرات المنشورات للتقويم: {id: dataUrl}
+function tg_thumbs(token, idsJson) {
+  var a = auth_(token), ids = JSON.parse(idsJson || '[]').slice(0, 40), q = readJson_('tgq.json', []), out = {};
+  ids.forEach(function (id) { var x = q.filter(function (y) { return y.id === id; })[0]; if (!x || !x.thumbId || !(adminOf_(a, x.program) || x.uid === a.uid || inProg_(a, x.program))) return; try { out[id] = fileDataUrl_(x.thumbId); } catch (e) {} });
+  return JSON.stringify(out);
 }
 function tg_cancel(token, id) {
   var a = auth_(token);
@@ -1153,17 +1250,142 @@ function tg_cancel(token, id) {
     var q = readJson_('tgq.json', []), x = q.filter(function (y) { return y.id === id; })[0];
     if (!x) throw new Error('غير موجود'); if (!(x.uid === a.uid || adminOf_(a, x.program))) throw new Error('ليس لك');
     if (x.status !== 'queued') throw new Error('أُرسل من قبل');
-    x.status = 'cancelled'; writeJson_('tgq.json', q); return 'ok';
+    x.status = 'cancelled'; x.upd = now_(); writeJson_('tgq.json', q); return 'ok';
   });
 }
-// المؤقّت: يرسل ما حان موعده
+// تعديل منشور مجدول: الموعد، النص، العنوان، التكرار. {id, when, caption, title, repeat (null يوقف التكرار)}
+function tg_update(token, json) {
+  var a = auth_(token), o = JSON.parse(json);
+  return withLock_(function () {
+    var q = readJson_('tgq.json', []), x = q.filter(function (y) { return y.id === o.id; })[0];
+    if (!x) throw new Error('غير موجود'); if (!(x.uid === a.uid || adminOf_(a, x.program))) throw new Error('ليس لك');
+    if (x.status !== 'queued') throw new Error('هذا المنشور أُرسل أو أُلغي؛ أعد جدولته منشوراً جديداً');
+    if (o.when != null) { var w = +o.when; if (!(w > now_() + 60000)) throw new Error('اختر موعداً في المستقبل'); x.when = w; }
+    if (o.caption != null) x.caption = clip_(String(o.caption), 4096);
+    if (o.title != null) x.title = clip_(o.title, 80);
+    if (o.mode && ['photo', 'doc', 'both'].indexOf(o.mode) >= 0) x.mode = o.mode;
+    if ('repeat' in o) { var r = cleanRepeat_(o.repeat); if (r) x.repeat = r; else delete x.repeat; }
+    x.upd = now_(); x.updBy = a.name;
+    writeJson_('tgq.json', q); audit_(a, 'عدّل منشوراً مجدولاً', x.title + ' · ' + x.program);
+    return JSON.stringify(tgPub_(x, a));
+  });
+}
+// إعادة جدولة منشور أُرسل أو فشل أو أُلغي: نسخة جديدة بموعد جديد (الملفات نفسها إن كانت محفوظة)
+function tg_requeue(token, id, when) {
+  var a = auth_(token), w = +when; if (!(w > now_() + 60000)) throw new Error('اختر موعداً في المستقبل');
+  return withLock_(function () {
+    var q = readJson_('tgq.json', []), x = q.filter(function (y) { return y.id === id; })[0];
+    if (!x) throw new Error('غير موجود'); if (!(x.uid === a.uid || adminOf_(a, x.program))) throw new Error('ليس لك');
+    if (!x.pngId && !x.fileId) throw new Error('هذا المنشور أُرسل فوراً ولم تُحفظ صورته؛ افتح التصميم وجدوله من جديد');
+    var n = Object.assign({}, x, { id: uid_(), when: w, at: now_(), status: 'queued', uid: a.uid, name: a.name, seriesId: x.seriesId || undefined }); delete n.msg; delete n.link; delete n.err; delete n.sentAt; delete n.repeat; delete n.upd;
+    q.unshift(n); if (q.length > 500) q.length = 500; writeJson_('tgq.json', q);
+    audit_(a, 'أعاد جدولة منشور', n.title + ' · ' + n.program);
+    return JSON.stringify(tgPub_(n, a));
+  });
+}
+// المؤقّت: يرسل ما حان موعده، ويولّد الموعد التالي للمتكرر، ويُشعر صاحبه
 function tgTick() {
   JC = {};
   var due = readJson_('tgq.json', []).filter(function (x) { return x.status === 'queued' && x.when <= now_(); });
   due.forEach(function (x) {
     var res = null, err = '';
     try { res = tgDeliver_(x.chat, x.caption, x.mode, x.pngId ? DriveApp.getFileById(x.pngId).getBlob() : null, x.fileId ? DriveApp.getFileById(x.fileId).getBlob() : null); } catch (e) { err = String(e && e.message || e); }
-    withLock_(function () { var q = readJson_('tgq.json', []); q.forEach(function (y) { if (y.id === x.id) { y.status = err ? 'failed' : 'sent'; y.err = err; y.sentAt = now_(); if (res) { y.msg = res.msg; y.link = res.link; } } }); writeJson_('tgq.json', q); });
+    var nextRec = null;
+    withLock_(function () {
+      var q = readJson_('tgq.json', []), cur = null;
+      q.forEach(function (y) { if (y.id === x.id) { cur = y; y.status = err ? 'failed' : 'sent'; y.err = err; y.sentAt = now_(); if (res) { y.msg = res.msg; y.link = res.link; } } });
+      if (cur && cur.repeat) { nextRec = tgNextOf_(cur); if (nextRec) q.unshift(nextRec); }
+      if (q.length > 500) q.length = 500;
+      writeJson_('tgq.json', q);
+    });
+    ntPush_(x.uid, 'tg', err ? 'تعذّر نشر «' + (x.title || 'منشور') + '» في القناة: ' + clip_(err, 120) : 'نُشر «' + (x.title || 'منشور') + '» في القناة' + (nextRec ? '، والموعد التالي ' + Utilities.formatDate(new Date(nextRec.when), tz_(), 'd/M HH:mm') : ''), err ? '#/cal' : (res && res.link) || '#/cal');
+  });
+}
+/* ---------- اكتشاف القنوات والمجموعات التي أُضيف إليها البوت ---------- */
+// getUpdates يعيد آخر ما وصل البوت خلال ٢٤ ساعة: إضافته لقناة أو مجموعة، ومنشورات القنوات التي هو مشرف فيها. يُجمع ما نجده في settings.tgKnown
+function tg_discover(token) {
+  var a = auth_(token); needAdmin_(a);
+  var ups = tgCall_('getUpdates', { limit: 100, timeout: 0, allowed_updates: JSON.stringify(['my_chat_member', 'channel_post', 'message', 'chat_member', 'edited_channel_post']) }) || [];
+  var found = {};
+  ups.forEach(function (u) {
+    var m = u.my_chat_member || u.chat_member || u.channel_post || u.edited_channel_post || u.message, ch = m && m.chat; if (!ch || ch.type === 'private') return;
+    var st = u.my_chat_member && u.my_chat_member.new_chat_member ? u.my_chat_member.new_chat_member.status : '';
+    var k = String(ch.id), prev = found[k] || {};
+    found[k] = { id: ch.id, title: clip_(ch.title || '', 80), type: ch.type, username: ch.username ? '@' + ch.username : '', status: st || prev.status || '', seen: Math.max(prev.seen || 0, (m.date || 0) * 1000) };
+  });
+  return withLock_(function () {
+    var s = readJson_('settings.json', {}), known = s.tgKnown || [], map = {};
+    known.forEach(function (c) { map[String(c.id)] = c; });
+    Object.keys(found).forEach(function (k) { var c = found[k]; if (c.status === 'left' || c.status === 'kicked') { delete map[k]; return; } map[k] = Object.assign({}, map[k] || {}, c); });
+    var list = Object.keys(map).map(function (k) { return map[k]; }).sort(function (x, y) { return (y.seen || 0) - (x.seen || 0); }).slice(0, 60);
+    s.tgKnown = list; writeJson_('settings.json', s);
+    return JSON.stringify({ found: Object.keys(found).length, list: list });
+  });
+}
+// فحص قناة: هل يصل إليها البوت، وهل هو مشرف بصلاحية النشر؟
+function tg_chat_check(token, chat) {
+  var a = auth_(token); needAdmin_(a); chat = clip_(String(chat || '').trim(), 80); if (!chat) throw new Error('اكتب اسم القناة أو معرّفها');
+  var info = tgCall_('getChat', { chat_id: chat }), me = tgCall_('getMe', {});
+  var mem = null; try { mem = tgCall_('getChatMember', { chat_id: chat, user_id: me.id }); } catch (e) {}
+  var st = mem ? mem.status : 'unknown', canPost = !!(mem && (st === 'creator' || (st === 'administrator' && (info.type !== 'channel' || mem.can_post_messages !== false))));
+  // نسجّلها في المعروفة أيضاً
+  try { withLock_(function () { var s = readJson_('settings.json', {}), known = s.tgKnown || []; if (!known.some(function (c) { return String(c.id) === String(info.id); })) { known.unshift({ id: info.id, title: clip_(info.title || '', 80), type: info.type, username: info.username ? '@' + info.username : '', status: st, seen: now_() }); s.tgKnown = known.slice(0, 60); writeJson_('settings.json', s); } }); } catch (e) {}
+  return JSON.stringify({ id: info.id, title: info.title || '', type: info.type, username: info.username ? '@' + info.username : '', status: st, canPost: canPost, members: info.members_count || 0 });
+}
+function tg_known(token) { var a = auth_(token); needAdmin_(a); return JSON.stringify(settings_().tgKnown || []); }
+
+/* ================= التقويم والمهام =================
+   tasks.json: [{id, program, title, note, due, allDay, from, fromName, to, toName, status: open|done, prio, link, at, upd, doneAt}]
+   المهمة لصاحبها (يكتبها لنفسه)، أو يسندها مشرف البرنامج إلى عضو فيصله إشعار. */
+function taskVisible_(a, t) { return t.status !== 'deleted' && (t.from === a.uid || t.to === a.uid || (t.to === '' && inProg_(a, t.program)) || adminOf_(a, t.program)); }
+function task_list(token, program) {
+  var a = auth_(token);
+  return JSON.stringify(readJson_('tasks.json', []).filter(function (t) { return (!program || t.program === program) && taskVisible_(a, t); }).slice(0, 400)
+    .map(function (t) { var o = Object.assign({}, t); o.mine = t.to === a.uid || (t.to === '' && t.from === a.uid); o.canEdit = t.from === a.uid || adminOf_(a, t.program); o.canDone = t.to === a.uid || t.from === a.uid || adminOf_(a, t.program); return o; }));
+}
+function task_save(token, json) {
+  var a = auth_(token), o = JSON.parse(json), pid = clip_(o.program || '', 30);
+  if (!inProg_(a, pid)) throw new Error('ليس من برامجك');
+  var title = clip_(String(o.title || '').trim(), 140); if (!title) throw new Error('اكتب عنوان المهمة');
+  var saved = withLock_(function () {
+    var list = readJson_('tasks.json', []), t = o.id ? list.filter(function (x) { return x.id === o.id; })[0] : null, isNew = !t;
+    if (t && !(t.from === a.uid || adminOf_(a, t.program))) throw new Error('هذه المهمة ليست لك');
+    if (!t) { t = { id: uid_(), program: pid, from: a.uid, fromName: a.name, at: now_(), status: 'open' }; list.unshift(t); }
+    var to = clip_(o.to != null ? o.to : (t.to != null ? t.to : a.uid), 40), toName = a.name;
+    if (to && to !== a.uid) { if (!adminOf_(a, pid)) throw new Error('إسناد المهام لغيرك لمشرف البرنامج'); var accs = readJson_('accounts.json', {}), acc = accs[to]; if (!acc || !inProg_(acc, pid)) throw new Error('العضو ليس في هذا البرنامج'); toName = acc.name; }
+    if (!to) toName = '';   // مهمة لكل الفريق
+    var notifyNew = (isNew || t.to !== to) && to && to !== a.uid;
+    t.title = title; t.note = clip_(o.note, 1500); t.due = Math.max(0, +o.due || 0); t.allDay = !!o.allDay; t.to = to; t.toName = toName; t.prio = o.prio === 'high' ? 'high' : 'normal'; t.link = /^(#\/|https?:\/\/)/.test(o.link || '') ? clip_(o.link, 300) : ''; t.upd = now_();
+    if (o.status === 'open' || o.status === 'done') { t.status = o.status; t.doneAt = o.status === 'done' ? now_() : 0; }
+    if (t.repeat !== undefined) delete t.repeat;
+    if (list.length > 2000) list.length = 2000;
+    writeJson_('tasks.json', list);
+    return { t: t, notify: notifyNew };
+  });
+  // الإشعار خارج القفل (الإشعارات تأخذ القفل بنفسها)
+  var t = saved.t;
+  if (saved.notify) ntPush_(t.to, 'task', 'مهمة جديدة من ' + a.name + ': ' + title + (t.due ? ' — ' + Utilities.formatDate(new Date(t.due), tz_(), 'd/M') : ''), '#/cal?task=' + t.id);
+  return JSON.stringify(t);
+}
+function task_done(token, id, on) {
+  var a = auth_(token);
+  var done = on === true || on === 'true' || on === 1;
+  var t = withLock_(function () {
+    var list = readJson_('tasks.json', []), t = list.filter(function (x) { return x.id === id; })[0];
+    if (!t) throw new Error('غير موجودة'); if (!(t.to === a.uid || t.from === a.uid || adminOf_(a, t.program) || (t.to === '' && inProg_(a, t.program)))) throw new Error('ليست لك');
+    t.status = done ? 'done' : 'open'; t.doneAt = done ? now_() : 0; t.doneBy = done ? a.name : ''; t.upd = now_();
+    writeJson_('tasks.json', list);
+    return t;
+  });
+  if (done && t.from && t.from !== a.uid) ntPush_(t.from, 'task', a.name + ' أنجز المهمة: ' + t.title, '#/cal?task=' + t.id);
+  return JSON.stringify(t);
+}
+function task_del(token, id) {
+  var a = auth_(token);
+  return withLock_(function () {
+    var list = readJson_('tasks.json', []), t = list.filter(function (x) { return x.id === id; })[0];
+    if (!t) throw new Error('غير موجودة'); if (!(t.from === a.uid || adminOf_(a, t.program))) throw new Error('ليست لك');
+    t.status = 'deleted'; t.upd = now_(); writeJson_('tasks.json', list); return 'ok';
   });
 }
 function ensureTriggers_(log) {
@@ -1320,7 +1542,7 @@ function wkBuild_(uids, withAI) {
     .filter(function (r) { return r.c.active || r.p.active || uids; });
   // ترتيب المستخدم في برنامجه بعدد التنزيلات
   rows.forEach(function (r) { r.msg = weekMsgLocal_(r.name, r.c, r.p); r.focus = TIP_CAT_IDS[(r.c.exports + r.c.active) % TIP_CAT_IDS.length]; r.challenge = ''; });
-  if (withAI && (props_().getProperty('GEMINI_KEY') || props_().getProperty('GROQ_KEY')) && settings_().ai.enabled) {
+  if (withAI && (hasGemini_() || props_().getProperty('GROQ_KEY')) && settings_().ai.enabled) {
     for (var i = 0; i < rows.length; i += 20) {
       var batch = rows.slice(i, i + 20);
       try {
@@ -1655,16 +1877,30 @@ function resetPin() {
 // ومن أراد إضافتها لمكتبة البرنامج يطلب، فيوافق مشرف البرنامج.
 function imgProvider_() {
   var px = props_().getProperty('PEXELS_KEY'), pb = props_().getProperty('PIXABAY_KEY'), pref = settings_().imgProvider || '';
+  if (pref === 'openverse') return 'openverse';
   if (pref === 'pixabay' && pb) return 'pixabay'; if (pref === 'pexels' && px) return 'pexels';
   if (px) return 'pexels'; if (pb) return 'pixabay';
-  throw new Error('لم يُضبط مفتاح الصور المجانية بعد (الإعدادات)');
+  return 'openverse';   // بلا مفتاح: Openverse (صور بتراخيص المشاع الإبداعي من فليكر وويكيميديا وغيرهما)
+}
+// Openverse: بلا مفتاح، ويعمل من المتصفح مباشرة أيضاً (المتصفح يستعمله أولاً، وهذا احتياط)
+function openverseSearch_(q, page, orient) {
+  var ar = orient === 'portrait' ? 'tall' : orient === 'landscape' ? 'wide' : orient === 'square' ? 'square' : '';
+  var url = 'https://api.openverse.org/v1/images/?q=' + encodeURIComponent(q) + '&page_size=24&page=' + Math.max(1, +page || 1) + '&mature=false' + (ar ? '&aspect_ratio=' + ar : '') + '&license_type=commercial';
+  var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, headers: { 'User-Agent': 'AtharPlatform/6.0 (educational design platform)' } });
+  if (res.getResponseCode() === 429) throw new Error('بلغنا حد البحث في Openverse الآن؛ جرّب بعد قليل');
+  if (res.getResponseCode() !== 200) throw new Error('تعذّر البحث في Openverse (' + res.getResponseCode() + ')');
+  var j = JSON.parse(res.getContentText());
+  return { provider: 'openverse', total: j.result_count || 0, page: j.page || 1, photos: (j.results || []).map(function (p) {
+    return { id: p.id, w: p.width || 0, h: p.height || 0, thumb: p.thumbnail || p.url, big: p.url, orig: p.url, by: p.creator || '', byUrl: p.creator_url || '', url: p.foreign_landing_url || '', alt: clip_(p.title || '', 160), color: '', license: (p.license ? 'CC ' + String(p.license).toUpperCase() + ' ' + (p.license_version || '') : '').trim(), licenseUrl: p.license_url || '', src: p.source || p.provider || '' };
+  }) };
 }
 function img_search(token, q, page, orient) {
   var a = auth_(token); q = clip_(q, 100).trim(); if (!q) throw new Error('اكتب ما تبحث عنه');
   var prov = imgProvider_(), c = CacheService.getScriptCache(), ck = 'im:' + prov + ':' + Utilities.base64EncodeWebSafe(q + '|' + (page || 1) + '|' + (orient || '')).slice(0, 190), hit = c.get(ck);
   if (hit) return hit;
   var out, res;
-  if (prov === 'pexels') {
+  if (prov === 'openverse') out = openverseSearch_(q, page, orient);
+  else if (prov === 'pexels') {
     var url = 'https://api.pexels.com/v1/search?query=' + encodeURIComponent(q) + '&per_page=24&page=' + (Math.max(1, +page || 1)) + (orient ? '&orientation=' + encodeURIComponent(orient) : '') + (/[؀-ۿ]/.test(q) ? '&locale=ar-SA' : '');
     res = UrlFetchApp.fetch(url, { headers: { Authorization: props_().getProperty('PEXELS_KEY') }, muteHttpExceptions: true });
     if (res.getResponseCode() === 429) throw new Error('بلغنا حد البحث هذه الساعة؛ جرّب بعد قليل');
@@ -1691,19 +1927,25 @@ function img_test(token) { var a = auth_(token); needAdmin_(a); var prov = imgPr
 // حفظ صورة بأصلها الكامل في مكتبة المستخدم (أو البرنامج إن كان مشرفه)، واختيارياً طلب إضافتها لمكتبة البرنامج
 function img_pick(token, json) {
   var a = auth_(token), m = JSON.parse(json);
-  if (!/^https:\/\/(images\.pexels\.com|pixabay\.com|cdn\.pixabay\.com)\//.test(m.orig || '')) throw new Error('رابط غير مقبول');
+  // أي رابط https لصورة: Openverse يعيد صوراً من مصادر كثيرة (فليكر، ويكيميديا…)، وPixabay وPexels، والصور المولَّدة
+  if (!/^https:\/\/[\w.\-]+\/\S+$/.test(m.orig || '') || /^https:\/\/(script\.google\.com|drive\.google\.com|localhost)/.test(m.orig)) throw new Error('رابط غير مقبول');
   if (!perm_(a, 'upload') && readJson_('settings.json', {}).uploadsNeedPerm) throw new Error('إضافة الصور تحتاج صلاحية من المشرف');
-  var res = UrlFetchApp.fetch(m.orig, { muteHttpExceptions: true });
-  if (res.getResponseCode() !== 200) throw new Error('تعذّر تنزيل الصورة');
+  var res = UrlFetchApp.fetch(m.orig, { muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AtharPlatform/6.0)' } });
+  if (res.getResponseCode() !== 200) throw new Error('تعذّر تنزيل الصورة (' + res.getResponseCode() + ')');
   var blob = res.getBlob(); var bytes = blob.getBytes(); if (bytes.length > 27 * 1024 * 1024) throw new Error('الصورة أكبر من المسموح');
-  var mime = blob.getContentType() || '', name = clip_(m.name || m.alt || 'صورة من Pexels', 120);
-  if (!/^image\//.test(mime)) mime = /\.png(\?|$)/i.test(m.orig) ? 'image/png' : /\.webp(\?|$)/i.test(m.orig) ? 'image/webp' : 'image/jpeg';
+  var srcName = clip_(m.src || (/pixabay/.test(m.orig) ? 'Pixabay' : /pexels/.test(m.orig) ? 'Pexels' : /pollinations/.test(m.orig) ? 'توليد بالذكاء' : /wikimedia/.test(m.orig) ? 'Wikimedia Commons' : 'Openverse'), 40);
+  var mime = blob.getContentType() || '', name = clip_(m.name || m.alt || ('صورة من ' + srcName), 120);
+  // نوع الصورة من بايتاتها الأولى (أوثق من ترويسة الخادم أو امتداد الرابط)
+  var b0 = bytes[0] & 255, b1 = bytes[1] & 255, head = String.fromCharCode.apply(null, bytes.slice(0, 64).map(function (b) { return b & 255; }));
+  var sniff = (b0 === 0x89 && b1 === 0x50) ? 'image/png' : (b0 === 0xff && b1 === 0xd8) ? 'image/jpeg' : (b0 === 0x52 && b1 === 0x49) ? 'image/webp' : (b0 === 0x47 && b1 === 0x49) ? 'image/gif' : /^\s*<(\?xml|svg)/i.test(head) ? 'image/svg+xml' : '';
+  mime = sniff || (/^image\//.test(mime) ? mime : '');
+  if (!/^image\//.test(mime)) throw new Error('الرابط ليس صورة');
   var toProg = !!m.program && adminOf_(a, m.program), scope = toProg ? 'program' : 'user';
-  var fileId = sub_('assets').createFile(Utilities.newBlob(bytes, mime, name + (mime === 'image/png' ? '.png' : '.jpg'))).getId();
+  var fileId = sub_('assets').createFile(Utilities.newBlob(bytes, mime, name + (mime === 'image/png' ? '.png' : mime === 'image/webp' ? '.webp' : mime === 'image/svg+xml' ? '.svg' : '.jpg'))).getId();
   var x = withLock_(function () {
     var reg = regName_(scope, a.uid), list = readJson_(reg, []);
-    var it = { id: scope === 'user' ? a.uid + '_' + uid_() : uid_(), at: now_(), owner: a.uid, ownerName: a.name, ver: 1, upd: now_(), kind: 'image', name: name, mime: mime, scope: scope, program: toProg ? m.program : '', fileId: fileId, size: bytes.length, key: '', thumb: /^https:\/\/(images\.pexels\.com|pixabay\.com|cdn\.pixabay\.com)\//.test(m.thumb || '') ? clip_(m.thumb, 300) : '', data: null,
-      tags: clip_((/pixabay/.test(m.orig) ? 'pixabay ' : 'pexels ') + (m.by || ''), 120), credit: { by: clip_(m.by, 80), byUrl: clip_(m.byUrl, 200), url: clip_(m.url, 200), src: /pixabay/.test(m.orig) ? 'Pixabay' : 'Pexels' } };
+    var it = { id: scope === 'user' ? a.uid + '_' + uid_() : uid_(), at: now_(), owner: a.uid, ownerName: a.name, ver: 1, upd: now_(), kind: 'image', name: name, mime: mime, scope: scope, program: toProg ? m.program : '', fileId: fileId, size: bytes.length, key: '', thumb: /^https:\/\/[\w.\-]+\/\S+$/.test(m.thumb || '') ? clip_(m.thumb, 400) : '', data: null,
+      tags: clip_(srcName + ' ' + (m.by || ''), 120), credit: { by: clip_(m.by, 80), byUrl: clip_(m.byUrl, 200), url: clip_(m.url, 200), src: srcName, license: clip_(m.license || '', 60), licenseUrl: clip_(m.licenseUrl || '', 200), prompt: clip_(m.prompt || '', 300) } };
     list.unshift(it); writeJson_(reg, list); return it;
   });
   var req = null;
@@ -1770,9 +2012,41 @@ function quranSurahs_() {
   var l = JSON.parse(r.getContentText()).data.map(function (s) { return { number: s.number, name: s.name }; });
   c.put('qsurahs', JSON.stringify(l), 21600); return l;
 }
-function hadith_find(token, q) {
+// مصدران: الدرر السنية (حكم المحدث على كل حديث)، وقاعدة sunnah.com عبر api.islamic.app (الصحيحان والسنن ورياض الصالحين…).
+// src: 'dorar' أو 'sunnah'. الافتراضي: الدرر، وإن تعذّر الوصول إليها (كثيراً ما تحجب خوادم جوجل) انتقلنا إلى الثاني تلقائياً
+function hadith_find(token, q, src) {
   auth_(token); q = clip_(q, 120).trim(); if (!q) throw new Error('اكتب كلمات من الحديث');
-  var c = CacheService.getScriptCache(), ck = 'hd:' + Utilities.base64EncodeWebSafe(q).slice(0, 200), hit = c.get(ck); if (hit) return hit;
+  src = src === 'sunnah' ? 'sunnah' : 'dorar';
+  var c = CacheService.getScriptCache(), ck = 'hd:' + src + ':' + Utilities.base64EncodeWebSafe(q).slice(0, 190), hit = c.get(ck); if (hit) return hit;
+  var txt;
+  if (src === 'sunnah') txt = JSON.stringify(sunnahSearch_(q));
+  else { try { txt = JSON.stringify(dorarSearch_(q)); } catch (e) { var alt = sunnahSearch_(q); alt.forEach(function (h) { h.fallback = true; }); if (!alt.length) throw e; txt = JSON.stringify(alt); } }
+  if (txt.length < 90000) c.put(ck, txt, 21600); return txt;
+}
+var SUNNAH_BOOKS = { bukhari: 'صحيح البخاري', muslim: 'صحيح مسلم', nasai: 'سنن النسائي', abudawud: 'سنن أبي داود', tirmidhi: 'جامع الترمذي', ibnmajah: 'سنن ابن ماجه', malik: 'موطأ مالك', ahmad: 'مسند أحمد', darimi: 'سنن الدارمي', adab: 'الأدب المفرد', shamail: 'الشمائل المحمدية', riyadussalihin: 'رياض الصالحين', mishkat: 'مشكاة المصابيح', bulugh: 'بلوغ المرام', forty: 'الأربعون النووية', hisn: 'حصن المسلم', virtues: 'فضائل الآيات والسور' };
+function sunnahSearch_(q) {
+  var r = UrlFetchApp.fetch('https://api.islamic.app/v1/hadith/search?q=' + encodeURIComponent(q) + '&lang=ar&limit=25', { muteHttpExceptions: true, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AtharPlatform/6.0)' } });
+  if (r.getResponseCode() !== 200) throw new Error('تعذّر الوصول إلى مصدر الأحاديث (' + r.getResponseCode() + ')');
+  var j = JSON.parse(r.getContentText()), list = (j.data && j.data.results) || [], out = [];
+  list.forEach(function (x) {
+    var ar = x.ar || {}; if (!ar.text) return;
+    var grade = (ar.grades && ar.grades[0] && ar.grades[0].grade) || ((x.collection === 'bukhari' || x.collection === 'muslim') ? 'صحيح' : '');
+    out.push({ text: matnOf_(ar.text), full: clip_(ar.text, 4000), rawi: '', muhaddith: x.collection === 'bukhari' ? 'البخاري' : x.collection === 'muslim' ? 'مسلم' : '', source: SUNNAH_BOOKS[x.collection] || x.collection, page: String(x.hadithNumber || ''), grade: grade, sahih: /صحيح|حسن/.test(grade) && !/ضعيف|موضوع|منكر/.test(grade), src: 'sunnah' });
+  });
+  return out;
+}
+// المتن بلا السند: ما بين علامتي التنصيص إن وُجدتا، وإلا ما بعد «صلى الله عليه وسلم قال/يقول»، وإلا ما بعد أول «قال» للراوي؛ وبلا تعليق الترمذي وأبي داود بعده
+function matnOf_(t) {
+  var s = String(t || '').replace(/\s+/g, ' ').replace(/\u200f/g, '').trim();
+  s = s.replace(/\s*قَالَ أَبُو عِيسَى[\s\S]*$/, '').replace(/\s*قَالَ أَبُو دَاوُدَ[\s\S]*$/, '').trim();
+  var qs = s.match(/"\s*([^"]{20,})\s*"/g);
+  if (qs) return qs.map(function (x) { return x.replace(/^"\s*|\s*"$/g, ''); }).join(' ').replace(/\s*\.\s*$/, '').trim();
+  var m = s.match(/صلى الله عليه وسلم\s*[:،]?\s*(?:قَالَ|يَقُولُ|فَقَالَ|قَالَتْ|فَقَالَتْ)\s*[:«]?\s*([\s\S]{20,})$/);
+  if (!m) m = s.match(/(?:^|[،,.]\s*|\s)(?:قَالَ|قَالَتْ)\s+([\s\S]{25,})$/);
+  var body = m ? m[1] : s;
+  return body.replace(/^[«"\s]+|[»"\s.]+$/g, '').trim();
+}
+function dorarSearch_(q) {
   var r; try { r = UrlFetchApp.fetch('https://dorar.net/dorar_api.json?skey=' + encodeURIComponent(q), { muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AtharPlatform/6.0)' } }); } catch (e) { throw new Error('تعذّر الوصول إلى الدرر السنية: ' + clip_(String(e && e.message || e), 120)); }
   if (r.getResponseCode() !== 200) throw new Error('تعذّر الوصول إلى الدرر السنية (' + r.getResponseCode() + ')');
   var html = ''; try { html = JSON.parse(r.getContentText()).ahadith.result || ''; } catch (e) { throw new Error('رد غير مفهوم من الدرر السنية: ' + clip_(r.getContentText().replace(/\s+/g, ' '), 100)); }
@@ -1789,5 +2063,6 @@ function hadith_find(token, q) {
     out.push({ text: text, rawi: f['الراوي'] || '', muhaddith: f['المحدث'] || '', source: f['المصدر'] || '', page: f['الصفحة أو الرقم'] || '', grade: grade, sahih: /صحيح|حسن|ثابت|إسناده جيد/.test(grade) && !/ضعيف|موضوع|منكر|لا يصح|باطل|لا أصل/.test(grade) });
   }
   if (!out.length && html.length > 200) throw new Error('تغيّر شكل صفحة الدرر السنية؛ أبلغ المطوّر');
-  var txt = JSON.stringify(out); if (txt.length < 90000) c.put(ck, txt, 21600); return txt;
+  out.forEach(function (h) { h.src = 'dorar'; });
+  return out;
 }

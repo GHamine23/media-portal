@@ -39,7 +39,7 @@ async def main():
         ok(await pg.evaluate("Object.keys(LASTG).length") >= 5, 'free design elements are editable groups: ' + await pg.evaluate("Object.keys(LASTG).join(',')"))
         await pg.screenshot(path=OUT + 'k3_free_editor.png')
         # بالمساعد (محاكى)
-        await pg.evaluate("GAS._props.GEMINI_KEY='k'; " + MOCK + "; void 0"); await pg.evaluate("refreshBundle()"); await pg.wait_for_timeout(1500)
+        await pg.evaluate("GAS._props.GEMINI_KEY='k-demo-AIzaSy0123456789abcdefghijklmnop'; " + MOCK + "; void 0"); await pg.evaluate("refreshBundle()"); await pg.wait_for_timeout(1500)
         await pg.goto(URL + '#/make?new=1'); await pg.wait_for_timeout(1000); await clean(pg)
         await pg.fill('#mk_text', 'لقاء أسري عن البيوت المطمئنة'); await pg.click('.mkform .btn.dark'); await pg.wait_for_timeout(2500)
         q = await pg.inner_text('.mkwiz h2'); ok('لمن' in q, 'AI intake: type known from AI, asks audience: ' + q)

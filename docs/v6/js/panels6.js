@@ -57,7 +57,7 @@ function pContent(b) {
       const h = !S.hide['f_' + f.k]; if (h) S.hide['f_' + f.k] = true; else delete S.hide['f_' + f.k];
       e.currentTarget.replaceChildren(ico(h ? 'eyeoff' : 'eye')); e.currentTarget.closest('.fld').classList.toggle('hid', h); changed6();
     } }, [ico(hid ? 'eyeoff' : 'eye')]);
-    form.appendChild(el('div', { class: 'fld' + (hid ? ' hid' : '') }, [el('div', { class: 'lab' }, [el('label', { for: id, text: f.label }), el('span', { class: 'row' }, [cnt, eye])]), inp, f.hint ? el('small', { text: f.hint }) : null]));
+    form.appendChild(el('div', { class: 'fld' + (hid ? ' hid' : '') }, [el('div', { class: 'lab' }, [el('label', { for: id, text: f.label }), el('span', { class: 'row' }, [cnt, emojiBtn(inp), eye])]), inp, f.hint ? el('small', { text: f.hint }) : null]));
   });
   b.appendChild(form);
   b.appendChild(el('p', { class: 'tip6', html: 'ما تكتبه بين <b>*نجمتين*</b> يظهر بلون مميز. والنص الطويل يصغر وحده ليبقى في مكانه.' }));
@@ -469,7 +469,7 @@ function pEl(b) {
     const ta = el('textarea', { rows: '2', dir: 'auto', placeholder: ph || '' });
     ta.value = it.layer ? (it.layer.txt || '') : (ph && S.d[it.f.k] === ph ? '' : S.d[it.f.k]);
     ta.addEventListener('input', function () { if (it.layer) it.layer.txt = ta.value; else S.d[it.f.k] = ta.value === '' && ph ? ph : ta.value; redraw(); clearTimeout(ED.inT); ED.inT = setTimeout(function () { changed6(true); }, 600); });
-    b.appendChild(el('div', { class: 'fld' }, [el('label', { text: it.layer ? 'النص' : it.f.label }), ta]));
+    b.appendChild(el('div', { class: 'fld' }, [el('div', { class: 'lab' }, [el('label', { text: it.layer ? 'النص' : it.f.label }), emojiBtn(ta)]), ta]));
   });
   // الخط
   if (texts.length) {

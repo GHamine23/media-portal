@@ -359,7 +359,7 @@ function openInline6(g) {
     box.appendChild(ta); setTimeout(fit2, 0);
     if (i === 0) setTimeout(function () { ta.focus(); if (ta.value) ta.select(); }, 40);
   });
-  box.appendChild(el('div', { class: 'iedf' }, [el('span', { class: 'tiny', text: 'ما بين *نجمتين* يظهر بلون مميز · Ctrl+Enter للإنهاء' }), el('button', { type: 'button', class: 'btn dark sm', text: 'تم', onclick: closeInline6 })]));
+  box.appendChild(el('div', { class: 'iedf' }, [emojiBtn(function () { return box.querySelector('textarea:focus') || box.querySelector('textarea'); }), el('span', { class: 'tiny', text: 'ما بين *نجمتين* يظهر بلون مميز · Ctrl+Enter للإنهاء' }), el('button', { type: 'button', class: 'btn dark sm', text: 'تم', onclick: closeInline6 })]));
   if (window.innerWidth <= 860) { document.body.appendChild(box); box.classList.add('mob'); }
   else {
     host.appendChild(box);
@@ -372,4 +372,4 @@ function openInline6(g) {
   }
   track('tool', { tool: 'inline_edit' });
 }
-document.addEventListener('mousedown', function (e) { const o = $('.ied6'); if (o && !o.contains(e.target) && !(e.target.closest && e.target.closest('#e_konva'))) closeInline6(); }, true);
+document.addEventListener('mousedown', function (e) { const o = $('.ied6'); if (o && !o.contains(e.target) && !(e.target.closest && (e.target.closest('#e_konva') || e.target.closest('.emopop')))) closeInline6(); }, true);

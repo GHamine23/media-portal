@@ -66,7 +66,7 @@ function showFeedback6(preset) {
   const imgPick = el('div', { class: 'fbimgs' }, [fileI, el('button', { type: 'button', class: 'btn sm line', onclick: function () { fileI.click(); } }, [ico('image'), 'أرفق صوراً من جهازك']), el('span', { class: 'tiny', text: 'حتى أربع صور بجودتها' }), thumbs]);
   const m = modal({ title: 'ملاحظة للفريق', body: [
     segOf([['bug', 'مشكلة'], ['idea', 'اقتراح'], ['q', 'سؤال']], kind, function (v) { kind = v; }),
-    el('div', { class: 'fld' }, [el('label', { for: 'fb_text', text: 'ملاحظتك' }), ta]),
+    el('div', { class: 'fld' }, [el('label', { for: 'fb_text', text: 'ملاحظتك' }), withEmoji(ta)]),
     hasDesign ? el('label', { class: 'tog' }, [shotI, el('span', { text: 'أرفق صورة التصميم المفتوح' })]) : null,
     imgPick,
     el('p', { class: 'tiny', text: 'يُرفق تلقائياً اسم الصفحة ونوع الجهاز وآخر الأخطاء التقنية، لنفهم المشكلة دون أسئلة كثيرة. وتتابع حالتها من «حسابي».' }),

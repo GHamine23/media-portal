@@ -1,0 +1,117 @@
+"""اختبار التقويم والمهام: الجدولة والتكرار، عرض الشهر والأسبوع والقائمة، النقل بالسحب، تعديل المنشور، المهام والإسناد والإشعارات، والرئيسية."""
+import asyncio, sys, datetime
+sys.path.insert(0, '/home/claude/media-portal/v6')
+from t6 import setup, URL, OUT
+from playwright.async_api import async_playwright
+def ok(c, m): print(('✓ ' if c else '✗ ') + m)
+async def clean(pg):
+    for _ in range(3):
+        if await pg.query_selector('.coach'): await pg.evaluate("document.querySelector('.coach').remove()")
+        if await pg.query_selector('.modal'): await pg.keyboard.press('Escape'); await pg.wait_for_timeout(250)
+async def main():
+    async with async_playwright() as p:
+        b = await p.chromium.launch()
+        pg = await b.new_page(viewport={'width': 1440, 'height': 900})
+        errs = await setup(pg)
+        # إعداد البوت والقناة
+        await pg.goto(URL + '#/admin/settings'); await pg.wait_for_timeout(1500)
+        await pg.fill('input[aria-label="رمز البوت"]', '123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij'); await pg.click('#abody > .btn.dark'); await pg.wait_for_timeout(1500)
+        await pg.evaluate("API6.me('prog_save', JSON.stringify({ id: 'academy', tg: { chat: '@jeel_demo', link: 'https://example.org/join' } }))"); await pg.evaluate("refreshBundle()"); await pg.wait_for_timeout(1200)
+        # جدولة منشور متكرر من المحرر
+        await pg.goto(URL + '#/e/ithmar/ann_cards'); await pg.wait_for_timeout(2500); await clean(pg)
+        await pg.fill('#f6_title', 'المقرر *الأسبوعي*'); await pg.click('#e_cap'); await pg.wait_for_timeout(900)
+        when = datetime.datetime.now() + datetime.timedelta(days=3)
+        await pg.click('.capsend .seg button:has-text("في موعد")'); await pg.wait_for_timeout(200)
+        await pg.fill('.capwhen input[type=date]', when.strftime('%Y-%m-%d')); await pg.fill('.capwhen input[type=time]', '09:30')
+        await pg.select_option('.repbox select[aria-label="التكرار"]', 'week'); await pg.wait_for_timeout(200)
+        await pg.select_option('.repbox select[aria-label="ينتهي"]', 'count'); await pg.fill('.repbox input[aria-label="عدد المرات"]', '3'); await pg.wait_for_timeout(200)
+        ok('كل أسبوع' in await pg.inner_text('.repsum') and '3 مرات' in await pg.inner_text('.repsum'), 'repeat summary shown')
+        await pg.click('.capsend .btn.dark'); await pg.wait_for_timeout(3000)
+        ok(await pg.evaluate("document.querySelector('.capsend .btn.dark').classList.contains('done')"), 'recurring post scheduled (done state)')
+        ok(not await pg.evaluate("document.querySelector('.capafter').hidden") and 'افتح التقويم' in await pg.inner_text('.capafter'), 'after-box offers calendar link')
+        await pg.screenshot(path=OUT + 'k1_sched_repeat.png')
+        await clean(pg)
+        # التقويم: الشهر
+        await pg.goto(URL + '#/cal?d=' + when.strftime('%Y-%m-%d')); await pg.wait_for_timeout(2500)
+        ok(await pg.evaluate("document.querySelectorAll('.cchip.post.queued').length") >= 1, 'month view shows the queued post chip')
+        ok(await pg.evaluate("document.querySelectorAll('.cchip svg.crep').length") >= 1, 'repeat icon on chip')
+        await pg.evaluate("Array.from(document.querySelectorAll('.seg button')).find(b=>b.textContent==='ميلادي').click()"); await pg.wait_for_timeout(600)
+        await pg.screenshot(path=OUT + 'k2_month.png', full_page=True)
+        # تفاصيل المنشور وتعديل الموعد
+        await pg.click('.cchip.post.queued'); await pg.wait_for_timeout(800)
+        ok(await pg.evaluate("!!document.querySelector('.pdgrid .caped')"), 'post dialog with editable caption')
+        await pg.fill('.pdr input[type=time]', '10:15'); await pg.wait_for_timeout(200)
+        ok(not await pg.evaluate("document.querySelector('.pdr .btn.dark').disabled"), 'save enabled after change')
+        await pg.click('.pdr .btn.dark'); await pg.wait_for_timeout(1500)
+        ok('حُفظت' in await pg.inner_text('.pdr .btn.dark'), 'post update saved (done state)')
+        await pg.screenshot(path=OUT + 'k3_post_dialog.png')
+        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(400)
+        q = await pg.evaluate("API6.me('tg_queue','academy')")
+        ok(any(x['status'] == 'queued' and datetime.datetime.fromtimestamp(x['when'] / 1000).strftime('%H:%M') == '10:15' for x in q), 'queue reflects new time')
+        # السحب إلى يوم آخر
+        chip = await pg.query_selector('.cchip.post.queued'); src = await chip.bounding_box()
+        target_day = (when + datetime.timedelta(days=2)).strftime('%Y-%m-%d')
+        cell = await pg.query_selector('.cgd[data-day="%s"]' % target_day)
+        if cell is None:
+            await pg.evaluate("CAL.cursor.setMonth(CAL.cursor.getMonth()+1); CAL.redraw()"); await pg.wait_for_timeout(800)
+            cell = await pg.query_selector('.cgd[data-day="%s"]' % target_day)
+        if cell:
+            tb = await cell.bounding_box()
+            await pg.evaluate("""(function(){ const chip=document.querySelector('.cchip.post.queued'), cell=document.querySelector('.cgd[data-day="%s"]'); const dt=new DataTransfer(); chip.dispatchEvent(new DragEvent('dragstart',{dataTransfer:dt,bubbles:true})); cell.dispatchEvent(new DragEvent('dragover',{dataTransfer:dt,bubbles:true,cancelable:true})); cell.dispatchEvent(new DragEvent('drop',{dataTransfer:dt,bubbles:true,cancelable:true})); chip.dispatchEvent(new DragEvent('dragend',{dataTransfer:dt,bubbles:true})); })()""" % target_day)
+            await pg.wait_for_timeout(600)
+            ok(await pg.evaluate("!!document.querySelector('.modal') && /نقل المنشور/.test(document.querySelector('.modal h3').textContent)"), 'drop opens move confirmation')
+            await pg.screenshot(path=OUT + 'k4_move.png')
+            await pg.click('.modal .acts .btn.dark'); await pg.wait_for_timeout(2000)
+            q = await pg.evaluate("API6.me('tg_queue','academy')")
+            ok(any(x['status'] == 'queued' and datetime.datetime.fromtimestamp(x['when'] / 1000).strftime('%Y-%m-%d') == target_day for x in q), 'post moved to the dropped day')
+            void = tb
+        else:
+            ok(False, 'target cell for drag not found')
+        await clean(pg)
+        # الأسبوع والقائمة
+        await pg.evaluate("Array.from(document.querySelectorAll('.seg button')).find(b=>b.textContent==='أسبوع').click()"); await pg.wait_for_timeout(700)
+        ok(await pg.evaluate("document.querySelectorAll('.cweek .cwcol').length") == 7, 'week view has 7 columns')
+        await pg.screenshot(path=OUT + 'k5_week.png')
+        await pg.evaluate("Array.from(document.querySelectorAll('.seg button')).find(b=>b.textContent==='القادم').click()"); await pg.wait_for_timeout(700)
+        ok(await pg.evaluate("document.querySelectorAll('.clgroup').length") >= 1 and await pg.evaluate("document.querySelectorAll('.ccard.post').length") >= 1, 'list view groups upcoming posts')
+        await pg.screenshot(path=OUT + 'k6_list.png', full_page=True)
+        # مهمة جديدة من المدير إلى أحمد
+        await pg.click('.calpage .btn.dark:has-text("مهمة جديدة")'); await pg.wait_for_timeout(900)
+        await pg.fill('.modal input[aria-label="العنوان"]', 'جهّز إعلان اللقاء الأسري')
+        await pg.fill('.modal textarea[aria-label="ملاحظات"]', 'بهوية إثمار 🌱')
+        await pg.fill('.modal input[aria-label="التاريخ"]', (datetime.datetime.now() + datetime.timedelta(days=1)).strftime('%Y-%m-%d'))
+        ahmad = await pg.evaluate("API6.me('acc_list').then(l => l.find(a => a.username === 'ahmad').uid)")
+        await pg.wait_for_timeout(600); await pg.select_option('.modal select[aria-label="لمن"]', ahmad)
+        await pg.click('.modal .seg button:has-text("مهمة")'); await pg.wait_for_timeout(100)
+        await pg.screenshot(path=OUT + 'k7_task_form.png')
+        await pg.click('.modal .btn.dark:has-text("أضف المهمة")'); await pg.wait_for_timeout(1800)
+        tasks = await pg.evaluate("API6.me('task_list','academy')")
+        ok(len(tasks) == 1 and tasks[0]['to'] == ahmad and tasks[0]['prio'] == 'high', 'task assigned to ahmad with high priority')
+        ok(await pg.evaluate("document.querySelectorAll('.ccard.task.high').length") >= 1, 'task card appears in list view')
+        # الرئيسية: القادم
+        await pg.goto(URL + '#/'); await pg.wait_for_timeout(2500); await clean(pg)
+        t = await pg.inner_text('.calmini')
+        ok('القادم في التقويم' in t and 'كل أسبوع' in t, 'home widget lists upcoming post: ' + t.replace('\n', ' | ')[:100])
+        ok(await pg.evaluate("document.querySelectorAll('.cal6 a.cd.has').length") >= 1, 'home calendar marks the scheduled day as link')
+        await pg.screenshot(path=OUT + 'k8_home_widget.png')
+        # أحمد: يرى المهمة والإشعار، ويُنجزها
+        await pg.evaluate("logout()"); await pg.wait_for_timeout(800)
+        await pg.fill('#lg_id', 'ahmad'); await pg.fill('#lg_pw', 'Ahmad#2026'); await pg.click('.lgform button[type=submit]'); await pg.wait_for_selector('#top:not([hidden])', timeout=60000); await pg.wait_for_timeout(1500); await clean(pg)
+        nts = await pg.evaluate("API6.me('nt_list')")
+        ok(any(n['kind'] == 'task' and 'جهّز إعلان' in n['text'] for n in nts), 'ahmad notified about the task')
+        await pg.goto(URL + '#/cal'); await pg.wait_for_timeout(2500)
+        await pg.evaluate("Array.from(document.querySelectorAll('.seg button')).find(b=>b.textContent==='القادم').click()"); await pg.wait_for_timeout(700)
+        ok(await pg.evaluate("document.querySelectorAll('.ccard.task').length") == 1, 'ahmad sees the assigned task')
+        await pg.click('.ccard.task .tchk'); await pg.wait_for_timeout(1200)
+        ok(await pg.evaluate("document.querySelector('.ccard.task').classList.contains('done')"), 'ahmad completes the task from the card')
+        await pg.screenshot(path=OUT + 'k9_ahmad_done.png')
+        # الجوال
+        m = await b.new_page(viewport={'width': 390, 'height': 844}, has_touch=True, is_mobile=True)
+        me = await setup(m)
+        await m.goto(URL + '#/cal'); await m.wait_for_timeout(2500)
+        await m.screenshot(path=OUT + 'k10_m_cal.png', full_page=True)
+        ok(await m.evaluate("document.querySelectorAll('.cgd').length") > 20, 'mobile month renders')
+        print('ERRORS', [e for e in errs if 'favicon' not in e and '404' not in e][:10])
+        print('M ERRORS', [e for e in me if 'favicon' not in e and '404' not in e][:5])
+        await b.close()
+if __name__ == '__main__': asyncio.run(main())

@@ -13,12 +13,16 @@ GAS._fetch.handler = function (url, opt) {
   if (url.indexOf('raw.githubusercontent.com/google/fonts') >= 0) return { code: 200, body: [0, 1, 0, 0, 0, 9] };
   if (url.indexOf('api.telegram.org') >= 0) {
     GAS._tg = GAS._tg || []; GAS._tg.push({ url: url, opt: opt });
-    if (/getMe$/.test(url)) return { code: 200, body: JSON.stringify({ ok: true, result: { username: 'athar_bot', first_name: 'أثر' } }) };
+    if (/getMe$/.test(url)) return { code: 200, body: JSON.stringify({ ok: true, result: { id: 777, username: 'athar_bot', first_name: 'أثر' } }) };
+    if (/getUpdates$/.test(url)) return { code: 200, body: JSON.stringify({ ok: true, result: [{ update_id: 1, my_chat_member: { chat: { id: -1001, title: 'قناة الجيل', type: 'channel', username: 'jeel_new' }, date: 1700000000, new_chat_member: { status: 'administrator' } } }, { update_id: 2, message: { chat: { id: -2002, title: 'مجموعة المشرفين', type: 'supergroup' }, date: 1700000100, text: 'hi' } }, { update_id: 3, message: { chat: { id: 5, type: 'private' }, date: 1, text: 'x' } }] }) };
+    if (/getChat$/.test(url)) return { code: 200, body: JSON.stringify({ ok: true, result: { id: -1001, title: 'قناة الجيل', type: 'channel', username: 'jeel_new', members_count: 120 } }) };
+    if (/getChatMember$/.test(url)) return { code: 200, body: JSON.stringify({ ok: true, result: { status: 'administrator', can_post_messages: true } }) };
     if (!opt.payload.chat_id) return { code: 400, body: JSON.stringify({ ok: false, description: 'chat not found' }) };
     return { code: 200, body: JSON.stringify({ ok: true, result: { message_id: 40 + GAS._tg.length } }) };
   }
   if (url.indexOf('generativelanguage.googleapis.com') >= 0) {
-    GAS._lastAi = { url: url, opt: opt };
+    GAS._lastAi = { url: url, opt: opt }; const gk = opt.headers && opt.headers['x-goog-api-key']; if (GAS._aiKeys) GAS._aiKeys.push(gk);
+    if (GAS._quota429 && (gk === GAS._quota429 || GAS._quota429 === 'ALL')) return { code: 429, body: JSON.stringify({ error: { message: 'Quota exceeded for metric generate_content_free_tier_requests, limit: 20 per day PerDay' } }) };
     if (GAS._busy && url.indexOf(GAS._busy) >= 0) return { code: 503, body: '{}' };
     return { code: 200, body: JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"designs":[{"tpl":"ann_panel"}]}' }] } }] }) };
   }
@@ -29,10 +33,16 @@ GAS._fetch.handler = function (url, opt) {
   if (url.indexOf('pixabay.com/api/') >= 0) return { code: 200, body: JSON.stringify({ totalHits: 1, hits: [{ id: 9, imageWidth: 3000, imageHeight: 2000, webformatURL: 'https://pixabay.com/get/x_640.jpg', largeImageURL: 'https://pixabay.com/get/x_1280.jpg', user: 'Nadia', user_id: 5, pageURL: 'https://pixabay.com/photos/x-9/', tags: 'mosque, dome' }] }) };
   if (url.indexOf('pixabay.com/get/x_1280.jpg') >= 0) return { code: 200, body: [255, 216, 255, 9], mime: 'image/jpeg' };
   if (url.indexOf('images.pexels.com/o1.jpg') >= 0) return { code: 200, body: [255, 216, 255, 1, 2, 3], mime: 'image/jpeg' };
+  if (url.indexOf('api.openverse.org/v1/images/') >= 0) { GAS._lastOv = url; return { code: 200, body: JSON.stringify({ result_count: 1, page_count: 1, page: 1, results: [{ id: 'ov1', title: 'Mosque', url: 'https://live.staticflickr.com/1/ov1_b.jpg', thumbnail: 'https://api.openverse.org/v1/images/ov1/thumb/', creator: 'Peer', creator_url: 'https://flickr.com/peer', license: 'by-sa', license_version: '2.0', license_url: 'https://creativecommons.org/licenses/by-sa/2.0/', foreign_landing_url: 'https://flickr.com/p/1', width: 1024, height: 683, source: 'flickr', provider: 'flickr' }] }) }; }
+  if (url.indexOf('live.staticflickr.com/1/ov1_b.jpg') >= 0) return { code: 200, body: [255, 216, 255, 7], mime: 'image/jpeg' };
+  if (url.indexOf('evil.example') >= 0) return { code: 200, body: 'not an image', mime: 'text/html' };
   if (url.indexOf('api.alquran.cloud/v1/surah') >= 0) return { code: 200, body: JSON.stringify({ data: [{ number: 1, name: 'سُورَةُ ٱلْفَاتِحَةِ' }, { number: 17, name: 'سُورَةُ الإِسۡرَاءِ' }] }) };
   if (url.indexOf('api.alquran.cloud/v1/ayah/17:23') >= 0) return { code: 200, body: JSON.stringify({ data: { text: 'وَقَضَىٰ رَبُّكَ أَلَّا تَعْبُدُوا إِلَّا إِيَّاهُ وَبِالْوَالِدَيْنِ إِحْسَانًا', surah: { number: 17, name: 'سُورَةُ الإِسۡرَاءِ' }, numberInSurah: 23 } }) };
   if (url.indexOf('api.alquran.cloud/v1/search/') >= 0) return { code: 200, body: JSON.stringify({ data: { count: 1, matches: [{ text: 'وَوَصَّيْنَا الْإِنسَانَ بِوَالِدَيْهِ حُسْنًا', surah: { number: 29, name: 'سُورَةُ العَنكَبُوتِ' }, numberInSurah: 8 }] } }) };
+  if (url.indexOf('dorar.net/dorar_api.json') >= 0 && GAS._dorarDown) return { code: 403, body: 'blocked' };
+  if (url.indexOf('api.islamic.app/v1/hadith/search') >= 0) return { code: 200, body: JSON.stringify({ code: 200, data: { total: 1, results: [{ collection: 'bukhari', hadithNumber: '1', ar: { text: 'حَدَّثَنَا الْحُمَيْدِيُّ، قَالَ : سَمِعْتُ عُمَرَ بْنَ الْخَطَّابِ رضى الله عنه عَلَى الْمِنْبَرِ قَالَ سَمِعْتُ رَسُولَ اللَّهِ صلى الله عليه وسلم يَقُولُ " إِنَّمَا الْأَعْمَالُ بِالنِّيَّاتِ، وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى "', grades: [{ grade: 'صحيح' }] } }] } }) };
   if (url.indexOf('dorar.net/dorar_api.json') >= 0) return { code: 200, body: JSON.stringify({ ahadith: { result: '<div class="hadith" style="text-align:justify;">إنَّ اللهَ يُحِبُّ إذا <span class="search-keys">عَمِلَ</span> أحدُكُم عملًا أن يُتقِنَه</div><div class="hadith-info"><span class="info-subtitle">الراوي:</span> عائشة أم المؤمنين <span class="info-subtitle">المحدث:</span> الألباني <span class="info-subtitle">المصدر:</span> صحيح الجامع <span class="info-subtitle">الصفحة أو الرقم:</span> 1880 <span class="info-subtitle">خلاصة حكم المحدث:</span> <span >حسن</span></div>--------------<br/><div class="hadith" style="text-align:justify;">نص ضعيف</div><div class="hadith-info"><span class="info-subtitle">الراوي:</span> فلان <span class="info-subtitle">المحدث:</span> الألباني <span class="info-subtitle">المصدر:</span> ضعيف الجامع <span class="info-subtitle">الصفحة أو الرقم:</span> 12 <span class="info-subtitle">خلاصة حكم المحدث:</span> <span >ضعيف</span></div><a href="x">المزيد</a>' } }) };
+  if (url.indexOf('text.pollinations.ai') >= 0) { GAS._poll = (GAS._poll || 0) + 1; if (GAS._pollDown) return { code: 500, body: '' }; return { code: 200, body: JSON.stringify({ choices: [{ message: { content: 'نص\n{"text":"من الاحتياطي"}' } }] }) }; }
   if (url.indexOf('api.groq.com') >= 0) {
     GAS._lastGroq = { url: url, opt: opt };
     if (GAS._groqDown) return { code: 500, body: '{}' };
@@ -179,6 +189,51 @@ const realNow = ctx.Date.now; ctx.Date.now = function () { return realNow() + 60
 ctx.tgTick(); ctx.Date.now = realNow;
 ok(J('tg_queue', adm, 'academy').filter(function (x) { return x.id === sch2.id; })[0].status === 'sent', 'tick sends due post');
 ok(ctx.ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'tgTick'; }), 'tgTick trigger installed by bootstrap');
+// النص الطويل يُرسل رسالة منفصلة تردّ على الصورة
+GAS._tg.length = 0;
+const longCap = J('tg_send', ut, JSON.stringify({ program: 'academy', name: 'طويل', caption: '<b>' + 'نص '.repeat(400) + '</b>', png: Buffer.from([1]).toString('base64'), mode: 'photo' }));
+ok(longCap.split && GAS._tg.length === 2 && GAS._tg[0].opt.payload.caption === '' && /sendMessage/.test(GAS._tg[1].url) && GAS._tg[1].opt.payload.reply_to_message_id === longCap.msg, 'long caption sent as reply message, photo without clipped caption');
+// التكرار والتعديل وإعادة الجدولة والمصغّر
+const base = Date.now();
+const rep = J('tg_send', ut, JSON.stringify({ program: 'academy', track: 'ishraq', name: 'متكرر', caption: 'كل أسبوع', png: Buffer.from([1]).toString('base64'), thumb: Buffer.from([255, 216, 255]).toString('base64'), mode: 'photo', when: base + 7200000, repeat: { every: 'week', n: 1, count: 3 } }));
+ok(rep.queued && rep.repeat.every === 'week' && J('tg_queue', ut, 'academy').filter(function (x) { return x.id === rep.id; })[0].hasThumb, 'recurring post queued with thumb');
+const th = J('tg_thumbs', ut, JSON.stringify([rep.id])); ok(/^data:image\/jpeg;base64,/.test(th[rep.id] || ''), 'thumb served');
+fails('tg_update', /ليس لك/, at, JSON.stringify({ id: rep.id, when: base + 9000000 }));
+fails('tg_update', /المستقبل/, ut, JSON.stringify({ id: rep.id, when: base - 1000 }));
+const upd = J('tg_update', ut, JSON.stringify({ id: rep.id, when: base + 9000000, caption: 'نص معدّل', title: 'عنوان معدّل' }));
+ok(upd.when === base + 9000000 && upd.caption === 'نص معدّل' && upd.title === 'عنوان معدّل' && upd.repeat.count === 3, 'queued post updated');
+ctx.Date.now = function () { return base + 9000000 + 60000; }; ctx.tgTick(); ctx.Date.now = realNow;
+let q2 = J('tg_queue', adm, 'academy'); const sentRep = q2.filter(function (x) { return x.id === rep.id; })[0], nextRep = q2.filter(function (x) { return x.seriesId === rep.id && x.status === 'queued'; })[0];
+ok(sentRep.status === 'sent' && nextRep && nextRep.when === base + 9000000 + 7 * 864e5 && nextRep.repeat.count === 2 && nextRep.caption === 'نص معدّل', 'tick creates next weekly occurrence with decremented count');
+ok((JSON.parse(call('nt_list', ut)) || []).some(function (n) { return n.kind === 'tg' && /نُشر/.test(n.text); }), 'owner notified after send');
+J('tg_update', ut, JSON.stringify({ id: nextRep.id, repeat: null })); ok(!J('tg_queue', ut, 'academy').filter(function (x) { return x.id === nextRep.id; })[0].repeat, 'repeat stopped');
+const rq2 = J('tg_requeue', ut, sentRep.id, base + 99999999); ok(rq2.status === 'queued' && rq2.when === base + 99999999 && rq2.title === 'عنوان معدّل', 'requeue sent post');
+fails('tg_requeue', /المستقبل/, ut, sentRep.id, base - 5);
+// المهام
+fails('task_save', /عنوان/, ut, JSON.stringify({ program: 'academy', title: '  ' }));
+const t1 = J('task_save', ut, JSON.stringify({ program: 'academy', title: 'تصميم إعلان اللقاء', due: base + 86400000, note: 'بهوية إشراق' }));
+ok(t1.to === usr.acc.uid && t1.status === 'open' && t1.from === usr.acc.uid, 'personal task');
+fails('task_save', /مشرف/, ut, JSON.stringify({ program: 'academy', title: 'لغيري', to: 'someone' }));
+const t2 = J('task_save', adm, JSON.stringify({ program: 'academy', title: 'راجع التصميم', to: usr.acc.uid, due: base + 3 * 86400000, prio: 'high', link: '#/mine' }));
+ok(t2.to === usr.acc.uid && t2.toName === usr.acc.name && t2.prio === 'high', 'supervisor assigns a task');
+ok((JSON.parse(call('nt_list', ut)) || []).some(function (n) { return n.kind === 'task' && /راجع التصميم/.test(n.text); }), 'assignee notified');
+const tl = J('task_list', ut, 'academy'); ok(tl.length === 2 && tl.filter(function (t) { return t.id === t2.id; })[0].canDone && !tl.filter(function (t) { return t.id === t2.id; })[0].canEdit, 'task list with permissions');
+fails('task_done', /ليست لك/, at, t2.id);
+ok(J('task_done', ut, t2.id, true).status === 'done', 'assignee completes task');
+ok((JSON.parse(call('nt_list', adm)) || []).some(function (n) { return n.kind === 'task' && /أنجز/.test(n.text); }), 'assigner notified of completion');
+fails('task_del', /ليست لك/, ut, t2.id);
+call('task_del', adm, t2.id); ok(J('task_list', ut, 'academy').length === 1, 'task deleted by assigner');
+// اكتشاف القنوات
+const disc = J('tg_discover', adm);
+ok(disc.found === 2 && disc.list.length === 2 && disc.list.some(function (c) { return c.username === '@jeel_new' && c.type === 'channel' && c.status === 'administrator'; }), 'discovered chats from getUpdates');
+const chk = J('tg_chat_check', adm, '@jeel_new'); ok(chk.canPost && chk.title === 'قناة الجيل', 'chat check reports admin with posting rights');
+ok(J('tg_known', adm).length === 2 && J('bundle', adm).settings.tgKnown === 2, 'known chats persisted');
+// الأحاديث: الدرر ثم الاحتياط
+GAS._dorarDown = true;
+const hdf = JSON.parse(call('hadith_find', ut, 'الأعمال بالنيات'));
+ok(hdf.length === 1 && hdf[0].fallback && hdf[0].source === 'صحيح البخاري' && hdf[0].sahih && hdf[0].text.indexOf('إِنَّمَا الْأَعْمَالُ') === 0, 'dorar down → sunnah fallback with matn only: ' + hdf[0].text.slice(0, 30));
+GAS._dorarDown = false;
+ok(JSON.parse(call('hadith_find', ut, 'النيات', 'sunnah'))[0].src === 'sunnah', 'explicit sunnah source');
 // legacy import
 const imp = J('acc_import', adm, 'academy');
 ok(imp.length === 1 && imp[0].name === 'أ. خالد العمر', 'legacy import');
@@ -207,22 +262,44 @@ J('bc_save', adm, JSON.stringify({ title: 'للجميع', body: 'تحديث ال
 ok(J('bc_list', ut).length === 1 && J('bc_list', at).length === 2, 'broadcast targeting');
 fails('bc_save', /حدّد برنامجك/, sp, JSON.stringify({ title: 'x', programs: [] }));
 // settings & AI
-fails('ai_make', /مفتاح/, ut, JSON.stringify({ prompt: 'p', system: 's', schema: {} }));
-GAS._props.GEMINI_KEY = 'k-test';
+GAS._poll = 0; ok(/من الاحتياطي/.test(call('ai_make', ut, JSON.stringify({ prompt: 'p', system: 's' }))) && GAS._poll === 1, 'no keys at all: text request served by free fallback');
+fails('ai_make', /Gemini/, ut, JSON.stringify({ prompt: 'p', system: 's', files: [{ mime: 'image/png', b64: 'AA' }] }));
+GAS._props.GEMINI_KEY = 'k-test-AIzaSy0123456789abcdefghijklmnop';
 fails('ai_make', /صلاحية/, at, JSON.stringify({ prompt: 'p', system: 's', schema: {} }));
 const out = call('ai_make', ut, JSON.stringify({ prompt: 'إعلان لقاء', system: 'أنت مصمم', schema: { type: 'object' } }));
 ok(JSON.parse(out).designs[0].tpl === 'ann_panel', 'ai roundtrip');
-ok(GAS._lastAi.opt.headers['x-goog-api-key'] === 'k-test' && /gemini-3\.8-flash:generateContent/.test(GAS._lastAi.url), 'ai request shape');
-ok(J('ai_status', ut).used === 1, 'ai usage counted');
+ok(GAS._lastAi.opt.headers['x-goog-api-key'] === 'k-test-AIzaSy0123456789abcdefghijklmnop' && /gemini-3\.8-flash:generateContent/.test(GAS._lastAi.url), 'ai request shape');
+// مفاتيح Gemini: تناوب ونفاد الحصة
+J('set_save', adm, JSON.stringify({ geminiKeys: 'k-two-AIzaSy0123456789abcdefghijklmnopq\nshort' }));
+ok(J('set_get', adm).aiKeys === 2, 'second gemini key stored, short one ignored');
+GAS._quota429 = 'k-test-AIzaSy0123456789abcdefghijklmnop'; GAS._aiKeys = [];
+J('acc_save', adm, JSON.stringify({ uid: usr.acc.uid, perms: { ai: true, social: true, send: true } }));
+GAS._props.GROQ_KEY = ''; delete GAS._props.GROQ_KEY;
+const rot = call('ai_make', adm, JSON.stringify({ kind: 'review', prompt: 'p', system: 's', schema: { type: 'object' }, files: [{ mime: 'image/png', b64: 'AAAA' }] }));
+ok(JSON.parse(rot).designs && GAS._aiKeys.indexOf('k-two-AIzaSy0123456789abcdefghijklmnopq') >= 0 && GAS._aiKeys.length <= 2, 'quota-exhausted key skipped, second key answered: ' + GAS._aiKeys.join(','));
+GAS._aiKeys = []; call('ai_make', adm, JSON.stringify({ kind: 'review', prompt: 'p', system: 's', files: [{ mime: 'image/png', b64: 'AAAA' }] }));
+ok(GAS._aiKeys.length === 1 && GAS._aiKeys[0] !== GAS._quota429, 'exhausted key remembered and not retried');
+GAS._quota429 = '';
+// الملاذ الأخير: كل مفاتيح Gemini نفدت وبلا Groq → Pollinations للنصوص فقط
+GAS._quota429 = 'ALL'; GAS._aiKeys = [];
+const pf = call('ai_make', adm, JSON.stringify({ kind: 'caption', prompt: 'p', system: 's', schema: { type: 'object' } }));
+ok(JSON.parse(pf).text === 'من الاحتياطي', 'pollinations text fallback when all gemini keys exhausted'); GAS._poll = 1;
+fails('ai_make', /حدّها|مشغول/, adm, JSON.stringify({ kind: 'review', prompt: 'p', system: 's', files: [{ mime: 'image/png', b64: 'AAAA' }] }));
+ok(GAS._poll === 1, 'no pollinations fallback for requests with images');
+GAS._quota429 = '';
+ok(J('ai_status', ut).used === 2, 'ai usage counted');
 J('set_save', adm, JSON.stringify({ ai: { enabled: true, model: 'gemini-3.8-flash', perDay: 1 } }));
 fails('ai_make', /حد اليوم/, ut, JSON.stringify({ prompt: 'p', system: 's', schema: {} }));
 // صور مجانية وآيات وأحاديث
-fails('img_search', /مفتاح/, ut, 'mosque');
+// بلا مفتاح: Openverse
+const ov = J('img_search', ut, 'mosque', 1, 'landscape');
+ok(ov.provider === 'openverse' && ov.photos.length === 1 && ov.photos[0].license === 'CC BY-SA 2.0' && /aspect_ratio=wide/.test(GAS._lastOv), 'openverse search without key');
 call('set_save', adm, JSON.stringify({ pexelsKey: 'PXKEY' }));
 ok(J('set_get', adm).pexelsOn === true, 'pexels key saved');
 const px = J('img_search', ut, 'mosque', 1, 'portrait');
 ok(px.photos.length === 1 && px.photos[0].orig.indexOf('images.pexels.com') > 0 && px.photos[0].by === 'سمير', 'pexels search mapped');
-fails('img_pick', /رابط غير مقبول/, ut, JSON.stringify({ orig: 'https://evil.example/x.jpg' }));
+fails('img_pick', /رابط غير مقبول/, ut, JSON.stringify({ orig: 'http://evil.example/x.jpg' }));
+fails('img_pick', /ليس صورة|تعذّر تنزيل/, ut, JSON.stringify({ orig: 'https://evil.example/x.jpg' }));
 const pick = J('img_pick', ut, JSON.stringify({ orig: px.photos[0].orig, name: 'مسجد', by: 'سمير', byUrl: px.photos[0].byUrl, url: px.photos[0].url, thumb: px.photos[0].thumb, program: 'academy', suggest: true }));
 ok(pick.asset.scope === 'user' && pick.asset.kind === 'image' && pick.asset.credit.by === 'سمير' && pick.request && pick.request.status === 'new', 'picked into user library + request');
 ok(JSON.parse(call('asset_list', ut, 'user')).some(function (x) { return x.id === pick.asset.id; }), 'asset listed for user');
@@ -290,7 +367,11 @@ GAS._busy = 'gemini-3.8-flash';
 const fb = call('ai_make', adm, JSON.stringify({ kind: 'design', prompt: 'p', system: 's', schema: { type: 'object' } }));
 ok(JSON.parse(fb).designs && GAS._lastAi.url.indexOf('gemini-3.6-flash') >= 0, 'falls back to second model on 503');
 GAS._busy = 'gemini-3';
+const pfBusy = call('ai_make', adm, JSON.stringify({ kind: 'design', prompt: 'p', system: 's' }));
+ok(/من الاحتياطي/.test(pfBusy), 'all google models busy → pollinations text fallback');
+const prevAi = J('set_get', adm).ai; call('set_save', adm, JSON.stringify({ ai: Object.assign({}, prevAi, { pollFallback: false }) }));
 fails('ai_make', /مزدحمة/, adm, JSON.stringify({ kind: 'design', prompt: 'p', system: 's' }));
+call('set_save', adm, JSON.stringify({ ai: Object.assign({}, prevAi, { pollFallback: true }) }));
 GAS._busy = null;
 // Groq للمهام النصية
 call('set_save', adm, JSON.stringify({ groqKey: 'gsk_test' }));

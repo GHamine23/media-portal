@@ -97,7 +97,7 @@ async def main():
         await pg.screenshot(path=OUT + 'b5_temp.png')
         await pg.keyboard.press('Escape')
         # ---------- المساعد الذكي (بنموذج مقلّد) ----------
-        await pg.evaluate("""DEMO.srv; GAS._props.GEMINI_KEY='k'; window.DEMO_AI=function(body){ return JSON.stringify({info:{title:'بيوت *مطمئنة*',who:'الشيخ خالد',time:'بعد العشاء',place:'مسجد الحي',kind:'لقاء أسري'},designs:[{tpl:'ann_panel',why:'لوحة هادئة',fields:[{k:'title',v:'بيوت *مطمئنة*'}]},{tpl:'ann_circle',why:'دائرة',fields:[]}],missing:['تاريخ اللقاء']}); };""")
+        await pg.evaluate("""DEMO.srv; GAS._props.GEMINI_KEY='k-demo-AIzaSy0123456789abcdefghijklmnop'; window.DEMO_AI=function(body){ return JSON.stringify({info:{title:'بيوت *مطمئنة*',who:'الشيخ خالد',time:'بعد العشاء',place:'مسجد الحي',kind:'لقاء أسري'},designs:[{tpl:'ann_panel',why:'لوحة هادئة',fields:[{k:'title',v:'بيوت *مطمئنة*'}]},{tpl:'ann_circle',why:'دائرة',fields:[]}],missing:['تاريخ اللقاء']}); };""")
         await pg.evaluate("refreshBundle()"); await pg.wait_for_timeout(1500)
         await pg.goto(URL + '#/make'); await pg.wait_for_timeout(1000)
         ok(await pg.evaluate("aiReady()"), 'ai ready for admin')

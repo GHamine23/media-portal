@@ -1,7 +1,7 @@
 """اختبار الواجهة السادسة محلياً (يحتاج خادماً محلياً على المنفذ 8765 يخدم /home/claude)."""
 import asyncio, sys
 from playwright.async_api import async_playwright
-OUT = '/tmp/claude-0/-home-claude/70f68a14-a7f8-546d-a4d0-039a53fab0d1/scratchpad/v6/'
+OUT = '/tmp/claude-0/-home-claude/c52b6293-5ec5-5831-a8f0-81095c1243b7/scratchpad/v6/'
 URL = 'http://localhost:8765/media-portal/dist6/index.html'
 THM = ['thmanyahserifdisplay-Medium.otf', 'thmanyahserifdisplay-Bold.otf', 'thmanyahserifdisplay-Black.otf', 'thmanyahseriftext-Light.otf', 'thmanyahseriftext-Regular.otf', 'thmanyahseriftext-Medium.otf']
 async def setup(pg, user='admin', pw='Admin#2026'):

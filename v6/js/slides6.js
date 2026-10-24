@@ -45,7 +45,17 @@ function present6(fromView, startAt) {
       if (L.t !== 'video' && L.t !== 'yt' && L.t !== 'audio') return;
       const b = boxes['L:' + L.id]; if (!b || (p.hide || {})['g_L:' + L.id]) return;
       const box = el('div', { class: 'pmbox', style: 'left:' + (b.x0 * r) + 'px;top:' + (b.y0 * r) + 'px;width:' + ((b.x1 - b.x0) * r) + 'px;height:' + ((b.y1 - b.y0) * r) + 'px' });
-      if (L.t === 'yt') { box.appendChild(el('a', { class: 'pmyt', href: L.url, target: '_blank', rel: 'noopener', title: 'يفتح في يوتيوب' })); }
+      if (L.t === 'yt') {
+        // يوتيوب يعمل داخل العرض نفسه: زر تشغيل فوق البطاقة، وبالنقر يُحمَّل المشغّل ويبدأ
+        const id = ytId(L.url);
+        const play = el('button', { type: 'button', class: 'pmyt', title: 'شغّل المقطع هنا', 'aria-label': 'تشغيل المقطع', onclick: function (e) {
+          e.stopPropagation();
+          const f = el('iframe', { class: 'pmframe', src: 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&rel=0&modestbranding=1&playsinline=1&hl=ar&cc_lang_pref=ar', allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen', allowfullscreen: '', referrerpolicy: 'strict-origin-when-cross-origin', title: L.title || 'يوتيوب' });
+          box.replaceChildren(f, el('a', { class: 'pmext', href: L.url, target: '_blank', rel: 'noopener', title: 'افتح في يوتيوب', text: '↗' }));
+          box.classList.add('playing');
+        } }, [svgOf('<circle cx="50" cy="50" r="46" fill="rgba(0,0,0,.55)"/><path d="M40 30v40l32-20z" fill="#fff"/>')]);
+        box.appendChild(play);
+      }
       else if (L.t === 'video') {
         const v = el('video', { class: 'pmvideo', playsinline: '', controls: '', preload: 'metadata' });
         assetURL(V6.assets[L.ref.slice(6)] || { id: L.ref.slice(6), ver: 1, mime: 'video/mp4' }).then(function (u) { v.src = u; }).catch(function () {});
@@ -255,7 +265,7 @@ function pAnim(b) {
   // ٤) ملاحظات المقدّم
   b.appendChild(el('h4', { class: 'psh', text: 'ملاحظات المقدّم' }));
   const notes = el('textarea', { rows: '4', dir: 'auto', placeholder: 'ما تريد تذكّره وأنت تعرض هذه الشريحة. يراه المقدّم فقط (N في العرض).', oninput: function (e) { p.notes = e.target.value; markDirty(); } }); notes.value = p.notes || '';
-  b.appendChild(notes);
+  b.appendChild(withEmoji(notes));
 }
 /* ---------- وسائط الشريحة: فيديو وصوت من الجهاز، ورابط يوتيوب ---------- */
 function mediaPanelSection(b) {

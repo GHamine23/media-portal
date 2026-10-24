@@ -21,7 +21,7 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(); pg = await b.new_page(viewport={'width': 1440, 'height': 900})
         errs = await setup(pg)
-        await pg.evaluate("GAS._props.GEMINI_KEY='k'; " + MOCK + "; void 0"); await pg.evaluate("refreshBundle()"); await pg.wait_for_timeout(1500)
+        await pg.evaluate("GAS._props.GEMINI_KEY='k-demo-AIzaSy0123456789abcdefghijklmnop'; " + MOCK + "; void 0"); await pg.evaluate("refreshBundle()"); await pg.wait_for_timeout(1500)
         # صفحة الشرائح: بطاقة الدرس والميزات
         await pg.goto(URL + '#/s/ithmar'); await pg.wait_for_timeout(1500); await clean(pg)
         t = await pg.inner_text('#view')
@@ -93,8 +93,10 @@ async def main():
         tm = await pg.inner_text('.ptimer'); ok(tm.startswith('0:5'), 'timer counting: ' + tm)
         await pg.screenshot(path=OUT + 'n8_notes_timer.png')
         # الوسائط: بطاقة يوتيوب (على الغلاف) تظهر رابطاً فوق مكانها
-        href = await pg.evaluate("(document.querySelector('.pmedia .pmyt')||{}).href||''")
-        ok('youtube.com/watch?v=dQw4w9WgXcQ' in href, 'youtube overlay link placed over the card: ' + href)
+        ok(await pg.evaluate("!!document.querySelector('.pmedia .pmyt')"), 'youtube play button placed over the card')
+        await pg.click('.pmedia .pmyt'); await pg.wait_for_timeout(600)
+        src = await pg.evaluate("(document.querySelector('.pmedia iframe.pmframe')||{}).src||''")
+        ok('youtube-nocookie.com/embed/dQw4w9WgXcQ' in src and 'autoplay=1' in src, 'youtube plays inside the presentation: ' + src[:70])
         await pg.keyboard.press('Escape'); await pg.wait_for_timeout(400)
         ok(await pg.query_selector('.present6') is None, 'presenter closes')
         # الحفظ يحفظ الخطوات والملاحظات

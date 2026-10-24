@@ -104,6 +104,7 @@ function modal(opt) {
   wrap.addEventListener('mousedown', function (e) { if (e.target === wrap && !opt.sticky) close(); });
   document.addEventListener('keydown', esc);
   (document.fullscreenElement || document.body).appendChild(wrap);   // أثناء العرض بملء الشاشة تُفتح الحوارات داخله
+  modalMoreCue(box);
   setTimeout(function () { const f = box.querySelector('input,textarea,select'); if (f && !opt.noFocus) f.focus(); }, 60);
   return { close: close, box: box };
 }
@@ -281,3 +282,115 @@ function notifyBtn() {
   return el('div', { class: 'row wrapr notifyrow' }, [b, el('small', { class: 'tiny', text: 'يمكنك الانتقال إلى تبويب آخر ريثما ينتهي.' })]);
 }
 function aiNotice(text) { return el('div', { class: 'ainote' }, [ico('info'), el('span', { text: text || 'نتائج المساعد أولية وقد تخطئ؛ راجعها قبل الاعتماد.' })]); }
+
+/* ---------- التاريخ المحلي لحقول date (toISOString يعطي يوم غرينتش فيخطئ بعد منتصف الليل) ---------- */
+function localISO(d) { d = d || new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function localHM(d) { d = d || new Date(); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+function fromISO(dateStr, hm) { const p = String(dateStr || '').split('-').map(Number), q = String(hm || '00:00').split(':').map(Number); if (!p[0]) return null; return new Date(p[0], p[1] - 1, p[2], q[0] || 0, q[1] || 0); }
+
+/* ---------- حالة الأزرار: مشغول ← تمّ ← عودة. كل فعل في المنصة يُظهر أنه بدأ وأنه انتهى ----------
+   withBusy(btn, fn, {busy, done, keep}): يعطّل الزر ويضع دوّاراً، وبعد نجاح fn يعرض علامة ✓ مع نص «تم» ثم يعود؛ وإن أخفق يعرض الخطأ. */
+function btnSnapshot(b) { if (!b._snap) b._snap = { html: b.innerHTML, cls: b.className, title: b.title }; }
+function btnBusy(b, label) { btnSnapshot(b); b.disabled = true; b.classList.add('busy'); b.replaceChildren(el('span', { class: 'spin' }), label ? el('span', { text: ' ' + label }) : null); }
+function btnDone(b, label, ms, keep) {
+  btnSnapshot(b);
+  b.disabled = false; b.classList.remove('busy'); b.classList.add('done');
+  b.replaceChildren(ico('check', 'chk'), el('span', { text: label || 'تم' }));
+  if (keep) return;
+  clearTimeout(b._doneT); b._doneT = setTimeout(function () { btnReset(b); }, ms || 1800);
+}
+function btnReset(b) { if (!b._snap) return; b.disabled = false; b.classList.remove('busy', 'done'); b.innerHTML = b._snap.html; b.className = b._snap.cls; b._snap = null; }
+async function withBusy(b, fn, opt) {
+  opt = opt || {}; if (!b || b._busyRun) return; b._busyRun = true;
+  btnBusy(b, opt.busy);
+  try { const r = await fn(); btnDone(b, opt.done || 'تم', opt.ms, opt.keep); return r; }
+  catch (e) { btnReset(b); b.classList.add('shake'); setTimeout(function () { b.classList.remove('shake'); }, 500); toast(e.message || 'تعذّر'); throw e; }
+  finally { b._busyRun = false; }
+}
+// ومضة نجاح على أي عنصر (بطاقة حُفظت، صف تغيّر)
+function flashOk(node) { if (!node) return; node.classList.remove('flash-ok'); void node.offsetWidth; node.classList.add('flash-ok'); setTimeout(function () { node.classList.remove('flash-ok'); }, 1200); }
+
+/* ---------- «يوجد المزيد بالأسفل»: تمويه عند حافة الشاشة وسهم ينبض، في كل الصفحات، ويختفي عند الوصول إلى آخر الصفحة ---------- */
+(function () {
+  let cue = null, idleT = 0;
+  function build() {
+    cue = el('div', { id: 'morecue', 'aria-hidden': 'true' }, [el('button', { type: 'button', class: 'morebtn', tabindex: '-1', 'aria-label': 'المزيد بالأسفل', onclick: function () { window.scrollBy({ top: Math.round(innerHeight * 0.8), behavior: 'smooth' }); } }, [el('span', { text: 'المزيد' }), ico('chevd')])]);
+    document.body.appendChild(cue);
+  }
+  function tick() {
+    if (!cue) build();
+    const h = document.documentElement, max = h.scrollHeight - h.clientHeight, left = max - h.scrollTop;
+    const off = document.body.classList.contains('in-editor') || /^#\/(e|d|present|arc|login)\b/.test(location.hash) || document.body.dataset.page === 'login' || !!document.querySelector('.present6') || !!document.querySelector('.modal');
+    const show = !off && max > 160 && left > 140;
+    cue.classList.toggle('on', show);
+    cue.classList.add('quiet'); clearTimeout(idleT); idleT = setTimeout(function () { cue.classList.remove('quiet'); }, 1200);   // يختفي أثناء التمرير ويعود عند التوقف
+  }
+  window.addEventListener('scroll', tick, { passive: true }); window.addEventListener('resize', tick);
+  window.addEventListener('hashchange', function () { setTimeout(tick, 500); setTimeout(tick, 1500); });
+  window.addEventListener('load', function () { setTimeout(tick, 700); setTimeout(tick, 2000); });
+  new MutationObserver(function () { clearTimeout(tick._m); tick._m = setTimeout(tick, 250); }).observe(document.body, { childList: true, subtree: true });
+})();
+// داخل النوافذ: إن كان في النافذة ما يُمرَّر إليه يظهر تمويه وسهم في أسفلها
+function modalMoreCue(box) {
+  const f = el('div', { class: 'mfade', 'aria-hidden': 'true' }, [ico('chevd')]); box.appendChild(f);
+  const upd = function () { box.classList.toggle('has-more', box.scrollHeight - box.clientHeight - box.scrollTop > 24); };
+  box.addEventListener('scroll', upd, { passive: true }); new ResizeObserver(upd).observe(box); new MutationObserver(upd).observe(box, { childList: true, subtree: true }); setTimeout(upd, 60); setTimeout(upd, 400);
+}
+
+/* ---------- الرموز التعبيرية: منتقٍ صغير لكل حقول التحرير ---------- */
+const EMOJI_SETS = [
+  ['إشارات', '📌 📍 🗓 📅 ⏰ ⏳ 🔗 📝 📚 📖 ✅ ☑️ ❗️ ❕ ❓ 🔔 📣 📢 🎙 🎯 🏆 🥇 🎉 🎊 ✨ ⭐️ 🌟 💡 🔥 🤍 💚 💙 🧡 💛 💜 🤎 🖤 ❤️ 🔖 🧭 🗂 📋 📊 📈 🎓 🧠 🕌 🕋 📿 🌙 ☀️'],
+  ['وجوه وأيدٍ', '😀 😃 😄 😁 😊 🙂 😉 😍 🤩 🥳 😎 🤔 😌 🙏 👏 💪 👍 👋 ✌️ 🤝 🫶 🤲 👆 👇 👈 👉 ☝️ 🙌 ✍️ 👀'],
+  ['طبيعة', '🌱 🌿 🍃 🌸 🌺 🌻 🌹 🌷 🌴 🌳 🌾 🍀 🌈 🌊 🏔 ⛰ 🌅 🌄 🌤 ⛅️ 🌧 ❄️ 💧 🔆 🌍 🌏'],
+  ['أشياء', '📘 📗 📙 📕 📒 📓 🖊 ✏️ 🖋 📎 🖇 📐 📏 🎬 🎧 🎵 📷 📸 🎨 🖼 🏠 🏫 🚀 ✈️ 🚗 ⌛️ ⏱ 🗓 📆 📣 🎤 🎁 🛎 💻 📱 🖥 🔍 🔎 🧩 🧰 🪔 🕯 🔑 🗝 🧾 🪧 🧵'],
+  ['رموز', '✔️ ❌ ⚠️ ⛔️ ➡️ ⬅️ ⬆️ ⬇️ ↩️ ↪️ 🔸 🔹 🔶 🔷 ▪️ ▫️ ◾️ ◽️ 💠 🔺 🔻 ♦️ ✴️ ❇️ 〰️ ➖ ➕ ✖️ ➗ 💯 🔁 🔂 🔄 🆕 🆓 🔝 🔛 ⏩ ⏪ ⏫ ⏬ 🔅 ✳️ ⭕️ 🅰️ 🆗 ™️ ©️ ®️ 1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣ 6️⃣ 7️⃣ 8️⃣ 9️⃣ 🔟']
+];
+function emojiRecent(add) { let r = ls('emoji') || []; if (add) { r = [add].concat(r.filter(function (x) { return x !== add; })).slice(0, 24); ls('emoji', r); } return r; }
+function emojiPop(anchor, onPick) {
+  $$('.emopop').forEach(function (x) { x.remove(); });
+  const grid = el('div', { class: 'emogrid' }), tabs = el('div', { class: 'emotabs', role: 'tablist' });
+  const sets = [['الأخيرة', emojiRecent().join(' ')]].concat(EMOJI_SETS).filter(function (s) { return s[1].trim(); });
+  let cur = ls('emojiTab') || (emojiRecent().length ? 'الأخيرة' : 'إشارات');
+  if (!sets.some(function (s) { return s[0] === cur; })) cur = sets[0][0];
+  function fill() {
+    grid.innerHTML = '';
+    const set = sets.find(function (s) { return s[0] === cur; }) || sets[0];
+    set[1].trim().split(/\s+/).forEach(function (e) { grid.appendChild(el('button', { type: 'button', class: 'emo', text: e, title: e, onmousedown: function (ev) { ev.preventDefault(); }, onclick: function () { emojiRecent(e); onPick(e); } })); });
+    $$('button', tabs).forEach(function (b) { b.classList.toggle('on', b.dataset.k === cur); });
+  }
+  sets.forEach(function (s) { tabs.appendChild(el('button', { type: 'button', role: 'tab', 'data-k': s[0], text: s[0], onmousedown: function (ev) { ev.preventDefault(); }, onclick: function () { cur = s[0]; ls('emojiTab', cur); fill(); } })); });
+  const pop = el('div', { class: 'emopop', role: 'dialog', 'aria-label': 'رموز تعبيرية' }, [tabs, grid]);
+  (document.fullscreenElement || document.body).appendChild(pop); fill();
+  const r = anchor.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
+  let x = Math.min(Math.max(8, r.left + r.width / 2 - pw / 2), innerWidth - pw - 8), y = r.bottom + 8; if (y + ph > innerHeight - 8) y = Math.max(8, r.top - ph - 8);
+  pop.style.left = x + 'px'; pop.style.top = y + 'px';
+  setTimeout(function () { document.addEventListener('mousedown', function off(e) { if (!pop.contains(e.target) && e.target !== anchor) { pop.remove(); document.removeEventListener('mousedown', off); } }); }, 0);
+  return pop;
+}
+// يدرج رمزاً في موضع المؤشر: حقل نصي، أو محرر contenteditable
+function insertAtCaret(target, text) {
+  if (!target) return;
+  if (target.isContentEditable) {
+    target.focus();
+    const sel = window.getSelection();
+    if (target._range && target.contains(target._range.startContainer)) { sel.removeAllRanges(); sel.addRange(target._range); }
+    if (!document.execCommand('insertText', false, text)) { const rg = sel.rangeCount ? sel.getRangeAt(0) : null; if (rg) { rg.deleteContents(); rg.insertNode(document.createTextNode(text)); rg.collapse(false); } target.dispatchEvent(new Event('input', { bubbles: true })); }
+    const s2 = window.getSelection(); if (s2.rangeCount) target._range = s2.getRangeAt(0).cloneRange();
+    return;
+  }
+  const s = target.selectionStart != null ? target.selectionStart : target.value.length, e = target.selectionEnd != null ? target.selectionEnd : s;
+  target.focus();
+  if (typeof target.setRangeText === 'function') { target.setRangeText(text, s, e, 'end'); } else { target.value = target.value.slice(0, s) + text + target.value.slice(e); }
+  target.dispatchEvent(new Event('input', { bubbles: true }));
+}
+// زر الرموز لحقل: يتذكّر موضع المؤشر في المحررات
+function emojiBtn(target, cls) {
+  if (target && target.isContentEditable && !target._emoTrack) { target._emoTrack = true; const save = function () { const s = window.getSelection(); if (s.rangeCount && target.contains(s.anchorNode)) target._range = s.getRangeAt(0).cloneRange(); }; target.addEventListener('keyup', save); target.addEventListener('mouseup', save); target.addEventListener('blur', save); }
+  const b = el('button', { type: 'button', class: 'ib sm emobtn ' + (cls || ''), title: 'رمز تعبيري', 'aria-label': 'رمز تعبيري', onmousedown: function (e) { e.preventDefault(); }, onclick: function (e) { emojiPop(e.currentTarget, function (em) { insertAtCaret(typeof target === 'function' ? target() : target, em); }); } }, [el('span', { class: 'emoface', text: '😊' })]);
+  return b;
+}
+// يغلّف حقلاً بزر الرموز في زاويته
+function withEmoji(input, opt) {
+  const w = el('div', { class: 'emowrap' + (opt && opt.sm ? ' sm' : '') }, [input, emojiBtn(input)]);
+  return w;
+}

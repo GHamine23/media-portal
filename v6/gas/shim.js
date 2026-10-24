@@ -109,7 +109,7 @@
   function uuid() { const h = '0123456789abcdef'; let s = ''; for (let i = 0; i < 32; i++) s += h[Math.floor(Math.random() * 16)]; return s.slice(0, 8) + '-' + s.slice(8, 12) + '-4' + s.slice(13, 16) + '-a' + s.slice(17, 20) + '-' + s.slice(20, 32); }
   function pad(n) { return ('0' + n).slice(-2); }
   const Utilities = {
-    DigestAlgorithm: { SHA_256: 'SHA_256' }, Charset: { UTF_8: 'UTF_8' },
+    DigestAlgorithm: { SHA_256: 'SHA_256', MD5: 'MD5' }, Charset: { UTF_8: 'UTF_8' },
     getUuid: uuid,
     computeDigest: function (alg, v) { return signed(sha256(typeof v === 'string' ? utf8(v) : v)); },
     computeHmacSha256Signature: function (v, k) { return signed(hmac(typeof v === 'string' ? utf8(v) : v, typeof k === 'string' ? utf8(k) : k)); },
@@ -117,7 +117,7 @@
     base64EncodeWebSafe: function (v) { return b64enc(typeof v === 'string' ? utf8(v) : v).replace(/\+/g, '-').replace(/\//g, '_'); },
     base64Decode: b64dec,
     newBlob: function (data, mime, name) { return new Blob(typeof data === 'string' ? utf8(data) : (data || []).slice(), mime, name); },
-    formatDate: function (d, tz, fmt) { const x = new Date(d.getTime() + 3 * 3600000); return fmt.replace('yyyy', x.getUTCFullYear()).replace('MM', pad(x.getUTCMonth() + 1)).replace('dd', pad(x.getUTCDate())); },
+    formatDate: function (d, tz, fmt) { const x = new Date(d.getTime() + 3 * 3600000); return fmt.replace('yyyy', x.getUTCFullYear()).replace('MM', pad(x.getUTCMonth() + 1)).replace('dd', pad(x.getUTCDate())).replace('HH', pad(x.getUTCHours())).replace('mm', pad(x.getUTCMinutes())).replace(/\bd\b/, x.getUTCDate()).replace(/\bM\b/, x.getUTCMonth() + 1); },
     sleep: function () {}
   };
   const ContentService = { MimeType: { JSON: 'json' }, createTextOutput: function (s) { return { s: s, setMimeType: function () { return this; }, getContent: function () { return this.s; } }; } };

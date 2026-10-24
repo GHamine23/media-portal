@@ -5,12 +5,29 @@ const el = function (tag, attrs, kids) {
   if (attrs) Object.keys(attrs).forEach(function (k) {
     if (k === 'text') e.textContent = attrs[k];
     else if (k === 'html') e.innerHTML = attrs[k];
+    else if (k === 'onclick' && typeof attrs[k] === 'function') e.addEventListener('click', guardClick(attrs[k]));
     else if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), attrs[k]);
     else if (attrs[k] !== false && attrs[k] != null) e.setAttribute(k, attrs[k] === true ? '' : attrs[k]);
   });
   (kids || []).forEach(function (c) { if (c) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
   return e;
 };
+
+// حارس النقر: إن كان معالج الزر غير متزامن (يعيد وعداً) تُهمل النقرات التالية حتى ينتهي، ويظهر على الزر أنه مشغول.
+// هذا يمنع تكرار العنصر المطلوب بعدد النقرات حين يتأخر الرد
+function guardClick(fn) {
+  return function (e) {
+    const b = e.currentTarget;
+    if (b && b._pending) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+    const r = fn.call(this, e);
+    if (r && typeof r.then === 'function' && b) {
+      b._pending = true; b.classList.add('pending'); b.setAttribute('aria-busy', 'true');
+      const done = function () { b._pending = false; b.classList.remove('pending'); b.removeAttribute('aria-busy'); };
+      r.then(done, done);
+    }
+    return r;
+  };
+}
 
 /* حالة التصميم المفتوح: d النصوص، hide المخفي، ov الألوان المخصصة */
 const S = { track: null, type: 'all', tpl: null, size: null, variant: null, k: 1, d: {}, hide: {}, ov: {}, pos: {}, gs: {}, layers: [], bgfx: null, sel: null, hijriAdj: 0, tab: 'content', q: '', mine: null, mineName: '', mineKey: '', curKey: '' };
