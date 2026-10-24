@@ -505,6 +505,7 @@ function pEl(b) {
       b.appendChild(el('div', { class: 'fld' }, [el('label', { text: 'العنوان على البطاقة' }), el('input', { type: 'text', class: 'inp sm', value: L.title || '', oninput: function (e) { L.title = e.target.value; changed6(); } })]));
       if (L.t === 'yt') b.appendChild(el('div', { class: 'fld' }, [el('label', { text: 'رابط يوتيوب' }), el('input', { type: 'url', class: 'inp sm', dir: 'ltr', value: L.url || '', onchange: function (e) { const id = ytId(e.target.value); if (!id) { toast('الرابط ليس رابط يوتيوب'); return; } L.url = 'https://www.youtube.com/watch?v=' + id; changed6(); } })]));
       b.appendChild(el('p', { class: 'tiny', text: 'تعمل الوسائط في العرض بملء الشاشة؛ وفي PDF تبقى بطاقة.' }));
+      if (typeof mediaElSettings === 'function') mediaElSettings(L, b);
     }
     if (L.t === 'text') b.appendChild(el('div', { class: 'row wrapr' }, [segMini([['0', 'عادي'], ['0.6', 'عريض'], ['1', 'أعرض']], String(L.b >= 0.9 ? 1 : L.b >= 0.5 ? 0.6 : 0), function (v) { L.b = +v; changed6(); }),
       segMini([['right', 'يمين'], ['center', 'وسط'], ['left', 'يسار']], L.al || 'center', function (v) { L.al = v; changed6(); })]));
