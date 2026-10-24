@@ -68,12 +68,14 @@ function snap() {
 let LASTT = {};   // النصوص المرسومة في كل عنصر في آخر رسم للمعاينة
 function photoOf(v) {
   if (!v || !v.src) return null;
-  if (v.src.slice(0, 4) === 'lib:') { const im = IMG[v.src.slice(4)]; return im ? { im: im, z: v.z, ox: v.ox, oy: v.oy, lib: true } : null; }
+  // تعديلات الصورة (المرشحات والقلب) تُطبَّق هنا فتعمل في كل القوالب وفي الطبقات
+  const fxd = function (im) { return typeof imgFx === 'function' && (v.fx || v.fh || v.fv) ? imgFx(im, v.fx, v.fh, v.fv) : im; };
+  if (v.src.slice(0, 4) === 'lib:') { const im = IMG[v.src.slice(4)]; return im ? { im: fxd(im), z: v.z, ox: v.ox, oy: v.oy, lib: true } : null; }
   // الإصدار السادس: صورة مرفوعة محفوظة في مكتبة المستخدم على الخادم
-  if (v.src.slice(0, 6) === 'asset:' && typeof assetImage === 'function') { const im = assetImage(v.src.slice(6)); return im ? { im: im, z: v.z, ox: v.ox, oy: v.oy, lib: false } : null; }
+  if (v.src.slice(0, 6) === 'asset:' && typeof assetImage === 'function') { const im = assetImage(v.src.slice(6)); return im ? { im: fxd(im), z: v.z, ox: v.ox, oy: v.oy, lib: false } : null; }
   const im = UP[v.src];
   if (!im) { if (UP[v.src] === undefined) { const i = new Image(); UP[v.src] = null; i.onload = function () { UP[v.src] = i; schedule(); }; i.src = v.src; } return null; }
-  return { im: im, z: v.z, ox: v.ox, oy: v.oy, lib: false };
+  return { im: fxd(im), z: v.z, ox: v.ox, oy: v.oy, lib: false };
 }
 
 /* الرسم: st = {d, variant, k, hide, ov} */
@@ -112,21 +114,24 @@ function renderTo(canvas, tpl, sizeKey, st, T, scale, collect) {
   GST = gs;
   if (collect) { GBOX = {}; GTXT = {}; }
   // عناصر من القالب نُقلت إلى الأمام: تُخفى في الرسم الأول، ثم يُرسم كل منها وحده فوق الباقي بترتيبه
-  const front = (st.front || []).filter(function (g) { return !GHIDE[g]; });
-  front.forEach(function (g) { GHIDE[g] = 1; });
+  // ويمكن أن تتخللها طبقات مضافة ('L:معرّف') نُقلت تحت بعض عناصر القالب؛ وما لم يُذكر من الطبقات يُرسم في الأعلى
+  const lyr = st.layers || [], inFront = {};
+  const front = (st.front || []).filter(function (g) { if (g.slice(0, 2) === 'L:') { if (lyr.some(function (L) { return 'L:' + L.id === g; })) { inFront[g] = 1; return true; } return false; } return !GHIDE[g]; });
+  front.forEach(function (g) { if (g.slice(0, 2) !== 'L:') GHIDE[g] = 1; });
   try {
     tpl.draw(ctx, sz.w, sz.h, d, T2, st.variant, st.k || 1, P); G(ctx, null);
     if (front.length) {
       const keepT = GTXT ? Object.assign({}, GTXT) : null;
-      if (GBOX) front.forEach(function (g) { delete GBOX[g]; });
+      if (GBOX) front.forEach(function (g) { if (g.slice(0, 2) !== 'L:') delete GBOX[g]; });
       front.forEach(function (g) {
+        if (g.slice(0, 2) === 'L:') { drawLayers(ctx, sz.w, sz.h, lyr.filter(function (L) { return 'L:' + L.id === g; }), T2); return; }
         delete GHIDE[g]; SOLO = {}; SOLO[g] = 1; if (GTXT) GTXT = {};
         G(ctx, null);
         try { tpl.draw(ctx, sz.w, sz.h, d, T2, st.variant, st.k || 1, P); } finally { G(ctx, null); SOLO = null; if (SOLO_OUT) { ctx.restore(); SOLO_OUT = false; } }
         if (keepT) { keepT[g] = GTXT[g] || keepT[g]; GTXT = keepT; }
       });
     }
-    drawLayers(ctx, sz.w, sz.h, st.layers, T2);
+    drawLayers(ctx, sz.w, sz.h, lyr.filter(function (L) { return !inFront['L:' + L.id]; }), T2);
   }
   catch (e) { console.error(e); SOLO = null; G(ctx, null); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#b00'; ctx.font = '20px sans-serif'; ctx.fillText('خطأ في القالب: ' + e.message, 10, 30); }
   const gb = GBOX;

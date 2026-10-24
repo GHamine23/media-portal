@@ -1784,6 +1784,25 @@ body.in-editor .gx-intro{top:calc(var(--top) + 12px);bottom:auto}
 .imgview.full .ivstage img{max-width:none;max-height:none;cursor:zoom-out}
 .rvimg{position:relative}.rvimg .rvbig{position:absolute;bottom:8px;left:8px;box-shadow:var(--sh1);background:#fff}
 
+/* ===== imgtools.css ===== */
+/* أدوات تعديل الصورة في المحرر */
+.imgtools { display: grid; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line, #e6e6e6); }
+.fxrow { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.fxb { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 4px; border: 0; background: transparent; padding: 0; font: inherit; font-size: .74rem; color: var(--ink2, #444); cursor: pointer; }
+.fxb canvas { width: 58px; height: 58px; border-radius: 12px; display: block; outline: 2px solid transparent; outline-offset: 2px; transition: outline-color .15s; }
+.fxb.on canvas { outline-color: var(--ac, #222); }
+.fxb.on span { color: var(--ac-ink, #111); font-weight: 700; }
+.mkrow { display: flex; gap: 6px; flex-wrap: wrap; }
+.mkb { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 62px; padding: 6px 4px; border-radius: 12px; border: 1.5px solid var(--line, #e3e3e3); background: #f7f7f7; font: inherit; font-size: .7rem; cursor: pointer; }
+.mkb canvas { width: 30px; height: 30px; }
+.mkb.on { background: var(--ac, #222); color: #fff; border-color: var(--ac, #222); }
+.imgtools .btn.on { background: var(--ac-t); color: var(--ac-ink); border-color: var(--ac); }
+.imgdet { margin-top: 8px; border: 1px solid var(--line, #e6e6e6); border-radius: 14px; padding: 8px 12px; }
+.imgdet > summary { cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: .9rem; list-style: none; }
+.imgdet > summary::-webkit-details-marker { display: none; }
+.imgdet > summary svg { width: 18px; height: 18px; color: var(--ac); }
+.imgdet .imgtools { border-top: 0; margin-top: 4px; }
+
 /* ===== progmark.css ===== */
 /* شعار البرنامج المفتوح في الرئيسية: سطر واحد مكان التحية، الشعار يُكتب من اليمين ثم يظهر خط ذهبي والدفعة */
 .pmark { display: flex; align-items: center; gap: 14px; margin: 0; max-width: 100%; }
@@ -1977,14 +1996,14 @@ body.in-editor .gx-intro{top:calc(var(--top) + 12px);bottom:auto}
 <main id="view"></main>
 <script src="js/config.js?v=b79cfa4c64"></script>
 <script src="js/konva.min.js?v=65c5c4e432"></script>
-<script src="js/engine.js?v=96d52953a4"></script>
+<script src="js/engine.js?v=8259422517"></script>
 <script src="js/identities.js?v=867f3e03db"></script>
-<script src="js/templates.js?v=e73a8ee90f"></script>
-<script src="js/templates2.js?v=47619101e6"></script>
-<script src="js/templates3.js?v=cd7e0d1f92"></script>
-<script src="js/templates4.js?v=41b168cadb"></script>
-<script src="js/core5.js?v=b68a7f39c2"></script>
-<script src="js/studio.js?v=5584a29b23"></script>
+<script src="js/templates.js?v=5e193e0810"></script>
+<script src="js/templates2.js?v=da35b150db"></script>
+<script src="js/templates3.js?v=0f2ff161cf"></script>
+<script src="js/templates4.js?v=2e2e28da1d"></script>
+<script src="js/core5.js?v=419c7c89f5"></script>
+<script src="js/studio.js?v=2f491d4b33"></script>
 <script src="js/slides.js?v=849b6bf589"></script>
 <script src="js/qr.js?v=4c79be1679"></script>
 <script src="js/ticons.js?v=d1041b1786"></script>
@@ -1998,9 +2017,9 @@ body.in-editor .gx-intro{top:calc(var(--top) + 12px);bottom:auto}
 <script src="js/motion6.js?v=c3c5dbc6be"></script>
 <script src="js/kb6.js?v=8f7305f987"></script>
 <script src="js/guide6.js?v=c4636f695a"></script>
-<script src="js/editor6.js?v=98b024a235"></script>
-<script src="js/panels6.js?v=f29dcfa1f5"></script>
-<script src="js/docs6.js?v=a33c9ee45f"></script>
+<script src="js/editor6.js?v=69f9abcd78"></script>
+<script src="js/panels6.js?v=ae269b9832"></script>
+<script src="js/docs6.js?v=476f6ee7f8"></script>
 <script src="js/make6.js?v=a6b2855dcb"></script>
 <script src="js/caption6.js?v=ee66ba7087"></script>
 <script src="js/cal6.js?v=5d32d6c604"></script>

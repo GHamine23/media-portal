@@ -1,0 +1,17 @@
+/* أدوات تعديل الصورة في المحرر */
+.imgtools { display: grid; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line, #e6e6e6); }
+.fxrow { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.fxb { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 4px; border: 0; background: transparent; padding: 0; font: inherit; font-size: .74rem; color: var(--ink2, #444); cursor: pointer; }
+.fxb canvas { width: 58px; height: 58px; border-radius: 12px; display: block; outline: 2px solid transparent; outline-offset: 2px; transition: outline-color .15s; }
+.fxb.on canvas { outline-color: var(--ac, #222); }
+.fxb.on span { color: var(--ac-ink, #111); font-weight: 700; }
+.mkrow { display: flex; gap: 6px; flex-wrap: wrap; }
+.mkb { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 62px; padding: 6px 4px; border-radius: 12px; border: 1.5px solid var(--line, #e3e3e3); background: #f7f7f7; font: inherit; font-size: .7rem; cursor: pointer; }
+.mkb canvas { width: 30px; height: 30px; }
+.mkb.on { background: var(--ac, #222); color: #fff; border-color: var(--ac, #222); }
+.imgtools .btn.on { background: var(--ac-t); color: var(--ac-ink); border-color: var(--ac); }
+.imgdet { margin-top: 8px; border: 1px solid var(--line, #e6e6e6); border-radius: 14px; padding: 8px 12px; }
+.imgdet > summary { cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: .9rem; list-style: none; }
+.imgdet > summary::-webkit-details-marker { display: none; }
+.imgdet > summary svg { width: 18px; height: 18px; color: var(--ac); }
+.imgdet .imgtools { border-top: 0; margin-top: 4px; }

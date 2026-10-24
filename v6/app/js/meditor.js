@@ -28,17 +28,26 @@ function mRail() {
     r.appendChild(el('button', { type: 'button', class: ED.tab === it[0] ? 'on' : '', 'data-tab': it[0], role: 'tab', onclick: function () { if (ED.tab === it[0] && MED.detent !== 'peek') { sheetTo('peek'); return; } ED.tab = it[0]; buildPanel(); if (MED.detent === 'peek') sheetTo('half'); track('tool', { tool: 'tab_' + it[0] }); } }, [ico(it[2]), el('span', { text: it[1] })]));
   });
   if (ED.tab === 'el') r.appendChild(el('button', { type: 'button', class: 'on', 'data-tab': 'el' }, [ico('pencil'), el('span', { text: 'العنصر' })]));
-  setTimeout(function () { const on = r.querySelector('.on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' }); }, 30);
   return r;
 }
 // بعد كل بناء للوحة: نضيف شريط الأدوات الأفقي والمقبض القابل للسحب
 const buildPanelDesk = buildPanel;
 buildPanel = function () {
+  // موضع شريط الأدوات قبل إعادة البناء: يبقى كما هو فلا يقفز الشريط يساراً ثم يعود
+  const old = document.querySelector('#e_panel .mrail'), prevX = old ? old.scrollLeft : null;
   buildPanelDesk();
   if (!document.body.classList.contains('mapp')) return;
   const p = $('#e_panel'); if (!p) return;
-  const grab = p.querySelector('.grab'), rail = railHints(mRail());
+  const grab = p.querySelector('.grab'), rail = railHints(mRail()), mr = rail.querySelector('.mrail');
   if (grab) grab.after(rail); else p.insertBefore(rail, p.firstChild);
+  if (mr) {
+    mr.style.scrollBehavior = 'auto';
+    if (prevX != null) mr.scrollLeft = prevX;
+    // الأداة المختارة إن كانت خارج المرئي: يُمرَّر إليها بأقصر مسافة وبهدوء
+    const on = mr.querySelector('.on');
+    if (on) { const rr = mr.getBoundingClientRect(), ro = on.getBoundingClientRect(); if (ro.left < rr.left + 8 || ro.right > rr.right - 8) { mr.style.scrollBehavior = ''; on.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: prevX == null ? 'auto' : 'smooth' }); } }
+    requestAnimationFrame(function () { mr.style.scrollBehavior = ''; });
+  }
   const pb = p.querySelector('.pbody'); if (pb) pb.classList.add('pbody');
   attachSheetDrag(p);
   if (!MED.detent) sheetTo('peek', false);
@@ -114,6 +123,9 @@ showEditor6 = function (doc, fromDraft) {
       ], ED.doc.name);
     } }, [ico('more')]);
     const dl = top.querySelector('#e_dl'); if (dl) top.insertBefore(more, dl); else top.appendChild(more);
+    // تراجع سريع ظاهر دائماً بجانب «المزيد»
+    const und = el('button', { type: 'button', class: 'ib e-mundo', id: 'e_mundo', 'aria-label': 'تراجع', title: 'تراجع', disabled: !ED.undo.length, onclick: function () { undo6(); haptic(); } }, [ico('undo')]);
+    top.insertBefore(und, more);
   }
   setTimeout(function () { sheetTo('peek', false); refit(); }, 50);
   window.addEventListener('resize', function onr() { if (!ED.open) { window.removeEventListener('resize', onr); return; } sheetTo(MED.detent || 'peek', false); });

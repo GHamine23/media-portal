@@ -347,7 +347,7 @@ function pushUndo6(init) {
 function applySnap(s) { const o = JSON.parse(s); ED.doc.pages[o.cur] = o.p; loadPage(o.cur); ED.last = s; buildPanel(); buildSizeSel(); select(null); drawNow(); markDirty(); updUndo6(); buildPages(); }
 function undo6() { pushUndo6(); if (!ED.undo.length) return; ED.redo.push(ED.last); applySnap(ED.undo.pop()); }
 function redo6() { if (!ED.redo.length) return; ED.undo.push(ED.last); applySnap(ED.redo.pop()); }
-function updUndo6() { const u = $('#e_undo'), r = $('#e_redo'); if (u) u.disabled = !ED.undo.length; if (r) r.disabled = !ED.redo.length; }
+function updUndo6() { const u = $('#e_undo'), r = $('#e_redo'), m = $('#e_mundo'); if (u) u.disabled = !ED.undo.length; if (r) r.disabled = !ED.redo.length; if (m) m.disabled = !ED.undo.length; }
 
 /* ---------- التنزيل والمشاركة ---------- */
 function dlMenu(btn) {
@@ -423,7 +423,7 @@ function buildPages() {
       oncontextmenu: function (e) { e.preventDefault(); pageMenu(e.currentTarget, i); } }, [pageThumb(i), el('small', { text: String(i + 1) })]));
   });
   box.appendChild(el('button', { type: 'button', class: 'pg add', title: ED.doc.kind === 'book' ? 'صفحة جديدة' : 'شريحة جديدة', onclick: function (e) { addPageMenu(e.currentTarget); } }, [ico('plus')]));
-  box.appendChild(el('button', { type: 'button', class: 'ib sm', title: 'خيارات ' + pageWord(), 'aria-label': 'خيارات ' + pageWord(), onclick: function (e) { pageMenu(e.currentTarget, ED.cur); } }, [ico('more')]));
+  box.appendChild(el('button', { type: 'button', class: 'ib sm', title: ED.doc.kind === 'book' ? 'خيارات الصفحة' : 'خيارات الشريحة', 'aria-label': ED.doc.kind === 'book' ? 'خيارات الصفحة' : 'خيارات الشريحة', onclick: function (e) { pageMenu(e.currentTarget, ED.cur); } }, [ico('more')]));
 }
 function pageMenu(anchor, i) {
   const n = ED.doc.pages.length;

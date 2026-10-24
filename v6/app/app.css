@@ -312,3 +312,8 @@ body.mapp .btn.danger{background:rgba(255,59,48,.1);color:var(--ios-red)}
 .msheet .shd h3{font-family:var(--fd)}
 body.mapp .fld>label{font-weight:500;color:var(--ac-ink);opacity:.85}
 body.mapp .capfmt{gap:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}body.mapp .capfmt .ib{min-width:38px;width:38px;flex:none}body.mapp .capfmt .sp{display:none}
+
+/* تراجع سريع في شريط المحرر العلوي */
+body.mapp .e-top .e-mundo{width:40px;height:36px;min-width:40px;min-height:36px;border-radius:10px;background:var(--ac-t);color:var(--ac-ink);margin-inline:2px}
+body.mapp .e-top .e-mundo:disabled{opacity:.35}
+body.mapp .e-top .e-mundo svg{width:20px;height:20px}

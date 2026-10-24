@@ -333,6 +333,7 @@ TEMPLATES.push(
       const ty = top + hh + 16 * sv;
       omGlass(ctx, mx - 16 * u, ty - 14 * sv, cw + 32 * u, rh * n + 28 * sv, 30 * u, true);
       rows.forEach(function (r, i) {
+        G(ctx, 'row' + i);
         const ry = ty + i * rh, pad = 10 * sv;
         fillRR(ctx, mx, ry + pad, cw, rh - pad * 2, 18 * u, 'rgba(10,16,40,0.35)');
         line(ctx, r[0], xr - 30 * u, ry + rh / 2, { size: Math.min(36 * sv, rh * 0.34), color: gold, align: 'right', bold: 0.9, title: true, maxW: dayW - 30 * u });
@@ -348,6 +349,7 @@ TEMPLATES.push(
       line(ctx, d.h1, xr - dayW / 2, top + hh / 2, { size: 34 * sv, color: '#ffffff', align: 'center', bold: 0.9, title: true });
       const ty = top + hh + 16 * sv;
       rows.forEach(function (r, i) {
+        G(ctx, 'row' + i);
         const ry = ty + i * rh;
         if (i) { hline(ctx, mx + 20 * u, subjX1 - 10 * u, ry, alpha(C.p, 0.14), 1.5 * u); hline(ctx, xr - dayW + 14 * u, xr - 14 * u, ry, 'rgba(255,255,255,0.18)', 1.5 * u); }
         const dsz = Math.min(38 * sv, rh * 0.32);
@@ -399,6 +401,7 @@ TEMPLATES.push(
     const icons = ['book', 'star', 'clock', 'layers'];
     G(ctx, 'items');
     items.forEach(function (it, i) {
+      G(ctx, 'item' + i);   // كل بند (العنوان وصندوقه) عنصر مستقل
       const col = i % cols, row = Math.floor(i / cols);
       const x1 = xr - col * (colW + gap), x0 = x1 - colW, y0 = y + row * (rowH + 20 * sv);
       // العنوان المرقّم مع أيقونة في مربع كحلي
@@ -544,6 +547,7 @@ TEMPLATES.push(
     G(ctx, 'info');
     const ls = [d.l1, d.l2, d.l3].filter(has);
     ls.forEach(function (t, i) {
+      G(ctx, 'info' + i);
       const ly = y + i * 74 * sv + 20 * sv;
       const f = line(ctx, t, xr - 30 * u, ly, { size: 44 * sv, color: fg, align: 'right', bold: 0.9, title: true, maxW: cw * 0.6 });
       if (D()) { omLeader(ctx, mx + 50 * u, xr - 30 * u - f.w - 30 * u, ly, alpha(gold, 0.8), u); omDiamond(ctx, mx + 30 * u, ly, 12 * u, gold); }
@@ -559,6 +563,7 @@ TEMPLATES.push(
       if (has(d.head)) pill(ctx, d.head, xr - 24 * u, y + 2 * sv, 30 * sv, gold, dark ? C.teal : '#ffffff', { bold: 0.9 });
       const rh = Math.min(86 * sv, (ch - 100 * sv) / items.length);
       items.forEach(function (t, i) {
+        G(ctx, 'it' + i);
         const iy = y + 90 * sv + i * rh + rh / 2;
         line(ctx, omArNum(i + 1), xr - 50 * u, iy, { size: 48 * sv, color: gold, align: 'center', bold: 1, title: true });
         line(ctx, t, xr - 100 * u, iy, { size: Math.min(36 * sv, rh * 0.46), color: dark ? '#ffffff' : C.ink, align: 'right', bold: 0.7, maxW: cw - 150 * u });

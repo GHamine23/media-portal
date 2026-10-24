@@ -635,7 +635,7 @@ const TEMPLATES = [
       bgr.addColorStop(0, alpha(col, 0.95)); bgr.addColorStop(0.55, alpha(col, 0.7)); bgr.addColorStop(1, alpha(col, 0.08));
       area(bx, 0, bx + bw, H); ctx.fillStyle = bgr; ctx.fillRect(bx, 0, bw, H);
       if (!HIDE.logo) { ctx.save(); ctx.translate(bx + bw / 2, H * 0.97); ctx.rotate(-Math.PI / 2); ctx.globalAlpha = 0.35;
-        const save = BOXES; BOXES = null; drawLogo(ctx, T, 0, 0, Math.min(H * 0.32, 420 * s * 1.5), '#ffffff', 'bl'); BOXES = save; ctx.restore(); }
+        quiet(function () { drawLogo(ctx, T, 0, 0, Math.min(H * 0.32, 420 * s * 1.5), '#ffffff', 'bl'); }); ctx.restore(); }
       cL = bx + bw + W * 0.04;
     }
     const cR = W - W * 0.05, cx = (cL + cR) / 2, cw = cR - cL;

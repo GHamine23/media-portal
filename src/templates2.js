@@ -329,6 +329,7 @@ TEMPLATES.push(
     G(ctx, 'list');
     const colW = W * 0.34;
     it.forEach(function (t, i) {
+      G(ctx, 'li' + i);   // كل فقرة عنصر مستقل
       const col = i < half ? 0 : 1, row = col ? i - half : i;
       const xr = W / 2 + (col ? -30 * u : colW + 30 * u), yy = y + rowH * row + rowH / 2;
       sparkle(ctx, xr - 8 * u, yy - 10 * u, 15 * sv, C.a);
@@ -369,6 +370,7 @@ TEMPLATES.push(
     const tints = [C.a2, C.p, C.s, C.pl, C.a, C.pd];
     G(ctx, 'rows');
     rows.forEach(function (r, i) {
+      G(ctx, 'row' + i);   // كل لقاء عنصر مستقل
       const ry = top + oy + i * (rh + gap), col = tints[i % tints.length];
       const chipW = Math.min(170 * u, rh * 1.05), x0 = 80 * u, x1 = xr;
       ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.08)'; ctx.shadowBlur = 26 * u; ctx.shadowOffsetY = 8 * u;

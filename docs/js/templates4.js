@@ -106,6 +106,7 @@ TEMPLATES.push(
     // قياس بطاقة فرع: عنوان ونقاط
     const cardH = function (b, sc) { const tf2 = fit(ctx, b.t, { maxW: cardW - 50 * s, size: 32 * s * sc, maxLines: 2, bold: 1, title: true, lh: 1.2 }); let h = 26 * s + tf2.h + 14 * s; b.pts.forEach(function (p) { const pf = fit(ctx, p, { maxW: cardW - 70 * s, size: 25 * s * sc, maxLines: 2, lh: 1.3 }); h += pf.h + 6 * s; }); return h + 20 * s; };
     const drawCard = function (b, i, x, yy, sc, h) {
+      G(ctx, 'br' + i);   // كل فرع عنصر مستقل
       const col = pal[i % pal.length], filled = v === 'color';
       ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.10)'; ctx.shadowBlur = 24 * s; ctx.shadowOffsetY = 8 * s;
       fillRR(ctx, x, yy, cardW, h, 22 * s, filled ? col : (isD ? 'rgba(255,255,255,0.08)' : '#ffffff')); ctx.restore();
@@ -117,7 +118,7 @@ TEMPLATES.push(
       b.pts.forEach(function (p) { const pf = fit(ctx, p, { maxW: cardW - 70 * s, size: 25 * s * sc, maxLines: 2, lh: 1.3 }); ctx.beginPath(); ctx.arc(x + cardW - 36 * s, ty + pf.pt + pf.size * pf.lh / 2, 5 * s, 0, Math.PI * 2); ctx.fillStyle = filled ? alpha(stOn(col, C), 0.7) : col; ctx.fill(); drawFit(ctx, pf, x + cardW - 52 * s, ty, { align: 'right', color: pc }); ty += pf.h + 6 * s; });
     };
     const conn = function (x0, y0, x1, y1, col, vert) {
-      ctx.save(); ctx.strokeStyle = alpha(col, 0.75); ctx.lineWidth = 4 * s; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x0, y0);
+      G(ctx, 'links'); ctx.save(); ctx.strokeStyle = alpha(col, 0.75); ctx.lineWidth = 4 * s; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x0, y0);
       if (vert) ctx.bezierCurveTo(x0, (y0 + y1) / 2, x1, (y0 + y1) / 2, x1, y1); else ctx.bezierCurveTo((x0 + x1) / 2, y0, (x0 + x1) / 2, y1, x1, y1);
       ctx.stroke(); ctx.beginPath(); ctx.arc(x1, y1, 7 * s, 0, Math.PI * 2); ctx.fillStyle = col; ctx.fill(); ctx.restore();
     };
@@ -156,7 +157,7 @@ TEMPLATES.push(
         pair.forEach(function (b, j) { const i = br.indexOf(b), h = cardH(b, sc), x = colsX[j], ey = yy + Math.min(h / 2, 60 * s); conn(cx, ey, j ? x + cardW : x, ey, pal[i % pal.length], false); drawCard(b, i, x, yy, sc, h); });
         mids.push(yy + Math.min(rh / 2, 60 * s)); yy += rh + 30 * s + extra;
       }
-      ctx.save(); ctx.strokeStyle = alpha(ac, 0.45); ctx.lineWidth = 5 * s; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(cx, top + ch); ctx.lineTo(cx, mids[mids.length - 1] || top + ch); ctx.stroke(); ctx.restore();
+      G(ctx, 'links'); ctx.save(); ctx.strokeStyle = alpha(ac, 0.45); ctx.lineWidth = 5 * s; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(cx, top + ch); ctx.lineTo(cx, mids[mids.length - 1] || top + ch); ctx.stroke(); ctx.restore();
       mids.forEach(function (my) { ctx.beginPath(); ctx.arc(cx, my, 9 * s, 0, Math.PI * 2); ctx.fillStyle = ac; ctx.fill(); });
     }
     G(ctx, 'note'); if (has(d.note)) line(ctx, d.note, W / 2, H - 60 * s, { size: 24 * s, color: isD ? alpha('#ffffff', 0.7) : C.muted, align: 'center', maxW: W * 0.8 });
@@ -325,6 +326,7 @@ TEMPLATES.push(
     if (v === 'fold') {
       const gap = 22 * s, ch = (bot - y - gap * (n - 1)) / n, half = cw / 2;
       cards.forEach(function (c, i) {
+        G(ctx, 'card' + i);
         const yy = y + i * (ch + gap), col = pal[i % 3 === 0 ? 0 : i % 3 === 1 ? 1 : 3];
         area(m, yy, xr, yy + ch);
         rrect(ctx, m, yy, cw, ch, 20 * s); ctx.fillStyle = isD ? alpha('#ffffff', 0.06) : '#ffffff'; ctx.fill(); ctx.save(); ctx.strokeStyle = cut; ctx.lineWidth = 2 * s; ctx.setLineDash([10 * s, 8 * s]); ctx.stroke(); ctx.restore();
@@ -342,6 +344,7 @@ TEMPLATES.push(
     } else {
       const cols = 2, rows = Math.ceil(n / cols), gap = 24 * s, cw2 = (cw - gap) / cols, ch = (bot - y - gap * (rows - 1)) / rows;
       cards.forEach(function (c, i) {
+        G(ctx, 'card' + i);
         const x = xr - (i % cols) * (cw2 + gap) - cw2, yy = y + Math.floor(i / cols) * (ch + gap), col = OV.accent || pal[i % 4];
         area(x, yy, x + cw2, yy + ch);
         rrect(ctx, x, yy, cw2, ch, 22 * s); ctx.fillStyle = isD ? alpha('#ffffff', 0.06) : '#ffffff'; ctx.fill(); ctx.save(); ctx.strokeStyle = cut; ctx.lineWidth = 2 * s; ctx.setLineDash([10 * s, 8 * s]); ctx.stroke(); ctx.restore();
@@ -392,6 +395,7 @@ TEMPLATES.push(
     if (stats.length) {
       const n = stats.length, gap = 22 * u, sw = (cw - gap * (n - 1)) / n, sh = 230 * sv;
       stats.forEach(function (st, i) {
+        G(ctx, 'stat' + i);
         const x = xr - i * (sw + gap) - sw;
         ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.08)'; ctx.shadowBlur = 26 * u; ctx.shadowOffsetY = 8 * u; fillRR(ctx, x, y, sw, sh, 26 * u, isD ? alpha('#ffffff', 0.07) : '#ffffff'); ctx.restore();
         area(x, y, x + sw, y + sh);
@@ -411,6 +415,7 @@ TEMPLATES.push(
       const q = stScale(measure, bot - y, 0.5), nx = xr - 34 * u;
       let yy = y; const ys = [];
       steps.forEach(function (st, i) {
+        G(ctx, 'step' + i);
         const tf2 = fit(ctx, st[0], { maxW: cw - 130 * u, size: 34 * sv * q, maxLines: 1, bold: 0.9, title: true }), bf = fit(ctx, st[1] || '', { maxW: cw - 130 * u, size: 26 * sv * q, maxLines: 3, lh: 1.45 });
         ys.push(yy + tf2.pt + tf2.size * tf2.lh / 2);
         drawFit(ctx, tf2, nx - 60 * u, yy, { align: 'right', color: isD ? '#ffffff' : C.pd });
@@ -418,8 +423,8 @@ TEMPLATES.push(
         area(m, yy, xr, yy + tf2.h + bf.h);
         yy += tf2.h + bf.h + 36 * sv * q;
       });
-      if (ys.length > 1) { ctx.save(); ctx.strokeStyle = alpha(ac, 0.35); ctx.lineWidth = 4 * u; ctx.setLineDash([2 * u, 10 * u]); ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(nx, ys[0]); ctx.lineTo(nx, ys[ys.length - 1]); ctx.stroke(); ctx.restore(); }
-      ys.forEach(function (cy, i) { ctx.beginPath(); ctx.arc(nx, cy, 30 * u, 0, Math.PI * 2); ctx.fillStyle = base; ctx.fill(); stNum(ctx, omArNum0(i + 1), nx, cy, 26 * u, i % 2 ? (isD ? C.a : C.s) : ac, isD && i % 2 ? C.teal : '#ffffff'); });
+      G(ctx, 'steps'); if (ys.length > 1) { ctx.save(); ctx.strokeStyle = alpha(ac, 0.35); ctx.lineWidth = 4 * u; ctx.setLineDash([2 * u, 10 * u]); ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(nx, ys[0]); ctx.lineTo(nx, ys[ys.length - 1]); ctx.stroke(); ctx.restore(); }
+      ys.forEach(function (cy, i) { G(ctx, 'step' + i); ctx.beginPath(); ctx.arc(nx, cy, 30 * u, 0, Math.PI * 2); ctx.fillStyle = base; ctx.fill(); stNum(ctx, omArNum0(i + 1), nx, cy, 26 * u, i % 2 ? (isD ? C.a : C.s) : ac, isD && i % 2 ? C.teal : '#ffffff'); });
     }
     G(ctx, 'footer');
     if (has(d.note)) { const f = line(ctx, d.note, W / 2, H - 100 * u, { size: 28 * sv, color: mut, align: 'center', maxW: cw }); if (D()) { star(ctx, W / 2 + f.w / 2 + 28 * u, H - 100 * u, 9 * u, C.a, 0); star(ctx, W / 2 - f.w / 2 - 28 * u, H - 100 * u, 9 * u, C.a, 0); } }
@@ -459,6 +464,7 @@ TEMPLATES.push(
     line(ctx, 'اليوم', xr - dayW / 2, y + hh / 2, { size: 28 * s, color: isD ? '#ffffff' : ac, align: 'center', bold: 1, title: true });
     let yy = y + hh + gap;
     rows.forEach(function (r, i) {
+      G(ctx, 'row' + i);
       fillRR(ctx, xr - dayW, yy, dayW, rh, 16 * s, isD ? alpha('#ffffff', 0.08) : (i % 2 ? '#f4f3ef' : '#efede7'));
       line(ctx, r[0], xr - dayW / 2, yy + rh / 2, { size: Math.min(30 * s, rh * 0.32), color: isD ? '#ffffff' : C.pd, align: 'center', bold: 1, title: true, maxW: dayW - 20 * s });
       for (let j = 0; j < nC; j++) {

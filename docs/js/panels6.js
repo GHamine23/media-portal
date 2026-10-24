@@ -95,7 +95,8 @@ function imageField6(f) {
   grid.appendChild(uploadBtn('رفع', function (res) { S.d[f.k] = { src: 'asset:' + res.id, z: 1, ox: 0, oy: 0 }; changed6(); buildPanel(); }));
   const v = S.d[f.k];
   return el('div', { class: 'fld' }, [el('label', { text: f.label }), grid, v ? el('div', { class: 'range6' }, [el('span', { text: 'تكبير' }), el('input', { type: 'range', min: '0.6', max: '2.5', step: '0.01', value: String(v.z || 1), 'aria-label': 'تكبير الصورة', oninput: function (e) { v.z = +e.target.value; redraw(); }, onchange: function () { changed6(); } }),
-    el('button', { type: 'button', class: 'btn sm ghost', text: 'توسيط', onclick: function () { v.ox = 0; v.oy = 0; v.z = 1; changed6(); buildPanel(); } })]) : null]);
+    el('button', { type: 'button', class: 'btn sm ghost', text: 'توسيط', onclick: function () { v.ox = 0; v.oy = 0; v.z = 1; changed6(); buildPanel(); } })]) : null,
+    v && v.src ? (function () { const d = el('details', { class: 'imgdet' }, [el('summary', {}, [ico('wand'), el('span', { text: 'تعديل الصورة: مرشحات وألوان وقلب' })])]); d.open = !!ED.imgdetOpen; d.addEventListener('toggle', function () { ED.imgdetOpen = d.open; }); imageTools(d, { o: v, field: f.k }); return d; })() : null]);
 }
 // رفع صورة: تُحفظ في مكتبتك على الخادم بجودتها الأصلية، مع مصغّر للعرض
 function uploadBtn(label, done, accept) {
@@ -392,28 +393,30 @@ function fontUploader(scope, program, onDone, ui) {
 
 /* ---------- الطبقات: كل العناصر بترتيبها من الأعلى، تُسمّى وتُرتَّب وتُخفى، والقلم يفتح إعداداتها ---------- */
 // الترتيب من الأسفل للأعلى: عناصر القالب بترتيب رسمها، ثم ما نُقل منها إلى الأمام، ثم ما أضافه المستخدم
+// الترتيب من الأسفل إلى الأعلى: عناصر القالب بترتيبها الأصلي، ثم ما نُقل منها أو من الطبقات (S.front بترتيبه)، ثم بقية الطبقات المضافة
 function stackOrder() {
-  const front = (S.front || []).filter(function (g) { return LASTG[g] || S.hide['g_' + g]; });
+  const lids = (S.layers || []).map(function (L) { return 'L:' + L.id; });
+  const front = (S.front || []).filter(function (g) { return isLayer(g) ? lids.indexOf(g) >= 0 : (LASTG[g] || S.hide['g_' + g]); });
   const base = Object.keys(LASTG).filter(function (g) { return !isLayer(g) && front.indexOf(g) < 0; });
   Object.keys(S.hide).forEach(function (k) { if (k.slice(0, 2) === 'g_' && S.hide[k] && base.indexOf(k.slice(2)) < 0 && front.indexOf(k.slice(2)) < 0) base.push(k.slice(2)); });
-  const layers = (S.layers || []).map(function (L) { return 'L:' + L.id; });
-  return { base: base, front: front, layers: layers, all: base.concat(front, layers) };
+  const tail = lids.filter(function (g) { return front.indexOf(g) < 0; });
+  return { base: base, front: front, layers: lids, tail: tail, all: base.concat(front, tail) };
 }
+// تحريك عنصر خطوة في الترتيب: كل العناصر (من القالب أو مضافة) تتبادل أماكنها بحرية
 function moveInStack(g, dir) {   // dir: +1 للأعلى، -1 للأسفل
-  const o = stackOrder();
-  if (isLayer(g)) {
-    const i = S.layers.findIndex(function (L) { return 'L:' + L.id === g; }), j = i + dir;
-    if (j < 0) { toast('ما تضيفه يبقى فوق عناصر القالب'); return; }
-    if (j >= S.layers.length) return;
-    const L = S.layers.splice(i, 1)[0]; S.layers.splice(j, 0, L);
-  } else {
-    S.front = (S.front || []).slice();
-    const fi = S.front.indexOf(g);
-    if (fi < 0) { if (dir > 0) S.front.unshift(g); else { toast('هذا العنصر في مكانه من القالب'); return; } }
-    else if (dir > 0) { if (fi === S.front.length - 1) { toast('العناصر المضافة فوقه دائماً'); return; } S.front.splice(fi, 1); S.front.splice(fi + 1, 0, g); }
-    else { S.front.splice(fi, 1); if (fi > 0) S.front.splice(fi - 1, 0, g); }
-    void o;
-  }
+  const o = stackOrder(), arr = o.all.slice(), i = arr.indexOf(g), j = i + dir;
+  if (i < 0) return;
+  if (j < 0) { toast('هذا أسفل العناصر'); return; }
+  if (j >= arr.length) { toast('هذا أعلى العناصر'); return; }
+  arr[i] = arr[j]; arr[j] = g;
+  // ما بقي على ترتيب القالب الأصلي في الأسفل لا يُسجَّل؛ وما بعده يصير «الترتيب المخصّص»
+  const natural = Object.keys(LASTG).filter(function (x) { return !isLayer(x); });
+  let k = 0; while (k < arr.length && !isLayer(arr[k]) && arr[k] === natural[k]) k++;
+  const rest = arr.slice(k);
+  let last = -1; rest.forEach(function (x, n) { if (!isLayer(x)) last = n; });
+  S.front = rest.slice(0, last + 1);
+  const order = arr.filter(isLayer);
+  S.layers = (S.layers || []).slice().sort(function (a, b) { return order.indexOf('L:' + a.id) - order.indexOf('L:' + b.id); });
   changed6(); buildPanel();
 }
 function renameEl(g, name) { S.names = Object.assign({}, S.names || {}); const v = String(name || '').trim(); if (v) S.names[g] = v.slice(0, 40); else delete S.names[g]; changed6(true); }
@@ -482,6 +485,69 @@ function logoOptions(b) {
   b.appendChild(box);
 }
 
+/* ---------- أدوات الصورة: مرشحات جاهزة، وضبط دقيق، وقلب، وقصّ بأشكال، وإطار وظل ولون وتلاشي ----------
+   tgt.o هو الكائن الذي يحمل الإعدادات: الطبقة المضافة (L) أو قيمة خانة الصورة في القالب ({src, z, ox, oy}) */
+const FX_PRESETS = [['orig', 'الأصل', {}], ['warm', 'دافئ', { br: 1.04, ct: 1.05, sa: 1.1, wm: 0.4 }], ['cool', 'بارد', { br: 1.02, ct: 1.05, sa: 0.95, wm: -0.4 }], ['vivid', 'حيوي', { ct: 1.15, sa: 1.4 }],
+  ['soft', 'ناعم', { br: 1.08, ct: 0.86, sa: 0.8 }], ['bw', 'أبيض وأسود', { gs: 1, ct: 1.15 }], ['old', 'عتيق', { sp: 0.6, ct: 0.95, vg: 0.45 }], ['drama', 'درامي', { ct: 1.3, sa: 0.85, br: 0.94, vg: 0.6 }], ['fade', 'باهت', { br: 1.12, ct: 0.78, sa: 0.65 }]];
+function imgSrcOf(o) { const p = photoOf({ src: o.src || o.ref, z: 1, ox: 0, oy: 0 }); return p && p.im; }
+function imageTools(b, tgt) {
+  const o = tgt.o, isL = !!tgt.layer, box = el('div', { class: 'imgtools' });
+  const set = function (k, v, live) { if (v === undefined || v === null || v === '') delete o[k]; else o[k] = v; if (live) redraw(); else changed6(); };
+  const setFx = function (k, v) { o.fx = Object.assign({}, o.fx || {}); if (v == null) delete o.fx[k]; else o.fx[k] = v; if (!Object.keys(o.fx).length) delete o.fx; };
+  box.appendChild(el('h4', { class: 'psh', text: 'تعديل الصورة' }));
+  // المرشحات الجاهزة بمعاينة مصغّرة من الصورة نفسها
+  const src = imgSrcOf(o);
+  if (src) {
+    const small = document.createElement('canvas'), k = 120 / Math.max(srcW(src), srcH(src)); small.width = Math.max(1, Math.round(srcW(src) * k)); small.height = Math.max(1, Math.round(srcH(src) * k)); small.getContext('2d').drawImage(src, 0, 0, small.width, small.height);
+    const cur = JSON.stringify(o.fx || {});
+    box.appendChild(el('div', { class: 'fxrow' }, FX_PRESETS.map(function (pr) {
+      const cv = el('canvas', { width: 64, height: 64 }), g = cv.getContext('2d'), im = imgFx(small, pr[2]), q = Math.max(64 / srcW(im), 64 / srcH(im));
+      g.drawImage(im, (64 - srcW(im) * q) / 2, (64 - srcH(im) * q) / 2, srcW(im) * q, srcH(im) * q);
+      return el('button', { type: 'button', class: 'fxb' + (JSON.stringify(pr[2]) === cur ? ' on' : ''), onclick: function () { if (Object.keys(pr[2]).length) o.fx = Object.assign({}, pr[2]); else delete o.fx; changed6(); buildPanel(); } }, [cv, el('span', { text: pr[1] })]);
+    })));
+  }
+  const fx = o.fx || {}, pct = function (v) { return Math.round(v * 100) + '٪'; }, sgn = function (v) { return (v > 0 ? '+' : '') + Math.round(v * 100); };
+  const fs = function (label, key, def, min, max, step, fmt) { return slider(label, fx[key] == null ? def : fx[key], min, max, step, fmt, function (v) { setFx(key, Math.abs(v - def) < step / 2 ? null : v); }); };
+  box.appendChild(fs('السطوع', 'br', 1, 0.5, 1.5, 0.01, pct));
+  box.appendChild(fs('التباين', 'ct', 1, 0.5, 1.6, 0.01, pct));
+  box.appendChild(fs('التشبّع', 'sa', 1, 0, 2, 0.01, pct));
+  box.appendChild(fs('الدفء', 'wm', 0, -1, 1, 0.02, sgn));
+  box.appendChild(fs('الضبابية', 'bl', 0, 0, 20, 0.5, function (v) { return String(Math.round(v)); }));
+  box.appendChild(fs('تعتيم الأطراف', 'vg', 0, 0, 1, 0.02, pct));
+  box.appendChild(el('div', { class: 'row wrapr' }, [
+    el('button', { type: 'button', class: 'btn sm line' + (o.fh ? ' on' : ''), onclick: function () { set('fh', o.fh ? null : true); buildPanel(); } }, [ico('copy'), 'قلب أفقي']),
+    el('button', { type: 'button', class: 'btn sm line' + (o.fv ? ' on' : ''), onclick: function () { set('fv', o.fv ? null : true); buildPanel(); } }, [ico('copy'), 'قلب رأسي']),
+    el('button', { type: 'button', class: 'btn sm ghost', onclick: function () { ['fx', 'fh', 'fv'].forEach(function (k) { delete o[k]; }); if (isL) ['cr', 'mk', 'z', 'ox', 'oy', 'bw', 'bc', 'sh', 'tc', 'ta', 'fe'].forEach(function (k) { delete o[k]; }); changed6(); buildPanel(); } }, [ico('reset'), 'إلغاء التعديلات'])]));
+  if (isL) {
+    box.appendChild(el('h4', { class: 'psh', text: 'القصّ والشكل' }));
+    const ar0 = src ? srcH(src) / srcW(src) : 1;
+    box.appendChild(segMini([['', 'الأصل'], ['1', '١:١'], ['1.25', '٤:٥'], ['0.5625', '١٦:٩'], ['1.3333', '٣:٤'], ['1.7778', '٩:١٦']], o.cr ? String(+o.cr.toFixed(4)).replace(/0+$/, '') : '', function (v) { set('cr', v ? +v : null); buildPanel(); }));
+    box.appendChild(el('div', { class: 'mkrow' }, [['rect', 'مستطيل'], ['circle', 'دائرة'], ['arch', 'قوس'], ['hex', 'سداسي'], ['diamond', 'معيّن']].map(function (q) {
+      const cv = el('canvas', { width: 40, height: 40 }), g = cv.getContext('2d'); g.fillStyle = (o.mk || 'rect') === q[0] ? '#fff' : '#555'; maskPath(g, q[0], 6, 6, 28, 28, 0.15); g.fill();
+      return el('button', { type: 'button', class: 'mkb' + ((o.mk || 'rect') === q[0] ? ' on' : ''), title: q[1], 'aria-label': q[1], onclick: function () { set('mk', q[0] === 'rect' ? null : q[0]); if ((q[0] === 'circle' || q[0] === 'hex') && !o.cr) o.cr = 1; changed6(); buildPanel(); } }, [cv, el('span', { text: q[1] })]);
+    })));
+    if ((o.mk || 'rect') === 'rect') box.appendChild(slider('استدارة الحواف', o.r || 0, 0, 0.5, 0.02, function (v) { return Math.round(v * 200) + '٪'; }, function (v) { o.r = v || 0; }));
+    const cropped = (o.cr && Math.abs(o.cr - ar0) > 0.01) || (o.z || 1) > 1.001;
+    box.appendChild(slider('تكبير داخل الإطار', o.z || 1, 1, 3, 0.01, pct, function (v) { o.z = v; }));
+    if (cropped || o.ox || o.oy) {
+      box.appendChild(slider('تحريك أفقي', o.ox || 0, -1, 1, 0.01, sgn, function (v) { o.ox = v; }));
+      box.appendChild(slider('تحريك رأسي', o.oy || 0, -1, 1, 0.01, sgn, function (v) { o.oy = v; }));
+    }
+    box.appendChild(el('h4', { class: 'psh', text: 'الإطار والظل واللون' }));
+    box.appendChild(slider('سُمك الإطار', o.bw || 0, 0, 0.08, 0.002, function (v) { return Math.round(v * 1000) / 10 + '٪'; }, function (v) { o.bw = v || 0; }));
+    if (o.bw) box.appendChild(el('div', { class: 'crow6' }, [el('span', { text: 'لون الإطار' }), colorBtn(o.bc && o.bc !== 'p' ? o.bc : '', 'لون الإطار', function (c) { set('bc', c || null); }, { orig: true, origLabel: 'لون الهوية' })]));
+    box.appendChild(slider('الظل', o.sh || 0, 0, 1, 0.02, pct, function (v) { o.sh = v || 0; }));
+    box.appendChild(el('div', { class: 'crow6' }, [el('span', { text: 'طبقة لونية فوق الصورة' }), colorBtn(o.tc && o.tc !== 'p' ? o.tc : '', 'طبقة لونية', function (c) { set('tc', c || null); buildPanel(); }, { orig: true, origLabel: 'بلا' })]));
+    if (o.tc) box.appendChild(slider('قوة اللون', o.ta == null ? 0.35 : o.ta, 0.05, 0.95, 0.01, pct, function (v) { o.ta = v; }));
+    box.appendChild(slider('تلاشي الأطراف', o.fe || 0, 0, 1, 0.02, pct, function (v) { o.fe = v || 0; }));
+    box.appendChild(el('div', { class: 'row wrapr' }, [uploadBtn('استبدال الصورة', function (res) { o.ref = 'asset:' + res.id; changed6(); buildPanel(); })]));
+  } else {
+    box.appendChild(slider('تكبير', o.z || 1, 0.6, 2.5, 0.01, pct, function (v) { o.z = v; }));
+    box.appendChild(slider('تحريك أفقي', o.ox || 0, -1, 1, 0.01, sgn, function (v) { o.ox = v; }));
+    box.appendChild(slider('تحريك رأسي', o.oy || 0, -1, 1, 0.01, sgn, function (v) { o.oy = v; }));
+  }
+  b.appendChild(box);
+}
 function openElPanel(g) {
   ED.elG = g; ED.prevTab = ED.tab === 'el' ? ED.prevTab : ED.tab; ED.tab = 'el';
   if (S.sel !== g) select(g);
@@ -527,7 +593,7 @@ function pEl(b) {
     if (L.t === 'text') b.appendChild(slider('حجم الخط', L.sz || 0.06, 0.01, 0.3, 0.002, function (v) { return Math.round(v * 1000); }, function (v) { L.sz = v; }));
     else b.appendChild(slider('الحجم', L.w, 0.02, 1.6, 0.01, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { L.w = v; }));
     b.appendChild(slider('الشفافية', L.o == null ? 1 : L.o, 0.1, 1, 0.01, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { L.o = v; }));
-    if (L.t === 'img') b.appendChild(slider('استدارة الحواف', L.r || 0, 0, 0.5, 0.02, function (v) { return Math.round(v * 200) + '٪'; }, function (v) { L.r = v; }));
+
     if (L.t === 'qr') {
       b.appendChild(el('div', { class: 'fld' }, [el('label', { text: 'الرابط' }), el('input', { type: 'url', class: 'inp sm', dir: 'ltr', value: L.url || '', onchange: function (e) { const v = e.target.value.trim(); if (!/^https?:\/\/\S+$/.test(v)) { toast('رابط غير صالح'); return; } L.url = v; changed6(); } })]));
       b.appendChild(segMini([['#ffffff', 'خلفية بيضاء'], ['none', 'بلا خلفية']], L.bg === 'none' ? 'none' : '#ffffff', function (v) { L.bg = v; changed6(); }));
@@ -550,6 +616,8 @@ function pEl(b) {
   else if (!L && texts.length) { cols.appendChild(el('span', { class: 'tiny', text: 'لون النص' })); cols.appendChild(colorBtn(st.c || '', 'لون النص', function (c) { setGs(g, 'c', c); redraw(); }, { orig: true })); cols.appendChild(el('span', { class: 'tiny', text: 'التمييز والأيقونات' })); cols.appendChild(colorBtn(st.h || '', 'لون التمييز والأيقونات', function (c) { setGs(g, 'h', c); redraw(); }, { orig: true })); }
   if (cols.children.length) b.appendChild(cols);
   if ((g === 'logo' || (L && L.t === 'logo' && L.ref === 'track')) && S.track && S.track.logo) logoOptions(b);
+  if (L && L.t === 'img') imageTools(b, { o: L, layer: true });
+  else if (!L) { const imf = (S.tpl.fields || []).filter(function (f) { return f.kind === 'image' && S.d[f.k] && S.d[f.k].src; }).find(function (f) { return f.k === g || (g === 'photo' && /photo|img|pic/.test(f.k)); }); if (imf) imageTools(b, { o: S.d[imf.k], field: imf.k }); }
   // الترتيب والموضع
   b.appendChild(el('h4', { class: 'psh', text: 'الترتيب والموضع' }));
   b.appendChild(el('div', { class: 'row wrapr' }, [

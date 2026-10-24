@@ -91,6 +91,70 @@ function tinted(key, color) {
   g.fillStyle = color; g.fillRect(0, 0, c.width, c.height);
   TINT[id] = c; return c;
 }
+/* ---------- تعديل الصور: سطوع وتباين وتشبّع ودفء وضبابية وتدرّج رمادي وبنّي وتعتيم أطراف وقلب ----------
+   fx = {br, ct, sa, wm, bl, gs, sp, vg} (القيم الافتراضية: 1،1،1،0،0،0،0،0). النتيجة لوحة مخبّأة لكل صورة وإعدادات.
+   تُستعمل مرشحات اللوحة حيث تعمل، وإلا معالجة البكسلات (سفاري القديم)، فيطابق التنزيل ما يُرى في كل المتصفحات. */
+const FX_CACHE = new Map(); let FX_N = 0;
+const FX_FILTER_OK = (function () { try { const c = document.createElement('canvas'); c.width = c.height = 2; const g = c.getContext('2d'); if (!('filter' in g)) return false; g.fillStyle = '#fff'; g.fillRect(0, 0, 2, 2); g.filter = 'invert(1)'; g.drawImage(c, 0, 0); return g.getImageData(0, 0, 1, 1).data[0] < 128; } catch (e) { return false; } })();
+function fxActive(fx, fh, fv) { if (fh || fv) return true; if (!fx) return false; return ['br', 'ct', 'sa'].some(function (k) { return fx[k] != null && Math.abs(fx[k] - 1) > 0.001; }) || ['wm', 'bl', 'gs', 'sp', 'vg'].some(function (k) { return fx[k] && Math.abs(fx[k]) > 0.001; }); }
+function imgFx(src, fx, fh, fv) {
+  if (!src || !fxActive(fx, fh, fv)) return src;
+  fx = fx || {};
+  if (!src._fxid) src._fxid = ++FX_N;
+  const key = src._fxid + '|' + JSON.stringify(fx) + '|' + (fh ? 1 : 0) + (fv ? 1 : 0);
+  if (FX_CACHE.has(key)) return FX_CACHE.get(key);
+  const sw = srcW(src), sh = srcH(src), k = Math.min(1, 2400 / Math.max(sw, sh)), w = Math.max(1, Math.round(sw * k)), h = Math.max(1, Math.round(sh * k));
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d'); g.imageSmoothingQuality = 'high';
+  const br = fx.br == null ? 1 : +fx.br, ct = fx.ct == null ? 1 : +fx.ct, sa = fx.sa == null ? 1 : +fx.sa, gs = +fx.gs || 0, sp = +fx.sp || 0, bl = +fx.bl || 0;
+  const flip = function (gg) { gg.translate(fh ? w : 0, fv ? h : 0); gg.scale(fh ? -1 : 1, fv ? -1 : 1); };
+  const blurPx = bl * Math.max(w, h) / 400;   // bl من ٠ إلى ٢٠
+  if (FX_FILTER_OK) {
+    g.save(); flip(g);
+    const f = []; if (br !== 1) f.push('brightness(' + br + ')'); if (ct !== 1) f.push('contrast(' + ct + ')'); if (sa !== 1) f.push('saturate(' + sa + ')'); if (gs) f.push('grayscale(' + gs + ')'); if (sp) f.push('sepia(' + sp + ')'); if (blurPx > 0.3) f.push('blur(' + blurPx.toFixed(1) + 'px)');
+    g.filter = f.join(' ') || 'none';
+    if (blurPx > 0.3) { const m = blurPx * 2; g.drawImage(src, -m, -m, w + m * 2, h + m * 2); } else g.drawImage(src, 0, 0, w, h);
+    g.restore(); g.filter = 'none';
+  } else {
+    g.save(); flip(g);
+    if (blurPx > 0.3) {   // ضبابية بالتصغير ثم التكبير: سريعة وتعمل في كل المتصفحات
+      const q = Math.max(0.02, 1 / (1 + blurPx * 0.6)), t = document.createElement('canvas'); t.width = Math.max(1, Math.round(w * q)); t.height = Math.max(1, Math.round(h * q));
+      const tg = t.getContext('2d'); tg.imageSmoothingQuality = 'high'; tg.drawImage(src, 0, 0, t.width, t.height); g.imageSmoothingQuality = 'high'; g.drawImage(t, 0, 0, w, h);
+    } else g.drawImage(src, 0, 0, w, h);
+    g.restore();
+    if (br !== 1 || ct !== 1 || sa !== 1 || gs || sp) {
+      const im = g.getImageData(0, 0, w, h), a = im.data, cf = ct, co = 128 * (1 - ct);
+      for (let i = 0; i < a.length; i += 4) {
+        let r = a[i] * br, gg = a[i + 1] * br, b = a[i + 2] * br;
+        r = r * cf + co; gg = gg * cf + co; b = b * cf + co;
+        const l = 0.2126 * r + 0.7152 * gg + 0.0722 * b;
+        const s2 = sa * (1 - gs); r = l + (r - l) * s2; gg = l + (gg - l) * s2; b = l + (b - l) * s2;
+        if (sp) { const sr = r * 0.393 + gg * 0.769 + b * 0.189, sg = r * 0.349 + gg * 0.686 + b * 0.168, sb = r * 0.272 + gg * 0.534 + b * 0.131; r += (sr - r) * sp; gg += (sg - gg) * sp; b += (sb - b) * sp; }
+        a[i] = r < 0 ? 0 : r > 255 ? 255 : r; a[i + 1] = gg < 0 ? 0 : gg > 255 ? 255 : gg; a[i + 2] = b < 0 ? 0 : b > 255 ? 255 : b;
+      }
+      g.putImageData(im, 0, 0);
+    }
+  }
+  // الدفء: طبقة برتقالية أو زرقاء بمزج «الضوء الناعم»
+  const wm = +fx.wm || 0;
+  if (wm) { g.save(); g.globalCompositeOperation = 'soft-light'; g.globalAlpha = Math.min(1, Math.abs(wm)) * 0.75; g.fillStyle = wm > 0 ? '#ff9a3c' : '#3c8cff'; g.fillRect(0, 0, w, h); g.restore(); }
+  // تعتيم الأطراف
+  const vg = +fx.vg || 0;
+  if (vg) { g.save(); const gr = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.25, w / 2, h / 2, Math.hypot(w, h) * 0.55); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,' + Math.min(0.85, vg * 0.85) + ')'); g.fillStyle = gr; g.globalCompositeOperation = 'multiply'; g.fillRect(0, 0, w, h); g.restore(); }
+  // الشفافية الأصلية تبقى (الصور المفرّغة)
+  if (FX_CACHE.size > 40) FX_CACHE.delete(FX_CACHE.keys().next().value);
+  FX_CACHE.set(key, c);
+  return c;
+}
+// مسار شكل القصّ: مستطيل بحواف، دائرة/بيضوي، قوس، سداسي، معيّن
+function maskPath(ctx, mk, x, y, w, h, r) {
+  ctx.beginPath();
+  if (mk === 'circle') { ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); }
+  else if (mk === 'arch') { const rr = Math.min(w / 2, h); ctx.moveTo(x, y + h); ctx.lineTo(x, y + rr); ctx.arc(x + w / 2, y + rr, w / 2, Math.PI, 0); ctx.lineTo(x + w, y + h); ctx.closePath(); }
+  else if (mk === 'hex') { for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + i * Math.PI / 3, px = x + w / 2 + w / 2 * Math.cos(a), py = y + h / 2 + h / 2 * Math.sin(a); if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); } ctx.closePath(); }
+  else if (mk === 'diamond') { ctx.moveTo(x + w / 2, y); ctx.lineTo(x + w, y + h / 2); ctx.lineTo(x + w / 2, y + h); ctx.lineTo(x, y + h / 2); ctx.closePath(); }
+  else { const rr = Math.min(w, h) * (r || 0); if (rr > 0.5) { rrect(ctx, x, y, w, h, rr); } else ctx.rect(x, y, w, h); }
+}
 function srcW(s) { return s.naturalWidth || s.width; }
 function srcH(s) { return s.naturalHeight || s.height; }
 
@@ -472,7 +536,9 @@ const ICONS = {
 function icon(ctx, name, cx, cy, s, color) {
   const gs = gStyle(); if (gs && (gs.h || gs.c)) color = gs.h || gs.c;
   if (name && name !== 'none') box('icon', cx - s / 2, cy - s / 2, cx + s / 2, cy + s / 2, name);
-  ctx.save(); ctx.translate(cx, cy); (ICONS[name] || ICONS.none)(ctx, s, color); ctx.restore();
+  // رسم الأيقونة في إحداثيات منقولة: لا تُسجَّل صناديقها الداخلية (كانت النجمة تضيف صندوقاً عند أصل اللوحة فيتضخم العنصر)
+  const sb = BOXES, sg = GBOX; BOXES = null; GBOX = null;
+  try { ctx.save(); ctx.translate(cx, cy); (ICONS[name] || ICONS.none)(ctx, s, color); ctx.restore(); } finally { BOXES = sb; GBOX = sg; }
 }
 
 /* سطر معلومات: أيقونة على اليمين ثم النص. يعيد عرضه الكلي */

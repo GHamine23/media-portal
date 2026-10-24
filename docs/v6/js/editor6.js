@@ -19,6 +19,8 @@ function drawNow() {
   const sz = SIZES[S.size], z = ED.zoom, dpr = Math.min(2.5, window.devicePixelRatio || 1);
   PHTXT = phList();
   LASTG = renderTo(EPV, S.tpl, S.size, snap(), S.track, z * dpr, true) || {};
+  // صندوق العنصر داخل حدود التصميم: الزخرفة الممتدة خارجه لا تُفسد التوسيط ولا يخرج الإطار عن اللوحة
+  (function () { const sz = SIZES[S.size]; Object.keys(LASTG).forEach(function (g) { const b = LASTG[g]; if (isLayer(g)) return; b.x0 = Math.max(0, b.x0); b.y0 = Math.max(0, b.y0); b.x1 = Math.min(sz.w, b.x1); b.y1 = Math.min(sz.h, b.y1); if (b.x1 <= b.x0 || b.y1 <= b.y0) delete LASTG[g]; }); })();
   PHTXT = null;
   EPV.style.width = Math.round(sz.w * z) + 'px'; EPV.style.height = Math.round(sz.h * z) + 'px';
   if (!ED.dragging && !ED.transforming) syncProxies();
@@ -67,8 +69,10 @@ function syncProxies() {
   if (!ED.layer) return;
   const z = ED.zoom, keep = {};
   // عناصر القالب: الأكبر أولاً فيبقى الأصغر فوقه وأسهل في الاختيار، ثم الطبقات المضافة بترتيبها
-  const keys = Object.keys(LASTG).filter(function (k) { return !isLayer(k); }).sort(function (a, b) { return area(LASTG[b]) - area(LASTG[a]); })
-    .concat((S.layers || []).map(function (L) { return 'L:' + L.id; }).filter(function (k) { return LASTG[k]; }));
+  // ترتيب الالتقاط يتبع ترتيب الرسم: عناصر القالب في مكانها الأصلي (الأكبر أولاً)، ثم المرتَّب يدوياً، ثم الطبقات العليا
+  const so = typeof stackOrder === 'function' ? stackOrder() : null;
+  const keys = (so ? so.base : Object.keys(LASTG).filter(function (k) { return !isLayer(k); })).filter(function (k) { return LASTG[k]; }).sort(function (a, b) { return area(LASTG[b]) - area(LASTG[a]); })
+    .concat((so ? so.front.concat(so.tail) : (S.layers || []).map(function (L) { return 'L:' + L.id; })).filter(function (k) { return LASTG[k]; }));
   function area(b) { return (b.x1 - b.x0) * (b.y1 - b.y0); }
   keys.forEach(function (g, i) {
     const b = LASTG[g]; if (!b) return; keep[g] = 1;
@@ -110,7 +114,7 @@ function layerH(L) {
   let ar = 1;
   if (L.t === 'sticker') ar = (STICKERS[L.ref] && STICKERS[L.ref].ar) || 1;
   else if (L.t === 'logo') { const k = L.ref === 'track' ? logoKey(S.track) : L.ref; const im = IMG[k]; if (im) ar = srcH(im) / srcW(im); }
-  else if (L.t === 'img') { const im = layerImg(L); if (im) ar = srcH(im) / srcW(im); }
+  else if (L.t === 'img') { const im = layerImg(L); if (im) ar = L.cr || srcH(im) / srcW(im); }
   return L.w * sz.w * ar;
 }
 function attachTr() {
@@ -130,6 +134,8 @@ function select(g) {
   attachTr(); ED.layer.batchDraw();
   buildToolbar();
   if (ED.tab === 'layers') buildPanel();
+  // لوحة «إعدادات العنصر» مفتوحة: تنتقل إلى العنصر المحدَّد الجديد
+  else if (ED.tab === 'el' && g && ED.elG !== g) { ED.elG = g; buildPanel(); }
 }
 
 /* ---------- السحب: التصاق بالمنتصف والهوامش والعناصر، وShift يقيّد المحور ---------- */
@@ -319,7 +325,7 @@ function buildToolbar() {
 }
 function segMini(items, cur, on) { return el('div', { class: 'tseg' }, items.map(function (it) { return el('button', { type: 'button', class: it[0] === cur ? 'on' : '', onclick: function (e) { $$('button', e.currentTarget.parentNode).forEach(function (x) { x.classList.remove('on'); }); e.currentTarget.classList.add('on'); on(it[0]); } }, [it[1]]); })); }
 function dupLayer(L) { const c = JSON.parse(JSON.stringify(L)); c.id = newId(); c.x += 0.03; c.y += 0.03; S.layers.push(c); S.sel = 'L:' + c.id; changed6(); setTimeout(function () { select(S.sel); }, 30); }
-function delLayer6(id) { S.layers = S.layers.filter(function (L) { return L.id !== id; }); select(null); changed6(); }
+function delLayer6(id) { S.layers = S.layers.filter(function (L) { return L.id !== id; }); S.front = (S.front || []).filter(function (g) { return g !== 'L:' + id; }); select(null); changed6(); }
 function addLayer6(L) {
   L.id = newId(); if (L.x == null) { L.x = 0.5; L.y = 0.5; }
   S.layers = (S.layers || []).concat([L]);

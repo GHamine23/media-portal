@@ -24,8 +24,14 @@ const GROUP_NAMES = { logo: 'الشعار', title: 'العنوان', sub: 'ال�
 function gName(g) {
   if (g && S.names && S.names[g]) return S.names[g];
   if (g && g.slice(0, 2) === 'L:') { const L = layerById(g.slice(2)); return L ? (LIB_LABEL[L.t] || 'عنصر') + (L.t === 'text' ? ': ' + String(L.txt || '').slice(0, 16) : '') : 'عنصر'; }
-  return GROUP_NAMES[g] || g;
+  if (GROUP_NAMES[g]) return GROUP_NAMES[g];
+  // عناصر مرقّمة (بند ١، صف ٢…): الاسم الأساسي ورقم بالأرقام المشرقية
+  const m = /^([a-z]+?)(\d+)$/i.exec(g || '');
+  if (m && GROUP_NUM[m[1]]) return GROUP_NUM[m[1]] + ' ' + String(+m[2] + 1).replace(/\d/g, function (x) { return '٠١٢٣٤٥٦٧٨٩'[+x]; });
+  return GROUP_NAMES2[g] || g;
 }
+const GROUP_NUM = { item: 'البند', row: 'الصف', li: 'الفقرة', it: 'الفقرة', info: 'سطر المعلومات', br: 'الفرع', card: 'البطاقة', stat: 'الرقم', step: 'المرحلة', sec: 'القسم', q: 'السؤال', p: 'الفقرة', h: 'العنوان الفرعي', qt: 'الاقتباس' };
+const GROUP_NAMES2 = { links: 'الوصلات', center: 'المفهوم المركزي', table: 'الجدول', terms: 'المصطلحات', sum: 'الخلاصة', items: 'البنود', stats: 'الأرقام', steps: 'خط المراحل', seal: 'الختم', sign: 'التوقيعات', frame: 'الإطار', label: 'التسمية', q: 'كبسولة السؤال', q2: 'كبسولة المحتويات', note: 'الملاحظة', run: 'العنوان الجاري', num: 'رقم الفصل', fields: 'خانات الطالب', cards: 'البطاقات', branches: 'الفروع', meta: 'سطر المعلومات', eyebrow: 'الكلمة العلوية', ribbon: 'شريط الزاوية', stepsHead: 'عنوان المراحل', author: 'الإعداد', edition: 'الطبعة', seal2: 'الختم', time: 'الموعد', who2: 'المقدّم', cta: 'زر الدعوة', text: 'النص', tz: 'التوقيت', day: 'اليوم', links2: 'الوصلات' };
 const LIB_LABEL = { ticon: 'أيقونة', qr: 'رمز QR', sticker: 'زخرفة', icon: 'أيقونة', logo: 'شعار', img: 'صورة', text: 'نص', video: 'فيديو', yt: 'يوتيوب', audio: 'صوت' };
 
 /* ---------- الطبقات: عناصر مضافة من المكتبة ---------- */
@@ -67,7 +73,7 @@ function allLogos() {
 function newId() { return Math.random().toString(36).slice(2, 9); }
 function layerById(id) { return (S.layers || []).find(function (L) { return L.id === id; }); }
 function layerImg(L) {
-  if (L.t === 'img') { const p = photoOf({ src: L.ref, z: 1, ox: 0, oy: 0 }); return p && p.im; }
+  if (L.t === 'img') { const p = photoOf({ src: L.ref, z: 1, ox: 0, oy: 0, fx: L.fx, fh: L.fh, fv: L.fv }); return p && p.im; }
   return null;
 }
 function drawLayer(ctx, W, H, L, T) {
@@ -85,7 +91,7 @@ function drawLayer(ctx, W, H, L, T) {
     let ar = 1, src = null;
     if (L.t === 'sticker') ar = (STICKERS[L.ref] && STICKERS[L.ref].ar) || 1;
     if (L.t === 'logo') { const k = L.ref === 'track' ? logoKey(T) : L.ref; const mask = k === 'academy' || k === 'social'; src = (!mask && (!L.c || L.c === 'color')) ? IMG[k] : tinted(k, L.c && L.c !== 'color' ? L.c : '#2b2b2b'); if (src) ar = srcH(src) / srcW(src); }
-    if (L.t === 'img') { src = layerImg(L); if (src) ar = srcH(src) / srcW(src); }
+    if (L.t === 'img') { src = layerImg(L); if (src) ar = L.cr || srcH(src) / srcW(src); }   // cr: نسبة قصّ الإطار (الارتفاع إلى العرض)
     if (L.t === 'video') { src = L.poster ? layerImg({ t: 'img', ref: L.poster }) : null; ar = src ? srcH(src) / srcW(src) : 9 / 16; }
     if (L.t === 'yt') ar = ({ '9:16': 16 / 9, '4:3': 3 / 4, '1:1': 1 })[L.ar] || 9 / 16;
     if (L.t === 'audio') ar = 0.22;
@@ -113,13 +119,36 @@ function drawLayer(ctx, W, H, L, T) {
       const r = h * 0.3; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(w / 2 - h * 0.62 - r * 0.4, -r * 0.6); ctx.lineTo(w / 2 - h * 0.62 + r * 0.6, 0); ctx.lineTo(w / 2 - h * 0.62 - r * 0.4, r * 0.6); ctx.closePath(); ctx.fill();
       line(ctx, L.title || 'صوت', w / 2 - h * 1.1, 0, { size: h * 0.42, color: '#ffffff', align: 'right', maxW: w - h * 1.4 });
     }
-    else if (src) {
-      if (L.t === 'img' && L.r) { ctx.save(); rrect(ctx, -w / 2, -h / 2, w, h, Math.min(w, h) * L.r); ctx.clip(); ctx.drawImage(src, -w / 2, -h / 2, w, h); ctx.restore(); }
-      else ctx.drawImage(src, -w / 2, -h / 2, w, h);
-    }
+    else if (src && L.t === 'img') drawImgLayer(ctx, src, w, h, L, T);
+    else if (src) ctx.drawImage(src, -w / 2, -h / 2, w, h);
     BOXES = save; GBOX = gb;
   }
   ctx.restore();
+}
+// صورة مضافة: إطار بقصّ وشكل، وتكبير وإزاحة داخله، وظل وإطار ولون فوقها وتلاشي الأطراف
+function drawImgLayer(ctx, src, w, h, L, T) {
+  const x = -w / 2, y = -h / 2, mk = L.mk || 'rect', r = L.r || 0;
+  const iw = srcW(src), ih = srcH(src), sc = Math.max(w / iw, h / ih) * (L.z || 1), dw = iw * sc, dh = ih * sc;
+  const dx = x + (w - dw) / 2 + (L.ox || 0) * (dw - w) / 2, dy = y + (h - dh) / 2 + (L.oy || 0) * (dh - h) / 2;
+  if (L.sh) { ctx.save(); ctx.shadowColor = 'rgba(0,0,0,' + (0.18 + 0.3 * (+L.sh || 0.5)) + ')'; ctx.shadowBlur = Math.max(w, h) * 0.06 * (+L.sh || 0.5) * 2; ctx.shadowOffsetY = Math.max(w, h) * 0.02 * (+L.sh || 0.5) * 2; ctx.fillStyle = '#000'; maskPath(ctx, mk, x, y, w, h, r); ctx.fill(); ctx.restore(); }
+  const fe = +L.fe || 0;
+  if (fe > 0.01) {
+    // تلاشي الأطراف: نرسم في لوحة جانبية بدقة الرسم الحالية ثم نمسح الأطراف بتدرّج
+    let k = 1; try { const t = ctx.getTransform(); k = Math.hypot(t.a, t.b) || 1; } catch (e) {}
+    const cw = Math.max(1, Math.round(w * k)), ch = Math.max(1, Math.round(h * k)), c = document.createElement('canvas'); c.width = cw; c.height = ch;
+    const g = c.getContext('2d'); g.scale(k, k); g.translate(w / 2, h / 2); g.imageSmoothingQuality = 'high';
+    maskPath(g, mk, x, y, w, h, r); g.clip(); g.drawImage(src, dx, dy, dw, dh);
+    if (L.tc) { g.globalAlpha = L.ta == null ? 0.35 : +L.ta; g.fillStyle = L.tc === 'p' ? T.c.p : L.tc; g.fillRect(x, y, w, h); g.globalAlpha = 1; }
+    g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'destination-in';
+    const gr = g.createRadialGradient(cw / 2, ch / 2, Math.min(cw, ch) * (0.5 - fe * 0.5), cw / 2, ch / 2, Math.hypot(cw, ch) / 2 * (1 - fe * 0.25));
+    gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, cw, ch);
+    ctx.drawImage(c, x, y, w, h);
+  } else {
+    ctx.save(); maskPath(ctx, mk, x, y, w, h, r); ctx.clip(); ctx.drawImage(src, dx, dy, dw, dh);
+    if (L.tc) { ctx.globalAlpha *= L.ta == null ? 0.35 : +L.ta; ctx.fillStyle = L.tc === 'p' ? T.c.p : L.tc; ctx.fillRect(x, y, w, h); }
+    ctx.restore();
+  }
+  if (L.bw) { const lw = Math.min(w, h) * L.bw; ctx.save(); ctx.lineWidth = lw; ctx.strokeStyle = !L.bc || L.bc === 'p' ? T.c.p : L.bc; maskPath(ctx, mk, x + lw / 2, y + lw / 2, w - lw, h - lw, Math.max(0, r - L.bw / 2)); ctx.stroke(); ctx.restore(); }
 }
 // أيقونة من مجموعة Tabler: مسارات 24×24 تُرسم بالخط
 function drawTIcon(ctx, name, w, color, lw) {
