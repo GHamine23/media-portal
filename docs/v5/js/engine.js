@@ -368,6 +368,7 @@ function drawFit(ctx, f, x, y, o) {
       if (r.sp) xr -= sp;
       const col = r.hl ? ((gs && gs.h) || o.hl || hlFor(o.color)) : ((gs && gs.c) || o.color);
       ctx.fillStyle = col;
+      if (o.ol) { ctx.save(); ctx.shadowColor = 'transparent'; ctx.strokeStyle = o.ol; ctx.lineWidth = f.size * (o.olw || 0.08); ctx.lineJoin = 'round'; ctx.miterLimit = 2; ctx.strokeText(r.t, xr, yc); ctx.restore(); }   // حدّ حول الحروف (نص مضاف)
       if (f.stroke) { ctx.strokeStyle = col; ctx.lineWidth = f.size * 0.045 * f.stroke; ctx.lineJoin = 'round'; ctx.strokeText(r.t, xr, yc); }
       ctx.fillText(r.t, xr, yc);
       xr -= ctx.measureText(r.t).width;

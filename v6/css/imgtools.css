@@ -15,3 +15,9 @@
 .imgdet > summary::-webkit-details-marker { display: none; }
 .imgdet > summary svg { width: 18px; height: 18px; color: var(--ac); }
 .imgdet .imgtools { border-top: 0; margin-top: 4px; }
+/* شريط المحاذاة */
+.albar { display: flex; align-items: center; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+.albar .tiny { margin-inline-end: 4px; }
+.alb { width: 38px; height: 36px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--line, #e3e3e3); background: #fff; color: var(--ink, #222); cursor: pointer; }
+.alb:hover { background: var(--ac-t); color: var(--ac-ink); border-color: var(--ac); }
+.alsep { width: 1px; height: 22px; background: var(--line, #e3e3e3); margin: 0 4px; }

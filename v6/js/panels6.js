@@ -548,6 +548,35 @@ function imageTools(b, tgt) {
   }
   b.appendChild(box);
 }
+/* ---------- المحاذاة: العنصر إلى حواف التصميم أو وسطه (بهامش التصميم) ---------- */
+const AL_IC = {
+  r: '<path d="M20 4v16M6 8h10v3H6zM9 13h7v3H9z"/>', ch: '<path d="M12 4v16M6 8h12v3H6zM8 13h8v3H8z"/>', l: '<path d="M4 4v16M8 8h10v3H8zM8 13h7v3H8z"/>',
+  t: '<path d="M4 4h16M8 6v10h3V6zM13 6v7h3V6z"/>', cv: '<path d="M4 12h16M8 6v12h3V6zM13 8v8h3V8z"/>', b: '<path d="M4 20h16M8 18V8h3v10zM13 18v-7h3v7z"/>'
+};
+function alignBar(g) {
+  const go = function (k) {
+    const bx = LASTG[g]; if (!bx) return; const sz = SIZES[S.size], m = margin(); S.sel = g;
+    const dx = k === 'r' ? (sz.w - m) - bx.x1 : k === 'l' ? m - bx.x0 : k === 'ch' ? sz.w / 2 - (bx.x0 + bx.x1) / 2 : 0;
+    const dy = k === 't' ? m - bx.y0 : k === 'b' ? (sz.h - m) - bx.y1 : k === 'cv' ? sz.h / 2 - (bx.y0 + bx.y1) / 2 : 0;
+    moveSel(dx, dy); changed6();
+  };
+  const bt = function (k, t) { const x = el('button', { type: 'button', class: 'alb', title: t, 'aria-label': t, onclick: function () { go(k); } }); x.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px">' + AL_IC[k] + '</svg>'; return x; };
+  return el('div', { class: 'albar' }, [el('span', { class: 'tiny', text: 'محاذاة' }), bt('r', 'إلى اليمين'), bt('ch', 'وسط أفقي'), bt('l', 'إلى اليسار'), el('i', { class: 'alsep' }), bt('t', 'إلى الأعلى'), bt('cv', 'وسط رأسي'), bt('b', 'إلى الأسفل')]);
+}
+/* ---------- تأثيرات النص المضاف: تباعد الأسطر، الظل، الحدّ، الخلفية ---------- */
+function textEffects(b, L) {
+  const box = el('div', { class: 'imgtools' }, [el('h4', { class: 'psh', text: 'تأثيرات النص' })]);
+  box.appendChild(slider('تباعد الأسطر', L.lh || 1.32, 0.9, 2.2, 0.02, function (v) { return v.toFixed(2); }, function (v) { L.lh = v; }));
+  box.appendChild(slider('الظل', L.ts || 0, 0, 1, 0.02, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { L.ts = v || 0; }));
+  box.appendChild(el('div', { class: 'crow6' }, [el('span', { text: 'حدّ حول الحروف' }), colorBtn(L.olc || '', 'لون الحدّ', function (c) { if (c) { L.olc = c; if (!L.olw) L.olw = 0.08; } else { delete L.olc; delete L.olw; } changed6(); buildPanel(); }, { orig: true, origLabel: 'بلا' })]));
+  if (L.olc) box.appendChild(slider('سُمك الحدّ', L.olw || 0.08, 0.02, 0.3, 0.01, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { L.olw = v; }));
+  box.appendChild(el('div', { class: 'crow6' }, [el('span', { text: 'خلفية خلف النص' }), colorBtn(L.bgc || '', 'لون الخلفية', function (c) { if (c) L.bgc = c; else delete L.bgc; changed6(); buildPanel(); }, { orig: true, origLabel: 'بلا' })]));
+  if (L.bgc) {
+    box.appendChild(slider('حشوة الخلفية', L.bgp == null ? 0.45 : L.bgp, 0.1, 1.2, 0.02, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { L.bgp = v; }));
+    box.appendChild(slider('استدارة الخلفية', L.bgr == null ? 0.35 : L.bgr, 0, 1, 0.02, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { L.bgr = v; }));
+  }
+  b.appendChild(box);
+}
 function openElPanel(g) {
   ED.elG = g; ED.prevTab = ED.tab === 'el' ? ED.prevTab : ED.tab; ED.tab = 'el';
   if (S.sel !== g) select(g);
@@ -608,6 +637,7 @@ function pEl(b) {
     }
     if (L.t === 'text') b.appendChild(el('div', { class: 'row wrapr' }, [segMini([['0', 'عادي'], ['0.6', 'عريض'], ['1', 'أعرض']], String(L.b >= 0.9 ? 1 : L.b >= 0.5 ? 0.6 : 0), function (v) { L.b = +v; changed6(); }),
       segMini([['right', 'يمين'], ['center', 'وسط'], ['left', 'يسار']], L.al || 'center', function (v) { L.al = v; changed6(); })]));
+    if (L.t === 'text') textEffects(b, L);
   } else b.appendChild(slider('الحجم', st.s || 1, 0.3, 4, 0.01, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { setGs(g, 's', v); }));
   // الألوان
   const cols = el('div', { class: 'row wrapr elcols' });
@@ -623,9 +653,11 @@ function pEl(b) {
   b.appendChild(el('div', { class: 'row wrapr' }, [
     el('button', { type: 'button', class: 'btn sm line', onclick: function () { moveInStack(g, 1); } }, [ico('up'), 'للأعلى']),
     el('button', { type: 'button', class: 'btn sm line', onclick: function () { moveInStack(g, -1); } }, [ico('down'), 'للأسفل']),
-    el('button', { type: 'button', class: 'btn sm line', onclick: function () { const bx = LASTG[g]; S.sel = g; moveSel(SIZES[S.size].w / 2 - (bx.x0 + bx.x1) / 2, 0); changed6(); } }, ['توسيط أفقي']),
+    el('button', { type: 'button', class: 'btn sm line', title: 'فوق كل العناصر', onclick: function () { for (let i = 0; i < 80; i++) { const a = stackOrder().all; if (a.indexOf(g) >= a.length - 1) break; moveInStack(g, 1); } } }, [ico('front'), 'إلى الأعلى تماماً']),
+    el('button', { type: 'button', class: 'btn sm line', title: 'تحت كل العناصر', onclick: function () { for (let i = 0; i < 80; i++) { if (stackOrder().all.indexOf(g) <= 0) break; moveInStack(g, -1); } } }, [ico('back'), 'إلى الأسفل تماماً']),
     L ? null : el('button', { type: 'button', class: 'btn sm line', onclick: function () { const q = posOf(g); q.dx = 0; q.dy = 0; delete S.gs[g]; S.front = (S.front || []).filter(function (x) { return x !== g; }); changed6(); buildPanel(); } }, [ico('reset'), 'كما في القالب'])
   ]));
+  b.appendChild(alignBar(g));
   b.appendChild(el('div', { class: 'row wrapr', style: 'margin-top:8px' }, L ? [
     el('button', { type: 'button', class: 'btn sm line', onclick: function () { dupLayer(L); } }, [ico('copy'), 'تكرار']),
     el('button', { type: 'button', class: 'btn sm line', onclick: function () { saveElement([L]); } }, [ico('star'), 'احفظه عنصراً']),

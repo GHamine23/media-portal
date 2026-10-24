@@ -1802,6 +1802,12 @@ body.in-editor .gx-intro{top:calc(var(--top) + 12px);bottom:auto}
 .imgdet > summary::-webkit-details-marker { display: none; }
 .imgdet > summary svg { width: 18px; height: 18px; color: var(--ac); }
 .imgdet .imgtools { border-top: 0; margin-top: 4px; }
+/* شريط المحاذاة */
+.albar { display: flex; align-items: center; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+.albar .tiny { margin-inline-end: 4px; }
+.alb { width: 38px; height: 36px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--line, #e3e3e3); background: #fff; color: var(--ink, #222); cursor: pointer; }
+.alb:hover { background: var(--ac-t); color: var(--ac-ink); border-color: var(--ac); }
+.alsep { width: 1px; height: 22px; background: var(--line, #e3e3e3); margin: 0 4px; }
 
 /* ===== progmark.css ===== */
 /* شعار البرنامج المفتوح في الرئيسية: سطر واحد مكان التحية، الشعار يُكتب من اليمين ثم يظهر خط ذهبي والدفعة */
@@ -1996,14 +2002,14 @@ body.in-editor .gx-intro{top:calc(var(--top) + 12px);bottom:auto}
 <main id="view"></main>
 <script src="js/config.js?v=b79cfa4c64"></script>
 <script src="js/konva.min.js?v=65c5c4e432"></script>
-<script src="js/engine.js?v=8259422517"></script>
+<script src="js/engine.js?v=754979d193"></script>
 <script src="js/identities.js?v=867f3e03db"></script>
 <script src="js/templates.js?v=5e193e0810"></script>
 <script src="js/templates2.js?v=da35b150db"></script>
 <script src="js/templates3.js?v=0f2ff161cf"></script>
 <script src="js/templates4.js?v=2e2e28da1d"></script>
 <script src="js/core5.js?v=419c7c89f5"></script>
-<script src="js/studio.js?v=2f491d4b33"></script>
+<script src="js/studio.js?v=917f2a575e"></script>
 <script src="js/slides.js?v=849b6bf589"></script>
 <script src="js/qr.js?v=4c79be1679"></script>
 <script src="js/ticons.js?v=d1041b1786"></script>
@@ -2018,7 +2024,7 @@ body.in-editor .gx-intro{top:calc(var(--top) + 12px);bottom:auto}
 <script src="js/kb6.js?v=8f7305f987"></script>
 <script src="js/guide6.js?v=c4636f695a"></script>
 <script src="js/editor6.js?v=69f9abcd78"></script>
-<script src="js/panels6.js?v=ae269b9832"></script>
+<script src="js/panels6.js?v=47b96e3bfd"></script>
 <script src="js/docs6.js?v=476f6ee7f8"></script>
 <script src="js/make6.js?v=a6b2855dcb"></script>
 <script src="js/caption6.js?v=ee66ba7087"></script>

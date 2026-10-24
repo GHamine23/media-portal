@@ -50,6 +50,17 @@ async def main():
         ok(await pg.evaluate("!!document.querySelector('.imgtools')"), 'template photo element has image tools')
         await pg.evaluate("S.d.photo.fx={sp:1}; changed6(); drawNow()"); await pg.wait_for_timeout(500)
         ok(await pg.evaluate("snap().d.photo.fx.sp") == 1, 'filter saved with the design')
+        # المحاذاة وتأثيرات النص
+        await pg.evaluate("addLayer6({t:'text', txt:'نص تجربة للمحاذاة', w:0.5, sz:0.06})"); await pg.wait_for_timeout(600)
+        tl = await pg.evaluate("S.sel")
+        await pg.evaluate("l => openElPanel(l)", tl); await pg.wait_for_timeout(500)
+        ok(await pg.evaluate("document.querySelectorAll('.albar .alb').length") == 6, 'alignment bar with six directions')
+        await pg.click('.albar .alb[title="إلى الأعلى"]'); await pg.wait_for_timeout(500)
+        top = await pg.evaluate("l => LASTG[l].y0 - margin()", tl)
+        ok(abs(top) < 2, 'align to top margin (off by %.1f)' % top)
+        ok('تأثيرات النص' in await pg.evaluate("document.querySelector('#e_panel').textContent"), 'text effects section for added text')
+        await pg.evaluate("l => { const L=layerById(l.slice(2)); L.bgc='#222222'; L.olc='#ffffff'; L.olw=0.1; L.ts=0.6; L.lh=1.6; changed6(); drawNow(); }", tl); await pg.wait_for_timeout(500)
+        await pg.screenshot(path=OUT + 'aa2_text.png')
         await pg.evaluate("ED.leaveOK=true")
         # الجوال
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True)
