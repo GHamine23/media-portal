@@ -156,12 +156,12 @@ async function savePrefs6(patch) { V6.me.prefs = Object.assign({}, V6.me.prefs |
    على الشاشات الضيقة يختفي شريط التنقل، فتنتقل أقسامه إلى أعلى قائمة الصورة. */
 function navItems() {
   return [['#/', 'home', 'الرئيسية', 'home'], progFeat('ai') ? ['#/make', 'make', 'اصنع إعلانك', 'ai'] : null, ['#/mine', 'mine', 'تصاميمي', 'heart'], ['#/cal', 'cal', 'التقويم', 'cal'], ['#/tips', 'tips', 'نصائح', 'star'],
-    isAdmin() ? ['#/admin', 'admin', 'الإدارة', 'gear'] : null].filter(Boolean);
+    ['#/guide', 'guide', 'دليل أثر', 'guide', 'nguide'], isAdmin() ? ['#/admin', 'admin', 'الإدارة', 'gear'] : null].filter(Boolean);
 }
 function navHidden() { const n = $('#top .nav'); return !n || n.getBoundingClientRect().width === 0; }
 function buildTop() {
   const top = $('#top'); top.hidden = false; top.innerHTML = '';
-  const nav = el('nav', { class: 'nav', 'aria-label': 'التنقل' }, navItems().map(function (n) { return el('a', { href: n[0], 'data-r': n[1], text: n[2] }); }));
+  const nav = el('nav', { class: 'nav', 'aria-label': 'التنقل' }, navItems().map(function (n) { return n[4] ? el('a', { href: n[0], 'data-r': n[1], class: n[4] }, [ico(n[3]), el('span', { text: n[2] })]) : el('a', { href: n[0], 'data-r': n[1], text: n[2] }); }));
   const progs = V6.bundle.programs;
   const psw = el('button', { type: 'button', class: 'prog-sw', id: 'progsw', 'aria-label': 'تبديل البرنامج', onclick: function () {
     if (progs.length < 2) return;
@@ -178,7 +178,6 @@ function buildTop() {
         { t: 'أسبوعي في أثر', ic: 'chart', href: '#/week' },
         { t: 'مراجعاتي', ic: 'review', href: '#/reviews' },
         fbHidden ? { t: 'ملاحظة للفريق', ic: 'chat', fn: function () { showFeedback6(); } } : null,
-        { t: 'دليل أثر', ic: 'guide', href: '#/guide' },   // المقدمات والجولات والأسئلة في مكان واحد
         '-', { t: 'خروج', ic: 'logout', fn: logout }]).filter(Boolean));
   } });
   if (V6.me.avatar) av.appendChild(el('img', { src: V6.me.avatar, alt: '' }));

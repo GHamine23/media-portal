@@ -191,7 +191,7 @@ async def main():
         # ٥) نقاط الدخول: قائمة الصورة، ما الجديد
         await pg.click('#avatar'); await pg.wait_for_timeout(300)
         mt = await pg.inner_text('.menu')
-        ok('دليل أثر' in mt and 'جولة تعريفية' not in mt, 'avatar menu: «دليل أثر» replaces the tour item (one place)')
+        ok('جولة تعريفية' not in mt and await pg.evaluate("!!document.querySelector('.nav a.nguide[href=\"#/guide\"]')"), '«دليل أثر» in the top nav (distinct), tour item gone from the avatar menu')
         await pg.keyboard.press('Escape'); await pg.mouse.click(700, 500); await pg.wait_for_timeout(200)
         await pg.evaluate("showNews()"); await pg.wait_for_timeout(500)
         ok(await pg.query_selector('.modal .gnews') is not None, '«ما الجديد» links to the guide')

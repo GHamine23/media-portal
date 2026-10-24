@@ -1693,6 +1693,12 @@ body.in-editor .gx-intro{top:calc(var(--top) + 12px);bottom:auto}
 .nclip{display:inline-flex;align-items:center;gap:3px;margin-inline-start:8px;font-size:13px;color:var(--ac-ink);text-decoration:none;background:var(--ac-t);padding:1px 9px;border-radius:99px}
 .nclip svg{width:12px;height:12px;fill:currentColor}
 @media (prefers-reduced-motion:reduce){.gx-intro,.gx-panel{filter:none!important}}
+/* «دليل أثر» في شريط التنقل: مميَّز بلون دافئ وأيقونة، فيُعرف من بين الأقسام */
+.nav a.nguide{display:inline-flex;align-items:center;gap:6px;color:#9a4a0e;background:linear-gradient(135deg,#fff3e6,#ffe6cc);box-shadow:inset 0 0 0 1px rgba(240,115,31,.28);font-weight:600}
+.nav a.nguide svg{width:16px;height:16px;color:#f0731f}
+.nav a.nguide:hover{color:#7a3a0b;background:linear-gradient(135deg,#ffecd9,#ffdcb8)}
+.nav a.nguide.on{color:#fff;background:linear-gradient(135deg,#f0731f,#d4580c);box-shadow:0 6px 16px -8px #f0731f}
+.nav a.nguide.on svg{color:#fff}
 
 /* ===== ia.css ===== */
 /* ===== بنية الموقع والصفحات العامة (ia): الرأس، حسابي، الرئيسية، الإدارة ===== */
@@ -1950,10 +1956,10 @@ body.in-editor .gx-intro{top:calc(var(--top) + 12px);bottom:auto}
 <script src="js/core6.js?v=93c35b93f2"></script>
 <script src="js/freetpl6.js?v=ec4f7b8631"></script>
 <script src="js/assets6.js?v=f312f9f69f"></script>
-<script src="js/auth6.js?v=ec4a6f249e"></script>
+<script src="js/auth6.js?v=9fd9b378fe"></script>
 <script src="js/home6.js?v=c3a0c51477"></script>
 <script src="js/updates6.js?v=1210eaa02d"></script>
-<script src="js/motion6.js?v=73fdf4594c"></script>
+<script src="js/motion6.js?v=4223fd5d34"></script>
 <script src="js/kb6.js?v=8f7305f987"></script>
 <script src="js/guide6.js?v=c4636f695a"></script>
 <script src="js/editor6.js?v=0f2a69f94e"></script>

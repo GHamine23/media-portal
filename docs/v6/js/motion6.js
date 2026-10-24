@@ -47,7 +47,8 @@ const MO = (function () {
     const k = K, x = (o.x || 0) * k, y = (o.y || 0) * k, r = (o.r || 0) * k;
     let s = o.s == null ? 1 : o.s; s = 1 + (s - 1) * (k < 1 ? 0.15 : 1);
     const sx = o.sx == null ? 1 : 1 + (o.sx - 1) * (k < 1 ? 0.15 : 1), sy = o.sy == null ? 1 : 1 + (o.sy - 1) * (k < 1 ? 0.15 : 1);
-    let tr = 'translate3d(' + x.toFixed(2) + 'px,' + y.toFixed(2) + 'px,0)';
+    // تحويل ثنائي الأبعاد: لا طبقة مستقلة لكل عنصر، فلا تقفز العناصر بكسلاً هنا وهناك (كان يبدو اهتزازاً)
+    let tr = 'translate(' + x.toFixed(2) + 'px,' + y.toFixed(2) + 'px)';
     if (r) tr += ' rotate(' + r.toFixed(3) + 'deg)';
     if (s !== 1) tr += ' scale(' + s.toFixed(4) + ')';
     if (sx !== 1 || sy !== 1) tr += ' scale(' + sx.toFixed(4) + ',' + sy.toFixed(4) + ')';
@@ -232,6 +233,7 @@ const MO = (function () {
     '.mo-stage *{box-sizing:border-box;transition:none!important;animation:none!important}',
     '.mo-stage svg{display:block}',
     '.mo-a{position:absolute}',
+    '.mo-pl .mo-stage{will-change:transform;backface-visibility:hidden}',
     '.mo-sc{position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;transform-origin:50% 50%}',
     '.mo-kt{font-family:var(--mo-fd);line-height:1.32;text-wrap:balance}',
     '.mo-kt.t{font-family:var(--mo-ft)}',
@@ -1301,7 +1303,7 @@ const MO = (function () {
   }
 
   /* ================= المشاهد ================= */
-  function camera(root, d) { const cam = A(root, 0, 0, null, null); css(cam, { left: '0', top: '0', right: '0', bottom: '0', transformOrigin: '50% 50%' }); return { e: cam, up: function (lt) { T(cam, { s: 1 + 0.035 * E.lin(P(lt, 0, d)) }); } }; }
+  function camera(root, d) { const cam = A(root, 0, 0, null, null); css(cam, { left: '0', top: '0', right: '0', bottom: '0', transformOrigin: '50% 50%' }); return { e: cam, up: function (lt) { T(cam, { s: 1 + 0.035 * (1 - E.o3(P(lt, 0, 0.9))) }); } }; }   // دخول بتقريب يستقر سريعاً ثم ثبات: التكبير البطيء المستمر كان يُرى اهتزازاً في النصوص
   // مشهد قياسي: رأس + مكوّن
   function stdScene(d, opt, mkComp, beats, compAt) {
     return {

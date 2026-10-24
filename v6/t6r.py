@@ -26,7 +26,7 @@ async def main():
         errs = await setup(pg)
         # الرأس: الأقسام في التنقل، وما يخصك في قائمة الصورة
         nav = await pg.evaluate("Array.from(document.querySelectorAll('.nav a')).map(a=>a.textContent)")
-        ok(nav == ['الرئيسية', 'اصنع إعلانك', 'تصاميمي', 'التقويم', 'نصائح', 'الإدارة'], 'top nav: ' + '،'.join(nav))
+        ok(nav == ['الرئيسية', 'اصنع إعلانك', 'تصاميمي', 'التقويم', 'نصائح', 'دليل أثر', 'الإدارة'], 'top nav: ' + '،'.join(nav))
         await pg.click('#avatar'); await pg.wait_for_timeout(300)
         menu = await pg.evaluate("Array.from(document.querySelectorAll('.menu a,.menu button')).map(a=>a.textContent.trim())")
         ok(not (set(menu) & set(nav)) and {'حسابي', 'أسبوعي في أثر', 'مراجعاتي', 'خروج'} <= set(menu), 'avatar menu personal only, no nav duplicates: ' + '،'.join(menu))
