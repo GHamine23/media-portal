@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>تصدير أفلام الحركة</title>
+<!-- صفحة التصدير فقط (لا تُنشر): ترسم إطارات فيلم الحركة واحداً واحداً بالمحرك نفسه، وتولّد الصوت دون اتصال -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=block">
+<style>
+:root{--ac:#4f46e5}
+html,body{margin:0;background:#000;overflow:hidden}
+#host{position:absolute;left:0;top:0;overflow:hidden}
+</style>
+</head>
+<body>
+<div id="host"></div>
+<script src="../docs/v6/js/brand6.js"></script>
+<script src="js/motion6.js"></script>
+<script>
+(function () {
+  const q = new URLSearchParams(location.search), W = +q.get('w') || 1920, H = +q.get('h') || 1080, host = document.getElementById('host');
+  host.style.width = W + 'px'; host.style.height = H + 'px';
+  const st = document.createElement('style');
+  // خط ثمانية إن وُفّرت ملفاته محلياً عبر سكربت التصدير (لا تُرفع إلى المستودع)، وإلا IBM Plex Sans Arabic
+  if (q.get('thm')) st.textContent = "@font-face{font-family:'thm-display';src:url(thm/thmanyahserifdisplay-Bold.otf);font-weight:700}@font-face{font-family:'thm-display';src:url(thm/thmanyahserifdisplay-Medium.otf);font-weight:500 600}@font-face{font-family:'thm-text';src:url(thm/thmanyahseriftext-Regular.otf);font-weight:400}@font-face{font-family:'thm-text';src:url(thm/thmanyahseriftext-Medium.otf);font-weight:500 700}:root{--fd:'thm-display','IBM Plex Sans Arabic',sans-serif;--ft:'thm-text','IBM Plex Sans Arabic',sans-serif}";
+  else st.textContent = ":root{--fd:'IBM Plex Sans Arabic',sans-serif;--ft:'IBM Plex Sans Arabic',sans-serif}";
+  document.head.appendChild(st);
+  if (q.get('ac')) document.documentElement.style.setProperty('--ac', '#' + q.get('ac'));
+  window.moReady = (async function () {
+    const fams = q.get('thm') ? ["700 60px thm-display", "500 60px thm-display", "400 30px thm-text", "600 30px thm-text"] : [];
+    ['400', '500', '600', '700'].forEach(function (w) { fams.push(w + " 40px 'IBM Plex Sans Arabic'"); });
+    await Promise.all(fams.map(function (f) { return document.fonts.load(f, 'منصة الأثر ١٢٣').catch(function () {}); }));
+    await document.fonts.ready;
+    renderMotionFrame(q.get('clip') || 'launch', 0, host, { portrait: H > W });
+    return true;
+  })();
+  window.moFrame = function (id, t) { renderMotionFrame(id, t, host, { portrait: H > W }); };
+})();
+</script>
+</body>
+</html>
