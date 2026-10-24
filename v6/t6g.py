@@ -55,7 +55,7 @@ async def main():
         q = await pg.evaluate("API6.me('tg_queue','academy')"); ok(len([x for x in q if x['status']=='queued']) == 1 and any('11:45' in __import__('datetime').datetime.fromtimestamp(x['when']/1000).strftime('%H:%M') for x in q if x['status']=='queued'), 'queue has one updated scheduled post')
         await pg.screenshot(path=OUT + 'm3b_scheduled.png'); await clean(pg)
         await pg.evaluate("typeof ED!=='undefined' && ED.open && (ED.leaveOK=true)"); await pg.goto(URL + '#/'); await pg.wait_for_timeout(2500); await clean(pg)
-        ok(await pg.evaluate("document.querySelectorAll('.cal6 .cd.has').length") == 1 and 'القادم في التقويم' in await pg.inner_text('.clock6'), 'calendar shows the scheduled post')
+        ok(await pg.evaluate("document.querySelectorAll('.cal6 .cd.has').length") == 1 and 'القادم في التقويم' in await pg.inner_text('#view'), 'calendar shows the scheduled post')
         await pg.screenshot(path=OUT + 'm4_calendar.png')
         await pg.evaluate("typeof ED!=='undefined' && ED.open && (ED.leaveOK=true)"); await pg.goto(URL + '#/admin/tg'); await pg.wait_for_timeout(2000)
         t = await pg.inner_text('#abody'); ok('مجدول' in t and 'أُرسل' in t, 'admin queue lists sent + scheduled')

@@ -345,7 +345,7 @@ function updUndo6() { const u = $('#e_undo'), r = $('#e_redo'); if (u) u.disable
 /* ---------- التنزيل والمشاركة ---------- */
 function dlMenu(btn) {
   const items = [{ hd: 'تنزيل بجودة عالية' }, { t: 'صورة PNG (أعلى جودة)', ic: 'download', fn: function () { exportImg6('png'); } }, { t: 'صورة JPG (حجم أخف)', ic: 'download', fn: function () { exportImg6('jpg'); } }];
-  if (ED.doc.kind === 'deck') items.push({ t: 'العرض كاملاً PDF', ic: 'slides', fn: exportPdf6 }, { t: 'عرض بملء الشاشة', ic: 'play', fn: present6 });
+  if (ED.doc.kind === 'deck') items.push({ t: 'العرض كاملاً PDF', ic: 'slides', fn: exportPdf6 }, { t: 'افتح في كانفا', ic: 'share', fn: openInCanva }, { t: 'عرض بملء الشاشة', ic: 'play', fn: present6 });
   if (navigator.canShare) items.push('-', { t: 'مشاركة مباشرة', ic: 'share', fn: function () { exportImg6('png', true); } });
   if (ED.doc.kind !== 'deck') items.push('-', { t: 'النشر في القناة', ic: 'send', fn: function () { openPublish(true); } });
   popMenu(btn, items);
@@ -392,6 +392,7 @@ async function exportPdf6() {
   const blob = buildPdf(pages, 960, 540), url = URL.createObjectURL(blob);
   const a = el('a', { href: url, download: fileName6('pdf') }); document.body.appendChild(a); a.click(); a.remove();
   track('export', { tpl: 'deck' }); archive6('pdf'); toast('بدأ تنزيل العرض (' + pages.length + ' شرائح)');
+  return true;
 }
 /* العرض الحي انتقل إلى slides6.js */
 

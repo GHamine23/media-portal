@@ -70,7 +70,7 @@ function showSlides6(tid) {
         idSel]),
       heroPv
     ]),
-    el('div', { class: 'wrap' }, [
+    el('div', { class: 'wrap slpage' }, [
       el('section', { class: 'hsec' }, [el('div', { class: 'shead' }, [H('h2', 'ابدأ من عرض جاهز'), el('span', { class: 'tiny', text: 'افتحه ثم بدّل النصوص' })]),
         stripNav(el('div', { class: 'strip sldecks' }, samples.map(function (s, i) {
           const first = s.slides[0], tpl = slideTpl(first.tpl), st = { d: Object.assign(defaults(tpl, T), first.d), variant: s.style || tpl.variants[0].id, k: 1 };
@@ -83,19 +83,26 @@ function showSlides6(tid) {
           el('div', { class: 'fld' }, [ta]), el('button', { type: 'button', class: 'btn dark', onclick: function () { if (!ta.value.trim()) { ta.focus(); return; } const sl = deckFromOutline(ta.value, T); if (!sl) { toast('لم نفهم المخطط'); return; } openDeckNew(T.id, sl, String(sl[0].d.title || 'عرض جديد').replace(/\n/g, ' ')); } }, [ico('slides'), 'اصنع العرض'])])
       ]),
       el('section', { class: 'hsec', id: 'mydecks' }, [el('div', { class: 'shead' }, [H('h2', 'عروضك الأخيرة'), el('a', { class: 'btn sm line', href: '#/mine', onclick: function () { ls('mineTab', 'mine'); }, text: 'كلها' })]), stripNav(recent)]),
-      el('section', { class: 'slfeat' }, [['sparkles', 'حركات دخول وانتقالات', 'من تبويب «الحركة» في المحرر: لكل الشرائح أو لكل عنصر.'], ['play', 'عرض حي بملء الشاشة', 'ظهور بنقرة، ومؤقّت، وملاحظات للمقدّم، ونافذة مقدّم.'], ['image', 'فيديو وصوت ويوتيوب', 'من لوحة «العناصر»، تعمل أثناء العرض.'], ['ai', 'من درس إلى عرض', 'الصق النص أو ارفع PDF أو Word ويرتّبه المساعد.']].map(function (f, i) {
+      el('section', { class: 'slfeat' }, [['sparkles', 'انتقالات وحركات', 'انتقال بين الشرائح، وحركة لكل عنصر، من تبويب «الحركة».'], ['play', 'عرض حي بملء الشاشة', 'ظهور بنقرة، ومؤقّت، وملاحظات، ونظرة على كل الشرائح.'], ['image', 'فيديو وصوت ويوتيوب', 'تعمل داخل العرض، ولكل مقطع إعدادات تشغيله.'], ['ai', 'من درس إلى عرض', 'الصق النص أو ارفع PDF أو Word ويرتّبه المساعد.']].map(function (f, i) {
         return el('div', { class: 'slf rv', style: '--d:' + i }, [el('span', { class: 'icon-tile t-pu' }, [ico(f[0])]), el('b', { text: f[1] }), el('small', { class: 'tiny', text: f[2] })]);
       }))
     ])
   );
+  showAllNow($('#view'));
   API6.me('item_list').then(function (list) {
     const decks = list.filter(function (x) { return x.kind === 'deck' && (x.mine || x.shared); }).sort(function (a, b) { return (b.at || 0) - (a.at || 0); }).slice(0, 12);
     recent.innerHTML = '';
-    if (!decks.length) { $('#mydecks').hidden = true; return; }
+    if (!decks.length) { const md = $('#mydecks'); if (md) md.hidden = true; return; }
     decks.forEach(function (x, i) {
       recent.appendChild(el('div', { class: 'sldeck hover-lift rv', style: '--d:' + i }, [el('img', { src: x.thumb || '', alt: '', loading: 'lazy' }), el('div', { class: 'sldeck-m' }, [el('b', { text: x.name }), el('small', { class: 'tiny', text: (x.mine ? '' : x.owner + ' · ') + fmtTime(x.at) })]),
         el('div', { class: 'sldeck-a' }, [el('a', { class: 'btn sm dark', href: '#/d/' + x.id }, [ico('pencil'), 'افتح']), el('a', { class: 'btn sm line', href: '#/p/' + x.id }, [ico('play'), 'اعرض'])])]));
     });
-    revealAll(recent);
-  }).catch(function () { $('#mydecks').hidden = true; });
+    showAllNow(recent, true);
+  }).catch(function () { const md = $('#mydecks'); if (md) md.hidden = true; });
+}
+// صفحة الشرائح تظهر كاملة من أول لحظة بدل انتظار التمرير. عند فتح الصفحة تكفي حركة انتقال الصفحة نفسها،
+// فتظهر الأقسام فوراً (الانتظار لإطار الرسم يتأخر نحو ثانية أثناء انتقال الصفحة فتبدو فارغة)؛ وما يصل لاحقاً يدخل بتلاشٍ ناعم
+function showAllNow(root, soft) {
+  const on = function () { $$('.rv,.bwrap', root).forEach(function (x) { x.classList.add('in-view'); }); };
+  if (soft) requestAnimationFrame(function () { requestAnimationFrame(on); }); else on();
 }
