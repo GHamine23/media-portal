@@ -120,12 +120,16 @@ const MO = (function () {
   }
 
   /* ---------- الألوان: تُقرأ من نظام الألوان في المنصة (--ac) ---------- */
+  let MO_POP = '#4f46e5';
   function accent() {
     let ac = '';
     try { ac = getComputedStyle(document.documentElement).getPropertyValue('--ac').trim(); } catch (e) {}
     if (!/^#[0-9a-f]{3,6}$/i.test(ac)) ac = '#4f46e5';
     if (ac.length === 4) ac = '#' + ac[1] + ac[1] + ac[2] + ac[2] + ac[3] + ac[3];
-    return { ac: ac, ac2: mix(ac, '#000000', 0.22), ac3: mix(ac, '#ffffff', 0.25), ink: mix(ac, '#0b0b14', 0.82), soft: mix(ac, '#ffffff', 0.93), bg: mix(ac, '#f6f6f8', 0.965), t1: rgba(ac, 0.10), t2: rgba(ac, 0.18) };
+    // لون اللمعة: إن كان لون الواجهة داكناً (أسود) نلمع بالبرتقالي فيكسر رتابة الأسود والأبيض
+    const lum = parseInt(ac.slice(1, 3), 16) * 0.299 + parseInt(ac.slice(3, 5), 16) * 0.587 + parseInt(ac.slice(5, 7), 16) * 0.114;
+    MO_POP = lum < 45 ? '#f0731f' : ac;
+    return { pop: MO_POP, ac: ac, ac2: mix(ac, '#000000', 0.22), ac3: mix(ac, '#ffffff', 0.25), ink: mix(ac, '#0b0b14', 0.82), soft: mix(ac, '#ffffff', 0.93), bg: mix(ac, '#f6f6f8', 0.965), t1: rgba(ac, 0.10), t2: rgba(ac, 0.18) };
   }
   const PAL = { or: '#f88833', te: '#0d8478', pl: '#9d2b5e', bl: '#1a71fd', gr: '#36a660', ol: '#467a2f', rd: '#d64545' };
   // هويات تجريبية (أسماء عامة، لا بيانات حقيقية)
@@ -316,7 +320,7 @@ const MO = (function () {
         if (w === '') return;
         if (!first) e.appendChild(document.createTextNode(' '));
         const sp = h('span', 'mo-w', e); sp.textContent = w;
-        if (hl === 1) sp.style.color = o.hl || '#4f46e5';
+        if (hl === 1) sp.style.color = o.hl || MO_POP;
         let mk = null;
         if (hl === 2) { mk = h('i', 'mo-mk', sp); mk.style.background = o.mk || 'rgba(79,70,229,.22)'; }
         words.push({ e: sp, hl: hl, mk: mk }); first = false;
@@ -348,7 +352,7 @@ const MO = (function () {
     o = o || {};
     const touch = !!o.touch, el = A(parent, 0, 0, touch ? 64 : 44, touch ? 64 : 54, 'mo-cur', touch ? '' : PTR);
     if (touch) css(el, { borderRadius: '50%', background: 'rgba(255,255,255,.55)', border: '3px solid rgba(20,20,30,.35)', boxShadow: '0 6px 18px rgba(0,0,0,.25)', marginLeft: '-32px', marginTop: '-32px' });
-    const ring = A(parent, 0, 0, 90, 90, 'mo-ring'); css(ring, { border: '4px solid ' + (o.color || '#4f46e5'), marginLeft: '-45px', marginTop: '-45px' });
+    const ring = A(parent, 0, 0, 90, 90, 'mo-ring'); css(ring, { border: '4px solid ' + (o.color || MO_POP), marginLeft: '-45px', marginTop: '-45px' });
     keys = keys.slice().sort(function (a, b) { return a[0] - b[0]; });
     if (sfx) keys.forEach(function (k) { if (k[3]) sfx(k[0], touch ? 'tick' : 'click', { v: touch ? 0.2 : 0.4, p: 0.8 }); });
     const end = o.end == null ? keys[keys.length - 1][0] + 0.7 : o.end;
@@ -397,6 +401,7 @@ const MO = (function () {
       const pn = A(e, 0, hh * 0.47, w, hh * 0.53); css(pn, { background: 'var(--p1)', borderRadius: (7 * u) + 'px ' + (7 * u) + 'px 0 0' }); R.panel = pn;
       R.title = mkTitle(6 * u, hh * 0.47 + 7 * u, 88 * u, 10.5 * u, '#fff'); R.sub = mkSub(6 * u, hh * 0.47 + 32 * u, 88 * u, 'rgba(255,255,255,.82)');
       R.meta = meta(hh - 11 * u, '#fff');
+      if (hh * 0.47 + 32 * u + 7 * u > hh - 11 * u) R.sub.style.visibility = 'hidden';   // بطاقة قصيرة: لا يتداخل اسم المقدّم مع الموعد
     } else if (L === 'circle') {
       e.style.background = '#fff';
       const ring = A(e, 12 * u, hh * 0.5 - 38 * u, 76 * u, 76 * u); css(ring, { borderRadius: '50%', border: (0.8 * u) + 'px solid var(--p2)' });
@@ -1339,7 +1344,7 @@ const MO = (function () {
       root.style.background = '#fff';
       const C = S.C, sz = S.v ? 132 : 140, w = S.W - (S.v ? 120 : 260);
       const cbox = function () { const b = A(root, (S.W - w) / 2, 0, w, S.H); css(b, { display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: '2' }); return b; };
-      const l1 = KT(cbox(), 'من *فكرةٍ* في بالك', { flow: 1, w: w, size: sz, align: 'center', hl: C.ac });
+      const l1 = KT(cbox(), 'من *فكرةٍ* في بالك', { flow: 1, w: w, size: sz, align: 'center', hl: C.pop });
       const l2 = KT(cbox(), 'إلى *إعلانٍ* بهوية برنامجك', { flow: 1, w: w, size: sz, align: 'center', hl: PAL.or });
       const iris = A(root, 0, 0, S.W, S.H); css(iris, { background: 'linear-gradient(140deg,' + C.ac + ',' + C.ac2 + ')' });
       const glow = A(iris, S.W * 0.1, S.H * 0.1, S.W * 0.8, S.W * 0.8); css(glow, { borderRadius: '50%', background: 'radial-gradient(circle,rgba(255,255,255,.18),transparent 65%)' });
@@ -1490,7 +1495,7 @@ const MO = (function () {
       const caps = def.moves.map(function (m, i) {
         const g = A(cam.e, r.x, r.y, r.w, r.h); css(g, { display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: S.v ? 'center' : 'flex-start', gap: '18px', textAlign: S.v ? 'center' : 'right' });
         const num = h('div', null, g); css(num, { width: (S.v ? 84 : 80) + 'px', height: (S.v ? 84 : 80) + 'px', borderRadius: '26px', background: C.ac, color: '#fff', display: 'grid', placeItems: 'center', fontFamily: 'var(--mo-fd)', fontSize: (S.v ? 46 : 44) + 'px', fontWeight: '700' }); num.textContent = ar(i + 1);
-        const tt = KT(g, m[0], { flow: 1, size: S.v ? 96 : 88, align: S.v ? 'center' : 'right', hl: C.ac, w: r.w });
+        const tt = KT(g, m[0], { flow: 1, size: S.v ? 96 : 88, align: S.v ? 'center' : 'right', hl: C.pop, w: r.w });
         const sb = KT(g, m[1], { flow: 1, size: S.v ? 42 : 38, font: 't', color: '#5d5d68', align: S.v ? 'center' : 'right', st: 0.025, w: r.w });
         return { g: g, num: num, tt: tt, sb: sb };
       });

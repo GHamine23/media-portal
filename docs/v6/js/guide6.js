@@ -178,7 +178,7 @@ function gIntroOk(id) {
 }
 function gBlocked() {
   if (GUIDE.playing || GUIDE.prompt) return true;
-  if ($('.modal,.msheet-wrap,.mact,.coach,.menu,.present6,.imgview,.ied6,.progld,.mopen,.motion6-open,.gx-panel.on')) return true;
+  if ($('.modal,.msheet-wrap,.mact,.coach,.menu,.present6,.imgview,.ied6,.progld,.mopen,.motion6-open,.mo-pl,.gx-panel.on')) return true;
   const sp = $('#splash'); if (sp && !sp.classList.contains('off')) return true;
   if (document.body.dataset.page === 'login' || document.visibilityState === 'hidden') return true;
   return false;

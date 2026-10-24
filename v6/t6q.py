@@ -138,7 +138,7 @@ async def main():
         await clean(pg)
         await pg.screenshot(path=OUT + 'q7_week.png')
         # ---- الموقع على الهاتف ----
-        dump = await pg.evaluate("GAS._dump()")
+        dump = await pg.evaluate("DEMO.dumpSlim()")
         async def clone(page, base, done_sel):
             await page.goto(base + '#/login'); await page.evaluate("(d) => { localStorage.clear(); localStorage.setItem('demo.gas', d); }", dump)
             await page.goto(base + '#/login'); await page.reload(); await page.wait_for_timeout(1200)

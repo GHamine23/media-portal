@@ -40,12 +40,19 @@
   const names = ['DriveApp', 'CacheService', 'PropertiesService', 'LockService', 'Utilities', 'ContentService', 'HtmlService', 'UrlFetchApp', 'ScriptApp'];
   const srv = new Function(names.join(','), code + '\nreturn { doPost: doPost, bootstrap: bootstrap, tgTick: tgTick };').apply(null, names.map(function (n) { return GAS[n]; }));
   try { const saved = localStorage.getItem('demo.gas'); if (saved) GAS._load(saved); } catch (e) {}
+  // حفظ حالة التجربة: إن تجاوزت ذاكرة المتصفح (ملفات الخطوط كبيرة) نحفظها بلا محتوى الخطوط، فتبقى الحسابات والتصاميم بعد إعادة التحميل
+  function slimDump(d) { const o = JSON.parse(d); Object.keys(o.st.files || {}).forEach(function (k) { const f = o.st.files[k]; if (/\.(otf|ttf|woff2?)$/i.test(String(f.name || '')) || /font/.test(String(f.mime || ''))) f.bytes = []; }); return JSON.stringify(o); }
+  function saveDemo() {
+    const d = GAS._dump();
+    try { localStorage.setItem('demo.gas', d); return; } catch (e) {}
+    try { localStorage.setItem('demo.gas', slimDump(d)); } catch (e2) {}
+  }
   window.DEMO = {
     call: function (fn, args) {
       return new Promise(function (ok, bad) {
         setTimeout(function () {
           const out = JSON.parse(srv.doPost({ postData: { contents: JSON.stringify({ fn: fn, args: args }) } }).getContent());
-          if (/^(auth_|acc_|prog_|asset_put|asset_del|asset_meta|item_save|item_del|item_model|arc_put|pack_put|pack_toggle|tg_send|tg_cancel|tg_update|tg_requeue|task_|nt_seen|me_profile|font_family|fb_|bc_|cl_|set_|prefs_)/.test(fn)) { try { localStorage.setItem('demo.gas', GAS._dump()); } catch (e) {} }
+          if (/^(auth_|acc_|prog_|asset_put|asset_del|asset_meta|item_save|item_del|item_model|arc_put|pack_put|pack_toggle|tg_send|tg_cancel|tg_update|tg_requeue|task_|nt_seen|me_profile|font_family|fb_|bc_|cl_|set_|prefs_)/.test(fn)) { saveDemo(); }
           if (out.error) { if (/انتهت الجلسة|موقوف/.test(out.error) && fn !== 'auth_login' && typeof sessionLost === 'function') sessionLost(out.error); bad(new Error(out.error)); } else ok(out.result);
         }, 20);
       });
@@ -66,11 +73,12 @@
       const sup = call('acc_save', tok, JSON.stringify({ username: 'mushrif', name: 'مشرف الأكاديمية', role: 'sup', programs: ['academy'] }));
       const usr = call('acc_save', tok, JSON.stringify({ username: 'ahmad', name: 'أحمد السالم', role: 'user', programs: ['academy', 'alim'], perms: { ai: true, upload: true, slides: true } }));
       [[sup.temp, 'mushrif', 'Mushrif#2026'], [usr.temp, 'ahmad', 'Ahmad#2026']].forEach(function (q) { const t = call('auth_login', q[1], q[0]).token; call('auth_password', t, q[0], q[2]); });
-      try { localStorage.setItem('demo.gas', GAS._dump()); } catch (e) {}
+      saveDemo();
       return { admin: 'Admin#2026' };
     },
     // المؤقّت كما يشغّله Apps Script كل عشر دقائق (للاختبار): يرسل المجدول ويرسل تذكيرات المهام
-    tick: function () { srv.tgTick(); try { localStorage.setItem('demo.gas', GAS._dump()); } catch (e) {} },
+    tick: function () { srv.tgTick(); saveDemo(); },
+    dumpSlim: function () { return slimDump(GAS._dump()); },
     reset: function () { GAS._reset(); localStorage.removeItem('demo.gas'); }
   };
   window.DEMO_ON = true;

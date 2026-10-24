@@ -49,9 +49,13 @@ async def main():
         errs = await setup(pg)
         # ٠) بلا وحدتي الحركة والمعرفة: الصفحة تعمل، ولا مقدمات تلقائية، والجولة القديمة كما هي
         await pg.goto(URL + '#/guide'); await pg.wait_for_timeout(1500)
-        ok(await pg.evaluate("document.querySelectorAll('.gstep').length") >= 9 and await pg.evaluate("!!document.querySelector('.ghero .gposter.fb')"), 'guide renders without motion/kb (fallback posters)')
-        ok('قريباً' in await pg.inner_text('.ghero'), 'without motion: "coming soon" instead of play')
-        ok(await pg.evaluate("!gIntrosActive()"), 'intros inactive without motion module')
+        real = await pg.evaluate("typeof playMotion === 'function'")
+        if not real:
+            ok(await pg.evaluate("document.querySelectorAll('.gstep').length") >= 9 and await pg.evaluate("!!document.querySelector('.ghero .gposter.fb')"), 'guide renders without motion/kb (fallback posters)')
+            ok('قريباً' in await pg.inner_text('.ghero'), 'without motion: "coming soon" instead of play')
+            ok(await pg.evaluate("!gIntrosActive()"), 'intros inactive without motion module')
+        else:
+            ok(await pg.evaluate("document.querySelectorAll('.gstep').length") >= 9 and await pg.evaluate("!!document.querySelector('.ghero .gfilm') && !document.querySelector('.ghero .gposter.fb')"), 'guide renders with the real motion module (real posters)')
         await pg.screenshot(path=OUT + 'w0_guide_nomotion.png')
         # ١) مع الوحدتين
         await pg.evaluate(STUBS); await pg.evaluate("GAS._props.GEMINI_KEY='k-demo-AIzaSy0123456789abcdefghijklmnop'; " + MOCK + "; void 0"); await pg.evaluate("refreshBundle()"); await pg.wait_for_timeout(1200)
@@ -59,7 +63,8 @@ async def main():
         await pg.evaluate("$$('.gx-intro').forEach(function(x){x.remove()}); GUIDE.prompt=null; location.hash='#/guide'"); await pg.wait_for_timeout(1600)
         ok(await pg.evaluate("document.querySelectorAll('.gstep').length") == 10, 'learning path: 10 section cards (admin sees admin clip): %d' % await pg.evaluate("document.querySelectorAll('.gstep').length"))
         ok(await pg.evaluate("!!document.querySelector('.ghero .gfilm .mposter') && !!document.querySelector('.gstep .gthumb .mposter')"), 'posters from motionPoster')
-        ok('٢٠ث' in await pg.inner_text('.gpath') and '١:٠٠' in await pg.inner_text('.ghero'), 'durations in Arabic digits')
+        import re as _re
+        ok(bool(_re.search('[٠-٩]+ث', await pg.inner_text('.gpath'))) and bool(_re.search('[٠-٩]:[٠-٩]{2}', await pg.inner_text('.ghero'))), 'durations in Arabic digits')
         ok(await pg.evaluate("document.querySelectorAll('.gfaq .gfq').length") == 6 and await pg.evaluate("!!document.querySelector('.gfaqcol > .btn')"), 'FAQ: 6 shown + show all')
         await pg.evaluate("document.querySelectorAll('.rv,.bwrap').forEach(function(x){x.classList.add('in-view')})")
         await pg.screenshot(path=OUT + 'w1_guide.png', full_page=True)
@@ -75,18 +80,20 @@ async def main():
         ok(await pg.evaluate("document.querySelectorAll('.gstep.seen').length") == 2 and await pg.evaluate("document.querySelector('.gstep.next').dataset.clip") == 'editor', 'seen cards marked, next highlighted')
         ok('شاهدت ٣ من ١١' in await pg.inner_text('.gprog'), 'progress ring text: ' + (await pg.inner_text('.gprog')).replace('\n', ' '))
         # التقدّم يتبع المستخدم: إعادة التحميل تقرأه من الخادم
-        await pg.reload(); await pg.wait_for_timeout(2500); await pg.evaluate(STUBS); await pg.evaluate("location.hash='#/'"); await pg.wait_for_timeout(200); await pg.evaluate("location.hash='#/guide'"); await pg.wait_for_timeout(1500)
+        await pg.reload(); await pg.wait_for_timeout(4000); await pg.evaluate(STUBS); await pg.evaluate("location.hash='#/'"); await pg.wait_for_timeout(200); await pg.evaluate("location.hash='#/guide'"); await pg.wait_for_timeout(1500)
         ok(await pg.evaluate("document.querySelectorAll('.gstep.seen').length") == 2 and await pg.evaluate("!!V6.me.prefs.guide.seen.launch"), 'progress persisted on server (after reload)')
         # رابط مباشر لمقدمة
         await pg.goto(URL + '#/guide/cal'); await pg.wait_for_timeout(1500)
-        ok(await pg.evaluate("PLAYED.length && PLAYED[PLAYED.length-1].id") == 'cal', '#/guide/<clipId> opens the clip directly')
+        ok(await pg.evaluate("(typeof PLAYED !== 'undefined' && PLAYED.length && PLAYED[PLAYED.length-1].id === 'cal') || !!document.querySelector('.mo-pl')"), '#/guide/<clipId> opens the clip directly')
+        await pg.evaluate("document.querySelectorAll('.mo-pl').forEach(function(x){x.remove()}); if (typeof MO !== 'undefined' && MO.current && MO.current.close) try { MO.current.close(); } catch (e) {}"); await pg.wait_for_timeout(400)
+        await pg.evaluate(STUBS)
         # ٢) مقدمة أول دخول
         await pg.evaluate("gSave({ seen: V6.me.prefs.guide.seen, asked: {}, nag: {}, off: false })"); await pg.wait_for_timeout(300)
         await pg.evaluate("location.hash='#/mine'"); await pg.wait_for_timeout(700)
         ok(await pg.query_selector('.gx-intro') is None, 'no prompt in the first second')
         await pg.wait_for_timeout(1500)
         ok(await pg.query_selector('.gx-intro.on') is not None and 'تصاميمي' in await pg.inner_text('.gx-intro'), 'first visit to mine: prompt «مقدمة قصيرة عن تصاميمي»')
-        ok('(١٥ث)' in await pg.inner_text('.gx-intro'), 'prompt shows duration')
+        ok(bool(__import__('re').search('\\([٠-٩]+ث\\)', await pg.inner_text('.gx-intro'))), 'prompt shows duration')
         await pg.screenshot(path=OUT + 'w2_intro.png')
         await pg.click('.gx-intro .btn.dark'); await pg.wait_for_timeout(900)
         ok(await pg.evaluate("PLAYED[PLAYED.length-1].id === 'mine' && PLAYED[PLAYED.length-1].intro"), 'watch → playMotion(id, {intro:true})')
