@@ -1,0 +1,10 @@
+/* ================= المحرر في التطبيق: عنوان التصميم، والأيقونات، ولوحة النشر ================= */
+body.mapp .e-top .e-h1{flex:1;min-width:0}
+body.mapp .e-top .e-h1 .e-name{width:100%;max-width:none}
+body.mapp .e-panel .icstrip{grid-auto-columns:64px}
+body.mapp .e-panel .icb{width:64px;height:64px}
+body.mapp .e-panel .hpager::before{background:linear-gradient(90deg,var(--ios-card,#fff),transparent)}
+body.mapp .e-panel .hpager::after{background:linear-gradient(-90deg,var(--ios-card,#fff),transparent)}
+body.mapp .e-panel .pubgo .btn{min-height:46px}
+body.mapp .e-panel .pubacts{padding-inline-start:0}
+body.mapp .e-top > .sp{display:none}   /* الاسم يأخذ المساحة كلها بين الرجوع والأزرار */

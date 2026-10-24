@@ -23,8 +23,8 @@ async function wikimediaFind(q, page, orient) {
   return { total: list.length, photos: want ? list.filter(want) : list };
 }
 function freeImagesSection(b) {
-  b.appendChild(el('h4', { class: 'psh', text: 'صور مجانية' }));
-  b.appendChild(el('p', { class: 'tiny', text: 'ابحث في ملايين الصور بتراخيص المشاع الإبداعي، أو ولّد صورة بالذكاء من وصفك. ما تختاره يُحفظ بجودته الكاملة في مكتبتك.' }));
+  b.appendChild(el('h4', { class: 'psh', id: 'free_imgs', text: 'صور مجانية' }));
+  b.appendChild(el('p', { class: 'tiny', text: 'ابحث في ملايين الصور الحرة، أو ولّد صورة من وصفك. ما تختاره يُحفظ بجودته الكاملة في مكتبتك مع اسم صاحبه.' }));
   const keyed = V6.settings && V6.settings.imgKeys && (V6.settings.imgKeys.pixabay || V6.settings.imgKeys.pexels);
   let src = ls('imgSrc') || 'openverse'; if (src === 'keyed' && !keyed) src = 'openverse';
   const q = el('input', { type: 'search', class: 'inp sm', placeholder: 'ابحث: mosque, nature, book…', 'aria-label': 'بحث عن صورة' });
@@ -113,7 +113,8 @@ function freeImagesSection(b) {
   const aiBox = el('div', { class: 'genbox', hidden: src !== 'ai' }, [withEmoji(prompt, { sm: true }), el('div', { class: 'row wrapr' }, [styleSel, genBtn]), aiNotice('الصور المولّدة تقريبية وقد تخطئ في التفاصيل؛ لا تستعملها لتمثيل أشخاص أو أماكن حقيقية.')]);
   searchRow.hidden = src === 'ai';
   b.appendChild(srcSeg); b.appendChild(searchRow); b.appendChild(aiBox);
-  b.appendChild(res); b.appendChild(more); setCredit(); b.appendChild(credit);
+  b.appendChild(res); b.appendChild(more);
+  void credit; void setCredit;   // سطر المصدر والرخصة لم يعد يُعرض؛ الرخصة تبقى على كل صورة وتُحفظ معها
 }
 function sizeOrient() { const sz = SIZES[S.size] || {}; return !sz.w ? '' : sz.w > sz.h * 1.2 ? 'landscape' : sz.h > sz.w * 1.1 ? 'portrait' : 'square'; }
 async function imgQueryAI() {
@@ -125,30 +126,45 @@ async function imgQueryAI() {
 /* ---------- رمز QR وأيقونات Tabler في لوحة العناصر ---------- */
 function qrSection(b) {
   b.appendChild(el('h4', { class: 'psh', text: 'رمز QR' }));
-  b.appendChild(el('p', { class: 'tiny', text: 'رابط التسجيل أو القناة يصير رمزاً يُمسح بالهاتف. يُولَّد هنا بلا خدمة خارجية.' }));
+  b.appendChild(el('p', { class: 'tiny', text: 'رابط التسجيل أو القناة يصير رمزاً يُمسح بالهاتف.' }));
   const u = el('input', { type: 'url', class: 'inp sm', dir: 'ltr', placeholder: 'https://…', 'aria-label': 'رابط الرمز' });
   const add = function () { const v = u.value.trim(); if (!/^https?:\/\/\S+$/.test(v)) { toast('اكتب رابطاً يبدأ بـ https://'); u.focus(); return; } addLayer6({ t: 'qr', url: v, w: 0.22, c: '', bg: '#ffffff' }); u.value = ''; };
   u.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); add(); } });
   b.appendChild(el('div', { class: 'row' }, [u, el('button', { type: 'button', class: 'btn sm dark', onclick: add }, [ico('plus'), 'أضف'])]));
   const P = V6.prog && V6.prog.tg; if (P && P.link) b.appendChild(el('button', { type: 'button', class: 'chip', onclick: function () { u.value = P.link; add(); } }, ['رابط قناة البرنامج']));
 }
+// الأيقونات في قسم واحد: أيقونات الهوية أولاً ثم المجموعة الكاملة. البحث فوقها، وثلاثة صفوف تُمرَّر أفقياً بين صفحاتها
+const ICON_AR = { moon: 'هلال', layers: 'طبقات', mic: 'ميكروفون', clock: 'ساعة', cal: 'تقويم', pin: 'موقع', link: 'رابط', star: 'نجمة', book: 'كتاب', ring: 'حلقة', down: 'أسفل', up: 'أعلى' };
 function ticonSection(b) {
-  if (typeof TICONS === 'undefined') return;
-  b.appendChild(el('h4', { class: 'psh', text: 'أيقونات أكثر' }));
-  const C = S.track.c, q = el('input', { type: 'search', class: 'inp sm', placeholder: 'ابحث باسم الأيقونة…', 'aria-label': 'بحث عن أيقونة' });
-  const g = el('div', { class: 'libg' });
+  const C = S.track.c, tk = typeof TICONS === 'undefined' ? [] : Object.keys(TICONS);
+  const idIcons = (typeof ICON_LIST === 'undefined' ? [] : ICON_LIST).filter(function (k) { return ICONS[k]; });
+  const total = idIcons.length + tk.length;
+  b.appendChild(el('h4', { class: 'psh', text: 'أيقونات' }));
+  const hint = el('p', { class: 'tiny', text: 'ابحث بالاسم، أو مرّر لترى ' + total + ' أيقونة.' });
+  const q = el('input', { type: 'search', class: 'inp sm icq', placeholder: 'ابحث: كتاب، مسجد، ساعة…', 'aria-label': 'بحث عن أيقونة' });
+  const strip = el('div', { class: 'icstrip', role: 'list', 'aria-label': 'الأيقونات' });
+  const pager = hPager(strip);
+  const count = el('small', { class: 'tiny iccount', 'aria-live': 'polite' });
   function fill() {
-    g.innerHTML = ''; const t = q.value.trim();
-    Object.keys(TICONS).filter(function (k) { return !t || TICONS[k][0].indexOf(t) >= 0 || k.indexOf(t.toLowerCase()) >= 0; }).slice(0, t ? 94 : 40).forEach(function (k) {
-      const bt = el('button', { type: 'button', class: 'libb ticb', title: TICONS[k][0], 'aria-label': TICONS[k][0], onclick: function () { addLayer6({ t: 'ticon', ref: k, w: 0.09, c: C.s, lw: 2 }); } });
-      bt.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="' + C.s + '" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + TICONS[k][1] + '"/></svg><small>' + TICONS[k][0] + '</small>';
-      g.appendChild(bt);
+    strip.innerHTML = ''; strip.scrollLeft = 0;
+    const t = q.value.trim(), tl = t.toLowerCase(), hit = function (name, key) { return !t || name.indexOf(t) >= 0 || key.indexOf(tl) >= 0; };
+    let n = 0;
+    idIcons.filter(function (k) { return hit(ICON_AR[k] || '', k); }).forEach(function (k) {
+      n++; strip.appendChild(el('button', { type: 'button', class: 'icb', role: 'listitem', title: ICON_AR[k] || k, 'aria-label': ICON_AR[k] || k, onclick: function () { addLayer6({ t: 'icon', ref: k, w: 0.07, c: C.s }); } }, [libCanvas(function (g, s) { ICONS[k](g, s * 0.8, C.s); }, 30, 30), el('small', { text: ICON_AR[k] || '' })]));
     });
-    if (!t) g.appendChild(el('p', { class: 'tiny', text: 'اكتب للبحث في ' + Object.keys(TICONS).length + ' أيقونة.' }));
+    tk.filter(function (k) { return hit(TICONS[k][0], k); }).forEach(function (k) {
+      n++;
+      const bt = el('button', { type: 'button', class: 'icb', role: 'listitem', title: TICONS[k][0], 'aria-label': TICONS[k][0], onclick: function () { addLayer6({ t: 'ticon', ref: k, w: 0.09, c: C.s, lw: 2 }); } });
+      bt.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="' + C.s + '" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + TICONS[k][1] + '"/></svg><small>' + TICONS[k][0] + '</small>';
+      strip.appendChild(bt);
+    });
+    if (!n) strip.appendChild(el('p', { class: 'tiny icnone', text: 'لا أيقونة بهذا الاسم. جرّب كلمة أخرى.' }));
+    count.textContent = t ? n + ' نتيجة' : '';
+    strip.classList.toggle('few', n <= 12);
+    if (pager._upd) setTimeout(pager._upd, 30);
   }
   q.addEventListener('input', fill); fill();
-  b.appendChild(q); b.appendChild(g);
-  b.appendChild(el('p', { class: 'tiny', text: 'الأيقونات من مجموعة Tabler المفتوحة (رخصة MIT).' }));
+  b.appendChild(hint); b.appendChild(el('div', { class: 'row icsearch' }, [q, count])); b.appendChild(pager);
 }
 
 /* ---------- آية أو حديث موثّق: نص من مصدر معتمد مع الموضع أو حكم المحدث ---------- */

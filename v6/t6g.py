@@ -36,7 +36,7 @@ async def main():
         ok('لقاء الأسبوع' in cap and 'https://example.org/join' in cap and '#الأنشطة_التربوية' in cap, 'caption filled from design + program: ' + cap.replace('\n', ' | ')[:120])
         ok(await pg.evaluate("document.querySelector('.tgprev b') !== null"), 'telegram preview renders bold')
         await pg.screenshot(path=OUT + 'm2_caption.png')
-        await pg.click('.capsend .btn.dark'); await pg.wait_for_timeout(400); await pg.click('.modal:last-of-type .acts .btn.dark'); await pg.wait_for_timeout(4000)
+        await pg.click('.capsend .btn.dark'); await pg.wait_for_timeout(400); await pg.click('.capsend .btn.arm'); await pg.wait_for_timeout(4000)   # الإرسال الفوري بضغطتين على الزر نفسه
         calls = await pg.evaluate("(window.DEMO_TG||[]).map(c=>c.url.split('/').pop())")
         ok(calls.count('sendPhoto') == 1 and calls.count('sendDocument') == 1, 'sent photo + document: ' + str(calls))
         ok('t.me/jeel_demo/' in (await pg.evaluate("(document.querySelector('.capafter a[target=_blank]')||{}).href||''")), 'post link shown inline')

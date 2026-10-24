@@ -116,13 +116,21 @@ function openDeckNew(tid, slides, name) {
 /* ---------- شاشة المحرر ---------- */
 const RAIL = [
   ['content', 'المحتوى', 'content', 1], ['tpls', 'القوالب', 'grid', 1], ['text', 'النصوص', 'text', 0], ['els', 'العناصر', 'shapes', 0],
-  ['imgs', 'الصور', 'image', 1], ['bg', 'الخلفية', 'wand', 1], ['colors', 'الألوان', 'palette', 1], ['fonts', 'الخطوط', 'font', 0], ['layers', 'الطبقات', 'layers', 0], ['assist', 'المساعد', 'sparkles', 0]
+  ['imgs', 'الصور', 'image', 1], ['bg', 'الخلفية', 'wand', 1], ['colors', 'الألوان', 'palette', 1], ['fonts', 'الخطوط', 'font', 0], ['layers', 'الطبقات', 'layers', 0], ['assist', 'المساعد', 'sparkles', 0],
+  ['pub', 'النشر', 'send', 1]   // آخر الشريط: إدارة نشر هذا التصميم في القناة
 ];
-const LEVEL_TABS = { content: ['content', 'tpls', 'imgs'], style: ['content', 'tpls', 'imgs', 'bg', 'colors', 'fonts', 'layers'] };
-function railItems() { const lv = LEVEL_TABS[editLevel()]; const items = RAIL.filter(function (r) { return (ED.mode === 'full' || r[3] || lv) && (!lv || lv.indexOf(r[0]) >= 0); }); if (ED.doc && ED.doc.kind === 'deck') items.splice(2, 0, ['anim', 'الحركة', 'sparkles', 1]); return items; }
+const LEVEL_TABS = { content: ['content', 'tpls', 'imgs', 'pub'], style: ['content', 'tpls', 'imgs', 'bg', 'colors', 'fonts', 'layers', 'pub'] };
+// في العرض: «الصور» تصير «الوسائط» (الفيديو والصوت ويوتيوب معها)، والنشر في القناة للتصاميم المفردة
+function railAdjust(items) {
+  const deck = ED.doc && ED.doc.kind === 'deck';
+  return items.filter(function (r) { return !(deck && r[0] === 'pub'); }).map(function (r) { return deck && r[0] === 'imgs' ? ['imgs', 'الوسائط', 'image', 1] : r; });
+}
+function railItems() { const lv = LEVEL_TABS[editLevel()]; const items = RAIL.filter(function (r) { return (ED.mode === 'full' || r[3] || lv) && (!lv || lv.indexOf(r[0]) >= 0); }); if (ED.doc && ED.doc.kind === 'deck') items.splice(2, 0, ['anim', 'الحركة', 'sparkles', 1]); return railAdjust(items); }
+// النشر في مكان واحد: تبويب «النشر»، ومعه نافذة النص المصاحب إن طُلبت
+function openPublish(withDialog) { if (!ED.doc || ED.doc.kind === 'deck') return; if (!(ED.tab === 'pub' && document.body.classList.contains('sheet-open'))) openTab('pub'); if (withDialog) captionDialog(); }
 function showEditor6(doc, fromDraft) {
   ED.open = true; ED.doc = doc; ED.cur = 0; ED.undo = []; ED.redo = []; ED.autoFit = true; ED.proxies = {}; ED.editing = null;
-  ED.dirty = !!fromDraft; ED.leaveOK = false; ED.hash = location.hash;
+  ED.dirty = !!fromDraft; ED.leaveOK = false; ED.hash = location.hash; ED.pubIds = [];
   ED.mode = ls('emode') || 'simple';
   ED.tab = doc.pages[0].tpl === 'blank' ? 'assist' : 'content';
   if (ED.tab === 'assist') ED.mode = 'full';
@@ -130,13 +138,14 @@ function showEditor6(doc, fromDraft) {
   loadPage(0);
   document.title = doc.name + ' — المحرر';
   EPV = el('canvas', { class: 'e-cv', 'aria-label': 'التصميم' });
-  const nameI = el('input', { type: 'text', class: 'e-name', value: doc.name, 'aria-label': 'اسم التصميم', dir: 'auto', oninput: function (e) { ED.doc.name = e.target.value; markDirty(); } });
+  const nameI = el('input', { type: 'text', class: 'e-name', value: doc.name, 'aria-label': 'اسم التصميم', dir: 'auto', oninput: function (e) { ED.doc.name = e.target.value; document.title = (e.target.value || 'تصميم') + ' — المحرر'; markDirty(); } });
   const back = (TRACKS[doc.track] ? '#/g/' + doc.track : '#/');
   const sizeSel = el('select', { class: 'e-size', 'aria-label': 'المقاس', id: 'e_size', onchange: function (e) { S.size = e.target.value; S.sel = null; changed6(); setTimeout(refit, 0); } });
   const topbar = el('header', { class: 'e-top' }, [
     el('a', { href: back, class: 'ib e-backl', 'aria-label': 'رجوع', title: 'رجوع' }, [ico('chev')]),
     el('a', { href: '#/', class: 'e-logo', 'aria-label': 'الرئيسية' }, [brandImg('mark')]),
-    nameI, el('span', { class: 'e-saved tiny', id: 'e_saved', text: fromDraft ? 'استعدنا مسودتك' : '' }),
+    el('h1', { class: 'e-h1' }, [nameI]),   // اسم التصميم هو عنوان الصفحة (h1) بلا تغيير في شكله
+    el('span', { class: 'e-saved tiny', id: 'e_saved', text: fromDraft ? 'استعدنا مسودتك' : '' }),
     el('span', { class: 'sp' }),
     el('div', { class: 'e-tools' }, [
       el('button', { type: 'button', class: 'ib', id: 'e_undo', title: 'تراجع (Ctrl+Z)', 'aria-label': 'تراجع', onclick: undo6, disabled: true }, [ico('undo')]),
@@ -146,7 +155,7 @@ function showEditor6(doc, fromDraft) {
       el('div', { class: 'e-mode', title: 'البسيط يعرض الأساسيات، والكامل يفتح كل الأدوات' }, [segOf([['simple', 'بسيط'], ['full', 'تحكم كامل']], ED.mode, function (v) { ED.mode = v; ls('emode', v); buildRail(); if (!railItems().some(function (r) { return r[0] === ED.tab; })) { ED.tab = 'content'; } buildPanel(); })])
     ]),
     el('button', { type: 'button', class: 'ib', id: 'e_share', title: 'شارك بالرابط مع فريقك', 'aria-label': 'مشاركة بالرابط', onclick: function () { shareDialog(); } }, [ico('share')]),
-    doc.kind !== 'deck' ? el('button', { type: 'button', class: 'btn line e-cap', id: 'e_cap', title: 'النص المصاحب للإعلان، والإرسال إلى قناة تليجرام', onclick: function () { captionDialog(); } }, [ico('send'), el('span', { class: 'hide-s', text: 'النص والقناة' })]) : null,
+    doc.kind !== 'deck' ? el('button', { type: 'button', class: 'btn line e-cap', id: 'e_cap', title: 'النص المصاحب والإرسال إلى القناة، ومنشورات هذا التصميم', onclick: function () { openPublish(true); } }, [ico('send'), el('span', { class: 'hide-s', text: 'النشر' })]) : null,
     doc.fromMake ? el('a', { class: 'btn line e-back', href: '#/make?back=1', title: 'العودة إلى اقتراحات المصمّم الذكي' }, [ico('chev'), el('span', { class: 'hide-s', text: 'الاقتراحات' })]) : null,
     el('button', { type: 'button', class: 'btn line e-rv', id: 'e_rv', title: 'مراجعة التصميم بالمصمّم الذكي أو من إدارة أثر، والتعليقات', onclick: function (e) { reviewMenu(e.currentTarget); } }, [ico('review'), el('span', { class: 'hide-s', text: 'مراجعة' })]),
     el('button', { type: 'button', class: 'ib cmb', id: 'e_cm', title: 'التعليقات', 'aria-label': 'التعليقات', onclick: function () { commentsDialog(); } }, [ico('comment'), el('b', {})]),
@@ -338,7 +347,7 @@ function dlMenu(btn) {
   const items = [{ hd: 'تنزيل بجودة عالية' }, { t: 'صورة PNG (أعلى جودة)', ic: 'download', fn: function () { exportImg6('png'); } }, { t: 'صورة JPG (حجم أخف)', ic: 'download', fn: function () { exportImg6('jpg'); } }];
   if (ED.doc.kind === 'deck') items.push({ t: 'العرض كاملاً PDF', ic: 'slides', fn: exportPdf6 }, { t: 'عرض بملء الشاشة', ic: 'play', fn: present6 });
   if (navigator.canShare) items.push('-', { t: 'مشاركة مباشرة', ic: 'share', fn: function () { exportImg6('png', true); } });
-  if (ED.doc.kind !== 'deck') items.push('-', { t: 'النص المصاحب وإرسال إلى القناة', ic: 'send', fn: captionDialog });
+  if (ED.doc.kind !== 'deck') items.push('-', { t: 'النشر في القناة', ic: 'send', fn: function () { openPublish(true); } });
   popMenu(btn, items);
 }
 async function checkPlaceholders() {
