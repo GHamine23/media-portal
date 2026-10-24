@@ -260,8 +260,6 @@ body.resizing{cursor:col-resize;user-select:none}
 .pb.nx svg{transform:scaleX(-1)}
 .pcount{font-size:13px;min-width:70px;text-align:center;font-variant-numeric:tabular-nums}
 .psep{width:1px;height:22px;background:rgba(255,255,255,.2);margin:0 4px}
-.psel{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px}
-.psel option{color:#111}
 .ptimer{position:absolute;bottom:18px;right:18px;background:rgba(0,0,0,.6);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:8px 14px;font-size:24px;font-variant-numeric:tabular-nums;z-index:2}
 .ptimer.done{background:#b42318;animation:pulse6 1s ease-in-out infinite}
 .pnotes{grid-column:2;justify-self:stretch;align-self:stretch;width:100%;box-sizing:border-box;height:100vh;overflow:auto;background:#161616;color:#eee;padding:56px 18px 18px;font-size:18px;line-height:1.9;white-space:pre-wrap;border-inline-start:1px solid #333}

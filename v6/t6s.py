@@ -164,6 +164,31 @@ async def main():
         ok(d.suggested_filename.endswith('.pdf') and 'استيراد ملف' in t and '✓' in t and await pg.evaluate("document.querySelector('.modal a.cvgo').href") == 'https://www.canva.com/', 'Canva sheet: PDF downloaded (%s) + link + steps' % d.suggested_filename)
         await pg.screenshot(path=OUT + 's8_canva.png')
         await clean(pg)
+        # ---------- رفع فيديو وصوت من قسم الوسائط، وإعدادات الفيديو في العرض ----------
+        import subprocess, shutil
+        if shutil.which('ffmpeg'):
+            vid, aud = OUT + 'clip.webm', OUT + 'tone.ogg'
+            subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc=size=320x180:rate=15', '-t', '4', '-c:v', 'libvpx', '-b:v', '200k', vid], check=True)
+            subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2', '-c:a', 'libvorbis', aud], check=True)
+            await pg.evaluate("commitPage(); loadPage(2); afterPages(); void 0"); await pg.wait_for_timeout(500)
+            for tb in ['imgs', 'els']:
+                await pg.evaluate("openTab('%s'); void 0" % tb); await pg.wait_for_timeout(500)
+                if await pg.query_selector('#e_panel .mediasec'): break
+            await pg.set_input_files('#e_panel .mediasec input[accept^="video"]', vid)
+            await pg.wait_for_function("(S.layers||[]).some(l=>l.t==='video')", timeout=20000); await pg.wait_for_timeout(400)
+            V = await pg.evaluate("S.layers.filter(l=>l.t==='video')[0]")
+            ok(V['ref'].startswith('asset:') and V.get('poster', '').startswith('asset:'), 'video upload adds a video layer with its poster')
+            await pg.evaluate("openTab('%s'); void 0" % tb); await pg.wait_for_timeout(400)
+            await pg.set_input_files('#e_panel .mediasec input[accept^="audio"]', aud)
+            await pg.wait_for_function("(S.layers||[]).some(l=>l.t==='audio')", timeout=20000); await pg.wait_for_timeout(300)
+            ok(True, 'audio upload adds an audio layer')
+            await pg.evaluate("Object.assign(layerById('%s'), { auto: true, mute: true, start: 1, fit: 'cover' }); changed6(); void 0" % V['id']); await pg.wait_for_timeout(300)
+            await pg.evaluate("present6(false, 2); void 0")
+            try: await pg.wait_for_function("(function(){const v=document.querySelector('.pmedia video'); return v && !v.paused && v.currentTime >= 1;})()", timeout=8000); played = True
+            except Exception: played = False
+            vs = await pg.evaluate("(function(){const v=document.querySelector('.pmedia video'); return v ? [v.muted, v.style.objectFit, !!v.controls, document.querySelector('.pmbox.pm-video').classList.contains('playing'), !!document.querySelector('.pmbox.pm-audio')] : null;})()")
+            ok(played and vs and vs[0] and vs[1] == 'cover' and vs[3] and vs[4], 'video autoplays muted from its start time, fills its frame; audio button placed %s' % vs)
+            await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
         print('ERRORS', [e for e in errs if '404' not in e][:8])
         # ---------- التطبيق (390) ----------
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True, user_agent='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1')
