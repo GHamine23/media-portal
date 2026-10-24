@@ -1000,10 +1000,6 @@ body.in-editor #morecue,body[data-page=login] #morecue{display:none}
 .cchip.task.high{background:var(--or-t)}
 .cchip.task.done{opacity:.55}.cchip.task.done .ctitle{text-decoration:line-through}
 .cchip svg.crep{width:12px;height:12px;color:var(--ink3);flex:none}
-.cthumb{width:22px;height:22px;border-radius:6px;background:var(--line) center/cover no-repeat;flex:none;position:relative;overflow:hidden}
-.cthumb:not(.has)::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,var(--bg3) 0%,#fafafa 50%,var(--bg3) 100%);background-size:200% 100%;animation:shimmer 1.4s linear infinite}
-.cthumb.big{width:100%;aspect-ratio:4/3;height:auto;border-radius:10px}
-.cthumb.xl{width:100%;aspect-ratio:4/5;height:auto;border-radius:14px;background-size:contain;background-color:var(--bg3)}
 .cgmore{border:0;background:transparent;color:var(--ink2);font:inherit;font-size:12px;text-align:right;padding:2px 6px;cursor:pointer;border-radius:8px}
 .cgmore:hover{background:var(--bg3)}
 .calsum{text-align:center;margin-top:12px}
@@ -1059,7 +1055,7 @@ body.cal-dragging .cgd:not(.over):not(.empty){box-shadow:inset 0 0 0 1px var(--l
   .cgrid{gap:3px}.cgd{min-height:62px;padding:6px 4px 4px;border-radius:10px}.cgn{font-size:14px}.cgtop small{display:none}.cgadd{display:none}
   .cgitems{flex-direction:row;flex-wrap:wrap;gap:3px}
   .cchip{padding:0;width:8px;height:8px;border-radius:50%;background:var(--bl);border:0!important;overflow:hidden;cursor:pointer}
-  .cchip .ctitle,.cchip .ctime,.cchip .cthumb,.cchip svg{display:none}
+  .cchip .ctitle,.cchip .ctime,.cchip svg{display:none}
   .cchip.post.sent{background:var(--gr)}.cchip.post.failed{background:var(--rd)}.cchip.post.cancelled{background:#ccc}.cchip.task{background:var(--or)}.cchip.task.done{background:#c8c8c8}
   .cgmore{font-size:10px;padding:0}
   .cweek{grid-template-columns:1fr}

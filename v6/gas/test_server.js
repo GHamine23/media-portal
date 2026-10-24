@@ -185,9 +185,14 @@ const nTg = GAS._tg.length; ctx.tgTick(); ok(GAS._tg.length === nTg, 'tick does 
 fails('tg_cancel', /ليس لك/, at, sch.id);
 call('tg_cancel', ut, sch.id); ok(J('tg_queue', adm, 'academy').filter(function (x) { return x.id === sch.id; })[0].status === 'cancelled', 'cancelled by owner');
 const sch2 = J('tg_send', ut, JSON.stringify({ program: 'academy', name: 'حان', caption: 'الآن', png: Buffer.from([1]).toString('base64'), mode: 'photo', when: Date.now() + 120000 }));
+const raw = function (id) { return ctx.readJson_('tgq.json', []).filter(function (x) { return x.id === id; })[0]; }, trashed = function (fid) { return ctx.DriveApp.getFileById(fid).isTrashed(); };
+const sch2png = raw(sch2.id).pngId; ok(sch2png && !trashed(sch2png), 'scheduled post keeps its image until sent');
 const realNow = ctx.Date.now; ctx.Date.now = function () { return realNow() + 600000; };
 ctx.tgTick(); ctx.Date.now = realNow;
 ok(J('tg_queue', adm, 'academy').filter(function (x) { return x.id === sch2.id; })[0].status === 'sent', 'tick sends due post');
+ok(trashed(sch2png) && !raw(sch2.id).pngId && raw(sch2.id).filesGone, 'sent one-off post: image moved to Drive trash, reference cleared');
+ok(J('tg_queue', ut, 'academy').filter(function (x) { return x.id === sch2.id; })[0].hasFile === false, 'hasFile false after trash');
+fails('tg_requeue', /سلة درايف.*افتح التصميم وانشره من جديد/, ut, sch2.id, Date.now() + 3600000);
 ok(ctx.ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'tgTick'; }), 'tgTick trigger installed by bootstrap');
 // النص الطويل يُرسل رسالة منفصلة تردّ على الصورة
 GAS._tg.length = 0;
@@ -196,8 +201,9 @@ ok(longCap.split && GAS._tg.length === 2 && GAS._tg[0].opt.payload.caption === '
 // التكرار والتعديل وإعادة الجدولة والمصغّر
 const base = Date.now();
 const rep = J('tg_send', ut, JSON.stringify({ program: 'academy', track: 'ishraq', name: 'متكرر', caption: 'كل أسبوع', png: Buffer.from([1]).toString('base64'), thumb: Buffer.from([255, 216, 255]).toString('base64'), mode: 'photo', when: base + 7200000, repeat: { every: 'week', n: 1, count: 3 } }));
-ok(rep.queued && rep.repeat.every === 'week' && J('tg_queue', ut, 'academy').filter(function (x) { return x.id === rep.id; })[0].hasThumb, 'recurring post queued with thumb');
-const th = J('tg_thumbs', ut, JSON.stringify([rep.id])); ok(/^data:image\/jpeg;base64,/.test(th[rep.id] || ''), 'thumb served');
+ok(rep.queued && rep.repeat.every === 'week' && J('tg_queue', ut, 'academy').filter(function (x) { return x.id === rep.id; })[0].hasFile, 'recurring post queued with its image');
+ok(!raw(rep.id).thumbId, 'calendar thumbnails no longer stored (sent thumb ignored)');
+const th = J('tg_thumbs', ut, JSON.stringify([rep.id])); ok(th && !th[rep.id], 'tg_thumbs still answers (backward compatible)');
 fails('tg_update', /ليس لك/, at, JSON.stringify({ id: rep.id, when: base + 9000000 }));
 fails('tg_update', /المستقبل/, ut, JSON.stringify({ id: rep.id, when: base - 1000 }));
 const upd = J('tg_update', ut, JSON.stringify({ id: rep.id, when: base + 9000000, caption: 'نص معدّل', title: 'عنوان معدّل' }));
@@ -209,6 +215,15 @@ ok((JSON.parse(call('nt_list', ut)) || []).some(function (n) { return n.kind ===
 J('tg_update', ut, JSON.stringify({ id: nextRep.id, repeat: null })); ok(!J('tg_queue', ut, 'academy').filter(function (x) { return x.id === nextRep.id; })[0].repeat, 'repeat stopped');
 const rq2 = J('tg_requeue', ut, sentRep.id, base + 99999999); ok(rq2.status === 'queued' && rq2.when === base + 99999999 && rq2.title === 'عنوان معدّل', 'requeue sent post');
 fails('tg_requeue', /المستقبل/, ut, sentRep.id, base - 5);
+const repPng = raw(rep.id).pngId; ok(repPng && raw(nextRep.id).pngId === repPng && !trashed(repPng), 'series occurrence sent: image kept for the next occurrence');
+ctx.Date.now = function () { return base + 99999999 + 60000; }; ctx.tgTick(); ctx.Date.now = realNow;
+ok(raw(rq2.id).status === 'sent' && raw(nextRep.id).status === 'queued' && !trashed(repPng), 'requeued copy sent: image kept while the series still needs it');
+ctx.Date.now = function () { return nextRep.when + 60000; }; ctx.tgTick(); ctx.Date.now = realNow;
+ok(raw(nextRep.id).status === 'sent' && trashed(repPng) && [rep.id, nextRep.id, rq2.id].every(function (id) { return !raw(id).pngId && raw(id).filesGone; }), 'last user of the image sent: trashed, every reference cleared');
+fails('tg_requeue', /افتح التصميم وانشره من جديد/, ut, rq2.id, Date.now() + 3600000);
+// إرسال فوري لمنشور متكرر مرة واحدة: لا يبقى ملف معلّق
+const once = J('tg_send', ut, JSON.stringify({ program: 'academy', name: 'مرة', caption: 'x', png: Buffer.from([1]).toString('base64'), mode: 'photo', repeat: { every: 'day', n: 1, count: 1 } }));
+ok(!once.next && !raw(once.id).pngId && raw(once.id).filesGone, 'immediate send with no next occurrence keeps no file');
 // المهام
 fails('task_save', /عنوان/, ut, JSON.stringify({ program: 'academy', title: '  ' }));
 const t1 = J('task_save', ut, JSON.stringify({ program: 'academy', title: 'تصميم إعلان اللقاء', due: base + 86400000, note: 'بهوية إشراق' }));
@@ -223,6 +238,36 @@ ok(J('task_done', ut, t2.id, true).status === 'done', 'assignee completes task')
 ok((JSON.parse(call('nt_list', adm)) || []).some(function (n) { return n.kind === 'task' && /أنجز/.test(n.text); }), 'assigner notified of completion');
 fails('task_del', /ليست لك/, ut, t2.id);
 call('task_del', adm, t2.id); ok(J('task_list', ut, 'academy').length === 1, 'task deleted by assigner');
+// المهام المتكررة والتذكيرات (يرسلها مؤقّت tgTick نفسه)
+const T0 = Date.now(), rawT = function (id) { return ctx.readJson_('tasks.json', []).filter(function (x) { return x.id === id; })[0]; };
+const remindsOf = function (tok, re) { return (JSON.parse(call('nt_list', tok)) || []).filter(function (n) { return n.kind === 'remind' && re.test(n.text); }); };
+const tr = J('task_save', ut, JSON.stringify({ program: 'academy', title: 'ورد يومي', due: T0 + 3 * 3600000, repeat: { every: 'day', n: 1, count: 3 }, remind: 60 }));
+ok(tr.repeat.every === 'day' && tr.repeat.count === 3 && tr.remind === 60 && tr.canDone && tr.canEdit, 'task saved with repeat + reminder');
+ok(J('task_save', ut, JSON.stringify({ program: 'academy', title: 'بلا موعد', repeat: { every: 'day' } })).repeat === undefined, 'repeat needs a due date');
+ok(J('task_save', ut, JSON.stringify({ program: 'academy', title: 'تذكير غريب', due: T0 + 1e6, remind: 7 })).remind === undefined, 'unknown reminder value ignored');
+ctx.tgTick(); ok(remindsOf(ut, /ورد يومي/).length === 0, 'no reminder before its time');
+ctx.Date.now = function () { return T0 + 2 * 3600000 + 60000; }; ctx.tgTick(); ctx.tgTick(); ctx.Date.now = realNow;
+const r1 = remindsOf(ut, /ورد يومي/); ok(r1.length === 1 && /تذكير/.test(r1[0].text) && r1[0].link === '#/cal?task=' + tr.id, 'reminder delivered to the bell once: ' + (r1[0] || {}).text);
+ok(rawT(tr.id).remindedFor === tr.due - 3600000, 'task marked reminded for that time');
+const tr2 = J('task_save', ut, JSON.stringify(Object.assign({}, tr, { due: T0 + 5 * 3600000 })));
+ctx.Date.now = function () { return T0 + 4 * 3600000 + 60000; }; ctx.tgTick(); ctx.Date.now = realNow;
+ok(remindsOf(ut, /ورد يومي/).length === 2, 'moving the due date re-arms the reminder');
+ctx.Date.now = function () { return T0 + 9 * 3600000; }; ctx.tgTick(); ctx.Date.now = realNow;
+ok(remindsOf(ut, /ورد يومي/).length === 2, 'no reminder for a time long past');
+const dn = J('task_done', ut, tr.id, true);
+ok(dn.status === 'done' && dn.next && dn.next.due === tr2.due + 864e5 && dn.next.repeat.count === 2 && dn.next.remind === 60 && dn.next.seriesId === tr.id && dn.next.status === 'open' && dn.next.canDone, 'completing creates the next occurrence');
+J('task_done', ut, tr.id, false); const dn2 = J('task_done', ut, tr.id, true);
+ok(!dn2.next && ctx.readJson_('tasks.json', []).filter(function (x) { return x.seriesId === tr.id; }).length === 1, 'reopen + redo does not duplicate the next occurrence');
+const dn3 = J('task_done', ut, dn.next.id, true); ok(dn3.next && dn3.next.repeat.count === 1 && dn3.next.seriesId === tr.id, 'third occurrence (last)');
+ok(!J('task_done', ut, dn3.next.id, true).next, 'series ends after count');
+const late = J('task_save', ut, JSON.stringify({ program: 'academy', title: 'أسبوعي فات', due: T0 - 20 * 864e5, repeat: { every: 'week', n: 1 } }));
+const ln = J('task_done', ut, late.id, true).next; ok(ln && ln.due === T0 + 864e5, 'late completion skips missed occurrences');
+const un = J('task_save', ut, JSON.stringify({ program: 'academy', title: 'حتى تاريخ', due: T0 + 864e5, repeat: { every: 'day', n: 1, until: T0 + 864e5 + 3600000 } }));
+ok(!J('task_done', ut, un.id, true).next, 'until date respected');
+const tt = J('task_save', adm, JSON.stringify({ program: 'academy', title: 'اجتماع الفريق', to: '', due: T0 + 30 * 60000, remind: 10 }));
+ctx.Date.now = function () { return T0 + 21 * 60000; }; ctx.tgTick(); ctx.Date.now = realNow;
+ok(remindsOf(ut, /اجتماع الفريق/).length === 1, 'team task reminder reaches program members');
+ok(ctx.ScriptApp.getProjectTriggers().filter(function (t) { return t.getHandlerFunction() === 'tgTick'; }).length === 1, 'reminders reuse the single tgTick trigger');
 // اكتشاف القنوات
 const disc = J('tg_discover', adm);
 ok(disc.found === 2 && disc.list.length === 2 && disc.list.some(function (c) { return c.username === '@jeel_new' && c.type === 'channel' && c.status === 'administrator'; }), 'discovered chats from getUpdates');

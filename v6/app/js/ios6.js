@@ -19,7 +19,8 @@ function mscreen(opt, kids) {
   if (opt.sub) nav.appendChild(el('p', { class: 'sub', text: opt.sub }));
   const body = el('div', { class: 'mbody' }, kids || []);
   const sc = el('section', { class: 'mscreen' + (M.dir === 'back' ? ' back' : '') }, [nav, body]);
-  const onScroll = function () { nav.classList.toggle('scrolled', window.scrollY > 24); };
+  // لا ينكمش العنوان إلا إن بقي بعده مجال للتمرير، وإلا تذبذب: الانكماش يقصّر الصفحة فيرجع التمرير فيعود العنوان
+  const onScroll = function () { const on = nav.classList.contains('scrolled'), room = document.documentElement.scrollHeight - innerHeight; nav.classList.toggle('scrolled', on ? window.scrollY > 4 : window.scrollY > 24 && room > 130); };
   window.addEventListener('scroll', onScroll, { passive: true }); LEAVE.push(function () { window.removeEventListener('scroll', onScroll); });
   setTimeout(onScroll, 0);
   return { node: sc, body: body, nav: nav };

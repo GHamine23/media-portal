@@ -1158,7 +1158,8 @@ function ai_log(token, m, program) {
 
 /* ================= تليجرام: إرسال التصميم إلى قناة البرنامج، فوراً أو في موعد =================
    بوت واحد للمنصة (رمزه في خصائص السكربت TG_TOKEN)، يُضاف مشرفاً في قناة كل برنامج، ولكل برنامج قناته في programs.json (tg.chat).
-   المجدول يُحفظ في tgq.json وملفاته في المجلد الفرعي tg، ويرسله المؤقّت tgTick كل عشر دقائق. */
+   المجدول يُحفظ في tgq.json وملفاته في المجلد الفرعي tg، ويرسله المؤقّت tgTick كل عشر دقائق (والمؤقّت نفسه يرسل تذكيرات المهام).
+   بعد نجاح النشر، وإن لم يبق موعد قادم يحتاج الملف نفسه، تُنقل الصورة إلى سلة درايف (تُستعاد خلال ٣٠ يوماً) ويُمحى مرجعها. */
 function tgToken_() { var t = props_().getProperty('TG_TOKEN'); if (!t) throw new Error('لم يُضبط بوت تليجرام بعد (الإعدادات)'); return t; }
 function tgCall_(method, payload) {
   var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + tgToken_() + '/' + method, { method: 'post', payload: payload, muteHttpExceptions: true });
@@ -1184,7 +1185,7 @@ function nextRepeat_(when, r) {
   if (r.every === 'day') d.setDate(d.getDate() + n); else if (r.every === 'week') d.setDate(d.getDate() + 7 * n); else if (r.every === 'month') { var day = d.getDate(); d.setDate(1); d.setMonth(d.getMonth() + n); var last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); d.setDate(Math.min(day, last)); } else return 0;
   var t = d.getTime(); if (r.until && t > r.until) return 0; return t;
 }
-function tgPub_(x, a) { var o = Object.assign({}, x); delete o.pngId; delete o.fileId; delete o.thumbId; delete o.uid; o.mine = x.uid === a.uid; o.hasThumb = !!x.thumbId; o.canEdit = x.uid === a.uid || adminOf_(a, x.program); return o; }
+function tgPub_(x, a) { var o = Object.assign({}, x); delete o.pngId; delete o.fileId; delete o.thumbId; delete o.uid; o.mine = x.uid === a.uid; o.hasThumb = !!x.thumbId; o.hasFile = !!(x.pngId || x.fileId); o.canEdit = x.uid === a.uid || adminOf_(a, x.program); return o; }
 function tg_send(token, json) {
   var a = auth_(token), o = JSON.parse(json), pid = o.program;
   if (!canSend_(a, pid)) throw new Error('الإرسال إلى القناة يحتاج صلاحية «الإرسال» من المشرف');
@@ -1194,8 +1195,7 @@ function tg_send(token, json) {
   var when = +o.when || 0, repeat = cleanRepeat_(o.repeat), dir = sub_('tg');
   var rec = { id: uid_(), program: pid, track: clip_(o.track || '', 40), chat: chat, uid: a.uid, name: a.name, title: clip_(o.name, 80), caption: cap, mode: mode, when: when > now_() + 60000 ? when : now_(), at: now_(), status: 'queued', item: clip_(o.item || '', 40) };
   if (repeat) rec.repeat = repeat;
-  // مصغّر للتقويم (JPEG صغير) يُحفظ ملفاً حتى لا يثقل ملف الطابور
-  if (o.thumb && /^[A-Za-z0-9+\/=]+$/.test(o.thumb) && o.thumb.length < 120000) { try { rec.thumbId = dir.createFile(Utilities.newBlob(Utilities.base64Decode(o.thumb), 'image/jpeg', 'tg_' + rec.id + '_thumb.jpg')).getId(); } catch (e) {} }
+  // o.thumb (مصغّر قديم للتقويم) يُقبل ويُهمل: التقويم صار يعرض عنوان التصميم فقط
   if (when > now_() + 60000 || repeat) {
     if (o.png) rec.pngId = dir.createFile(Utilities.newBlob(Utilities.base64Decode(o.png), 'image/png', 'tg_' + rec.id + '.png')).getId();
     if (o.file) rec.fileId = dir.createFile(Utilities.newBlob(Utilities.base64Decode(o.file), clip_(o.fileMime || 'image/png', 60), clip_(o.fileName || ('design_' + rec.id + '.png'), 100))).getId();
@@ -1208,7 +1208,9 @@ function tg_send(token, json) {
   var sent = tgDeliver_(chat, cap, mode, o.png ? Utilities.newBlob(Utilities.base64Decode(o.png), 'image/png', 'design.png') : null, o.file ? Utilities.newBlob(Utilities.base64Decode(o.file), clip_(o.fileMime || 'image/png', 60), clip_(o.fileName || 'design.png', 100)) : null);
   rec.status = 'sent'; rec.msg = sent.msg; rec.link = sent.link; rec.sentAt = now_();
   var nextRec = repeat ? tgNextOf_(rec) : null;
-  withLock_(function () { var q = readJson_('tgq.json', []); if (nextRec) q.unshift(nextRec); q.unshift(rec); if (q.length > 500) q.length = 500; writeJson_('tgq.json', q); });
+  var trash = [];
+  withLock_(function () { var q = readJson_('tgq.json', []); if (nextRec) q.unshift(nextRec); q.unshift(rec); trash = tgReleaseFiles_(q, rec); if (q.length > 500) q.length = 500; writeJson_('tgq.json', q); });
+  trash.forEach(function (fid) { try { DriveApp.getFileById(fid).setTrashed(true); } catch (e) {} });
   audit_(a, 'أرسل إلى القناة', clip_(o.name, 80) + ' · ' + pid);
   sent.id = rec.id; if (nextRec) sent.next = nextRec.when;
   return JSON.stringify(sent);
@@ -1276,30 +1278,46 @@ function tg_requeue(token, id, when) {
   return withLock_(function () {
     var q = readJson_('tgq.json', []), x = q.filter(function (y) { return y.id === id; })[0];
     if (!x) throw new Error('غير موجود'); if (!(x.uid === a.uid || adminOf_(a, x.program))) throw new Error('ليس لك');
-    if (!x.pngId && !x.fileId) throw new Error('هذا المنشور أُرسل فوراً ولم تُحفظ صورته؛ افتح التصميم وجدوله من جديد');
+    if (!x.pngId && !x.fileId) throw new Error((x.filesGone ? 'نُقلت صورة هذا المنشور إلى سلة درايف بعد نشره' : 'لم تُحفظ صورة هذا المنشور') + '؛ افتح التصميم وانشره من جديد');
     var n = Object.assign({}, x, { id: uid_(), when: w, at: now_(), status: 'queued', uid: a.uid, name: a.name, seriesId: x.seriesId || undefined }); delete n.msg; delete n.link; delete n.err; delete n.sentAt; delete n.repeat; delete n.upd;
     q.unshift(n); if (q.length > 500) q.length = 500; writeJson_('tgq.json', q);
     audit_(a, 'أعاد جدولة منشور', n.title + ' · ' + n.program);
     return JSON.stringify(tgPub_(n, a));
   });
 }
-// المؤقّت: يرسل ما حان موعده، ويولّد الموعد التالي للمتكرر، ويُشعر صاحبه
+// المؤقّت (كل عشر دقائق): يرسل ما حان موعده، ويولّد الموعد التالي للمتكرر، ويُشعر صاحبه، ثم يرسل تذكيرات المهام
 function tgTick() {
   JC = {};
+  try { tgSendDue_(); } catch (e) { console.warn('tgSendDue_', e); }
+  try { taskRemindTick_(); } catch (e) { console.warn('taskRemindTick_', e); }
+}
+function tgSendDue_() {
   var due = readJson_('tgq.json', []).filter(function (x) { return x.status === 'queued' && x.when <= now_(); });
   due.forEach(function (x) {
     var res = null, err = '';
     try { res = tgDeliver_(x.chat, x.caption, x.mode, x.pngId ? DriveApp.getFileById(x.pngId).getBlob() : null, x.fileId ? DriveApp.getFileById(x.fileId).getBlob() : null); } catch (e) { err = String(e && e.message || e); }
-    var nextRec = null;
+    var nextRec = null, trash = [];
     withLock_(function () {
       var q = readJson_('tgq.json', []), cur = null;
       q.forEach(function (y) { if (y.id === x.id) { cur = y; y.status = err ? 'failed' : 'sent'; y.err = err; y.sentAt = now_(); if (res) { y.msg = res.msg; y.link = res.link; } } });
       if (cur && cur.repeat) { nextRec = tgNextOf_(cur); if (nextRec) q.unshift(nextRec); }
+      if (cur && !err) trash = tgReleaseFiles_(q, cur);
       if (q.length > 500) q.length = 500;
       writeJson_('tgq.json', q);
     });
+    trash.forEach(function (fid) { try { DriveApp.getFileById(fid).setTrashed(true); } catch (e) {} });
     ntPush_(x.uid, 'tg', err ? 'تعذّر نشر «' + (x.title || 'منشور') + '» في القناة: ' + clip_(err, 120) : 'نُشر «' + (x.title || 'منشور') + '» في القناة' + (nextRec ? '، والموعد التالي ' + Utilities.formatDate(new Date(nextRec.when), tz_(), 'd/M HH:mm') : ''), err ? '#/cal' : (res && res.link) || '#/cal');
   });
+}
+// بعد نشر ناجح: إن لم يبق منشور مجدول يستعمل ملفات هذا المنشور (موعد قادم من السلسلة نفسها أو إعادة جدولة) نُخرجها من الطابور
+// ونعيد معرّفاتها لتُنقل إلى السلة. كل سجل كان يشير إليها يُعلَّم filesGone فتعطي إعادة جدولته رسالة واضحة.
+function tgReleaseFiles_(q, cur) {
+  var ids = [cur.pngId, cur.fileId].filter(Boolean); if (!ids.length) return [];
+  var uses = function (y) { return ids.indexOf(y.pngId) >= 0 || ids.indexOf(y.fileId) >= 0; };
+  if (q.some(function (y) { return y.status === 'queued' && y.id !== cur.id && uses(y); })) return [];
+  var out = {}; ids.forEach(function (id) { out[id] = 1; });
+  q.forEach(function (y) { if (!uses(y)) return; if (y.thumbId) out[y.thumbId] = 1; delete y.pngId; delete y.fileId; delete y.thumbId; y.filesGone = now_(); });
+  return Object.keys(out);
 }
 /* ---------- اكتشاف القنوات والمجموعات التي أُضيف إليها البوت ---------- */
 // getUpdates يعيد آخر ما وصل البوت خلال ٢٤ ساعة: إضافته لقناة أو مجموعة، ومنشورات القنوات التي هو مشرف فيها. يُجمع ما نجده في settings.tgKnown
@@ -1335,13 +1353,18 @@ function tg_chat_check(token, chat) {
 function tg_known(token) { var a = auth_(token); needAdmin_(a); return JSON.stringify(settings_().tgKnown || []); }
 
 /* ================= التقويم والمهام =================
-   tasks.json: [{id, program, title, note, due, allDay, from, fromName, to, toName, status: open|done, prio, link, at, upd, doneAt}]
-   المهمة لصاحبها (يكتبها لنفسه)، أو يسندها مشرف البرنامج إلى عضو فيصله إشعار. */
+   tasks.json: [{id, program, title, note, due, allDay, from, fromName, to, toName, status: open|done, prio, link, at, upd, doneAt,
+                 repeat: {every, n, until, count} (مثل المنشورات), seriesId, nextId, remind: دقائق قبل الموعد (0|10|60|1440), remindedFor}]
+   المهمة لصاحبها (يكتبها لنفسه)، أو يسندها مشرف البرنامج إلى عضو فيصله إشعار.
+   المتكررة: إنجازها يولّد التالية مرة واحدة (nextId). التذكير يرسله tgTick إلى الجرس مرة واحدة لكل موعد (remindedFor). */
+var TASK_REMIND = [0, 10, 60, 1440];
+function taskPub_(t, a) { var o = Object.assign({}, t); o.mine = t.to === a.uid || (t.to === '' && t.from === a.uid); o.canEdit = t.from === a.uid || adminOf_(a, t.program); o.canDone = t.to === a.uid || t.from === a.uid || adminOf_(a, t.program) || (t.to === '' && inProg_(a, t.program)); return o; }
+function taskRemindAt_(t) { return t.due && t.remind != null && TASK_REMIND.indexOf(+t.remind) >= 0 ? t.due - t.remind * 60000 : 0; }
 function taskVisible_(a, t) { return t.status !== 'deleted' && (t.from === a.uid || t.to === a.uid || (t.to === '' && inProg_(a, t.program)) || adminOf_(a, t.program)); }
 function task_list(token, program) {
   var a = auth_(token);
   return JSON.stringify(readJson_('tasks.json', []).filter(function (t) { return (!program || t.program === program) && taskVisible_(a, t); }).slice(0, 400)
-    .map(function (t) { var o = Object.assign({}, t); o.mine = t.to === a.uid || (t.to === '' && t.from === a.uid); o.canEdit = t.from === a.uid || adminOf_(a, t.program); o.canDone = t.to === a.uid || t.from === a.uid || adminOf_(a, t.program); return o; }));
+    .map(function (t) { return taskPub_(t, a); }));
 }
 function task_save(token, json) {
   var a = auth_(token), o = JSON.parse(json), pid = clip_(o.program || '', 30);
@@ -1357,15 +1380,17 @@ function task_save(token, json) {
     var notifyNew = (isNew || t.to !== to) && to && to !== a.uid;
     t.title = title; t.note = clip_(o.note, 1500); t.due = Math.max(0, +o.due || 0); t.allDay = !!o.allDay; t.to = to; t.toName = toName; t.prio = o.prio === 'high' ? 'high' : 'normal'; t.link = /^(#\/|https?:\/\/)/.test(o.link || '') ? clip_(o.link, 300) : ''; t.upd = now_();
     if (o.status === 'open' || o.status === 'done') { t.status = o.status; t.doneAt = o.status === 'done' ? now_() : 0; }
-    if (t.repeat !== undefined) delete t.repeat;
+    if ('repeat' in o) { var r = t.due ? cleanRepeat_(o.repeat) : null; if (r) t.repeat = r; else delete t.repeat; } else if (!t.due) delete t.repeat;
+    if ('remind' in o) { var m = o.remind === '' || o.remind == null ? -1 : +o.remind; if (TASK_REMIND.indexOf(m) >= 0) t.remind = m; else delete t.remind; }
     if (list.length > 2000) list.length = 2000;
     writeJson_('tasks.json', list);
     return { t: t, notify: notifyNew };
   });
   // الإشعار خارج القفل (الإشعارات تأخذ القفل بنفسها)
   var t = saved.t;
+  if (taskRemindAt_(t)) ensureTriggersOnce_();
   if (saved.notify) ntPush_(t.to, 'task', 'مهمة جديدة من ' + a.name + ': ' + title + (t.due ? ' — ' + Utilities.formatDate(new Date(t.due), tz_(), 'd/M') : ''), '#/cal?task=' + t.id);
-  return JSON.stringify(t);
+  return JSON.stringify(taskPub_(t, a));
 }
 function task_done(token, id, on) {
   var a = auth_(token);
@@ -1374,11 +1399,56 @@ function task_done(token, id, on) {
     var list = readJson_('tasks.json', []), t = list.filter(function (x) { return x.id === id; })[0];
     if (!t) throw new Error('غير موجودة'); if (!(t.to === a.uid || t.from === a.uid || adminOf_(a, t.program) || (t.to === '' && inProg_(a, t.program)))) throw new Error('ليست لك');
     t.status = done ? 'done' : 'open'; t.doneAt = done ? now_() : 0; t.doneBy = done ? a.name : ''; t.upd = now_();
+    var next = done && !t.nextId ? taskNextOf_(t) : null;
+    if (next) { t.nextId = next.id; list.unshift(next); if (list.length > 2000) list.length = 2000; }
     writeJson_('tasks.json', list);
-    return t;
+    return { t: t, next: next };
   });
-  if (done && t.from && t.from !== a.uid) ntPush_(t.from, 'task', a.name + ' أنجز المهمة: ' + t.title, '#/cal?task=' + t.id);
-  return JSON.stringify(t);
+  if (done && t.t.from && t.t.from !== a.uid) ntPush_(t.t.from, 'task', a.name + ' أنجز المهمة: ' + t.t.title, '#/cal?task=' + t.t.id);
+  var out = taskPub_(t.t, a); if (t.next) out.next = taskPub_(t.next, a);
+  return JSON.stringify(out);
+}
+// الموعد التالي لمهمة متكررة. إن أُنجزت متأخرة تخطّينا ما فات حتى أول موعد لم يمضِ عليه يوم، والعدّ ينقص مع كل موعد
+function taskNextOf_(t) {
+  var r = t.repeat; if (!r || !t.due) return null;
+  var count = r.count || 0, due = t.due;
+  do { if (count === 1) return null; due = nextRepeat_(due, r); if (!due) return null; if (count) count--; } while (due < now_() - 864e5);
+  var n = { id: uid_(), program: t.program, from: t.from, fromName: t.fromName, to: t.to, toName: t.toName, title: t.title, note: t.note, due: due, allDay: t.allDay, prio: t.prio, link: t.link,
+    status: 'open', at: now_(), upd: now_(), seriesId: t.seriesId || t.id, repeat: Object.assign({}, r, { count: count }) };
+  if (t.remind != null) n.remind = t.remind;
+  return n;
+}
+// التذكيرات: يعلَّم كل موعد قبل الإشعار (داخل القفل) فلا يتكرر ولو تداخل مؤقّتان. موعد فات بأكثر من نصف ساعة لا يُذكَّر به
+function taskRemindTick_() {
+  var now = now_(), fire = withLock_(function () {
+    var list = readJson_('tasks.json', []), out = [];
+    list.forEach(function (t) {
+      var at = taskRemindAt_(t);
+      if (!at || t.status !== 'open' || t.remindedFor === at || at > now || now > t.due + 1800000) return;
+      t.remindedFor = at; out.push(t);
+    });
+    if (out.length) writeJson_('tasks.json', list);
+    return out;
+  });
+  if (!fire.length) return 0;
+  var accs = readJson_('accounts.json', {});
+  fire.forEach(function (t) {
+    var uids = t.to ? [t.to] : Object.keys(accs).filter(function (k) { return !accs[k].disabled && (accs[k].programs || []).indexOf(t.program) >= 0; }).slice(0, 80);
+    var d = new Date(t.due), fmt = function (x, f) { return Utilities.formatDate(x, tz_(), f); }, dk = fmt(d, 'yyyy-MM-dd'), hm = t.allDay ? '' : ' ' + fmt(d, 'HH:mm');
+    var when = dk === fmt(new Date(now), 'yyyy-MM-dd') ? (t.allDay ? 'اليوم' : 'الساعة' + hm) : dk === fmt(new Date(now + 864e5), 'yyyy-MM-dd') ? 'غداً' + hm : fmt(d, 'd/M') + hm;
+    var text = 'تذكير: ' + t.title + ' — ' + (t.due - now <= 60000 && !t.allDay ? 'حان موعدها' : 'موعدها ' + when);
+    ntPushMany_(uids, 'remind', text, '#/cal?task=' + t.id);
+  });
+  return fire.length;
+}
+// إشعار واحد لعدة مستخدمين بكتابة واحدة (مهام الفريق)
+function ntPushMany_(uids, kind, text, link) {
+  uids = (uids || []).filter(Boolean); if (!uids.length) return;
+  try { withLock_(function () { var all = readJson_('notifs.json', {}); uids.forEach(function (uid) { var l = all[uid] = all[uid] || []; l.unshift({ id: uid_(), kind: kind, text: clip_(text, 300), link: clip_(link || '', 200), at: now_(), seen: false }); if (l.length > 40) l.length = 40; }); writeJson_('notifs.json', all); }); } catch (e) {}
+}
+// المؤقّت موجود عادة منذ التهيئة؛ نتأكد منه مرة كل ست ساعات عند ضبط تذكير (لا يُنشأ مؤقّت جديد إن وُجد)
+function ensureTriggersOnce_() {
+  try { var c = CacheService.getScriptCache(); if (c.get('trig_ok')) return; ensureTriggers_(null); c.put('trig_ok', '1', 21600); } catch (e) {}
 }
 function task_del(token, id) {
   var a = auth_(token);

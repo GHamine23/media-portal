@@ -716,24 +716,16 @@ function tgForm(p) {
     return false;
   } }, { t: 'إلغاء' }] });
 }
-/* ---------- منشورات القناة: المرسل والمجدول ---------- */
-const TG_ST = { queued: ['مجدول', 'bl'], sent: ['أُرسل', 'gr'], failed: ['فشل', 'rd'], cancelled: ['أُلغي', ''] };
+/* ---------- منشورات القناة: صارت في التقويم (قائمة بالبحث والتصفية بالبرنامج والحال والتصدير). هنا الخلاصة وروابطها ---------- */
 async function aTg(body) {
-  let prog = '';
-  aHead(body, 'منشورات القناة', 'ما أُرسل إلى قنوات تليجرام من المنصة وما جُدول. القناة والقوالب الكتابية تُضبط من «البرامج والهويات»، ورمز البوت من الإعدادات. التعديل والنقل والتكرار من «التقويم والمهام».', [el('a', { class: 'btn dark', href: '#/cal' }, [ico('cal'), 'التقويم والمهام']), progSelect('', true, function (v) { prog = v; load(); })]);
+  aHead(body, 'منشورات القناة', 'تُدار من التقويم: قائمة كل المنشورات مع البحث والتصفية بالبرنامج والحال والتصدير. القناة والقوالب الكتابية من «البرامج والهويات».', [el('a', { class: 'btn dark', href: '#/cal?view=list&prog=all' }, [ico('cal'), 'افتح قائمة المنشورات'])]);
   const box = el('div'); body.appendChild(box);
-  async function load() {
-    box.innerHTML = ''; const sk = loading(box);
-    let list; try { list = await API6.me('tg_queue', prog); } catch (e) { sk.remove(); box.appendChild(el('p', { class: 'err', text: e.message })); return; }
-    sk.remove();
-    if (!list.length) { box.appendChild(el('p', { class: 'empty', text: 'لا منشورات بعد.' })); return; }
-    const tbl = el('div', { class: 'ailog' });
-    list.forEach(function (x) {
-      const st = TG_ST[x.status] || [x.status, ''];
-      tbl.appendChild(el('div', { class: 'airow' + (x.status === 'failed' ? ' bad' : '') }, [el('span', { class: 'tiny', text: fmtTime(x.when) }), el('b', { text: x.title || '—' }), el('span', { class: 'pill sm ' + st[1], text: st[0] }), el('span', { class: 'aiq', text: x.name + ' · ' + capPlain(x.caption || '').slice(0, 80) + (x.err ? ' · ' + x.err : '') }),
-        x.status === 'queued' ? el('button', { type: 'button', class: 'btn sm ghost', text: 'إلغاء', onclick: async function () { try { await API6.me('tg_cancel', x.id); load(); } catch (e) { toast(e.message); } } }) : (x.link ? el('a', { class: 'btn sm ghost', href: x.link, target: '_blank', rel: 'noopener', text: 'افتح' }) : el('span'))]));
-    });
-    box.appendChild(tbl);
-  }
-  load();
+  const sk = loading(box);
+  let list; try { list = await API6.me('tg_queue', ''); } catch (e) { sk.remove(); box.appendChild(el('p', { class: 'err', text: e.message })); return; }
+  sk.remove();
+  const n = function (st) { return list.filter(function (x) { return x.status === st; }).length; };
+  // كل رقم رابط إلى القائمة مصفّاةً بحاله
+  box.appendChild(el('div', { class: 'kpis' }, [['queued', 'مجدولة', 'تنتظر موعدها'], ['sent', 'أُرسلت', 'إلى القنوات'], ['failed', 'فشلت', 'تحتاج نظرة'], ['cancelled', 'أُلغيت', '']].map(function (s) {
+    const k = kpi(s[1], n(s[0]), s[2], s[0] === 'failed' && n(s[0]) ? 'warn' : ''); return el('a', { class: 'kpilink', href: '#/cal?view=list&prog=all&range=all&status=' + s[0], title: 'اعرضها في التقويم' }, [k]);
+  })));
 }

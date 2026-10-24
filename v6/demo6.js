@@ -1,7 +1,8 @@
 /* وضع التجربة المحلي (لا يُنشر): يشغّل ملف الخادم نفسه server/Code.gs داخل المتصفح عبر المحاكي.
    يُفتح من خادم محلي يخدم مجلد /home/claude: /media-portal/dist6/index.html */
 (function () {
-  const ROOT = '/media-portal/';
+  // جذر نسخة العمل التي تخدم الصفحة (/media-portal/ أو /wt/<name>/)، فيشغّل كل نسخة خادمَها هي
+  const ROOT = (location.pathname.match(/^(.*\/)dist6\/[^/]*$/) || [0, '/media-portal/'])[1];
   function syncGet(url, binary) {
     const x = new XMLHttpRequest(); x.open('GET', url, false);
     if (binary) x.overrideMimeType('text/plain; charset=x-user-defined');
@@ -37,14 +38,14 @@
   };
   const code = syncGet(ROOT + 'server/Code.gs');
   const names = ['DriveApp', 'CacheService', 'PropertiesService', 'LockService', 'Utilities', 'ContentService', 'HtmlService', 'UrlFetchApp', 'ScriptApp'];
-  const srv = new Function(names.join(','), code + '\nreturn { doPost: doPost, bootstrap: bootstrap };').apply(null, names.map(function (n) { return GAS[n]; }));
+  const srv = new Function(names.join(','), code + '\nreturn { doPost: doPost, bootstrap: bootstrap, tgTick: tgTick };').apply(null, names.map(function (n) { return GAS[n]; }));
   try { const saved = localStorage.getItem('demo.gas'); if (saved) GAS._load(saved); } catch (e) {}
   window.DEMO = {
     call: function (fn, args) {
       return new Promise(function (ok, bad) {
         setTimeout(function () {
           const out = JSON.parse(srv.doPost({ postData: { contents: JSON.stringify({ fn: fn, args: args }) } }).getContent());
-          if (/^(auth_|acc_|prog_|asset_put|asset_del|asset_meta|item_save|item_del|item_model|arc_put|pack_put|pack_toggle|tg_send|tg_cancel|me_profile|font_family|fb_|bc_|cl_|set_|prefs_)/.test(fn)) { try { localStorage.setItem('demo.gas', GAS._dump()); } catch (e) {} }
+          if (/^(auth_|acc_|prog_|asset_put|asset_del|asset_meta|item_save|item_del|item_model|arc_put|pack_put|pack_toggle|tg_send|tg_cancel|tg_update|tg_requeue|task_|nt_seen|me_profile|font_family|fb_|bc_|cl_|set_|prefs_)/.test(fn)) { try { localStorage.setItem('demo.gas', GAS._dump()); } catch (e) {} }
           if (out.error) { if (/انتهت الجلسة|موقوف/.test(out.error) && fn !== 'auth_login' && typeof sessionLost === 'function') sessionLost(out.error); bad(new Error(out.error)); } else ok(out.result);
         }, 20);
       });
@@ -68,6 +69,8 @@
       try { localStorage.setItem('demo.gas', GAS._dump()); } catch (e) {}
       return { admin: 'Admin#2026' };
     },
+    // المؤقّت كما يشغّله Apps Script كل عشر دقائق (للاختبار): يرسل المجدول ويرسل تذكيرات المهام
+    tick: function () { srv.tgTick(); try { localStorage.setItem('demo.gas', GAS._dump()); } catch (e) {} },
     reset: function () { GAS._reset(); localStorage.removeItem('demo.gas'); }
   };
   window.DEMO_ON = true;

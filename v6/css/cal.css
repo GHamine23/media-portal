@@ -1,0 +1,125 @@
+/* ================= التقويم والمهام (cal6.js): عرض اليوم، أيقونات الحال بدل المصغّرات، أدوات القائمة ================= */
+.calnav.off{display:none}
+.calviews{display:contents}
+.calopts{display:contents}
+.calfilt{display:none}
+.calfilt.dot-badge::after{top:4px;left:4px}
+.calbar.optsopen .calfilt{background:var(--ac-soft);color:var(--ac)}
+/* أيقونة الحال: تحل محل المصغّر */
+.cchip svg.cst{width:13px;height:13px;flex:none;color:var(--bl)}
+.cchip.post.sent svg.cst{color:var(--gr)}.cchip.post.failed svg.cst{color:var(--rd)}.cchip.post.cancelled svg.cst{color:var(--mute)}
+.cchip .crep,.ccard .crep,.dvev .crep{width:12px;height:12px;color:var(--ink3);flex:none;vertical-align:-1px;margin-inline-start:3px}
+span.cst{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:none;background:var(--bl-t);color:var(--bl)}
+span.cst svg{width:16px;height:16px}
+span.cst.gr{background:var(--gr-t);color:var(--gr)}span.cst.rd{background:var(--rd-t);color:var(--rd)}span.cst:not(.bl):not(.gr):not(.rd){background:var(--bg3);color:var(--mute)}
+.ccard.post{flex-direction:row;align-items:center;gap:10px}
+.ccard.post .ccbody{flex:1}
+.ccard.post.opens .ccbody b{text-decoration:underline;text-decoration-color:transparent;text-underline-offset:3px;transition:text-decoration-color .2s}
+.ccard.post.opens:hover .ccbody b{text-decoration-color:var(--ac-t2)}
+.ccard:focus-visible,.dvev:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.cmore6{flex:none;opacity:.55;transition:opacity .2s,background .2s}
+.ccard:hover .cmore6,.dvev:hover .cmore6,.cmore6:focus-visible{opacity:1}
+.cmore6 svg{width:16px;height:16px}
+.cwday{border:0;background:transparent;font:inherit;color:inherit;text-align:right;padding:2px 4px;margin:-2px -4px;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;gap:1px;transition:background .2s}
+.cwday:hover{background:var(--bg3)}
+.calmini .prow6 span.cst{width:26px;height:26px;border-radius:8px}
+/* تفاصيل منشور: بلا صورة، عمود واحد */
+.pdgrid{grid-template-columns:1fr;gap:12px}
+.pdgone{display:flex;align-items:flex-start;gap:6px;background:var(--ac-soft);color:var(--ac-ink);border-radius:10px;padding:8px 10px;margin:0}
+.pdgone svg{width:15px;height:15px;flex:none;margin-top:2px}
+/* محرر التكرار داخل المهمة: ملخصه الخاص تحته */
+.taskrep .repsum{display:none}
+
+/* ---------- عرض اليوم ---------- */
+.dvwrap{display:flex;flex-direction:column;gap:10px}
+.dvstrip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.dvsd{border:0;background:#fff;box-shadow:inset 0 0 0 1px var(--line);border-radius:14px;padding:7px 2px 6px;font:inherit;color:var(--ink1);display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;transition:background .2s,box-shadow .2s,transform .2s var(--spring)}
+.dvsd small{font-size:11.5px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.dvsd b{font-family:var(--fd);font-weight:500;font-size:18px;line-height:1.2;font-variant-numeric:tabular-nums}
+.dvsd i{width:5px;height:5px;border-radius:50%;background:transparent}.dvsd i.on{background:var(--ac3)}
+.dvsd:hover{transform:translateY(-1px)}
+.dvsd.today b{color:var(--ac)}
+.dvsd.fri small{color:#c25a12}
+.dvsd.on{background:var(--ac);box-shadow:none;color:#fff}.dvsd.on small{color:rgba(255,255,255,.8)}.dvsd.on b{color:#fff}.dvsd.on i.on{background:#fff}
+.dvall{display:flex;align-items:flex-start;gap:8px;background:#fff;border-radius:14px;box-shadow:inset 0 0 0 1px var(--line);padding:8px 10px}
+.dvall > .dvlab{min-width:52px;flex:none;padding-top:5px;color:var(--ink3);white-space:nowrap}
+.dvalli{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
+.dvadd{border:0;background:transparent;color:var(--ink3);font:inherit;display:inline-flex;align-items:center;gap:4px;padding:4px 6px;border-radius:8px;cursor:pointer;transition:background .2s,color .2s}
+.dvadd:hover{background:var(--bg3);color:var(--ac)}.dvadd svg{width:14px;height:14px}
+.dvempty{text-align:center;color:var(--ink3);margin:0}
+.dvbox{background:#fff;border-radius:var(--r2);box-shadow:inset 0 0 0 1px var(--line);overflow:hidden}
+.dvscroll{height:clamp(360px,calc(100vh - 330px),780px);overflow-y:auto;overscroll-behavior:contain;position:relative;
+  --fade:linear-gradient(to bottom,transparent,#000 22px,#000 calc(100% - 22px),transparent)}
+.dvscroll.mtop.mbot{-webkit-mask-image:var(--fade);mask-image:var(--fade)}
+.dvscroll.mtop:not(.mbot){-webkit-mask-image:linear-gradient(to bottom,transparent,#000 22px);mask-image:linear-gradient(to bottom,transparent,#000 22px)}
+.dvscroll.mbot:not(.mtop){-webkit-mask-image:linear-gradient(to top,transparent,#000 22px);mask-image:linear-gradient(to top,transparent,#000 22px)}
+.dvscroll.dragging{cursor:grabbing}
+.dvgrid{position:relative;cursor:copy}
+.dvh{position:absolute;inset-inline:0;height:var(--hh);border-top:1px solid var(--line);pointer-events:none}
+.dvh:first-child{border-top:0}
+.dvh .dvlab{position:absolute;inset-inline-start:8px;top:-9px;width:44px;background:#fff;color:var(--ink3);font-size:11.5px;font-variant-numeric:tabular-nums;padding-inline-end:4px}
+.dvh::after{content:'';position:absolute;inset-inline:60px 0;top:50%;border-top:1px dashed #f2f2f2}
+.dvgrid:hover .dvh::after{border-top-color:#ececec}
+.dvnow{position:absolute;inset-inline:56px 0;height:0;border-top:2px solid var(--rd);z-index:3;pointer-events:none}
+.dvnow i{position:absolute;inset-inline-start:-5px;top:-6px;width:10px;height:10px;border-radius:50%;background:var(--rd)}
+.dvev{position:absolute;--lane:0;--lanes:1;inset-inline-start:calc(62px + (100% - 70px) * var(--lane) / var(--lanes));width:calc((100% - 70px) / var(--lanes) - 4px);
+  display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;padding:2px 8px;border-radius:9px;font-size:13px;line-height:1.3;cursor:pointer;z-index:2;
+  background:var(--bl-t);color:var(--ink1);border-inline-start:3px solid var(--bl);transition:box-shadow .2s,transform .2s var(--spring),opacity .2s;box-sizing:border-box}
+.dvev:hover{box-shadow:var(--sh1);z-index:4}
+.dvev b{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dvev .dvt{font-size:11.5px;color:var(--ink2);font-variant-numeric:tabular-nums;flex:none}
+.dvev svg.cst{width:13px;height:13px;flex:none;color:var(--bl)}
+.dvev.post.sent{background:var(--gr-t);border-color:var(--gr)}.dvev.post.sent svg.cst{color:var(--gr)}
+.dvev.post.failed{background:var(--rd-t);border-color:var(--rd)}.dvev.post.failed svg.cst{color:var(--rd)}
+.dvev.post.cancelled{background:var(--bg3);border-color:var(--line2);opacity:.65}.dvev.post.cancelled b{text-decoration:line-through}
+.dvev.task{background:var(--or-t);border-color:var(--or)}
+.dvev.task.high{background:rgba(248,136,51,.2)}
+.dvev.task.done{opacity:.55}.dvev.task.done b{text-decoration:line-through}
+.dvev .tchk{width:17px;height:17px}.dvev .tchk svg{width:10px;height:10px}
+.dvev .cmore6{width:24px;height:24px;margin-inline-end:-4px}
+.dvev .tiny{flex:none;color:var(--ink3)}
+.dvev.allday{position:static;width:auto;max-width:100%;padding:5px 9px}
+.dvev.movable{cursor:grab}
+.dvev.dragging{cursor:grabbing;box-shadow:0 10px 26px rgba(20,18,40,.18);transform:scale(1.02);z-index:6;transition:box-shadow .2s,transform .2s var(--spring)}
+.dvev.saving{opacity:.6;animation:dvpulse 1s var(--ease) infinite alternate}
+@keyframes dvpulse{to{opacity:.35}}
+.dvtip{position:absolute;inset-inline-end:6px;top:50%;transform:translateY(-50%);background:var(--ac);color:#fff;font-size:11.5px;padding:2px 8px;border-radius:99px;font-variant-numeric:tabular-nums}
+/* ---------- أدوات القائمة: البحث والمدى والبرنامج والتصدير ---------- */
+.cltools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.clsearch{display:flex;align-items:center;gap:6px;background:#fff;border-radius:99px;box-shadow:inset 0 0 0 1px var(--line2);padding:0 12px;flex:1 1 220px;min-width:0;max-width:420px}
+.clsearch svg{width:16px;height:16px;color:var(--ink3);flex:none}
+.clsearch .inp{border:0;background:transparent;box-shadow:none;padding-inline:0;flex:1;min-width:0;width:auto}
+.clsearch:focus-within{box-shadow:inset 0 0 0 1.5px var(--ac)}
+.cltools .inp.sm{width:auto}
+@media (max-width:700px){
+  .cchip .tchk{display:none}
+  .dvstrip{gap:3px}.dvsd{border-radius:12px;padding:6px 0 5px}.dvsd small{font-size:10.5px}.dvsd b{font-size:16px}
+  .dvscroll{height:clamp(340px,calc(100dvh - 300px),720px)}
+  .dvh .dvlab{width:38px;inset-inline-start:4px}
+  .dvh::after{inset-inline-start:46px}
+  .dvnow{inset-inline-start:44px}
+  .dvev{inset-inline-start:calc(48px + (100% - 54px) * var(--lane) / var(--lanes));width:calc((100% - 54px) / var(--lanes) - 3px);padding:2px 6px}
+  .dvev .cmore6{opacity:1}
+  .cltools{gap:8px}.clsearch{flex-basis:100%;max-width:none}
+  .cltools > .sp{display:none}
+  .cltools .inp.sm{flex:1 1 90px;min-width:0}
+  .cltools > .btn{flex:none}
+  .calbar{gap:8px 10px}
+  .calbar .caltitle{order:-2}
+  .calbar .calnav{order:-1}
+  .calfilt{display:inline-grid;order:0;flex:none;margin-inline-start:auto}
+  .calbar .calviews .seg{order:1;flex:1 1 100%;min-width:0;display:flex}.calbar .calviews .seg button{flex:1;padding-inline:4px}
+  .calbar.listv .calviews .seg{flex:1 1 0}.calbar.listv .calfilt{order:1;margin-inline-start:0}
+  .calopts{order:2;display:none;flex-wrap:wrap;align-items:center;gap:8px 10px;width:100%;padding-top:2px;animation:fadeIn .25s var(--ease) both}
+  .calbar.optsopen .calopts{display:flex}
+  .calbar > .sp{display:none}
+}
+/* الإدارة ← منشورات القناة: أرقام تقود إلى القائمة */
+.kpilink{display:block;text-decoration:none;color:inherit;border-radius:var(--r2)}
+.kpilink .kpi{height:100%;transition:transform .25s var(--ease),box-shadow .25s}
+.kpilink:hover .kpi{transform:translateY(-2px);box-shadow:var(--sh2,var(--sh1))}
+/* الأسبوع: الأعمدة ضيقة، فالأيقونة وزر التفاصيل في سطر والعنوان تحتهما */
+.cwcol .ccard.post{flex-wrap:wrap;justify-content:space-between;gap:6px;align-items:center}
+.cwcol .ccard.post .ccbody{flex:1 1 100%;order:2}
+.cwcol .ccard.post span.cst{width:26px;height:26px;border-radius:8px}
+.cwcol .ccard.post .cmore6{margin:-4px}
