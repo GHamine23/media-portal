@@ -62,7 +62,7 @@ function snap() {
   const d = {}; Object.keys(S.d).forEach(function (k) { const x = S.d[k]; d[k] = x && typeof x === 'object' ? Object.assign({}, x) : x; });
   return { d: d, size: S.size, variant: S.variant, k: S.k, hide: Object.assign({}, S.hide), ov: Object.assign({}, S.ov),
     pos: JSON.parse(JSON.stringify(S.pos || {})), gs: JSON.parse(JSON.stringify(S.gs || {})), layers: (S.layers || []).map(function (L) { return Object.assign({}, L); }), bgfx: S.bgfx ? Object.assign({}, S.bgfx) : null,
-    names: Object.assign({}, S.names || {}), front: (S.front || []).slice(), fs: S.fs ? Object.assign({}, S.fs) : null, lg: S.lg ? Object.assign({}, S.lg) : null };
+    names: Object.assign({}, S.names || {}), front: (S.front || []).slice(), fs: S.fs ? Object.assign({}, S.fs) : null, lg: S.lg ? Object.assign({}, S.lg) : null, lk: S.lk ? Object.assign({}, S.lk) : null };
 }
 
 let LASTT = {};   // النصوص المرسومة في كل عنصر في آخر رسم للمعاينة

@@ -42,6 +42,7 @@
 - أدوات الصورة: `imgFx(src, fx, fh, fv)` و`maskPath()` في `engine.js` (مرشحات اللوحة أو معالجة البكسلات)، `drawImgLayer()` في `studio.js` (قصّ cr، شكل mk، تكبير z وإزاحة ox/oy، إطار bw/bc، ظل sh، لون tc/ta، تلاشي fe)، `photoOf` يطبّق fx/fh/fv لخانات القوالب. الواجهة `imageTools()` في `panels6.js`.
 - المحاذاة `alignBar()` وتأثيرات النص `textEffects()` (lh، ظل ts، حدّ olc/olw عبر `drawFit` بخيار `ol`، خلفية bgc/bgp/bgr).
 - اختبار `v6/t6aa.py`، وتدقيق العناصر `v6/audit_groups.py`.
+- دفعة المتابعة: سطر المعلومات القديم (`G('info')` + `infoItem`) يُقسَّم تلقائياً إلى `info0..n` عبر `infoNext()`؛ وإخفاء/إزاحة/نمط `info` القديم يسري على الكل (`gStyle`، `G`). قصّ مباشر بالنقر المزدوج على صورة مضافة (`cropOn/cropOff` في `editor6.js`: سحب الصورة داخل الإطار، ٨ مقابض، عجلة للتكبير، شريط النِّسب). لوحة الألوان: آخر الألوان المستعملة، حقل HEX، وقطّارة `EyeDropper`. قفل العنصر `S.lk` (`toggleLock/lockBtn`) يمنع السحب والتحجيم ويُحفظ مع الصفحة.
 
 ## ١ط) مقاطع الشرح على الجوال (٢٥ أكتوبر)
 - المسرح يُصغَّر بـ `zoom` حيث يُدعم (`scaleStage` في `motion6.js`) بدل `transform: scale` مع `will-change`: كان يُنشئ طبقة رسومية ضخمة تومض وتختفي أجزاؤها في متصفحات الهواتف.

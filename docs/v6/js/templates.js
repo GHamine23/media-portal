@@ -176,6 +176,7 @@ const TEMPLATES = [
       if (has(d.day) || has(d.time)) items.push({ ic: 'moon', a: d.day, b: d.time });
       const sp = items.length > 1 ? 160 * u : 0;
       items.forEach(function (it, i) {
+        infoNext(ctx);
         const x = cx + (i === 0 ? sp : -sp);
         icon(ctx, it.ic, x, iy, 44 * u, icol);
         line(ctx, it.a, x, iy + 64 * u, { size: s, color: txt, align: 'center', maxW: 290 * u });

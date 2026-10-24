@@ -34,7 +34,7 @@ function loadPage(i) {
   S.d = d; S.variant = tpl.variants.some(function (v) { return v.id === pg.variant; }) ? pg.variant : tpl.variants[0].id; S.k = pg.k || 1;
   S.hide = pg.hide || {}; S.ov = pg.ov || {}; S.pos = pg.pos || {}; S.gs = pg.gs || {}; S.layers = pg.layers || []; S.bgfx = pg.bgfx || null; S.sel = null;
   S.names = pg.names || {}; S.front = pg.front || [];
-  S.lg = pg.lg || null;
+  S.lg = pg.lg || null; S.lk = pg.lk || null;
   S.fs = pg.fs || null; if (typeof applyDocFonts === 'function') applyDocFonts(S.fs);
 }
 // تصاميم الإصدار الخامس وعروضه تُحوَّل إلى صفحات

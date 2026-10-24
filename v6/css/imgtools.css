@@ -21,3 +21,19 @@
 .alb { width: 38px; height: 36px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--line, #e3e3e3); background: #fff; color: var(--ink, #222); cursor: pointer; }
 .alb:hover { background: var(--ac-t); color: var(--ac-ink); border-color: var(--ac); }
 .alsep { width: 1px; height: 22px; background: var(--line, #e3e3e3); margin: 0 4px; }
+/* شريط القصّ المباشر */
+.e-cropbar { position: fixed; z-index: 60; top: 74px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: min(760px, calc(100vw - 24px)); padding: 8px 12px; border-radius: 16px; background: rgba(20, 20, 28, .92); color: #fff; box-shadow: 0 12px 40px -12px rgba(0,0,0,.45); font-size: .85rem; }
+.e-cropbar .crt { opacity: .85; }
+.e-cropbar .crrow { display: flex; gap: 4px; }
+.e-cropbar .crr { border: 1px solid rgba(255,255,255,.25); background: transparent; color: #fff; border-radius: 9px; padding: 4px 8px; font: inherit; font-size: .8rem; cursor: pointer; }
+.e-cropbar .crr:hover { background: rgba(255,255,255,.15); }
+.e-cropbar .crz { display: flex; align-items: center; gap: 6px; }
+.e-cropbar .crz svg { width: 18px; height: 18px; }
+.e-cropbar input[type=range] { width: 120px; accent-color: #ff3d8b; }
+body.mapp .e-cropbar { top: auto; bottom: calc(var(--sheet-h, 120px) + 76px); font-size: 12px; gap: 6px; padding: 8px; }
+body.mapp .e-cropbar .crt { display: none; }
+/* منتقي الألوان: الأخيرة والرمز والقطّارة */
+.cpop .crecent { margin-top: 6px; }
+.cpop .crow2 { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.cpop .chex { width: 96px; font: inherit; font-size: .85rem; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line, #ddd); background: #fff; }
+.e-tb .ib.on, .albar + .row .btn.on { background: var(--ac-t); color: var(--ac-ink); }

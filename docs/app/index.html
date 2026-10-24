@@ -1810,6 +1810,22 @@ body.in-editor .gx-intro{top:calc(var(--top) + 12px);bottom:auto}
 .alb { width: 38px; height: 36px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--line, #e3e3e3); background: #fff; color: var(--ink, #222); cursor: pointer; }
 .alb:hover { background: var(--ac-t); color: var(--ac-ink); border-color: var(--ac); }
 .alsep { width: 1px; height: 22px; background: var(--line, #e3e3e3); margin: 0 4px; }
+/* شريط القصّ المباشر */
+.e-cropbar { position: fixed; z-index: 60; top: 74px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: min(760px, calc(100vw - 24px)); padding: 8px 12px; border-radius: 16px; background: rgba(20, 20, 28, .92); color: #fff; box-shadow: 0 12px 40px -12px rgba(0,0,0,.45); font-size: .85rem; }
+.e-cropbar .crt { opacity: .85; }
+.e-cropbar .crrow { display: flex; gap: 4px; }
+.e-cropbar .crr { border: 1px solid rgba(255,255,255,.25); background: transparent; color: #fff; border-radius: 9px; padding: 4px 8px; font: inherit; font-size: .8rem; cursor: pointer; }
+.e-cropbar .crr:hover { background: rgba(255,255,255,.15); }
+.e-cropbar .crz { display: flex; align-items: center; gap: 6px; }
+.e-cropbar .crz svg { width: 18px; height: 18px; }
+.e-cropbar input[type=range] { width: 120px; accent-color: #ff3d8b; }
+body.mapp .e-cropbar { top: auto; bottom: calc(var(--sheet-h, 120px) + 76px); font-size: 12px; gap: 6px; padding: 8px; }
+body.mapp .e-cropbar .crt { display: none; }
+/* منتقي الألوان: الأخيرة والرمز والقطّارة */
+.cpop .crecent { margin-top: 6px; }
+.cpop .crow2 { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.cpop .chex { width: 96px; font: inherit; font-size: .85rem; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line, #ddd); background: #fff; }
+.e-tb .ib.on, .albar + .row .btn.on { background: var(--ac-t); color: var(--ac-ink); }
 
 /* ===== progmark.css ===== */
 /* شعار البرنامج المفتوح في الرئيسية: سطر واحد مكان التحية، الشعار يُكتب من اليمين ثم يظهر خط ذهبي والدفعة */
@@ -2379,13 +2395,13 @@ body.mapp .card > h2.ch{font-size:18px}
 <nav class="mtab" id="mtab" hidden aria-label="التنقل"></nav>
 <script src="../v6/js/config.js?v=b79cfa4c64"></script>
 <script src="../v6/js/konva.min.js?v=65c5c4e432"></script>
-<script src="../v6/js/engine.js?v=754979d193"></script>
+<script src="../v6/js/engine.js?v=88cb73ffde"></script>
 <script src="../v6/js/identities.js?v=867f3e03db"></script>
-<script src="../v6/js/templates.js?v=5e193e0810"></script>
-<script src="../v6/js/templates2.js?v=da35b150db"></script>
+<script src="../v6/js/templates.js?v=05b1cdc180"></script>
+<script src="../v6/js/templates2.js?v=f2b04685e9"></script>
 <script src="../v6/js/templates3.js?v=0f2ff161cf"></script>
 <script src="../v6/js/templates4.js?v=2e2e28da1d"></script>
-<script src="../v6/js/core5.js?v=419c7c89f5"></script>
+<script src="../v6/js/core5.js?v=07c30ccba2"></script>
 <script src="../v6/js/studio.js?v=917f2a575e"></script>
 <script src="../v6/js/slides.js?v=849b6bf589"></script>
 <script src="../v6/js/qr.js?v=4c79be1679"></script>
@@ -2400,9 +2416,9 @@ body.mapp .card > h2.ch{font-size:18px}
 <script src="../v6/js/motion6.js?v=c3c5dbc6be"></script>
 <script src="../v6/js/kb6.js?v=8f7305f987"></script>
 <script src="../v6/js/guide6.js?v=c4636f695a"></script>
-<script src="../v6/js/editor6.js?v=69f9abcd78"></script>
-<script src="../v6/js/panels6.js?v=47b96e3bfd"></script>
-<script src="../v6/js/docs6.js?v=476f6ee7f8"></script>
+<script src="../v6/js/editor6.js?v=002d51fc20"></script>
+<script src="../v6/js/panels6.js?v=6e86ec1e3f"></script>
+<script src="../v6/js/docs6.js?v=3c32ecf75f"></script>
 <script src="../v6/js/make6.js?v=a6b2855dcb"></script>
 <script src="../v6/js/caption6.js?v=ee66ba7087"></script>
 <script src="../v6/js/cal6.js?v=5d32d6c604"></script>

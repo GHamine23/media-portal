@@ -88,7 +88,7 @@ function syncProxies() {
       p.on('mouseenter', function () { if (ED.dragging) return; const bb = p.getClientRect({ relativeTo: ED.stage }); ED.hover.setAttrs({ x: bb.x - 3, y: bb.y - 3, width: bb.width + 6, height: bb.height + 6, visible: S.sel !== g }); ED.guides.batchDraw(); document.body.style.cursor = 'move'; });
       p.on('mouseleave', function () { ED.hover.visible(false); ED.guides.batchDraw(); document.body.style.cursor = ''; });
       p.on('mousedown touchstart', function (e) { e.cancelBubble = true; if (S.sel !== g) select(g); });
-      p.on('dblclick dbltap', function (e) { e.cancelBubble = true; openInline6(g); });
+      p.on('dblclick dbltap', function (e) { e.cancelBubble = true; const L0 = isLayer(g) ? layerById(g.slice(2)) : null; if (L0 && L0.t === 'img') cropOn(g); else openInline6(g); });
       p.on('dragstart', function (e) { dragStart(g, p, e); });
       p.on('dragmove', function (e) { dragMove(g, p, e); });
       p.on('dragend', function () { dragEnd(g, p); });
@@ -100,7 +100,7 @@ function syncProxies() {
     if (rot) p.setAttrs({ x: x, y: y, width: w, height: h, offsetX: w / 2, offsetY: h / 2, rotation: rot, scaleX: 1, scaleY: 1 });
     else p.setAttrs({ x: x, y: y, width: w, height: h, offsetX: 0, offsetY: 0, rotation: 0, scaleX: 1, scaleY: 1 });
     p.zIndex(Math.min(i, ED.layer.children.length - 1));
-    p.draggable(!ED.locked);
+    p.draggable(!ED.locked && !(S.lk && S.lk[g]));
   });
   Object.keys(ED.proxies).forEach(function (g) { if (!keep[g]) { ED.proxies[g].destroy(); delete ED.proxies[g]; } });
   if (S.sel && !ED.proxies[S.sel]) S.sel = null;
@@ -122,7 +122,9 @@ function attachTr() {
   if (!p) { ED.tr.nodes([]); ED.layer.batchDraw(); return; }
   const L = isLayer(S.sel) ? layerById(S.sel.slice(2)) : null;
   ED.tr.nodes([p]);
-  if (ED.locked) { ED.tr.rotateEnabled(false); ED.tr.enabledAnchors([]); ED.hover.visible(false); return; }
+  if (ED.locked || (S.lk && S.lk[S.sel])) { ED.tr.rotateEnabled(false); ED.tr.enabledAnchors([]); ED.hover.visible(false); return; }
+  if (ED.crop === S.sel) { ED.tr.rotateEnabled(false); ED.tr.keepRatio(false); ED.tr.enabledAnchors(['top-left', 'top-center', 'top-right', 'middle-left', 'middle-right', 'bottom-left', 'bottom-center', 'bottom-right']); ED.tr.borderStroke('#ff3d8b'); ED.tr.borderDash([6, 4]); ED.hover.visible(false); return; }
+  ED.tr.borderStroke('#1a71fd'); ED.tr.borderDash([]);
   ED.tr.rotateEnabled(!!L);
   ED.tr.keepRatio(!(L && L.t === 'text'));
   ED.tr.enabledAnchors(L && L.t === 'text' ? ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right'] : ['top-left', 'top-right', 'bottom-left', 'bottom-right']);
@@ -130,6 +132,7 @@ function attachTr() {
 }
 function select(g) {
   if (ED.editing && ED.editing !== g) closeInline6();
+  if (ED.crop && ED.crop !== g) { ED.crop = null; const cb = $('#e_cropbar'); if (cb) cb.remove(); changed6(); }
   S.sel = g || null;
   attachTr(); ED.layer.batchDraw();
   buildToolbar();
@@ -143,11 +146,12 @@ function dragStart(g, p, e) {
   ED.dragging = true; closeInline6();
   if (S.sel !== g) select(g);
   const L = isLayer(g) ? layerById(g.slice(2)) : null;
-  ED.d0 = { x: p.x(), y: p.y(), box: Object.assign({}, LASTG[g]), lx: L ? L.x : 0, ly: L ? L.y : 0, pos: L ? null : Object.assign({}, posOf(g)), axis: null };
+  ED.d0 = { x: p.x(), y: p.y(), box: Object.assign({}, LASTG[g]), lx: L ? L.x : 0, ly: L ? L.y : 0, pos: L ? null : Object.assign({}, posOf(g)), axis: null, ox: L ? L.ox || 0 : 0, oy: L ? L.oy || 0 : 0 };
   hideToolbar();
 }
 function dragMove(g, p, e) {
   const d0 = ED.d0, z = ED.zoom, sz = SIZES[S.size], ev = e.evt || {};
+  if (ED.crop === g) { cropPan(g, p, (p.x() - d0.x) / z, (p.y() - d0.y) / z); p.position({ x: d0.x, y: d0.y }); return; }
   let dx = (p.x() - d0.x) / z, dy = (p.y() - d0.y) / z;
   if (ev.shiftKey) {
     if (!d0.axis && Math.abs(dx) + Math.abs(dy) > 4 / z) d0.axis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
@@ -178,6 +182,41 @@ function drawGuides(gs, axis) {
   ED.guides.batchDraw();
 }
 
+/* ---------- القصّ المباشر بالسحب: الإطار بمقابضه الثمانية، والصورة تُسحب داخله، والعجلة أو الشريط للتكبير ---------- */
+function cropOn(g) {
+  const L = isLayer(g) ? layerById(g.slice(2)) : null; if (!L || L.t !== 'img') return;
+  if (!L.cr) { const im = layerImg(L); if (im) L.cr = srcH(im) / srcW(im); }
+  ED.crop = g; if (S.sel !== g) select(g); else { attachTr(); buildToolbar(); }
+  cropBar(); hideToolbar();
+}
+function cropOff() {
+  if (!ED.crop) return;
+  ED.crop = null; const b = $('#e_cropbar'); if (b) b.remove();
+  attachTr(); changed6(); drawNow(); buildToolbar();
+}
+function cropPan(g, p, dx, dy) {
+  const L = layerById(g.slice(2)), im = layerImg(L); if (!L || !im) return;
+  const sz = SIZES[S.size], w = L.w * sz.w, h = w * (L.cr || srcH(im) / srcW(im)), iw = srcW(im), ih = srcH(im);
+  const sc = Math.max(w / iw, h / ih) * (L.z || 1), ex = (iw * sc - w) / 2, ey = (ih * sc - h) / 2, d0 = ED.d0;
+  if (ex > 0.5) L.ox = Math.max(-1, Math.min(1, d0.ox + dx / ex)); if (ey > 0.5) L.oy = Math.max(-1, Math.min(1, d0.oy + dy / ey));
+  redraw();
+}
+function cropBar() {
+  const old = $('#e_cropbar'); if (old) old.remove();
+  const L = layerById(ED.crop.slice(2)); if (!L) return;
+  const zr = el('input', { type: 'range', min: '1', max: '3', step: '0.01', value: String(L.z || 1), 'aria-label': 'تكبير الصورة داخل الإطار', oninput: function (e) { L.z = +e.target.value; redraw(); }, onchange: function () { changed6(true); } });
+  const ratio = function (v, t) { return el('button', { type: 'button', class: 'crr', onclick: function () { const im = layerImg(L); L.cr = v || (im ? srcH(im) / srcW(im) : 1); changed6(); drawNow(); attachTr(); } }, [t]); };
+  const bar = el('div', { class: 'e-cropbar', id: 'e_cropbar', role: 'toolbar', 'aria-label': 'القصّ' }, [
+    el('span', { class: 'crt', text: 'اسحب الصورة داخل الإطار، وغيّر الإطار من المقابض' }),
+    el('span', { class: 'crrow' }, [ratio(0, 'الأصل'), ratio(1, '١:١'), ratio(1.25, '٤:٥'), ratio(0.5625, '١٦:٩'), ratio(1.7778, '٩:١٦')]),
+    el('label', { class: 'crz' }, [ico('zoomin'), zr]),
+    el('button', { type: 'button', class: 'btn sm dark', onclick: cropOff }, [ico('check'), 'تم'])
+  ]);
+  document.body.appendChild(bar);
+  const sc = $('.e-scroll');
+  if (sc && !document.body.classList.contains('mapp')) { const r = sc.getBoundingClientRect(); bar.style.left = Math.round(r.left + r.width / 2) + 'px'; bar.style.top = Math.round(r.top + 14) + 'px'; }
+  if (sc && !sc._cropWheel) { sc._cropWheel = true; sc.addEventListener('wheel', function (e) { if (!ED.crop) return; e.preventDefault(); const L2 = layerById(ED.crop.slice(2)); if (!L2) return; L2.z = Math.max(1, Math.min(3, (L2.z || 1) * (1 - e.deltaY * 0.0015))); const r = $('#e_cropbar input[type=range]'); if (r) r.value = String(L2.z); redraw(); clearTimeout(ED.cwT); ED.cwT = setTimeout(function () { changed6(true); }, 300); }, { passive: false }); }
+}
 /* ---------- التكبير والتدوير بالمقابض ---------- */
 function trStart(g, p) {
   ED.transforming = true; closeInline6(); hideToolbar();
@@ -186,6 +225,11 @@ function trStart(g, p) {
 }
 function trMove(g, p) {
   const t0 = ED.t0, sx = Math.abs(p.scaleX()), sy = Math.abs(p.scaleY());
+  if (ED.crop === g) {   // القصّ: المقابض تغيّر الإطار نفسه، والصورة تملؤه من جديد
+    const L = layerById(g.slice(2)), sz = SIZES[S.size], z = ED.zoom, c = p.getClientRect({ relativeTo: ED.stage });
+    const w = c.width / z, h = c.height / z; if (w > 8 && h > 8) { L.w = w / sz.w; L.cr = h / w; L.x = (c.x + c.width / 2) / z / sz.w; L.y = (c.y + c.height / 2) / z / sz.h; }
+    redraw(); return;
+  }
   if (isLayer(g)) {
     const L = layerById(g.slice(2)), sz = SIZES[S.size], z = ED.zoom;
     if (L.t === 'text') {
@@ -211,7 +255,8 @@ function trEnd(g, p) {
 /* ---------- شريط العنصر العائم ---------- */
 function hideToolbar() { const t = $('#e_tb'); if (t) t.classList.remove('show'); }
 function placeToolbar() {
-  const tb = $('#e_tb'); if (!tb || !S.sel || ED.dragging || ED.transforming || !tb.firstChild) return;
+  const tb = $('#e_tb'); if (tb && ED.crop) { tb.classList.remove('show'); return; }
+  if (!tb || !S.sel || ED.dragging || ED.transforming || !tb.firstChild) return;
   const p = ED.proxies[S.sel]; if (!p) { tb.classList.remove('show'); return; }
   if (window.innerWidth <= 860) { tb.classList.add('show'); return; }   // في الجوال مثبّت فوق شريط الأدوات
   const host = $('.e-scroll'), hr = host.getBoundingClientRect(), cr = $('.e-canvas').getBoundingClientRect();
@@ -224,6 +269,9 @@ function placeToolbar() {
   tb.style.left = x + 'px'; tb.style.top = y + 'px';
   tb.classList.add('show');
 }
+// قفل العنصر: لا يُسحب ولا يُكبَّر بالخطأ، ويبقى قابلاً للتحرير من اللوحة
+function toggleLock(g) { S.lk = Object.assign({}, S.lk || {}); if (S.lk[g]) delete S.lk[g]; else S.lk[g] = 1; if (!Object.keys(S.lk).length) S.lk = null; changed6(); drawNow(); attachTr(); buildToolbar(); toast(S.lk && S.lk[g] ? 'قُفل العنصر: لا يتحرك بالسحب' : 'فُتح العنصر'); }
+function lockBtn(g) { const on = !!(S.lk && S.lk[g]); return el('button', { type: 'button', class: 'ib' + (on ? ' on' : ''), title: on ? 'فتح القفل' : 'قفل العنصر', 'aria-label': on ? 'فتح القفل' : 'قفل العنصر', 'aria-pressed': on ? 'true' : 'false', onclick: function () { toggleLock(g); } }, [ico('lock')]); }
 function tbBtn(ic, title, fn, cls) { return el('button', { type: 'button', class: 'ib ' + (cls || ''), title: title, 'aria-label': title, onclick: fn }, [ico(ic)]); }
 function tbSep() { return el('span', { class: 'tsep' }); }
 function colorBtn(cur, title, on, opts) {
@@ -231,6 +279,7 @@ function colorBtn(cur, title, on, opts) {
   b.addEventListener('click', function () { colorPop(b, cur, on, opts); });
   return b;
 }
+function rememberColor(c) { if (!/^#[0-9a-f]{6}$/i.test(c || '')) return; const r = (ls('recentColors') || []).filter(function (x) { return String(x).toLowerCase() !== c.toLowerCase(); }); ls('recentColors', [c].concat(r).slice(0, 10)); }
 function colorPop(anchor, cur, on, opts) {
   opts = opts || {};
   $$('.cpop').forEach(function (x) { x.remove(); });
@@ -240,10 +289,17 @@ function colorPop(anchor, cur, on, opts) {
     el('small', { text: 'ألوان الهوية' }),
     el('div', { class: 'cgrid' }, list.map(function (c) {
       if (c === '__orig') return el('button', { type: 'button', class: 'csw orig' + (!cur ? ' on' : ''), title: 'كما في القالب', onclick: function () { on(''); done(); } }, [opts.origLabel || 'أصل']);
-      return el('button', { type: 'button', class: 'csw' + (cur === c ? ' on' : ''), style: 'background:' + c, title: c, 'aria-label': c, onclick: function () { on(c); done(); } });
+      return el('button', { type: 'button', class: 'csw' + (cur === c ? ' on' : ''), style: 'background:' + c, title: c, 'aria-label': c, onclick: function () { rememberColor(c); on(c); done(); } });
     })),
-    el('label', { class: 'cmore' }, [el('span', { text: 'لون آخر' }), el('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(cur || '') ? cur : '#1a71fd', oninput: function (e) { on(e.target.value, true); }, onchange: function () { done(); } })])
+    el('label', { class: 'cmore' }, [el('span', { text: 'لون آخر' }), el('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(cur || '') ? cur : '#1a71fd', oninput: function (e) { on(e.target.value, true); }, onchange: function (e) { rememberColor(e.target.value); done(); } })])
   ]);
+  // ألوان استعملتها مؤخراً، وقطّارة من الشاشة، وكتابة الرمز
+  const recent = (ls('recentColors') || []).filter(function (c) { return /^#[0-9a-f]{6}$/i.test(c); }).slice(0, 10);
+  const pick = function (c) { if (!/^#[0-9a-f]{6}$/i.test(c)) return; rememberColor(c); on(c); done(); };
+  if (recent.length) pop.insertBefore(el('div', { class: 'crecent' }, [el('small', { text: 'استعملتها مؤخراً' }), el('div', { class: 'cgrid' }, recent.map(function (c) { return el('button', { type: 'button', class: 'csw' + (cur === c ? ' on' : ''), style: 'background:' + c, title: c, 'aria-label': c, onclick: function () { pick(c); } }); }))]), pop.querySelector('.cmore'));
+  const hex = el('input', { type: 'text', class: 'chex', dir: 'ltr', value: /^#[0-9a-f]{6}$/i.test(cur || '') ? cur : '', placeholder: '#1a71fd', maxlength: '7', 'aria-label': 'رمز اللون', onkeydown: function (e) { if (e.key === 'Enter') { let v = hex.value.trim(); if (!/^#/.test(v)) v = '#' + v; pick(v); } } });
+  pop.appendChild(el('div', { class: 'crow2' }, [hex,
+    typeof window.EyeDropper === 'function' ? el('button', { type: 'button', class: 'btn sm line', title: 'التقط لوناً من الشاشة', onclick: async function () { try { const r = await new window.EyeDropper().open(); pick(r.sRGBHex); } catch (e) {} } }, [ico('wand'), 'قطّارة']) : null]));
   function done() { pop.remove(); changed6(); buildToolbar(); }
   document.body.appendChild(pop);
   const r = anchor.getBoundingClientRect(); let x = r.left + r.width / 2 - pop.offsetWidth / 2; x = Math.max(8, Math.min(innerWidth - pop.offsetWidth - 8, x));
@@ -290,12 +346,14 @@ function buildToolbar() {
       items.push(sizeStepper(L.w, 0.02, 1.6, 0.01, function (v) { return Math.round(v * 100) + '٪'; }, function (v) { L.w = v; }));
       if (L.t !== 'img') items.push(colorBtn(L.c === 'color' ? '' : (L.c || ''), 'اللون', function (c) { L.c = c || (L.t === 'logo' ? 'color' : ''); redraw(); }, { orig: L.t === 'logo', origLabel: 'الأصلي' }));
       if (L.t === 'img') items.push(sizeStepper(L.r || 0, 0, 0.5, 0.02, function (v) { return 'حواف ' + Math.round(v * 200) + '٪'; }, function (v) { L.r = v; }));
+      if (L.t === 'img') items.push(tbBtn('expand', 'قصّ بالسحب (أو انقر الصورة مرتين)', function () { cropOn(g); }));
     }
     items.push(tbSep());
     items.push(el('label', { class: 'topac', title: 'الشفافية' }, [ico('eye'), el('input', { type: 'range', min: '0.1', max: '1', step: '0.01', value: String(L.o == null ? 1 : L.o), 'aria-label': 'الشفافية', oninput: function (e) { L.o = +e.target.value; redraw(); }, onchange: changed6 })]));
-    items.push(tbBtn('front', 'للأمام', function () { const i = S.layers.indexOf(L); if (i < S.layers.length - 1) { S.layers.splice(i, 1); S.layers.splice(i + 1, 0, L); changed6(); } }));
-    items.push(tbBtn('back', 'للخلف', function () { const i = S.layers.indexOf(L); if (i > 0) { S.layers.splice(i, 1); S.layers.splice(i - 1, 0, L); changed6(); } }));
+    items.push(tbBtn('front', 'للأمام', function () { moveInStack(g, 1); }));
+    items.push(tbBtn('back', 'للخلف', function () { moveInStack(g, -1); }));
     items.push(tbBtn('copy', 'تكرار (Ctrl+D)', function () { dupLayer(L); }));
+    items.push(lockBtn(g));
     items.push(tbBtn('pencil', 'إعدادات العنصر', function () { openElPanel(g); }));
     items.push(tbBtn('trash', 'حذف', function () { delLayer6(L.id); }, 'danger'));
   } else {
@@ -308,6 +366,7 @@ function buildToolbar() {
       if (fieldsOfGroup(g).length) items.push(tbBtn('text', 'تعديل النص (نقر مزدوج)', function () { openInline6(g); }));
     }
     items.push(tbSep());
+    items.push(lockBtn(g));
     items.push(tbBtn('pencil', 'إعدادات العنصر', function () { openElPanel(g); }));
     items.push(tbBtn('more', 'المزيد', function (e) {
       popMenu(e.currentTarget, [

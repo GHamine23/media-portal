@@ -94,6 +94,7 @@ function infoCols(ctx, items, cx, y, s, color, iconColor, sep) {
   if (tot > room) { const f = Math.max(0.6, room / tot); s *= f; ws = ws.map(function (w) { return Math.min(w * f, room / items.length); }); gap *= f; tot = ws.reduce(function (a, b) { return a + b; }, 0) + gap * (items.length - 1); }
   let x = cx + tot / 2;
   items.forEach(function (it, i) {
+    infoNext(ctx);
     const xc = x - ws[i] / 2;
     icon(ctx, it.ic, xc, y, s * 1.05, iconColor);
     line(ctx, it.a, xc, y + s * 1.25, { size: s, color: color, align: 'center', maxW: ws[i] });

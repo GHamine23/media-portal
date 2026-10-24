@@ -26,20 +26,25 @@ let PHTXT = null;   // نصوص العناوين العامة التي لم يغ
 const FAR = { dx: -100000, dy: -100000 };
 // SOLO: رسم عناصر بعينها فقط (لإظهار عنصر من القالب فوق غيره). كل ما عداها يُرسم بعيداً خارج اللوحة
 let SOLO = null, SOLO_OUT = false;
+// مجموعة «المعلومات»: كل سطر معلومة (أيقونة ونص) يصير عنصراً مستقلاً info0, info1… ويرث إخفاء «info» وإزاحتها في التصاميم القديمة
+let INFO_ON = false, INFO_N = 0;
+function infoNext(ctx) { if (INFO_ON) G(ctx, 'info' + (INFO_N++)); }
 function G(ctx, name) {
+  if (name === 'info') { INFO_ON = true; INFO_N = 0; } else if (name && !/^info\d+$/.test(name)) INFO_ON = false;
   if (CUR_G || SOLO_OUT) ctx.restore();
   SOLO_OUT = false;
   CUR_G = name || null; CUR_O = null; CUR_S = null;
   if (SOLO && !(CUR_G && SOLO[CUR_G])) { ctx.save(); ctx.translate(FAR.dx, FAR.dy); CUR_O = FAR; if (!CUR_G) SOLO_OUT = true; return; }
   if (CUR_G) {
     ctx.save();
-    if (GHIDE[CUR_G]) { ctx.translate(FAR.dx, FAR.dy); CUR_O = FAR; return; }   // عنصر أُخفي أو استُبدل
-    const o = OFF[CUR_G]; if (o && (o.dx || o.dy)) { ctx.translate(o.dx || 0, o.dy || 0); CUR_O = o; }
+    const leg = /^info\d+$/.test(CUR_G) ? 'info' : null;
+    if (GHIDE[CUR_G] || (leg && GHIDE[leg])) { ctx.translate(FAR.dx, FAR.dy); CUR_O = FAR; return; }   // عنصر أُخفي أو استُبدل
+    const o = OFF[CUR_G] || (leg && OFF[leg]); if (o && (o.dx || o.dy)) { ctx.translate(o.dx || 0, o.dy || 0); CUR_O = o; }
     const st = GST[CUR_G], pv = PIV[CUR_G];
     if (st && st.s && st.s !== 1 && pv) { ctx.translate(pv.x, pv.y); ctx.scale(st.s, st.s); ctx.translate(-pv.x, -pv.y); CUR_S = { s: st.s, x: pv.x, y: pv.y }; }
   }
 }
-function gStyle() { return CUR_G && GST[CUR_G] ? GST[CUR_G] : null; }
+function gStyle() { if (!CUR_G) return null; return GST[CUR_G] || (/^info\d+$/.test(CUR_G) && GST.info) || null; }
 
 const FONT_NONE = { name: 'خط النظام', w: { l: 'sans-serif', r: 'sans-serif', m: 'sans-serif|500', b: 'sans-serif|700', k: 'sans-serif|900' }, fake: false };
 function wkOf(bold) { return !bold ? 'r' : bold <= 0.45 ? 'm' : bold <= 0.92 ? 'b' : 'k'; }
@@ -545,6 +550,7 @@ function icon(ctx, name, cx, cy, s, color) {
 /* سطر معلومات: أيقونة على اليمين ثم النص. يعيد عرضه الكلي */
 function infoItem(ctx, ic, str, x, y, o) {
   if (!String(str || '').trim()) return 0;
+  infoNext(ctx);
   const s = o.size, gap = s * 0.45, isz = s * (o.iconScale || 1.15);
   let xr = x;
   if (ic && ic !== 'none') { icon(ctx, ic, xr - isz / 2, y, isz, o.iconColor || o.color); xr -= isz + gap; }

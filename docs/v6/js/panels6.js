@@ -528,6 +528,7 @@ function imageTools(b, tgt) {
     })));
     if ((o.mk || 'rect') === 'rect') box.appendChild(slider('استدارة الحواف', o.r || 0, 0, 0.5, 0.02, function (v) { return Math.round(v * 200) + '٪'; }, function (v) { o.r = v || 0; }));
     const cropped = (o.cr && Math.abs(o.cr - ar0) > 0.01) || (o.z || 1) > 1.001;
+    box.appendChild(el('button', { type: 'button', class: 'btn sm dark', onclick: function () { cropOn('L:' + o.id); } }, [ico('expand'), 'قصّ بالسحب على الصورة']));
     box.appendChild(slider('تكبير داخل الإطار', o.z || 1, 1, 3, 0.01, pct, function (v) { o.z = v; }));
     if (cropped || o.ox || o.oy) {
       box.appendChild(slider('تحريك أفقي', o.ox || 0, -1, 1, 0.01, sgn, function (v) { o.ox = v; }));
@@ -658,6 +659,7 @@ function pEl(b) {
     L ? null : el('button', { type: 'button', class: 'btn sm line', onclick: function () { const q = posOf(g); q.dx = 0; q.dy = 0; delete S.gs[g]; S.front = (S.front || []).filter(function (x) { return x !== g; }); changed6(); buildPanel(); } }, [ico('reset'), 'كما في القالب'])
   ]));
   b.appendChild(alignBar(g));
+  b.appendChild(el('div', { class: 'row wrapr', style: 'margin-top:6px' }, [el('button', { type: 'button', class: 'btn sm line' + (S.lk && S.lk[g] ? ' on' : ''), onclick: function () { toggleLock(g); buildPanel(); } }, [ico('lock'), S.lk && S.lk[g] ? 'العنصر مقفل (افتح)' : 'قفل العنصر'])]));
   b.appendChild(el('div', { class: 'row wrapr', style: 'margin-top:8px' }, L ? [
     el('button', { type: 'button', class: 'btn sm line', onclick: function () { dupLayer(L); } }, [ico('copy'), 'تكرار']),
     el('button', { type: 'button', class: 'btn sm line', onclick: function () { saveElement([L]); } }, [ico('star'), 'احفظه عنصراً']),
