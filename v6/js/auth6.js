@@ -175,7 +175,7 @@ function buildTop() {
         { t: 'أسبوعي في أثر', ic: 'chart', href: '#/week' },
         { t: 'مراجعاتي', ic: 'review', href: '#/reviews' },
         fbHidden ? { t: 'ملاحظة للفريق', ic: 'chat', fn: function () { showFeedback6(); } } : null,
-        { t: 'جولة تعريفية', ic: 'play', fn: function () { maybeTour(document.body.dataset.page || 'home', true); } },
+        { t: 'دليل أثر', ic: 'guide', href: '#/guide' },   // المقدمات والجولات والأسئلة في مكان واحد
         '-', { t: 'خروج', ic: 'logout', fn: logout }]).filter(Boolean));
   } });
   if (V6.me.avatar) av.appendChild(el('img', { src: V6.me.avatar, alt: '' }));

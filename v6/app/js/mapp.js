@@ -48,6 +48,7 @@ route6(/^\/tips(?:\/([a-z]+))?$/, mwrap('نصائح التصميم', showTips6, 
 route6(/^\/week$/, mwrap('أسبوعي في أثر', showWeek6, { back: '#/more', noTitle: true }), { page: 'more', noVT: true });
 route6(/^\/reviews$/, mwrap('مراجعاتي', showReviews6, { back: '#/more', noTitle: true }), { page: 'more', noVT: true });
 route6(/^\/more$/, plain(mMore), { page: 'more', noVT: true });
+route6(/^\/guide(?:\/([a-z]+))?$/, mwrap('دليل أثر', showGuide6, { back: '#/more', noTitle: true }), { page: 'more', noVT: true });
 route6(/^\/(feedback|fb)$/, function () { redirect6('#/account?fb'); }, { page: 'more', noVT: true });
 route6(/^\/news$/, function () { redirect6('#/more'); setTimeout(function () { showNews(); }, 500); }, { page: 'more', noVT: true });
 route6(/^\/admin(?:\/([a-z]+))?$/, function () { location.href = '../#/admin'; }, { page: 'more', noVT: true });

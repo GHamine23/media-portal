@@ -136,7 +136,7 @@ function mMore() {
   const bottom = el('div', { class: 'mbtns' }, [
     el('button', { type: 'button', class: 'btn danger', onclick: async function () { if (await ask('خروج', 'تخرج من حسابك على هذا الجهاز.', 'خروج', true)) logout(); } }, [ico('logout'), 'خروج'])
   ]);
-  const sc = mscreen({ title: 'المزيد' }, [hero, tiles, look, app, bottom,
+  const sc = mscreen({ title: 'المزيد' }, [hero, tiles, typeof guideMoreCard === 'function' ? guideMoreCard() : null, look, app, bottom,
     el('p', { class: 'mfoot', style: 'text-align:center', text: 'أثر · الإصدار ' + V6.version + (isStandalone() ? ' · تطبيق' : '') })]);
   view(sc.node);
 }

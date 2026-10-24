@@ -1,0 +1,22 @@
+/* ===== دليل أثر في التطبيق: ورقة «اسأل أثر» السفلية، وبطاقة المقدمة فوق شريط التبويب، والصفحة بعرض الهاتف ===== */
+body.mapp .gx-scrim{position:fixed;inset:0;z-index:125;display:flex;align-items:flex-end;justify-content:center;background:rgba(20,18,40,0);transition:background .3s}
+body.mapp .gx-scrim.on{background:rgba(20,18,40,.3)}
+body.mapp .gx-panel{position:relative;left:auto;bottom:auto;width:100%;max-width:640px;height:min(88dvh,760px);border-radius:var(--r3) var(--r3) 0 0;opacity:1;transform:translateY(105%);
+  transition:transform .5s var(--spring);padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -10px 40px rgba(0,0,0,.18)}
+body.mapp .gx-panel.on{transform:none}
+body.mapp .gx-panel::before{content:"";position:absolute;top:6px;left:50%;width:36px;height:5px;margin-left:-18px;border-radius:3px;background:rgba(60,60,67,.3);z-index:2}
+body.mapp .gx-hd{padding-top:16px}
+body.mapp .gx-in{font-size:16px}
+body.mapp .gx-intro{left:10px;right:10px;width:auto;bottom:calc(var(--tab-h) + 10px);border-radius:18px}
+body.mapp.in-editor .gx-intro{top:calc(env(safe-area-inset-top,0px) + 60px);bottom:auto}
+body.mapp .gxi-th{width:96px}
+.mnav .nb.gx-q svg{width:23px;height:23px}
+/* الصفحة */
+body.mapp .gpage{padding-top:4px;gap:18px}
+body.mapp .gpage .phead h1{font-size:30px}
+body.mapp .ghero{padding:12px;border-radius:22px;gap:14px}
+body.mapp .gside{padding:0 4px 4px}
+body.mapp .gside h2{font-size:24px}
+body.mapp .gpath{gap:14px}
+body.mapp .gstep:hover{transform:none}
+body.mapp .gset{padding:14px}

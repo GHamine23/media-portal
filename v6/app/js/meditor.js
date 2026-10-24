@@ -109,6 +109,7 @@ showEditor6 = function (doc, fromDraft) {
         { t: 'تراجع', ic: 'undo', fn: undo6 }, { t: 'إعادة', ic: 'redo', fn: redo6 },
         { t: 'إعادة ضبط الصفحة إلى القالب', ic: 'reset', fn: resetPage6 },
         { t: 'المقاس: ' + ((SIZES[S.size] || {}).name || ''), ic: 'grid', fn: function () { mactions(null, (S.tpl.sizes || []).map(function (sz) { return { t: SIZES[sz].name, fn: function () { S.size = sz; S.sel = null; changed6(); buildSizeSel(); setTimeout(refit, 0); } }; }), 'المقاس'); } },
+        typeof askAthar === 'function' ? { t: 'اسأل أثر', ic: 'help', fn: function () { askAthar(); } } : null,
         { t: 'ملاحظة للفريق', ic: 'chat', fn: function () { showFeedback6(); } }
       ], ED.doc.name);
     } }, [ico('more')]);
