@@ -113,7 +113,7 @@ function apiFns_() {
     stat_track: stat_track, stat_summary: stat_summary,
     bc_list: bc_list, bc_all: bc_all, bc_save: bc_save, bc_del: bc_del,
     cl_list: cl_list, cl_save: cl_save, set_get: set_get, set_save: set_save, audit_list: audit_list,
-    ai_make: ai_make, ai_status: ai_status, ai_log: ai_log,
+    ai_make: ai_make, ai_test: ai_test, ai_status: ai_status, ai_log: ai_log,
     tg_test: tg_test, tg_send: tg_send, tg_queue: tg_queue, tg_cancel: tg_cancel, tg_update: tg_update, tg_requeue: tg_requeue, tg_thumbs: tg_thumbs, tg_discover: tg_discover, tg_chat_check: tg_chat_check, tg_known: tg_known,
     task_list: task_list, task_save: task_save, task_done: task_done, task_del: task_del, me_profile: me_profile, font_family: font_family,
     img_search: img_search, img_test: img_test, img_pick: img_pick,
@@ -955,20 +955,24 @@ function geminiKeys_() {
   var seen = {}; return list.filter(function (k) { if (seen[k]) return false; seen[k] = true; return true; });
 }
 function hasGemini_() { return geminiKeys_().length > 0; }
-function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: !!(hasGemini_() || props_().getProperty('GROQ_KEY') || s.ai.pollFallback !== false), vision: hasGemini_(), capPrompt: (s.ai && s.ai.capPrompt) || '' }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN'), pexels: true, imgKeys: { pixabay: !!props_().getProperty('PIXABAY_KEY'), pexels: !!props_().getProperty('PEXELS_KEY') }, tgKnown: (s.tgKnown || []).length }; }
-function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.aiKey = hasGemini_(); s.aiKeys = geminiKeys_().length; s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); s.pixabayOn = !!props_().getProperty('PIXABAY_KEY'); s.groqOn = !!props_().getProperty('GROQ_KEY'); s.routeDefault = AI_ROUTE_DEFAULT; return JSON.stringify(s); }
+function aiAny_(s) { var h = aiHave_(); return !!(h.gemini || h.groq || h.cf || (s.ai && s.ai.pollFallback !== false)); }
+function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: aiAny_(s), vision: hasGemini_(), capPrompt: (s.ai && s.ai.capPrompt) || '' }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN'), pexels: true, imgKeys: { pixabay: !!props_().getProperty('PIXABAY_KEY'), pexels: !!props_().getProperty('PEXELS_KEY') }, tgKnown: (s.tgKnown || []).length }; }
+function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.aiKey = hasGemini_(); s.aiKeys = geminiKeys_().length; s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); s.pixabayOn = !!props_().getProperty('PIXABAY_KEY'); s.groqOn = !!props_().getProperty('GROQ_KEY'); s.cfOn = !!(props_().getProperty('CF_ACCOUNT') && props_().getProperty('CF_TOKEN')); s.routeDefault = AI_ROUTE_DEFAULT; return JSON.stringify(s); }
 function set_save(token, json) {
   var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
   var s = JSON.parse(json);
   return withLock_(function () {
     var cur = settings_();
-    if (s.ai) cur.ai = { enabled: !!s.ai.enabled, model: clip_(s.ai.model || 'gemini-3.8-flash', 60), fallback: clip_(s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 120), light: clip_(s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite', 60), groqModel: clip_(s.ai.groqModel || 'openai/gpt-oss-120b', 60), route: (function (r) { var o = {}; Object.keys(r || {}).forEach(function (k) { if (r[k] === 'groq' || r[k] === 'gemini') o[clip_(k, 20)] = r[k]; }); return o; })(s.ai.route), perDay: Math.max(0, Math.min(500, +s.ai.perDay || 0)), pollFallback: s.ai.pollFallback !== false, capPrompt: clip_(s.ai.capPrompt != null ? s.ai.capPrompt : (cur.ai.capPrompt || ''), 4000) };
+    if (s.ai) cur.ai = { enabled: !!s.ai.enabled, model: clip_(s.ai.model || 'gemini-3.8-flash', 60), fallback: clip_(s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 120), light: clip_(s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite', 60), groqModel: clip_(s.ai.groqModel || 'openai/gpt-oss-120b', 60), cfModel: clip_(s.ai.cfModel || '@cf/openai/gpt-oss-120b', 80), route: (function (r) { var o = {}; Object.keys(r || {}).forEach(function (k) { if (r[k] === 'groq' || r[k] === 'gemini') o[clip_(k, 20)] = r[k]; }); return o; })(s.ai.route), perDay: Math.max(0, Math.min(500, +s.ai.perDay || 0)), pollFallback: s.ai.pollFallback !== false, capPrompt: clip_(s.ai.capPrompt != null ? s.ai.capPrompt : (cur.ai.capPrompt || ''), 4000) };
     // مفاتيح Gemini الإضافية: يلصقها المدير (لا تُعرض بعد الحفظ). سطر أو فاصلة بين كل مفتاح وآخر. نص فارغ يحذفها، و«keep» يبقيها
     if (s.geminiKeys != null && s.geminiKeys !== 'keep') { var gks = String(s.geminiKeys).split(/[\s,;]+/).map(function (k) { return k.trim(); }).filter(function (k) { return /^[\w\-]{20,}$/.test(k); }); if (gks.length) props_().setProperty('GEMINI_KEYS', gks.join('\n')); else props_().deleteProperty('GEMINI_KEYS'); }
     if (s.uploadsNeedPerm != null) cur.uploadsNeedPerm = !!s.uploadsNeedPerm;
     if (s.maxUploadMb != null) cur.maxUploadMb = Math.max(1, Math.min(20, +s.maxUploadMb || 20));
     if (s.tgToken != null) { var tk = String(s.tgToken).trim(); if (tk) { if (!/^\d+:[\w-]{30,}$/.test(tk)) throw new Error('رمز البوت غير صحيح'); props_().setProperty('TG_TOKEN', tk); } else props_().deleteProperty('TG_TOKEN'); }
     if (s.sendNeedsApproval != null) cur.sendNeedsApproval = !!s.sendNeedsApproval;
+    // Cloudflare Workers AI (اختياري): رقم الحساب ورمز API يلصقهما المدير. نص فارغ يحذفهما
+    if (s.cfAccount != null) { var ca = String(s.cfAccount).trim(); if (ca) { if (!/^[a-f0-9]{32}$/i.test(ca)) throw new Error('رقم حساب Cloudflare غير صحيح (٣٢ حرفاً)'); props_().setProperty('CF_ACCOUNT', ca); } else props_().deleteProperty('CF_ACCOUNT'); }
+    if (s.cfToken != null) { var ct = String(s.cfToken).trim(); if (ct) props_().setProperty('CF_TOKEN', ct); else props_().deleteProperty('CF_TOKEN'); }
     if (s.groqKey != null) { var gk = String(s.groqKey).trim(); if (gk) props_().setProperty('GROQ_KEY', gk); else props_().deleteProperty('GROQ_KEY'); }
     if (s.pixabayKey != null) { var pbk = String(s.pixabayKey).trim(); if (pbk) props_().setProperty('PIXABAY_KEY', pbk); else props_().deleteProperty('PIXABAY_KEY'); }
     if (s.imgProvider != null) cur.imgProvider = ['pixabay', 'pexels', 'openverse'].indexOf(s.imgProvider) >= 0 ? s.imgProvider : '';
@@ -984,49 +988,71 @@ function audit_list(token) { var a = auth_(token); if (!isSuper_(a)) throw new E
 function ai_status(token) {
   var a = auth_(token), s = settings_();
   var used = +(CacheService.getScriptCache().get('ai:' + a.uid + ':' + dayKey_(now_())) || 0);
-  return JSON.stringify({ enabled: !!s.ai.enabled && !!(hasGemini_() || props_().getProperty('GROQ_KEY') || s.ai.pollFallback !== false) && perm_(a, 'ai'), perDay: s.ai.perDay, used: used, allowed: perm_(a, 'ai') });
+  return JSON.stringify({ enabled: !!s.ai.enabled && aiAny_(s) && perm_(a, 'ai'), perDay: s.ai.perDay, used: used, allowed: perm_(a, 'ai') });
 }
 
 // نداء Gemini الأساسي (يستعمله ai_make والتقارير الأسبوعية). يسجّل كل طلب في ailog
 
-/* ---------- توزيع المهام بين المساعدين: Gemini (يرى الصور) وGroq (نصي، سريع، لا يدرّب على البيانات) ---------- */
-var AI_ROUTE_DEFAULT = { intake: 'groq', caption: 'groq', outline: 'groq', imgq: 'groq', week: 'groq', weekly: 'groq', design: 'groq', creative: 'groq', spell: 'groq', review: 'gemini' };
+/* ---------- توزيع المهام بين المساعدين ----------
+   Gemini يرى الصور ويكتب العربية أجود، فهو للتصميم والمراجعة. Groq نصي سريع لا يحتفظ بالبيانات، فهو للمهام الخفيفة.
+   Cloudflare Workers AI اختياري (حصة يومية مجانية، لا يُدرَّب على البيانات). Pollinations بلا مفتاح ملاذاً أخيراً للنصوص.
+   كل طلب يمرّ على سلسلة: المساعد المختار للمهمة ← البقية المتاحة ← Pollinations. وما يُطلب بمخطط JSON يُتحقق منه ويُصلح، فإن فسد انتقلنا إلى التالي. */
+var AI_ROUTE_DEFAULT = { intake: 'groq', caption: 'groq', outline: 'groq', imgq: 'groq', week: 'groq', weekly: 'groq', design: 'gemini', creative: 'gemini', spell: 'groq', review: 'gemini', refine: 'groq', brief: 'groq' };
+// المهام الخفيفة: نموذج Gemini الخفيف (حصته أكبر) وتفكير قليل، وجهد استدلال منخفض في Groq
+var AI_FAST = { intake: 1, caption: 1, spell: 1, imgq: 1, outline: 1, week: 1, weekly: 1, refine: 1, brief: 1 };
 function aiRoute_(kind) { var s = settings_(), r = (s.ai && s.ai.route) || {}; return r[kind] || AI_ROUTE_DEFAULT[kind] || 'gemini'; }
-function geminiCall_(req, who) {
-  var hasGroq = !!props_().getProperty('GROQ_KEY'), hasGem = hasGemini_();
-  var textOnly = !(req.files || []).length, useGroq = hasGroq && textOnly && (aiRoute_(req.kind) === 'groq' || !hasGem);
-  var primary = function () {
-    if (useGroq) {
-      try { return groqCall_(req, who); } catch (e) { if (!hasGem) throw e; }
-      return geminiOnly_(req, who);
-    }
-    try { return geminiOnly_(req, who); }
-    catch (e) { if (hasGroq && textOnly && /مزدحمة|مشغول|429|503|حدّها/.test(e.message)) return groqCall_(req, who); throw e; }
-  };
-  try { return primary(); }
-  catch (e) {
-    // الملاذ الأخير للنصوص: Pollinations (مجاني بلا مفتاح) حتى لا يتوقف العمل حين تنفد الحصص
-    if (textOnly && settings_().ai.pollFallback !== false && !/صلاحية|متوقف|حد اليوم/.test(e.message)) { try { return pollCall_(req, who, e.message); } catch (e2) {} }
-    throw e;
-  }
+function aiHave_() { var p = props_(); return { gemini: hasGemini_(), groq: !!p.getProperty('GROQ_KEY'), cf: !!(p.getProperty('CF_ACCOUNT') && p.getProperty('CF_TOKEN')) }; }
+function aiChain_(req) {
+  var have = aiHave_(), textOnly = !(req.files || []).length;
+  if (!textOnly) return have.gemini ? ['gemini'] : [];
+  var order = [aiRoute_(req.kind), 'gemini', 'groq', 'cf'].filter(function (p, i, a) { return have[p] && a.indexOf(p) === i; });
+  if (settings_().ai.pollFallback !== false) order.push('poll');
+  return order;
 }
-function pollCall_(req, who, why) {
-  var body = { model: 'openai', temperature: req.temperature != null ? +req.temperature : 0.8, messages: [{ role: 'system', content: clip_(req.system, 30000) + (req.schema ? '\n\nأعد JSON فقط يطابق هذا المخطط بدقة: ' + JSON.stringify(toJsonSchema_(req.schema)) : '') }, { role: 'user', content: clip_(req.prompt, 60000) }] };
-  if (req.schema) body.response_format = { type: 'json_object' };
-  var t0 = now_(), log = { t: t0, uid: who.uid, name: who.name, program: clip_(req.program || '', 30), kind: clip_(req.kind || 'design', 20), inChars: String(req.prompt || '').length, files: 0, model: 'pollinations', ok: false, ms: 0, outChars: 0, err: '', q: clip_(String(req.prompt || '').replace(/\s+/g, ' '), 140), fallbackFrom: clip_(why || '', 80) };
-  var out = '';
-  try {
-    var res = UrlFetchApp.fetch('https://text.pollinations.ai/openai', { method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true });
-    if (res.getResponseCode() >= 300) throw new Error('تعذّر الوصول إلى المساعد الاحتياطي (' + res.getResponseCode() + ')');
-    var j = JSON.parse(res.getContentText());
-    out = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content || '';
-    if (req.schema) { var m = String(out).match(/\{[\s\S]*\}/); out = m ? m[0] : out; JSON.parse(out); }
-    if (!out) throw new Error('لم يُعد المساعد الاحتياطي نتيجة');
-    log.ok = true; log.outChars = out.length;
-  } catch (e) { log.err = clip_(String(e && e.message || e), 160); }
-  log.ms = now_() - t0; aiLog_(log);
-  if (!log.ok) throw new Error(log.err);
-  return out;
+// الاسم باقٍ للتوافق: كل نداءات المساعد تمرّ من هنا
+function geminiCall_(req, who) {
+  var chain = aiChain_(req), first = '';
+  if (!chain.length) throw new Error((req.files || []).length ? 'هذه المهمة تحتاج مفتاح Gemini (يرى الصور)؛ لم يُضبط بعد' : 'لم يُضبط مفتاح المساعد بعد');
+  for (var i = 0; i < chain.length; i++) {
+    try {
+      if (chain[i] === 'gemini') return geminiOnly_(req, who);
+      if (chain[i] === 'groq') return groqCall_(req, who);
+      if (chain[i] === 'cf') return cfCall_(req, who);
+      return pollCall_(req, who, first);
+    } catch (e) { if (/صلاحية|متوقف|حد اليوم/.test(e.message)) throw e; if (!first) first = e.message; }
+  }
+  throw new Error(first || 'تعذّر الوصول إلى المساعد');
+}
+// قراءة JSON من نص النموذج وإصلاحه: أسوار الشيفرة، والفواصل الزائدة، والحقول المطلوبة الناقصة، والأنواع
+function aiJson_(txt, schema) {
+  var s = String(txt || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
+  var a = s.indexOf('{'), b = s.lastIndexOf('}');
+  if (a < 0 || b < a) throw new Error('أعاد المساعد نتيجة غير صالحة');
+  s = s.slice(a, b + 1);
+  var o;
+  try { o = JSON.parse(s); }
+  catch (e) { try { o = JSON.parse(s.replace(/,\s*([}\]])/g, '$1').replace(/[“”]/g, '"')); } catch (e2) { throw new Error('أعاد المساعد نتيجة غير صالحة (JSON)'); } }
+  if (!o || typeof o !== 'object' || Array.isArray(o)) throw new Error('أعاد المساعد نتيجة غير صالحة');
+  return JSON.stringify(aiShape_(o, schema));
+}
+function aiEmpty_(sc) { var t = String(sc && sc.type || '').toUpperCase(); return t === 'ARRAY' ? [] : t === 'OBJECT' ? aiShape_({}, sc) : t === 'NUMBER' || t === 'INTEGER' ? 0 : t === 'BOOLEAN' ? false : ''; }
+function aiShape_(v, sc) {
+  if (!sc || typeof sc !== 'object') return v;
+  var t = String(sc.type || '').toUpperCase();
+  if (t === 'OBJECT') {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) v = {};
+    var props = sc.properties || {}, req = sc.required || [];
+    Object.keys(props).forEach(function (k) {
+      if (v[k] === null || v[k] === undefined) { if (req.indexOf(k) >= 0) v[k] = aiEmpty_(props[k]); else delete v[k]; }
+      else v[k] = aiShape_(v[k], props[k]);
+    });
+    return v;
+  }
+  if (t === 'ARRAY') { if (!Array.isArray(v)) v = v == null ? [] : [v]; return v.filter(function (x) { return x != null; }).map(function (x) { return aiShape_(x, sc.items); }); }
+  if (t === 'STRING') { v = typeof v === 'string' ? v : typeof v === 'object' ? JSON.stringify(v) : String(v); return sc.enum && sc.enum.indexOf(v) < 0 ? '' : v; }
+  if (t === 'NUMBER' || t === 'INTEGER') { var n = +v; return isFinite(n) ? n : 0; }
+  if (t === 'BOOLEAN') return !!v;
+  return v;
 }
 // تحويل مخطط Gemini (OBJECT/STRING…) إلى JSON Schema المعتاد
 function toJsonSchema_(sc) {
@@ -1036,34 +1062,68 @@ function toJsonSchema_(sc) {
     if (k === 'type' && typeof v === 'string') o.type = v.toLowerCase();
     else if (k === 'properties') { o.properties = {}; Object.keys(v).forEach(function (p) { o.properties[p] = toJsonSchema_(v[p]); }); }
     else if (k === 'items') o.items = toJsonSchema_(v);
-    else o[k] = v;
+    else if (k !== 'propertyOrdering' && k !== 'nullable') o[k] = v;
   });
   return o;
 }
-function groqCall_(req, who) {
-  var key = props_().getProperty('GROQ_KEY'); if (!key) throw new Error('لم يُضبط مفتاح Groq');
-  var s = settings_(), model = String((s.ai && s.ai.groqModel) || 'openai/gpt-oss-120b').replace(/[^\w.\-\/]/g, '');
-  var body = { model: model, temperature: req.temperature != null ? +req.temperature : 0.8,
-    messages: [{ role: 'system', content: clip_(req.system, 30000) }, { role: 'user', content: clip_(req.prompt, 60000) }] };
-  if (req.schema) body.response_format = { type: 'json_schema', json_schema: { name: 'athar', strict: false, schema: toJsonSchema_(req.schema) } };
-  var t0 = now_(), log = { t: t0, uid: who.uid, name: who.name, program: clip_(req.program || '', 30), kind: clip_(req.kind || 'design', 20), inChars: String(req.prompt || '').length, files: 0, model: 'groq:' + model, ok: false, ms: 0, outChars: 0, err: '', q: clip_(String(req.prompt || '').replace(/\s+/g, ' '), 140) };
+// المخطط الصارم (Groq strict): كل الحقول مطلوبة، والاختياري يقبل null، ولا حقول زائدة
+function strictSchema_(j) {
+  if (!j || typeof j !== 'object') return j;
+  if (j.type === 'object' && j.properties) {
+    var req = j.required || [], o = { type: 'object', properties: {}, required: Object.keys(j.properties), additionalProperties: false };
+    Object.keys(j.properties).forEach(function (k) { var p = strictSchema_(j.properties[k]); if (req.indexOf(k) < 0 && typeof p.type === 'string') { p = Object.assign({}, p, { type: [p.type, 'null'] }); if (p.enum) p.enum = p.enum.concat([null]); } o.properties[k] = p; });
+    return o;
+  }
+  if (j.type === 'array' && j.items) return Object.assign({}, j, { items: strictSchema_(j.items) });
+  return j;
+}
+function canStrict_(sc) { var walk = function (j) { if (!j || typeof j !== 'object') return true; if (j.type === 'object') return !!j.properties && Object.keys(j.properties).every(function (k) { return walk(j.properties[k]); }); if (j.type === 'array') return walk(j.items); return true; }; return !!(sc && sc.type === 'object' && walk(sc)); }
+// نداء موحّد لكل خدمة تتبع صيغة OpenAI (Groq وCloudflare وPollinations)
+function oaiCall_(cfg, req, who, why) {
+  var sys = clip_(req.system, 30000), schemaIn = cfg.fmt === 'prompt' || cfg.fmt === 'object';
+  if (req.schema && schemaIn) sys += '\n\nأعد JSON فقط يطابق هذا المخطط بدقة: ' + JSON.stringify(toJsonSchema_(req.schema));
+  var body = { model: cfg.model, temperature: req.temperature != null ? +req.temperature : 0.8, messages: [{ role: 'system', content: sys }, { role: 'user', content: clip_(req.prompt, 60000) }] };
+  var js = req.schema ? toJsonSchema_(req.schema) : null, strict = !!(js && cfg.fmt === 'schema' && cfg.strictOk && canStrict_(js));
+  if (js && cfg.fmt === 'schema') body.response_format = { type: 'json_schema', json_schema: { name: 'athar', strict: strict, schema: strict ? strictSchema_(js) : js } };
+  else if (js && cfg.fmt === 'object') body.response_format = { type: 'json_object' };
+  // نماذج gpt-oss تفكّر قبل الجواب: جهد منخفض يكفي للكتابة ويوفّر الوقت والحصة (Pollinations المجاني يقطع الجواب عند ١٥٠٠ رمز)
+  if (cfg.reasoning) { body.reasoning_effort = req.kind === 'outline' || req.kind === 'review' ? 'medium' : 'low'; if (cfg.hideReasoning) body.include_reasoning = false; }
+  var t0 = now_(), log = { t: t0, uid: who.uid, name: who.name, program: clip_(req.program || '', 30), kind: clip_(req.kind || 'design', 20), inChars: String(req.prompt || '').length, files: 0, model: cfg.tag, ok: false, ms: 0, outChars: 0, err: '', q: clip_(String(req.prompt || '').replace(/\s+/g, ' '), 140) };
+  if (why) log.fallbackFrom = clip_(why, 80);
   var out = '';
   try {
-    for (var attempt = 0; attempt < 2; attempt++) {
-      var res = UrlFetchApp.fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true, headers: { Authorization: 'Bearer ' + key } });
+    for (var attempt = 0; attempt < 3; attempt++) {
+      var res = UrlFetchApp.fetch(cfg.url, { method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true, headers: cfg.key ? { Authorization: 'Bearer ' + cfg.key } : {} });
       var code = res.getResponseCode();
-      if ((code === 429 || code >= 500) && attempt === 0) { Utilities.sleep(1500); continue; }
-      if (code >= 300) throw new Error('تعذّر الوصول إلى Groq (' + code + ')');
-      var j = JSON.parse(res.getContentText());
-      out = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content || '';
+      // المخطط الصارم قد يُرفض لبعض الصيغ: نعيد بلا صرامة
+      if (code === 400 && strict) { strict = false; body.response_format.json_schema = { name: 'athar', strict: false, schema: js }; continue; }
+      if (code === 400 && body.reasoning_effort) { delete body.reasoning_effort; delete body.include_reasoning; continue; }
+      if ((code === 429 || code >= 500) && attempt === 0 && cfg.retry) { Utilities.sleep(1500); continue; }
+      if (code >= 300) throw new Error('تعذّر الوصول إلى ' + cfg.label + ' (' + code + ')');
+      var j = JSON.parse(res.getContentText()), m = j.choices && j.choices[0] && j.choices[0].message;
+      out = m && (typeof m.content === 'string' ? m.content : (m.content || []).map(function (p) { return p.text || ''; }).join('')) || '';
       break;
     }
-    if (!out) throw new Error('لم يُعد Groq نتيجة');
+    if (!out) throw new Error('لم يُعد ' + cfg.label + ' نتيجة');
+    if (req.schema) out = aiJson_(out, req.schema);
     log.ok = true; log.outChars = out.length;
   } catch (e) { log.err = clip_(String(e && e.message || e), 160); }
   log.ms = now_() - t0; aiLog_(log);
   if (!log.ok) throw new Error(log.err);
   return out;
+}
+function pollCall_(req, who, why) {
+  return oaiCall_({ url: 'https://text.pollinations.ai/openai', model: 'openai', tag: 'pollinations', label: 'المساعد الاحتياطي', fmt: 'object', reasoning: true }, req, who, why || '');
+}
+function groqCall_(req, who) {
+  var key = props_().getProperty('GROQ_KEY'); if (!key) throw new Error('لم يُضبط مفتاح Groq');
+  var s = settings_(), model = String((s.ai && s.ai.groqModel) || 'openai/gpt-oss-120b').replace(/[^\w.\-\/]/g, '');
+  return oaiCall_({ url: 'https://api.groq.com/openai/v1/chat/completions', key: key, model: model, tag: 'groq:' + model, label: 'Groq', fmt: 'schema', strictOk: /gpt-oss|qwen/.test(model), reasoning: /gpt-oss/.test(model), hideReasoning: true, retry: true }, req, who);
+}
+function cfCall_(req, who) {
+  var p = props_(), acc = String(p.getProperty('CF_ACCOUNT') || '').replace(/[^\w]/g, ''), key = p.getProperty('CF_TOKEN'); if (!acc || !key) throw new Error('لم يُضبط Cloudflare');
+  var s = settings_(), model = String((s.ai && s.ai.cfModel) || '@cf/openai/gpt-oss-120b').replace(/[^\w.\-\/@]/g, '');
+  return oaiCall_({ url: 'https://api.cloudflare.com/client/v4/accounts/' + acc + '/ai/v1/chat/completions', key: key, model: model, tag: 'cf:' + model.replace('@cf/', ''), label: 'Cloudflare', fmt: 'prompt', reasoning: /gpt-oss/.test(model), retry: true }, req, who);
 }
 
 // نداء Gemini وحده (مع إعادة المحاولة والنماذج الاحتياطية)
@@ -1084,14 +1144,17 @@ function geminiOnly_(req, who) {
   var s = settings_(), keys = geminiKeys_(); if (!keys.length) throw new Error('لم يُضبط مفتاح المساعد بعد');
   var parts = [{ text: clip_(req.prompt, 60000) }];
   (req.files || []).slice(0, 3).forEach(function (f) { if (f && f.b64 && /^(application\/pdf|image\/(png|jpeg|webp)|text\/plain)$/.test(f.mime || '') && f.b64.length < 28 * 1024 * 1024) parts.push({ inlineData: { mimeType: f.mime, data: f.b64 } }); });
-  var body = { contents: [{ role: 'user', parts: parts }],
-    systemInstruction: { parts: [{ text: clip_(req.system, 30000) }] },
-    generationConfig: { temperature: req.temperature != null ? +req.temperature : 0.9 } };
-  if (req.schema) { body.generationConfig.responseMimeType = 'application/json'; body.generationConfig.responseSchema = req.schema; }
-  // المهام الخفيفة (فهم الفكرة، النص المصاحب، التصحيح، كلمات الصور، المخطط، تقرير الأسبوع) على نموذج حصته اليومية أكبر،
-  // والتصميم والمراجعة على النموذج الأقوى. الحصة المجانية لكل نموذج على حدة.
-  var LIGHT = { intake: 1, caption: 1, spell: 1, imgq: 1, outline: 1, week: 1, weekly: 1 };
-  var model = String((LIGHT[req.kind] && (s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite')) || s.ai.model || 'gemini-3.8-flash').replace(/[^\w.\-]/g, '');
+  // المهام الخفيفة (فهم الفكرة، النص المصاحب، التصحيح، كلمات الصور، المخطط، تقرير الأسبوع، التعديل) على نموذج حصته اليومية أكبر،
+  // والتصميم والمراجعة على النموذج الأقوى. الحصة المجانية لكل مشروع جوجل ولكل نموذج على حدة.
+  var model = String((AI_FAST[req.kind] && (s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite')) || s.ai.model || 'gemini-3.8-flash').replace(/[^\w.\-]/g, '');
+  // جسم الطلب لكل نموذج: Gemini 3 فما بعد يفكّر افتراضياً (أبطأ)؛ نخفّض التفكير لكل شيء عدا مراجعة الصور والمخطط. Gemma بلا مخطط مقيّد فنصفه في التعليمات
+  var noThink = {};
+  var bodyFor = function (m) {
+    var gc = { temperature: req.temperature != null ? +req.temperature : 0.9 }, sys = clip_(req.system, 30000);
+    if (req.schema) { if (/^gemma/.test(m)) sys += '\n\nأعد JSON فقط يطابق هذا المخطط بدقة: ' + JSON.stringify(toJsonSchema_(req.schema)); else { gc.responseMimeType = 'application/json'; gc.responseSchema = req.schema; } }
+    if (/^gemini-[3-9]/.test(m) && !/lite/.test(m) && req.kind !== 'review' && req.kind !== 'outline' && !noThink[m]) gc.thinkingConfig = { thinkingLevel: 'low' };
+    return JSON.stringify({ contents: [{ role: 'user', parts: parts }], systemInstruction: { parts: [{ text: sys }] }, generationConfig: gc });
+  };
   var t0 = now_(), log = { t: t0, uid: who.uid, name: who.name, program: clip_(req.program || '', 30), kind: clip_(req.kind || 'design', 20), inChars: parts[0].text.length, files: parts.length - 1, model: model, ok: false, ms: 0, outChars: 0, err: '', q: clip_(String(req.prompt || '').replace(/\s+/g, ' '), 90) };
   // ازدحام جوجل (503/500/429) مؤقت: نعيد المحاولة مرة بعد ثانيتين، ثم ننتقل إلى نموذج احتياطي
   var models = [model].concat(String(s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite').split(',').map(function (m) { return m.trim().replace(/[^\w.\-]/g, ''); }).filter(function (m) { return m && m !== model; }));
@@ -1106,17 +1169,19 @@ function geminiOnly_(req, who) {
         if (now_() - t0 > 75000) break outer;
         try {
           var res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + models[mi] + ':generateContent', {
-            method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true, headers: { 'x-goog-api-key': key } });
+            method: 'post', contentType: 'application/json', payload: bodyFor(models[mi]), muteHttpExceptions: true, headers: { 'x-goog-api-key': key } });
           var code = res.getResponseCode(), txt = res.getContentText(); lastCode = code;
           if (code === 429) { quotaHits++; geminiMarkBad_(key, models[mi], txt); break; }   // المفتاح التالي
+          if (code === 400 && /thinking/i.test(txt) && !noThink[models[mi]]) { noThink[models[mi]] = 1; continue; }   // نموذج لا يقبل ضبط التفكير: نعيد بدونه
           if (code === 503 || code === 500 || code === 504) { if (!busyRetried) { busyRetried = true; Utilities.sleep(2000); continue; } break; }
           if (code === 400 || code === 403) { if (/API key|API_KEY_INVALID|PERMISSION_DENIED/i.test(txt)) { geminiMarkBad_(key, models[mi], 'daily'); log.err = 'أحد مفاتيح Gemini غير صالح'; break; } log.err = 'تعذّر الوصول إلى المساعد (' + code + ')'; break outer; }
           if (code >= 300) { log.err = 'تعذّر الوصول إلى المساعد (' + code + ')'; if (code === 404) break; break outer; }
           var j = JSON.parse(txt), part = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
           out = (part || []).map(function (p) { return p.text || ''; }).join('');
           if (!out) { log.err = 'لم يُعد المساعد نتيجة. أعد صياغة طلبك.'; break outer; }
+          if (req.schema) out = aiJson_(out, req.schema);
           log.ok = true; log.outChars = out.length; log.model = models[mi]; log.key = ki + 1; log.err = ''; break outer;
-        } catch (e) { log.err = clip_(String(e && e.message || e), 160); break; }
+        } catch (e) { log.err = clip_(String(e && e.message || e), 160); if (/غير صالحة/.test(log.err)) break outer; break; }
       }
       if (lastCode === 404) break;   // النموذج غير موجود: لا فائدة من بقية المفاتيح
     }
@@ -1134,13 +1199,30 @@ function ai_make(token, json) {
   if (!perm_(a, 'ai')) throw new Error('المساعد يحتاج صلاحية من مشرف البرنامج');
   var req = JSON.parse(json);   // {kind, system, prompt, schema, temperature, files: [{mime, b64}]}
   var textOnly = !(req.files || []).length;
-  if (!hasGemini_() && !props_().getProperty('GROQ_KEY') && !(textOnly && s.ai.pollFallback !== false)) throw new Error(textOnly ? 'لم يُضبط مفتاح المساعد بعد' : 'هذه المهمة تحتاج مفتاح Gemini (يرى الصور)؛ لم يُضبط بعد');
-  var c = CacheService.getScriptCache(), ck = 'ai:' + a.uid + ':' + dayKey_(now_()), used = +(c.get(ck) || 0);
+  if (!aiChain_(req).length) throw new Error(textOnly ? 'لم يُضبط مفتاح المساعد بعد' : 'هذه المهمة تحتاج مفتاح Gemini (يرى الصور)؛ لم يُضبط بعد');
+  // الذاكرة المؤقتة (٦ ساعات) لما يطلبه العميل صراحةً (cache: true): الطلب نفسه يعود فوراً ولا يُحسب من حد اليوم
+  var c = CacheService.getScriptCache(), hk = req.cache && textOnly ? 'aic:' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, [req.kind, req.program, req.system, req.prompt, JSON.stringify(req.schema || ''), req.temperature].join('\u0001'))) : '';
+  if (hk) { var hit = c.get(hk); if (hit) return hit; }
+  var ck = 'ai:' + a.uid + ':' + dayKey_(now_()), used = +(c.get(ck) || 0);
   if (!isSuper_(a) && used >= s.ai.perDay) throw new Error('بلغت حد اليوم (' + s.ai.perDay + ' طلباً). جرّب غداً.');
   req.system = String(req.system || '') + skillsFor_(req.kind || 'design');
   var out = geminiCall_(req, { uid: a.uid, name: a.name });
   c.put(ck, String(used + 1), 90000);
+  if (hk && out.length < 90000) { try { c.put(hk, out, 21600); } catch (e) {} }
   return out;
+}
+// فحص المساعدين من الإعدادات: طلب صغير لكل مساعد مضبوط، ويعيد هل نجح وكم استغرق ومن أي نموذج
+function ai_test(token) {
+  var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
+  var have = aiHave_(), who = { uid: a.uid, name: a.name }, out = [];
+  var req = { kind: 'intake', program: '', system: 'أجب بـ JSON فقط.', prompt: 'أعد {"ok":"تم"}', schema: { type: 'OBJECT', properties: { ok: { type: 'STRING' } }, required: ['ok'] }, temperature: 0 };
+  [['gemini', geminiOnly_], ['groq', groqCall_], ['cf', cfCall_], ['poll', pollCall_]].forEach(function (p) {
+    if (p[0] !== 'poll' && !have[p[0]]) { out.push({ p: p[0], on: false }); return; }
+    var t0 = now_();
+    try { var r = JSON.parse(p[1](JSON.parse(JSON.stringify(req)), who)); out.push({ p: p[0], on: true, ok: !!r.ok, ms: now_() - t0 }); }
+    catch (e) { out.push({ p: p[0], on: true, ok: false, ms: now_() - t0, err: clip_(e.message, 160) }); }
+  });
+  return JSON.stringify(out);
 }
 // سجل المساعد: ما طُلب منه ومن ومتى وهل نجح (للمدير، ولمراقبة المهمة الأسبوعية). ملف شهري
 function aiLog_(x) {
@@ -1158,7 +1240,8 @@ function ai_log(token, m, program) {
 
 /* ================= تليجرام: إرسال التصميم إلى قناة البرنامج، فوراً أو في موعد =================
    بوت واحد للمنصة (رمزه في خصائص السكربت TG_TOKEN)، يُضاف مشرفاً في قناة كل برنامج، ولكل برنامج قناته في programs.json (tg.chat).
-   المجدول يُحفظ في tgq.json وملفاته في المجلد الفرعي tg، ويرسله المؤقّت tgTick كل عشر دقائق. */
+   المجدول يُحفظ في tgq.json وملفاته في المجلد الفرعي tg، ويرسله المؤقّت tgTick كل عشر دقائق (والمؤقّت نفسه يرسل تذكيرات المهام).
+   بعد نجاح النشر، وإن لم يبق موعد قادم يحتاج الملف نفسه، تُنقل الصورة إلى سلة درايف (تُستعاد خلال ٣٠ يوماً) ويُمحى مرجعها. */
 function tgToken_() { var t = props_().getProperty('TG_TOKEN'); if (!t) throw new Error('لم يُضبط بوت تليجرام بعد (الإعدادات)'); return t; }
 function tgCall_(method, payload) {
   var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + tgToken_() + '/' + method, { method: 'post', payload: payload, muteHttpExceptions: true });
@@ -1184,7 +1267,7 @@ function nextRepeat_(when, r) {
   if (r.every === 'day') d.setDate(d.getDate() + n); else if (r.every === 'week') d.setDate(d.getDate() + 7 * n); else if (r.every === 'month') { var day = d.getDate(); d.setDate(1); d.setMonth(d.getMonth() + n); var last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); d.setDate(Math.min(day, last)); } else return 0;
   var t = d.getTime(); if (r.until && t > r.until) return 0; return t;
 }
-function tgPub_(x, a) { var o = Object.assign({}, x); delete o.pngId; delete o.fileId; delete o.thumbId; delete o.uid; o.mine = x.uid === a.uid; o.hasThumb = !!x.thumbId; o.canEdit = x.uid === a.uid || adminOf_(a, x.program); return o; }
+function tgPub_(x, a) { var o = Object.assign({}, x); delete o.pngId; delete o.fileId; delete o.thumbId; delete o.uid; o.mine = x.uid === a.uid; o.hasThumb = !!x.thumbId; o.hasFile = !!(x.pngId || x.fileId); o.canEdit = x.uid === a.uid || adminOf_(a, x.program); return o; }
 function tg_send(token, json) {
   var a = auth_(token), o = JSON.parse(json), pid = o.program;
   if (!canSend_(a, pid)) throw new Error('الإرسال إلى القناة يحتاج صلاحية «الإرسال» من المشرف');
@@ -1194,8 +1277,7 @@ function tg_send(token, json) {
   var when = +o.when || 0, repeat = cleanRepeat_(o.repeat), dir = sub_('tg');
   var rec = { id: uid_(), program: pid, track: clip_(o.track || '', 40), chat: chat, uid: a.uid, name: a.name, title: clip_(o.name, 80), caption: cap, mode: mode, when: when > now_() + 60000 ? when : now_(), at: now_(), status: 'queued', item: clip_(o.item || '', 40) };
   if (repeat) rec.repeat = repeat;
-  // مصغّر للتقويم (JPEG صغير) يُحفظ ملفاً حتى لا يثقل ملف الطابور
-  if (o.thumb && /^[A-Za-z0-9+\/=]+$/.test(o.thumb) && o.thumb.length < 120000) { try { rec.thumbId = dir.createFile(Utilities.newBlob(Utilities.base64Decode(o.thumb), 'image/jpeg', 'tg_' + rec.id + '_thumb.jpg')).getId(); } catch (e) {} }
+  // o.thumb (مصغّر قديم للتقويم) يُقبل ويُهمل: التقويم صار يعرض عنوان التصميم فقط
   if (when > now_() + 60000 || repeat) {
     if (o.png) rec.pngId = dir.createFile(Utilities.newBlob(Utilities.base64Decode(o.png), 'image/png', 'tg_' + rec.id + '.png')).getId();
     if (o.file) rec.fileId = dir.createFile(Utilities.newBlob(Utilities.base64Decode(o.file), clip_(o.fileMime || 'image/png', 60), clip_(o.fileName || ('design_' + rec.id + '.png'), 100))).getId();
@@ -1208,7 +1290,9 @@ function tg_send(token, json) {
   var sent = tgDeliver_(chat, cap, mode, o.png ? Utilities.newBlob(Utilities.base64Decode(o.png), 'image/png', 'design.png') : null, o.file ? Utilities.newBlob(Utilities.base64Decode(o.file), clip_(o.fileMime || 'image/png', 60), clip_(o.fileName || 'design.png', 100)) : null);
   rec.status = 'sent'; rec.msg = sent.msg; rec.link = sent.link; rec.sentAt = now_();
   var nextRec = repeat ? tgNextOf_(rec) : null;
-  withLock_(function () { var q = readJson_('tgq.json', []); if (nextRec) q.unshift(nextRec); q.unshift(rec); if (q.length > 500) q.length = 500; writeJson_('tgq.json', q); });
+  var trash = [];
+  withLock_(function () { var q = readJson_('tgq.json', []); if (nextRec) q.unshift(nextRec); q.unshift(rec); trash = tgReleaseFiles_(q, rec); if (q.length > 500) q.length = 500; writeJson_('tgq.json', q); });
+  trash.forEach(function (fid) { try { DriveApp.getFileById(fid).setTrashed(true); } catch (e) {} });
   audit_(a, 'أرسل إلى القناة', clip_(o.name, 80) + ' · ' + pid);
   sent.id = rec.id; if (nextRec) sent.next = nextRec.when;
   return JSON.stringify(sent);
@@ -1276,30 +1360,46 @@ function tg_requeue(token, id, when) {
   return withLock_(function () {
     var q = readJson_('tgq.json', []), x = q.filter(function (y) { return y.id === id; })[0];
     if (!x) throw new Error('غير موجود'); if (!(x.uid === a.uid || adminOf_(a, x.program))) throw new Error('ليس لك');
-    if (!x.pngId && !x.fileId) throw new Error('هذا المنشور أُرسل فوراً ولم تُحفظ صورته؛ افتح التصميم وجدوله من جديد');
+    if (!x.pngId && !x.fileId) throw new Error((x.filesGone ? 'نُقلت صورة هذا المنشور إلى سلة درايف بعد نشره' : 'لم تُحفظ صورة هذا المنشور') + '؛ افتح التصميم وانشره من جديد');
     var n = Object.assign({}, x, { id: uid_(), when: w, at: now_(), status: 'queued', uid: a.uid, name: a.name, seriesId: x.seriesId || undefined }); delete n.msg; delete n.link; delete n.err; delete n.sentAt; delete n.repeat; delete n.upd;
     q.unshift(n); if (q.length > 500) q.length = 500; writeJson_('tgq.json', q);
     audit_(a, 'أعاد جدولة منشور', n.title + ' · ' + n.program);
     return JSON.stringify(tgPub_(n, a));
   });
 }
-// المؤقّت: يرسل ما حان موعده، ويولّد الموعد التالي للمتكرر، ويُشعر صاحبه
+// المؤقّت (كل عشر دقائق): يرسل ما حان موعده، ويولّد الموعد التالي للمتكرر، ويُشعر صاحبه، ثم يرسل تذكيرات المهام
 function tgTick() {
   JC = {};
+  try { tgSendDue_(); } catch (e) { console.warn('tgSendDue_', e); }
+  try { taskRemindTick_(); } catch (e) { console.warn('taskRemindTick_', e); }
+}
+function tgSendDue_() {
   var due = readJson_('tgq.json', []).filter(function (x) { return x.status === 'queued' && x.when <= now_(); });
   due.forEach(function (x) {
     var res = null, err = '';
     try { res = tgDeliver_(x.chat, x.caption, x.mode, x.pngId ? DriveApp.getFileById(x.pngId).getBlob() : null, x.fileId ? DriveApp.getFileById(x.fileId).getBlob() : null); } catch (e) { err = String(e && e.message || e); }
-    var nextRec = null;
+    var nextRec = null, trash = [];
     withLock_(function () {
       var q = readJson_('tgq.json', []), cur = null;
       q.forEach(function (y) { if (y.id === x.id) { cur = y; y.status = err ? 'failed' : 'sent'; y.err = err; y.sentAt = now_(); if (res) { y.msg = res.msg; y.link = res.link; } } });
       if (cur && cur.repeat) { nextRec = tgNextOf_(cur); if (nextRec) q.unshift(nextRec); }
+      if (cur && !err) trash = tgReleaseFiles_(q, cur);
       if (q.length > 500) q.length = 500;
       writeJson_('tgq.json', q);
     });
+    trash.forEach(function (fid) { try { DriveApp.getFileById(fid).setTrashed(true); } catch (e) {} });
     ntPush_(x.uid, 'tg', err ? 'تعذّر نشر «' + (x.title || 'منشور') + '» في القناة: ' + clip_(err, 120) : 'نُشر «' + (x.title || 'منشور') + '» في القناة' + (nextRec ? '، والموعد التالي ' + Utilities.formatDate(new Date(nextRec.when), tz_(), 'd/M HH:mm') : ''), err ? '#/cal' : (res && res.link) || '#/cal');
   });
+}
+// بعد نشر ناجح: إن لم يبق منشور مجدول يستعمل ملفات هذا المنشور (موعد قادم من السلسلة نفسها أو إعادة جدولة) نُخرجها من الطابور
+// ونعيد معرّفاتها لتُنقل إلى السلة. كل سجل كان يشير إليها يُعلَّم filesGone فتعطي إعادة جدولته رسالة واضحة.
+function tgReleaseFiles_(q, cur) {
+  var ids = [cur.pngId, cur.fileId].filter(Boolean); if (!ids.length) return [];
+  var uses = function (y) { return ids.indexOf(y.pngId) >= 0 || ids.indexOf(y.fileId) >= 0; };
+  if (q.some(function (y) { return y.status === 'queued' && y.id !== cur.id && uses(y); })) return [];
+  var out = {}; ids.forEach(function (id) { out[id] = 1; });
+  q.forEach(function (y) { if (!uses(y)) return; if (y.thumbId) out[y.thumbId] = 1; delete y.pngId; delete y.fileId; delete y.thumbId; y.filesGone = now_(); });
+  return Object.keys(out);
 }
 /* ---------- اكتشاف القنوات والمجموعات التي أُضيف إليها البوت ---------- */
 // getUpdates يعيد آخر ما وصل البوت خلال ٢٤ ساعة: إضافته لقناة أو مجموعة، ومنشورات القنوات التي هو مشرف فيها. يُجمع ما نجده في settings.tgKnown
@@ -1335,13 +1435,18 @@ function tg_chat_check(token, chat) {
 function tg_known(token) { var a = auth_(token); needAdmin_(a); return JSON.stringify(settings_().tgKnown || []); }
 
 /* ================= التقويم والمهام =================
-   tasks.json: [{id, program, title, note, due, allDay, from, fromName, to, toName, status: open|done, prio, link, at, upd, doneAt}]
-   المهمة لصاحبها (يكتبها لنفسه)، أو يسندها مشرف البرنامج إلى عضو فيصله إشعار. */
+   tasks.json: [{id, program, title, note, due, allDay, from, fromName, to, toName, status: open|done, prio, link, at, upd, doneAt,
+                 repeat: {every, n, until, count} (مثل المنشورات), seriesId, nextId, remind: دقائق قبل الموعد (0|10|60|1440), remindedFor}]
+   المهمة لصاحبها (يكتبها لنفسه)، أو يسندها مشرف البرنامج إلى عضو فيصله إشعار.
+   المتكررة: إنجازها يولّد التالية مرة واحدة (nextId). التذكير يرسله tgTick إلى الجرس مرة واحدة لكل موعد (remindedFor). */
+var TASK_REMIND = [0, 10, 60, 1440];
+function taskPub_(t, a) { var o = Object.assign({}, t); o.mine = t.to === a.uid || (t.to === '' && t.from === a.uid); o.canEdit = t.from === a.uid || adminOf_(a, t.program); o.canDone = t.to === a.uid || t.from === a.uid || adminOf_(a, t.program) || (t.to === '' && inProg_(a, t.program)); return o; }
+function taskRemindAt_(t) { return t.due && t.remind != null && TASK_REMIND.indexOf(+t.remind) >= 0 ? t.due - t.remind * 60000 : 0; }
 function taskVisible_(a, t) { return t.status !== 'deleted' && (t.from === a.uid || t.to === a.uid || (t.to === '' && inProg_(a, t.program)) || adminOf_(a, t.program)); }
 function task_list(token, program) {
   var a = auth_(token);
   return JSON.stringify(readJson_('tasks.json', []).filter(function (t) { return (!program || t.program === program) && taskVisible_(a, t); }).slice(0, 400)
-    .map(function (t) { var o = Object.assign({}, t); o.mine = t.to === a.uid || (t.to === '' && t.from === a.uid); o.canEdit = t.from === a.uid || adminOf_(a, t.program); o.canDone = t.to === a.uid || t.from === a.uid || adminOf_(a, t.program); return o; }));
+    .map(function (t) { return taskPub_(t, a); }));
 }
 function task_save(token, json) {
   var a = auth_(token), o = JSON.parse(json), pid = clip_(o.program || '', 30);
@@ -1357,15 +1462,17 @@ function task_save(token, json) {
     var notifyNew = (isNew || t.to !== to) && to && to !== a.uid;
     t.title = title; t.note = clip_(o.note, 1500); t.due = Math.max(0, +o.due || 0); t.allDay = !!o.allDay; t.to = to; t.toName = toName; t.prio = o.prio === 'high' ? 'high' : 'normal'; t.link = /^(#\/|https?:\/\/)/.test(o.link || '') ? clip_(o.link, 300) : ''; t.upd = now_();
     if (o.status === 'open' || o.status === 'done') { t.status = o.status; t.doneAt = o.status === 'done' ? now_() : 0; }
-    if (t.repeat !== undefined) delete t.repeat;
+    if ('repeat' in o) { var r = t.due ? cleanRepeat_(o.repeat) : null; if (r) t.repeat = r; else delete t.repeat; } else if (!t.due) delete t.repeat;
+    if ('remind' in o) { var m = o.remind === '' || o.remind == null ? -1 : +o.remind; if (TASK_REMIND.indexOf(m) >= 0) t.remind = m; else delete t.remind; }
     if (list.length > 2000) list.length = 2000;
     writeJson_('tasks.json', list);
     return { t: t, notify: notifyNew };
   });
   // الإشعار خارج القفل (الإشعارات تأخذ القفل بنفسها)
   var t = saved.t;
+  if (taskRemindAt_(t)) ensureTriggersOnce_();
   if (saved.notify) ntPush_(t.to, 'task', 'مهمة جديدة من ' + a.name + ': ' + title + (t.due ? ' — ' + Utilities.formatDate(new Date(t.due), tz_(), 'd/M') : ''), '#/cal?task=' + t.id);
-  return JSON.stringify(t);
+  return JSON.stringify(taskPub_(t, a));
 }
 function task_done(token, id, on) {
   var a = auth_(token);
@@ -1374,11 +1481,56 @@ function task_done(token, id, on) {
     var list = readJson_('tasks.json', []), t = list.filter(function (x) { return x.id === id; })[0];
     if (!t) throw new Error('غير موجودة'); if (!(t.to === a.uid || t.from === a.uid || adminOf_(a, t.program) || (t.to === '' && inProg_(a, t.program)))) throw new Error('ليست لك');
     t.status = done ? 'done' : 'open'; t.doneAt = done ? now_() : 0; t.doneBy = done ? a.name : ''; t.upd = now_();
+    var next = done && !t.nextId ? taskNextOf_(t) : null;
+    if (next) { t.nextId = next.id; list.unshift(next); if (list.length > 2000) list.length = 2000; }
     writeJson_('tasks.json', list);
-    return t;
+    return { t: t, next: next };
   });
-  if (done && t.from && t.from !== a.uid) ntPush_(t.from, 'task', a.name + ' أنجز المهمة: ' + t.title, '#/cal?task=' + t.id);
-  return JSON.stringify(t);
+  if (done && t.t.from && t.t.from !== a.uid) ntPush_(t.t.from, 'task', a.name + ' أنجز المهمة: ' + t.t.title, '#/cal?task=' + t.t.id);
+  var out = taskPub_(t.t, a); if (t.next) out.next = taskPub_(t.next, a);
+  return JSON.stringify(out);
+}
+// الموعد التالي لمهمة متكررة. إن أُنجزت متأخرة تخطّينا ما فات حتى أول موعد لم يمضِ عليه يوم، والعدّ ينقص مع كل موعد
+function taskNextOf_(t) {
+  var r = t.repeat; if (!r || !t.due) return null;
+  var count = r.count || 0, due = t.due;
+  do { if (count === 1) return null; due = nextRepeat_(due, r); if (!due) return null; if (count) count--; } while (due < now_() - 864e5);
+  var n = { id: uid_(), program: t.program, from: t.from, fromName: t.fromName, to: t.to, toName: t.toName, title: t.title, note: t.note, due: due, allDay: t.allDay, prio: t.prio, link: t.link,
+    status: 'open', at: now_(), upd: now_(), seriesId: t.seriesId || t.id, repeat: Object.assign({}, r, { count: count }) };
+  if (t.remind != null) n.remind = t.remind;
+  return n;
+}
+// التذكيرات: يعلَّم كل موعد قبل الإشعار (داخل القفل) فلا يتكرر ولو تداخل مؤقّتان. موعد فات بأكثر من نصف ساعة لا يُذكَّر به
+function taskRemindTick_() {
+  var now = now_(), fire = withLock_(function () {
+    var list = readJson_('tasks.json', []), out = [];
+    list.forEach(function (t) {
+      var at = taskRemindAt_(t);
+      if (!at || t.status !== 'open' || t.remindedFor === at || at > now || now > t.due + 1800000) return;
+      t.remindedFor = at; out.push(t);
+    });
+    if (out.length) writeJson_('tasks.json', list);
+    return out;
+  });
+  if (!fire.length) return 0;
+  var accs = readJson_('accounts.json', {});
+  fire.forEach(function (t) {
+    var uids = t.to ? [t.to] : Object.keys(accs).filter(function (k) { return !accs[k].disabled && (accs[k].programs || []).indexOf(t.program) >= 0; }).slice(0, 80);
+    var d = new Date(t.due), fmt = function (x, f) { return Utilities.formatDate(x, tz_(), f); }, dk = fmt(d, 'yyyy-MM-dd'), hm = t.allDay ? '' : ' ' + fmt(d, 'HH:mm');
+    var when = dk === fmt(new Date(now), 'yyyy-MM-dd') ? (t.allDay ? 'اليوم' : 'الساعة' + hm) : dk === fmt(new Date(now + 864e5), 'yyyy-MM-dd') ? 'غداً' + hm : fmt(d, 'd/M') + hm;
+    var text = 'تذكير: ' + t.title + ' — ' + (t.due - now <= 60000 && !t.allDay ? 'حان موعدها' : 'موعدها ' + when);
+    ntPushMany_(uids, 'remind', text, '#/cal?task=' + t.id);
+  });
+  return fire.length;
+}
+// إشعار واحد لعدة مستخدمين بكتابة واحدة (مهام الفريق)
+function ntPushMany_(uids, kind, text, link) {
+  uids = (uids || []).filter(Boolean); if (!uids.length) return;
+  try { withLock_(function () { var all = readJson_('notifs.json', {}); uids.forEach(function (uid) { var l = all[uid] = all[uid] || []; l.unshift({ id: uid_(), kind: kind, text: clip_(text, 300), link: clip_(link || '', 200), at: now_(), seen: false }); if (l.length > 40) l.length = 40; }); writeJson_('notifs.json', all); }); } catch (e) {}
+}
+// المؤقّت موجود عادة منذ التهيئة؛ نتأكد منه مرة كل ست ساعات عند ضبط تذكير (لا يُنشأ مؤقّت جديد إن وُجد)
+function ensureTriggersOnce_() {
+  try { var c = CacheService.getScriptCache(); if (c.get('trig_ok')) return; ensureTriggers_(null); c.put('trig_ok', '1', 21600); } catch (e) {}
 }
 function task_del(token, id) {
   var a = auth_(token);
@@ -1585,7 +1737,7 @@ function wk_admin(token, program) {
 /* ================= مهارات المساعد (Gemini Skills) =================
    مهارة = معرفة مكتوبة تُضاف إلى تعليمات المساعد في المهام التي تخصّها. الافتراضية هنا، ويعدّلها المدير العام أو يضيف غيرها من اللوحة. */
 var AI_SKILLS = [
-  { id: 'design-eye', name: 'عين المصمّم', kinds: ['review', 'design', 'creative', 'intake', 'imgq'], text: [
+  { id: 'design-eye', name: 'عين المصمّم', kinds: ['review'], text: [
     'احكم على التصميم بالمبادئ الأربعة (التباين، والتكرار، والمحاذاة، والتقارب)، ثم التسلسل البصري، والمساحة البيضاء، والألوان، والخط، والصور، والتوازن، ووضوح الرسالة، والاتساق مع الهوية.',
     'التصميم الجيد يُقرأ في ثلاث ثوانٍ: عنصر أول واحد واضح، ثم ثانٍ، ثم تفاصيل. إن تساوى كل شيء فلا شيء مهم.',
     'التباين يجب أن يكون صريحاً لا خجولاً: إن اختلف عنصران فليختلفا كثيراً (حجماً أو وزناً أو لوناً).',
@@ -1595,13 +1747,27 @@ var AI_SKILLS = [
     'لونان أو ثلاثة من الهوية تكفي؛ الأكثر إشباعاً لِما يجب أن يُرى أولاً.',
     'النص فوق الصورة يحتاج طبقة تعتيم أو تدرجاً أو مساحة هادئة.',
     'لا تقترح صوراً لطلاب ولا ما يخالف الحشمة والبيئة الإسلامية.'].join('\n') },
-  { id: 'arabic-type', name: 'الخط العربي', kinds: ['review', 'design', 'creative', 'spell', 'caption', 'outline'], text: [
+  { id: 'arabic-type', name: 'الخط العربي', kinds: ['review', 'design', 'creative', 'spell', 'caption', 'outline', 'refine'], text: [
     'العنوان العربي القصير أقوى: من ثلاث إلى ست كلمات. والسطر المثالي للنص من ٨ إلى ١٢ كلمة.',
     'تباعد الأسطر في العربية أوسع منه في اللاتينية (نحو ١٫٥ للنص و١٫١–١٫٢ للعناوين الكبيرة).',
     'لا تمدّ الحروف (الكشيدة) إلا لحاجة تصميمية مقصودة، ولا تُميل الخط العربي، ولا تُباعد بين حروفه.',
     'خطّان كحد أقصى في التصميم: واحد للعناوين وواحد للنص، ويُصنع التدرج بالوزن والحجم.',
     'الأرقام نوع واحد في التصميم كله (عربية مشرقية أو غربية).',
     'الهمزات والتاء المربوطة والألف المقصورة تُكتب صحيحة؛ والتشكيل حيث يرفع اللبس، وكاملاً في الآيات.'].join('\n') },
+  { id: 'ad-copy', name: 'كاتب الإعلانات', kinds: ['design', 'creative', 'refine', 'brief'], text: [
+    'العنوان يحمل الفكرة أو الفائدة لا الاسم الإداري للفعالية: «وقتك *رأس مالك*» أقوى من «ورشة إدارة الوقت». فإن ذكر المستخدم عنواناً بين «» فهو العنوان كما هو.',
+    'كلمة واحدة فقط بين *نجمتين*: جوهر الرسالة (اسم أو صفة)، لا حرف جر ولا اسم المقدّم.',
+    'السطر الفرعي يقول ما الحدث وماذا يكسب الحاضر، من ٥ إلى ١٠ كلمات، بلا تكرار للعنوان.',
+    'نوع الفعالية بكلمة أو كلمتين: «ورشة عمل»، «لقاء أسري»، «مسابقة حفظ». والمقدّم بلقبه كما ذُكر: «أ. سامر»، «الشيخ خالد».',
+    'الوقت والمكان مختصران: «الخميس ٨:٠٠ م»، «بعد العشاء»، «عبر زوم»، «مسجد الحي». لا «يوم» ولا «الساعة» زائدة.',
+    'لا رموز تعبيرية في التصميم، ولا علامات تعجب متتالية، ولا «ندعوكم للحضور» في العنوان، ولا تشكيل إلا لرفع اللبس.',
+    'التزم بحد كل خانة بالأحرف؛ والقصير الواضح أفضل من الطويل المحشو. لا تكرر المعلومة في خانتين.',
+    'أمثلة جيدة:',
+    '- ورشة لإدارة الوقت للطلاب، أ. سامر، الأحد بعد العصر، زوم ← العنوان «وقتك *رأس مالك*»، الفرعي «ورشة عملية في ترتيب الأولويات وصناعة يوم منجز»، النوع «ورشة عمل».',
+    '- لقاء لأولياء الأمور عن الحوار مع الأبناء ← «بيوتٌ *تُصغي*»، «لقاء أسري في فن الحوار مع الأبناء».',
+    '- مسابقة حفظ سورة الملك في أسبوع ← «*الملك* في صدري»، «سبعة أيام للحفظ ثم التسميع»، النوع «مسابقة حفظ».',
+    '- تهنئة لفائز بالمركز الأول ← «نهنّئ *بطلنا*»، «تميّز في مسابقة الحفظ، جعله الله قرة عين لوالديه». والاسم يكتبه المستخدم.',
+    '- تذكير بقيام الليل ← «*ركعتان* في جوف الليل»، والآية أو الحديث يُترك موضعهما للمستخدم.'].join('\n') },
   { id: 'caption-voice', name: 'صوت قناة البرنامج', kinds: ['caption'], text: [
     'الرسالة تبدأ بسطر جاذب قصير، ثم التفاصيل في أسطر مرتبة برموز بسيطة، ثم دعوة واضحة للعمل والرابط.',
     'لغة عربية فصيحة قريبة دافئة، بلا مبالغة ولا كثرة رموز تعبيرية (اثنان أو ثلاثة كحد أقصى).',

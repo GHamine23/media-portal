@@ -1,4 +1,6 @@
 /* ================= الرئيسية ومعرض القوالب ================= */
+// تحويل رابط قديم أو من التطبيق إلى مكانه دون أن يبقى في سجل الرجوع
+function redirect6(h) { history.replaceState(null, '', h); render(); }
 function firstName(n) { return String(n || '').trim().replace(/^(أ\.|د\.|م\.|الأستاذ|الأستاذة)\s*/, '').split(/\s+/)[0] || ''; }
 function tracksOf(group) { return Object.keys(TRACKS).map(function (k) { return TRACKS[k]; }).filter(function (t) { return !group || t.group === group; }); }
 // القوالب المتاحة لهذا المستخدم: مواقع التواصل لمن له صلاحيتها
@@ -8,15 +10,29 @@ function sizesFor(tpl) { const s = tpl.sizes.filter(function (z) { return canSoc
 // رسم مصغّر عند ظهور البطاقة فقط، فلا تتأخر الصفحة
 let THUMB_IO = null;
 function lazyThumb(cv, fn) {
-  if (!THUMB_IO) THUMB_IO = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { THUMB_IO.unobserve(e.target); const f = e.target._draw; if (f) requestAnimationFrame(function () { try { f(); } catch (er) { console.warn(er); } e.target.classList.add('drawn'); }); } }); }, { rootMargin: '200px' });
+  if (!THUMB_IO) THUMB_IO = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { THUMB_IO.unobserve(e.target); const f = e.target._draw; if (f && !e.target.classList.contains('drawn')) requestAnimationFrame(function () { try { f(); } catch (er) { console.warn(er); } e.target.classList.add('drawn'); }); } }); }, { rootMargin: '200px' });
   cv._draw = fn; THUMB_IO.observe(cv);
 }
-function tplThumb(tpl, T, szk, w, st) {
+// eager: يُرسم فوراً (أول ما تقع عليه العين)، بالتتابع إطاراً بعد إطار حتى لا تتجمد الصفحة؛ والباقي عند ظهوره
+let EAGER_Q = [], EAGER_ON = false;
+function eagerThumb(cv, fn) {
+  cv._draw = fn; EAGER_Q.push(cv);
+  if (EAGER_ON) return; EAGER_ON = true;
+  const step = function () {
+    const c = EAGER_Q.shift(); if (!c) { EAGER_ON = false; return; }
+    if (c._draw && c.isConnected && !c.classList.contains('drawn')) { try { c._draw(); } catch (er) { console.warn(er); } c.classList.add('drawn'); if (THUMB_IO) THUMB_IO.unobserve(c); }
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function tplThumb(tpl, T, szk, w, st, eager) {
   const sz = SIZES[szk], sc = w / sz.w;
   const cv = el('canvas', { width: Math.round(sz.w * sc), height: Math.round(sz.h * sc), class: 'thumbcv' });
-  lazyThumb(cv, function () { renderTo(cv, tpl, szk, st || { d: defaults(tpl, T), variant: tpl.variants[0].id, k: 1 }, T, sc * (window.devicePixelRatio > 1 ? 2 : 1)); cv.style.width = '100%'; });
+  const draw = function () { renderTo(cv, tpl, szk, st || { d: defaults(tpl, T), variant: tpl.variants[0].id, k: 1 }, T, sc * (window.devicePixelRatio > 1 ? 2 : 1)); cv.style.width = '100%'; };
+  if (eager) eagerThumb(cv, draw); else lazyThumb(cv, draw);
   return cv;
 }
+const EAGER_N = 12;
 
 function showHome() {
   POSTS = null;
@@ -47,7 +63,9 @@ function showHome() {
       el('div', { class: 'hgreet' }, [
         el('span', { class: 'eyebrow rv', text: timeGreeting(nm) + ' · ' + P.name }),
         msg, src,
-        el('div', { class: 'searchrow rv', style: '--d:2' }, [ico('search'), search])
+        el('div', { class: 'searchrow rv', style: '--d:2' }, [ico('search'), search]),
+        // القادم في التقويم بجانب الساعة: يملأ العمود ولا يترك فراغاً تحت التحية
+        el('div', { class: 'hup rv', style: '--d:3' }, [calHomeWidget()])
       ]),
       clockCard(),
       aiDesignerBox()
@@ -57,7 +75,7 @@ function showHome() {
     el('div', { class: 'wrap' }, [el('section', { class: 'hsec', id: 'modelsec', hidden: true }, [el('div', { class: 'shead' }, [H('h2', 'نماذج جاهزة'), el('a', { class: 'btn sm line', href: '#/mine', onclick: function () { ls('mineTab', 'models'); }, text: 'كل النماذج' })]), stripNav(models)])].concat(idSections).concat([
       el('section', { class: 'hsec', id: 'recentsec', hidden: true }, [el('div', { class: 'shead' }, [H('h2', 'آخر تصاميمك'), el('a', { class: 'btn sm line', href: '#/mine', text: 'كل تصاميمي' })]), stripNav(recent)]),
       newOnes.length && first ? el('section', { class: 'hsec' }, [el('div', { class: 'shead' }, [H('h2', 'جديد القوالب')]),
-        stripNav(el('div', { class: 'strip' }, newOnes.map(function (tpl, i) { const T = tracks[i % tracks.length]; const szk = sizesFor(tpl)[0]; return el('a', { class: 'scard hover-lift', href: '#/e/' + T.id + '/' + tpl.id }, [tplThumb(tpl, T, szk, 220), el('b', { text: tpl.name })]); })))]) : null
+        stripNav(el('div', { class: 'strip' }, newOnes.map(function (tpl, i) { const T = tracks[i % tracks.length]; const szk = sizesFor(tpl)[0]; return el('a', { class: 'scard hover-lift', href: '#/e/' + T.id + '/' + tpl.id }, [tplThumb(tpl, T, szk, 220, null, i < 6), el('b', { text: tpl.name })]); })))]) : null
     ]))
   );
   loadRecent(recent);
@@ -67,7 +85,7 @@ function showHome() {
 /* ---------- دعوة إلى تطبيق الجوال (تظهر على الشاشات الصغيرة في الموقع) ---------- */
 function appPromo() {
   if (document.body.classList.contains('mapp') || window.innerWidth > 760 || (ls('appPromoOff') && !ls('preferWeb'))) return null;
-  const b = el('div', { class: 'apppromo rv' }, [el('img', { src: 'icons/icon-192.png', alt: '' }), el('div', { class: 'grow' }, [el('b', { text: 'تطبيق أثر للجوال' }), el('span', { class: 'tiny', text: 'واجهة مصمّمة للهاتف: المحرر دون إخفاء التصميم، والتقويم، والنشر. ويُثبّت على شاشتك الرئيسية.' })]),
+  const b = el('div', { class: 'apppromo rv' }, [el('img', { src: 'icons/icon-192.png', alt: '', onerror: function (e) { e.target.remove(); } }), el('div', { class: 'grow' }, [el('b', { text: 'تطبيق أثر للجوال' }), el('span', { class: 'tiny', text: 'صمّم وانشر من هاتفك بواجهة خاصة به.' })]),
     el('a', { class: 'btn sm dark', href: '../app/', text: 'افتح التطبيق', onclick: function () { ls('preferWeb', null); } }), el('button', { type: 'button', class: 'ib sm', 'aria-label': 'إخفاء', onclick: function () { ls('appPromoOff', true); b.remove(); } }, [ico('close')])]);
   return b;
 }
@@ -78,13 +96,12 @@ function scrollCue() {
   window.addEventListener('scroll', on, { passive: true });
   return c;
 }
-/* ---------- الأزرار الأربعة داخل كل هوية ---------- */
+/* ---------- طرق البدء داخل كل هوية (تصاميمي في شريط التنقل، فلا تتكرر هنا) ---------- */
 function quickCards(tid) {
   return el('div', { class: 'quick' }, [
     ['#/make?tid=' + tid, 'اصنع إعلانك', 'اكتب فكرتك، ونقترح التصاميم', 'ai', 't-pu'],
     ['#/e/' + tid + '/blank', 'صفحة بيضاء', 'صمّم من الصفر بحرية كاملة', 'wand', 't-ink'],
-    ['#/s/' + tid, 'الشرائح', 'عروض للقاءات والمحاضرات', 'slides', 't-bl'],
-    ['#/mine', 'تصاميمي', 'ما حفظته وما شاركه فريقك', 'heart', 't-gr']
+    ['#/s/' + tid, 'الشرائح', 'عروض للقاءات والمحاضرات', 'slides', 't-bl']
   ].map(function (q, i) {
     return el('a', { href: q[0], class: 'qcard hover-lift rv', style: '--d:' + i, 'data-tour': 'q' + i }, [el('span', { class: 'icon-tile ' + q[4] }, [ico(q[3])]), el('div', {}, [el('b', { text: q[1] }), el('span', { text: q[2] })])]);
   }));
@@ -225,9 +242,8 @@ function clockCard() {
     el('details', { class: 'cdet', open: innerWidth > 700 }, [el('summary', { text: 'التقويم' }), el('div', { class: 'chead' }, [nav, seg]), cal])
   ]);
   const t = setInterval(function () { if (!card.isConnected) { clearInterval(t); return; } tick(); }, 15000);
-  // المنشورات المجدولة والمهام القادمة تحت التقويم، من قسم «التقويم والمهام»
-  if (V6.settings && V6.settings.tg) { card.appendChild(calHomeWidget()); calLoad().then(grid).catch(function () {}); }
-  else card.appendChild(calHomeWidget());
+  // أيام المنشورات المجدولة تُعلَّم في الشهر (القائمة نفسها في عمود التحية)
+  if (V6.settings && V6.settings.tg) calLoad().then(grid).catch(function () {});
   return card;
 }
 let POSTS = null, POSTS_BY_DAY = {};
@@ -290,7 +306,7 @@ function showGallery6(tid, type) {
       const ty = TYPES.find(function (x) { return x.id === tpl.type; }) || { name: '' };
       const szs = sizesFor(tpl), szk = szs[0];
       grid.appendChild(el('a', { class: 'tcard6 hover-lift', href: '#/e/' + T.id + '/' + tpl.id, style: '--d:' + (i % 8) }, [
-        el('div', { class: 'tthumb' }, [tplThumb(tpl, T, szk, 300), (tpl.isNew || tpl.pack) ? el('span', { class: 'pill or tnew', text: 'جديد' }) : null]),
+        el('div', { class: 'tthumb' }, [tplThumb(tpl, T, szk, 300, null, i < EAGER_N), (tpl.isNew || tpl.pack) ? el('span', { class: 'pill or tnew', text: 'جديد' }) : null]),
         el('div', { class: 'tmeta6' }, [el('b', { text: tpl.name }), el('span', { class: 'tiny', text: ty.name + ' · ' + szs.map(function (s) { return SIZES[s].name; }).join('، ') })])
       ]));
     });
@@ -302,8 +318,6 @@ function showGallery6(tid, type) {
       el('a', { href: '#/', class: 'ib back', 'aria-label': 'رجوع' }, [ico('chev')]),
       im ? el('img', { class: 'glogo rv', src: ASSETS[T.logo], alt: '' }) : null,
       el('div', { class: 'gt' }, [H('h1', T.full.replace('ـ', '')), el('div', { class: 'sw rv' }, ['pd', 'p', 'pl', 's', 'sd', 'a', 'a2'].map(function (k) { return el('i', { style: 'background:' + T.c[k], title: T.c[k] }); }))]),
-      el('span', { class: 'sp' }),
-      el('a', { class: 'btn dark', href: '#/e/' + T.id + '/blank' }, [ico('plus'), 'صفحة بيضاء'])
     ]),
     quickCards(T.id),
     el('section', { class: 'hsec', id: 'gmodels', hidden: true }, [el('div', { class: 'shead' }, [H('h2', 'نماذج جاهزة لهذه الهوية')]), stripNav(el('div', { class: 'strip models-strip', id: 'gmstrip' }))]),

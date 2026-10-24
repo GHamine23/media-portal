@@ -41,13 +41,15 @@ route6(/^\/p\/([^/?]+)$/, mwrap('عرض', showPresent, { back: '#/mine', noTitle
 route6(/^\/s\/([^/]+)$/, mwrap('الشرائح', showSlides6, { back: '#/tpl', noTitle: true }), { page: 'tpl', noVT: true });
 route6(/^\/arc\/(\d{4}-\d{2})\/([a-z0-9]+)$/, plain(openArc), { page: 'editor', noVT: true });
 route6(/^\/make(?:\?.*)?$/, mwrap('المصمّم الذكي', showMake6, { back: '#/', noTitle: true }), { page: 'home', noVT: true });
-route6(/^\/mine$/, mwrap('تصاميمي', showMine6, { back: '#/more', noTitle: true }), { page: 'more', noVT: true });
+route6(/^\/mine$/, mwrap('تصاميمي', showMine6, { back: '#/', noTitle: true }), { page: 'home', noVT: true });
 route6(/^\/cal(?:\?.*)?$/, mwrap('التقويم والمهام', showCal6, { back: '#/', right: [el('button', { type: 'button', class: 'nb', 'aria-label': 'مهمة جديدة', onclick: function () { haptic(); taskDialog(null, CAL.cursor || new Date()); } }, [ico('plus')])] }), { page: 'cal', noVT: true });
-route6(/^\/account$/, mwrap('حسابي', showAccount, { back: '#/more', noTitle: true }), { page: 'more', noVT: true });
-route6(/^\/tips(?:\/([a-z]+))?$/, mwrap('نصائح التصميم', showTips6, { back: '#/more', noTitle: true }), { page: 'more', noVT: true });
+route6(/^\/account(?:\?.*)?$/, mwrap('حسابي', showAccount, { back: '#/more', noTitle: true }), { page: 'more', noVT: true });
+route6(/^\/tips(?:\/([a-z]+))?$/, mwrap('نصائح التصميم', showTips6, { back: '#/', noTitle: true }), { page: 'home', noVT: true });
 route6(/^\/week$/, mwrap('أسبوعي في أثر', showWeek6, { back: '#/more', noTitle: true }), { page: 'more', noVT: true });
 route6(/^\/reviews$/, mwrap('مراجعاتي', showReviews6, { back: '#/more', noTitle: true }), { page: 'more', noVT: true });
 route6(/^\/more$/, plain(mMore), { page: 'more', noVT: true });
+route6(/^\/(feedback|fb)$/, function () { redirect6('#/account?fb'); }, { page: 'more', noVT: true });
+route6(/^\/news$/, function () { redirect6('#/more'); setTimeout(function () { showNews(); }, 500); }, { page: 'more', noVT: true });
 route6(/^\/admin(?:\/([a-z]+))?$/, function () { location.href = '../v6/#/admin'; }, { page: 'more', noVT: true });
 route6(/.*/, plain(mHome), { page: 'home', noVT: true });
 // اتجاه حركة الشاشة: الرجوع بزر المتصفح يُحرّك العكس

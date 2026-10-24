@@ -7,10 +7,11 @@ function mHome() {
   const tracks = tracksOf(), tid = ls('lastTrack') && TRACKS[ls('lastTrack')] ? ls('lastTrack') : (tracks[0] || {}).id;
   const quick = el('div', { class: 'mquick' }, [
     el('a', { href: '#/make' + (tid ? '?tid=' + tid : ''), class: 'mq ai wide', onclick: function () { haptic(); } }, [el('span', { class: 'mi' }, [ico('ai')]), el('span', { class: 'mt' }, [el('b', { text: 'اصنع إعلانك' }), el('br'), el('small', { text: 'اكتب فكرتك بكلماتك، ويقترح المساعد تصاميم بهوية برنامجك' })]), ico('chev', 'chev')]),
-    el('a', { href: '#/tpl', class: 'mq', onclick: function () { haptic(); } }, [el('span', { class: 'mi', style: 'background:#ff9500' }, [ico('grid')]), el('b', { text: 'القوالب' }), el('small', { text: 'جاهزة بهوية كل مسار' })]),
+    // القوالب والتقويم في شريط التبويب، فلا يتكرران هنا
     tid ? el('a', { href: '#/e/' + tid + '/blank', class: 'mq', onclick: function () { haptic(); } }, [el('span', { class: 'mi', style: 'background:#5856d6' }, [ico('wand')]), el('b', { text: 'صفحة بيضاء' }), el('small', { text: 'صمّم من الصفر' })]) : null,
-    el('a', { href: '#/cal', class: 'mq', onclick: function () { haptic(); } }, [el('span', { class: 'mi', style: 'background:#007aff' }, [ico('cal')]), el('b', { text: 'التقويم' }), el('small', { text: 'منشوراتك ومهامك' })]),
-    el('a', { href: '#/mine', class: 'mq', onclick: function () { haptic(); } }, [el('span', { class: 'mi', style: 'background:#34c759' }, [ico('heart')]), el('b', { text: 'تصاميمي' }), el('small', { text: 'ما حفظته وما شاركه فريقك' })])
+    tid ? el('a', { href: '#/s/' + tid, class: 'mq', onclick: function () { haptic(); } }, [el('span', { class: 'mi', style: 'background:#ff9500' }, [ico('slides')]), el('b', { text: 'الشرائح' }), el('small', { text: 'عروض للقاءات والمحاضرات' })]) : null,
+    el('a', { href: '#/mine', class: 'mq', onclick: function () { haptic(); } }, [el('span', { class: 'mi', style: 'background:#34c759' }, [ico('heart')]), el('b', { text: 'تصاميمي' }), el('small', { text: 'ما حفظته وما شاركه فريقك' })]),
+    el('a', { href: '#/tips', class: 'mq', onclick: function () { haptic(); } }, [el('span', { class: 'mi', style: 'background:#d9a400' }, [ico('star')]), el('b', { text: 'نصائح التصميم' }), el('small', { text: 'نصيحة جديدة كل يوم' })])
   ]);
   const upcoming = el('div', { class: 'mgroup' }, [el('div', { class: 'mskel', style: 'height:56px;border-radius:0' })]);
   const recent = el('div', { class: 'mstrip' }), models = el('div', { class: 'mstrip' });
@@ -76,9 +77,9 @@ function mTemplates(tid, type) {
     let list = cur === 'all' ? VIS : cur === 'new' ? VIS.filter(function (t) { return t.isNew || t.pack; }) : VIS.filter(function (t) { return t.type === cur; });
     list = list.filter(function (t) { const ty = TYPES.find(function (x) { return x.id === t.type; }) || {}; const hay = norm([t.name, t.tags, ty.name].join(' ')); return qs.every(function (w) { return hay.indexOf(w) >= 0; }); });
     if (!list.length) { grid.appendChild(mempty('search', 'لا قالب يطابق بحثك.')); return; }
-    list.forEach(function (tpl) {
+    list.forEach(function (tpl, i) {
       const ty = TYPES.find(function (x) { return x.id === tpl.type; }) || { name: '' }, szk = sizesFor(tpl)[0];
-      grid.appendChild(el('a', { class: 'mtc', href: '#/e/' + T.id + '/' + tpl.id, onclick: function () { haptic(); M.dir = 'fwd'; } }, [el('div', { class: 'th' }, [tplThumb(tpl, T, szk, 220)]), (tpl.isNew || tpl.pack) ? el('span', { class: 'new', text: 'جديد' }) : null, el('b', { text: tpl.name }), el('small', { text: ty.name })]));
+      grid.appendChild(el('a', { class: 'mtc', href: '#/e/' + T.id + '/' + tpl.id, onclick: function () { haptic(); M.dir = 'fwd'; } }, [el('div', { class: 'th' }, [tplThumb(tpl, T, szk, 220, null, i < EAGER_N)]), (tpl.isNew || tpl.pack) ? el('span', { class: 'new', text: 'جديد' }) : null, el('b', { text: tpl.name }), el('small', { text: ty.name })]));
     });
   }
   const sc = mscreen({ title: 'القوالب', sub: T.full.replace('ـ', ''), right: [el('a', { class: 'nb', href: '#/e/' + T.id + '/blank', 'aria-label': 'صفحة بيضاء', onclick: function () { haptic(); } }, [ico('plus')])] }, [
@@ -111,13 +112,12 @@ function mMore() {
       V6.prog ? el(progs.length > 1 ? 'button' : 'span', { class: 'pchip prog', type: progs.length > 1 ? 'button' : null, onclick: progs.length > 1 ? function () { mactions(null, progs.map(function (p) { return { t: p.name, sw: p.color, fn: async function () { await useProgram(p.id); go('#/'); toast('انتقلت إلى ' + p.name); } }; }), 'برامجك'); } : null }, [el('i', { style: 'background:' + (V6.prog.color || '#fff') }), V6.prog.name, progs.length > 1 ? ico('chevd') : null]) : null
     ])
   ]);
-  const tiles = el('div', { class: 'mtiles' }, [
-    mTile('تصاميمي', 'heart', '#e0457b', '#/mine'),
-    mTile('التقويم', 'cal', '#2f7cf6', '#/cal'),
+  const tiles = el('div', { class: 'mtiles four' }, [
+    // تصاميمي ونصائح التصميم في الرئيسية، والتقويم في شريط التبويب، فلا تتكرر هنا
     mTile('أسبوعي', 'chart', '#7c5cf0', '#/week'),
     mTile('مراجعاتي', 'review', '#f08a1c', '#/reviews'),
-    mTile('نصائح', 'star', '#d9a400', '#/tips'),
-    mTile('ما الجديد', 'megaphone', '#14a38b', null, function () { showNews(); })
+    mTile('ما الجديد', 'megaphone', '#14a38b', null, function () { showNews(); }),
+    mTile('ملاحظة للفريق', 'chat', '#2f7cf6', null, function () { showFeedback6(); })
   ]);
   const motion = (me.prefs && me.prefs.motion) || 'normal';
   const look = mCard('المظهر', 'palette', [
@@ -130,11 +130,10 @@ function mMore() {
   const app = mCard('التطبيق', 'phone', [
     isStandalone() ? mLine('التطبيق مثبّت على جهازك', 'يفتح من الشاشة الرئيسية', 'check', null, { badge: '✓' }) : mLine('ثبّت التطبيق على الشاشة الرئيسية', 'يفتح بملء الشاشة وأسرع', 'download', function () { installSheet(); }),
     mLine('انتقل إلى نسخة الويب', 'المحرر الموسّع، ويفتحها هذا الجهاز بعد ذلك', 'globe', toWeb),
-    isAdmin() ? mLine('لوحة الإدارة', 'في نسخة الويب', 'gear', function () { ls('preferWeb', true); location.href = '../v6/#/admin'; }) : null,
-    mLine('ملاحظة أو اقتراح للفريق', null, 'chat', function () { showFeedback6(); })
+    isAdmin() ? mLine('لوحة الإدارة', 'في نسخة الويب', 'gear', function () { ls('preferWeb', true); location.href = '../v6/#/admin'; }) : null
   ]);
+  // كلمة المرور في «حسابي» (بطاقة بياناتك)، والخروج هنا
   const bottom = el('div', { class: 'mbtns' }, [
-    el('a', { class: 'btn tint', href: '#/password', onclick: function () { haptic(); M.dir = 'fwd'; } }, [ico('key'), 'كلمة المرور']),
     el('button', { type: 'button', class: 'btn danger', onclick: async function () { if (await ask('خروج', 'تخرج من حسابك على هذا الجهاز.', 'خروج', true)) logout(); } }, [ico('logout'), 'خروج'])
   ]);
   const sc = mscreen({ title: 'المزيد' }, [hero, tiles, look, app, bottom,

@@ -4,21 +4,37 @@ const ADMIN_TABS = [
   ['assets', 'الشعارات والصور', 'image', 0], ['fonts', 'الخطوط', 'font', 0], ['models', 'النماذج والقوالب', 'model', 0], ['reviews', 'مراجعة التصاميم', 'review', 0], ['week', 'أسبوع الفريق', 'chart', 0], ['ai', 'الذكاء الاصطناعي', 'sparkles', 0], ['tg', 'منشورات القناة', 'send', 0], ['feedback', 'البلاغات', 'flag', 0], ['broadcasts', 'رسائل للمستخدمين', 'megaphone', 0],
   ['changelog', 'سجل التحديثات', 'history', 1], ['settings', 'الإعدادات', 'gear', 1], ['audit', 'سجل النشاط', 'shield', 1]
 ];
+// الأقسام نفسها مجمّعة بحسب الغرض، فيجد المشرف ما يريد دون أن يقرأ القائمة كلها. الروابط (#/admin/…) لم تتغير
+const ADMIN_GROUPS = [['المتابعة', ['overview', 'week', 'archive', 'audit']], ['الفريق', ['accounts', 'reviews', 'feedback']], ['الهوية والمحتوى', ['programs', 'assets', 'fonts', 'models']], ['النشر والتواصل', ['tg', 'broadcasts', 'changelog']], ['النظام', ['ai', 'settings']]];
+function adminNav(tabs, tab) {
+  const byId = {}; tabs.forEach(function (t) { byId[t[0]] = t; });
+  const seen = {}, kids = [];
+  const link = function (t) { seen[t[0]] = 1; return el('a', { href: '#/admin/' + t[0], class: t[0] === tab ? 'on' : '', 'aria-current': t[0] === tab ? 'page' : null }, [ico(t[2]), el('span', { text: t[1] })]); };
+  ADMIN_GROUPS.forEach(function (g) {
+    const list = g[1].map(function (id) { return byId[id]; }).filter(Boolean); if (!list.length) return;
+    kids.push(el('div', { class: 'agrp' }, [el('span', { class: 'agh', text: g[0] })].concat(list.map(link))));
+  });
+  const rest = tabs.filter(function (t) { return !seen[t[0]]; }); // قسم جديد لم يُصنَّف بعد يظهر في الآخر ولا يضيع
+  if (rest.length) kids.push(el('div', { class: 'agrp' }, rest.map(link)));
+  return el('nav', { class: 'anav grouped', 'aria-label': 'أقسام الإدارة' }, kids);
+}
 function myAdminProgs() { return V6.bundle.programs.filter(function (p) { return isSuper() || (V6.me.role === 'sup' && V6.me.programs.indexOf(p.id) >= 0); }); }
 function showAdmin(tab) {
   if (!isAdmin()) return go('#/');
   tab = tab || 'overview';
   const tabs = ADMIN_TABS.filter(function (t) { return !t[3] || isSuper(); });
   if (!tabs.some(function (t) { return t[0] === tab; })) tab = 'overview';
-  document.title = 'الإدارة';
+  document.title = 'الإدارة — ' + (tabs.find(function (t) { return t[0] === tab; }) || [0, ''])[1];
   const body = el('div', { class: 'abody', id: 'abody' });
   view(el('div', { class: 'wrap page admin' }, [
     el('div', { class: 'phead' }, [el('span', { class: 'eyebrow', text: isSuper() ? 'المدير العام' : 'مشرف ' + myAdminProgs().map(function (p) { return p.name; }).join('، ') }), H('h1', 'لوحة الإدارة')]),
     el('div', { class: 'alay' }, [
-      el('nav', { class: 'anav', 'aria-label': 'أقسام الإدارة' }, tabs.map(function (t) { return el('a', { href: '#/admin/' + t[0], class: t[0] === tab ? 'on' : '' }, [ico(t[2]), el('span', { text: t[1] })]); })),
+      adminNav(tabs, tab),
       body
     ])
   ]));
+  // على الشاشة الضيقة يصير التنقل شريطاً أفقياً: نُظهر القسم الحالي فيه
+  const an = $('.anav'), on = an && $('a.on', an); if (on && an.scrollWidth > an.clientWidth + 4) an.scrollLeft += on.getBoundingClientRect().left - an.getBoundingClientRect().left - (an.clientWidth - on.offsetWidth) / 2;
   ({ reviews: aReviews, week: aWeek, overview: aOverview, archive: aArchive, models: aModels, ai: aAI, tg: aTg, accounts: aAccounts, programs: aPrograms, assets: aAssets, fonts: aFonts, feedback: aFeedback, broadcasts: aBroadcasts, changelog: aChangelog, settings: aSettings, audit: aAudit }[tab])(body);
 }
 function aHead(body, title, note, acts) { body.appendChild(el('div', { class: 'ahead' }, [el('div', {}, [el('h2', { text: title }), note ? el('p', { class: 'muted small', text: note }) : null]), el('div', { class: 'row wrapr' }, acts || [])])); }
@@ -443,7 +459,19 @@ async function aSettings(body) {
   const groqTok = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.groqOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'gsk_…', 'aria-label': 'مفتاح Groq' });
   const groqM = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.groqModel || 'openai/gpt-oss-120b', 'aria-label': 'نموذج Groq' });
   const route = Object.assign({}, s.routeDefault || {}, s.ai.route || {});
-  const ROUTE_N = [['intake', 'فهم الفكرة'], ['caption', 'النص المصاحب'], ['outline', 'مخطط العرض'], ['imgq', 'كلمات الصور'], ['week', 'تقرير الأسبوع'], ['spell', 'التصحيح والتشكيل'], ['design', 'اقتراح التصاميم'], ['creative', 'دعه يبدع'], ['review', 'مراجعة التصميم']];
+  const ROUTE_N = [['intake', 'فهم الفكرة'], ['design', 'اقتراح التصاميم'], ['creative', 'دعه يبدع'], ['refine', 'تعديل اقتراح'], ['brief', 'تحسين الوصف'], ['caption', 'النص المصاحب'], ['outline', 'مخطط العرض'], ['imgq', 'كلمات الصور'], ['week', 'تقرير الأسبوع'], ['spell', 'التصحيح والتشكيل'], ['review', 'مراجعة التصميم']];
+  const cfAcc = el('input', { type: 'text', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.cfOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'Account ID (٣٢ حرفاً)', 'aria-label': 'رقم حساب Cloudflare' });
+  const cfTok = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.cfOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'API Token', 'aria-label': 'رمز Cloudflare' });
+  const cfM = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.cfModel || '@cf/openai/gpt-oss-120b', 'aria-label': 'نموذج Cloudflare' });
+  const cfClear = el('input', { type: 'checkbox' });
+  const PROV = { gemini: 'Gemini', groq: 'Groq', cf: 'Cloudflare', poll: 'Pollinations' };
+  const testOut = el('div', { class: 'aitest' });
+  const testBtn = el('button', { type: 'button', class: 'btn sm line', onclick: function (e) {
+    return withBusy(e.currentTarget, async function () {
+      const l = await API6.me('ai_test'); testOut.innerHTML = '';
+      l.forEach(function (x) { testOut.appendChild(el('div', { class: 'aitrow ' + (!x.on ? 'off' : x.ok ? 'ok' : 'bad') }, [el('b', { text: PROV[x.p] || x.p }), el('span', { text: !x.on ? 'غير مضبوط' : x.ok ? 'يعمل · ' + (x.ms / 1000).toFixed(1) + ' ث' : 'لا يعمل: ' + (x.err || '') })])); });
+    }, { busy: 'نختبر…', done: 'اختُبرت' });
+  } }, [ico('ai'), 'اختبر المساعدين']);
   const routeBox = el('div', { class: 'routes' }, ROUTE_N.map(function (r) { return el('div', { class: 'routerow' }, [el('span', { text: r[1] }), segOf([['gemini', 'Gemini'], ['groq', 'Groq']], route[r[0]] || 'gemini', function (v) { route[r[0]] = v; })]); }));
   const lightM = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite', 'aria-label': 'نموذج المهام الخفيفة' });
   const fbm = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 'aria-label': 'النماذج الاحتياطية' });
@@ -460,20 +488,30 @@ async function aSettings(body) {
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-pu' }, [ico('ai')]), el('h3', { text: 'اصنع إعلانك بالذكاء' }),
       el('p', { class: 'small ' + (s.aiKey ? 'ok' : 'err'), text: s.aiKey ? (s.aiKeys > 1 ? s.aiKeys + ' مفاتيح Gemini مضبوطة: تتناوب في الطلبات، وإذا بلغ أحدها حدّه انتقل الخادم إلى التالي تلقائياً.' : 'مفتاح Gemini مضبوط في الخادم.') : 'لم يُضبط مفتاح Gemini بعد (الصقه في خصائص السكربت، أو أضف مفاتيح هنا).' }),
       el('label', { class: 'tog' }, [aiOn, el('span', { text: 'مفعّل' })]),
-      el('div', { class: 'fld' }, [el('label', { text: 'مفاتيح Gemini إضافية (من حسابات جوجل أخرى) — تُحفظ في الخادم ولا تُعرض' }), gKeys, el('small', { text: 'كل مفتاح في سطر. الحصة المجانية لكل مفتاح على حدة، فكل حساب جوجل إضافي يضاعف ما يمكن طلبه يومياً. المفتاح الأساسي GEMINI_KEY يبقى كما هو.' }), s.aiKeys > 1 ? el('label', { class: 'tog tiny' }, [clearKeys, el('span', { text: 'احذف المفاتيح الإضافية المحفوظة' })]) : null]),
+      el('div', { class: 'fld' }, [el('label', { text: 'مفاتيح Gemini إضافية (من حسابات جوجل أخرى) — تُحفظ في الخادم ولا تُعرض' }), gKeys, el('small', { text: 'كل مفتاح في سطر. الحصة المجانية لكل مشروع جوجل، فأنشئ كل مفتاح في مشروع مختلف (ويُفضّل حساب جوجل آخر)؛ مفاتيح المشروع الواحد تتقاسم حصته. المفتاح الأساسي GEMINI_KEY يبقى كما هو.' }), s.aiKeys > 1 ? el('label', { class: 'tog tiny' }, [clearKeys, el('span', { text: 'احذف المفاتيح الإضافية المحفوظة' })]) : null]),
       el('div', { class: 'fld' }, [el('label', { text: 'النموذج' }), model, el('small', { text: 'أقوى نموذج مجاني الآن: gemini-3.8-flash' })]),
-      el('div', { class: 'fld' }, [el('label', { text: 'نموذج المهام الخفيفة' }), lightM, el('small', { text: 'فهم الفكرة والنص المصاحب والتصحيح والمخطط وتقرير الأسبوع. حصته المجانية ٥٠٠ طلب يومياً، بينما النموذج الأقوى ٢٠ فقط.' })]),
+      el('div', { class: 'fld' }, [el('label', { text: 'نموذج المهام الخفيفة' }), lightM, el('small', { text: 'فهم الفكرة وتعديل الاقتراحات والنص المصاحب والتصحيح والمخطط وتقرير الأسبوع. حصته اليومية أكبر من النموذج الأقوى؛ وتُرى حصصك الفعلية في aistudio.google.com/rate-limit.' })]),
       el('div', { class: 'fld' }, [el('label', { text: 'نماذج احتياطية عند ازدحام جوجل' }), fbm, el('small', { text: 'يُعيد المحاولة ثم ينتقل إليها بالترتيب. افصل بينها بفاصلة.' })]),
       el('div', { class: 'fld' }, [el('label', { text: 'حد الطلبات لكل مستخدم يومياً' }), perDay]),
       el('label', { class: 'tog' }, [pollOn, el('span', { text: 'مساعد احتياطي مجاني للنصوص حين تنفد الحصص (Pollinations، بلا مفتاح)' })]),
       el('small', { class: 'tiny', text: 'يُستعمل فقط إن تعطل Gemini وGroq معاً، وللمهام النصية دون الصور. لا تُرسل إليه بيانات شخصية.' }),
       el('div', { class: 'fld' }, [el('label', { text: 'كيف يصوغ المساعد النص المصاحب للتصاميم (لكل البرامج)' }), withEmoji(capPrompt), el('small', { text: 'تعليمات ثابتة تُضاف إلى كل طلب صياغة. ولكل برنامج تعليماته الخاصة من «البرامج والهويات ← قناة تليجرام».' })]),
       el('p', { class: 'tiny', text: 'في الخطة المجانية تستعمل جوجل الطلبات لتحسين منتجاتها، فلا تُرسل بيانات شخصية للطلاب. والمساعد لمن منحته صلاحيته.' })]),
-    el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-bl' }, [ico('ai')]), el('h3', { text: 'توزيع المهام بين المساعدين' }),
-      el('p', { class: 'small ' + (s.groqOn ? 'ok' : 'err'), text: s.groqOn ? 'مفتاح Groq مضبوط: المهام النصية تذهب إليه، وما يحتاج رؤية الصور يبقى مع Gemini.' : 'بلا مفتاح Groq: كل المهام على Gemini. المفتاح مجاني من console.groq.com/keys (ألف طلب يومياً، ولا يُدرَّب على بياناتكم).' }),
+    el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-bl' }, [ico('ai')]), el('h3', { text: 'المساعدون الإضافيون' }),
+      el('p', { class: 'small muted', text: 'كلها مجانية واختيارية. إن تعطل مساعد أو نفدت حصته أكمل التالي تلقائياً، فلا تتوقف الاقتراحات.' }),
+      el('h4', { class: 'aih', text: 'Groq: سريع جداً للمهام الخفيفة' }),
+      el('p', { class: 'small ' + (s.groqOn ? 'ok' : 'err'), text: s.groqOn ? 'مضبوط: فهم الفكرة والتعديل والنص المصاحب تذهب إليه، فتصل النتيجة في ثوانٍ.' : 'غير مضبوط. مفتاحه مجاني من console.groq.com/keys: ألف طلب يومياً، ولا يحتفظ بالبيانات.' }),
       el('div', { class: 'fld' }, [el('label', { text: 'مفتاح Groq (يُحفظ في الخادم ولا يُعرض)' }), groqTok]),
-      el('div', { class: 'fld' }, [el('label', { text: 'نموذج Groq' }), groqM]),
-      el('p', { class: 'tiny', text: 'من يتولى كل مهمة؟ (ما فيه صور أو ملف PDF يذهب إلى Gemini دائماً، وإن تعطل أحدهما أكمل الآخر)' }), routeBox]),
+      el('div', { class: 'fld' }, [el('label', { text: 'نموذج Groq' }), groqM, el('small', {}, ['للعربية جرّب أيضاً: ', el('bdi', { dir: 'ltr', text: 'qwen/qwen3.8-27b' })])]),
+      el('h4', { class: 'aih', text: 'Cloudflare: حصة يومية احتياطية' }),
+      el('p', { class: 'small ' + (s.cfOn ? 'ok' : 'err'), text: s.cfOn ? 'مضبوط: يكمل المهام النصية حين تنفد حصص Gemini وGroq.' : 'غير مضبوط. يضيف نحو خمسين اقتراحاً يومياً مجاناً حين تنفد الحصص، ولا يُدرَّب على بياناتكم.' }),
+      el('div', { class: 'fld' }, [el('label', { text: 'رقم الحساب (Account ID)' }), cfAcc, el('small', {}, ['يظهر في لوحة Cloudflare بصفحة ', el('bdi', { dir: 'ltr', text: 'Workers AI' }), '. والرمز من «إنشاء رمز» بقالب ', el('bdi', { dir: 'ltr', text: 'Workers AI' }), '.'])]),
+      el('div', { class: 'fld' }, [el('label', { text: 'رمز API (يُحفظ في الخادم ولا يُعرض)' }), cfTok]),
+      el('div', { class: 'fld' }, [el('label', { text: 'نموذج Cloudflare' }), cfM]),
+      s.cfOn ? el('label', { class: 'tog tiny' }, [cfClear, el('span', { text: 'احذف بيانات Cloudflare المحفوظة' })]) : null,
+      el('h4', { class: 'aih', text: 'من يتولى كل مهمة أولاً؟' }),
+      el('p', { class: 'tiny', text: 'Gemini أجود في كتابة العربية، وGroq أسرع. ما فيه صور أو ملف PDF يذهب إلى Gemini دائماً.' }), routeBox,
+      el('div', { class: 'row wrapr' }, [testBtn, el('small', { class: 'tiny', text: 'احفظ الإعدادات أولاً ثم اختبر.' })]), testOut]),
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-gr' }, [ico('send')]), el('h3', { text: 'بوت تليجرام' }),
       el('p', { class: 'small ' + (s.tgOn ? 'ok' : 'err'), text: s.tgOn ? 'رمز البوت مضبوط. أضف البوت مشرفاً في قناة كل برنامج، وحدد القناة من إعدادات البرنامج.' : 'لم يُضبط رمز البوت بعد. أنشئ بوتاً من BotFather والصق رمزه هنا.' }),
       el('div', { class: 'fld' }, [el('label', { text: 'رمز البوت (يُحفظ في الخادم ولا يُعرض)' }), tgTok]),
@@ -489,9 +527,9 @@ async function aSettings(body) {
       el('p', { class: 'tiny', text: 'الصورة التي يختارها المستخدم تُحفظ بأصلها كاملاً في مكتبته مع اسم المصوّر ورخصته، ويقترحها للبرنامج فتوافق أنت من «الشعارات والصور».' })])
   ]));
   body.appendChild(el('button', { type: 'button', class: 'btn dark', onclick: function (e) {
-    const o = { ai: { enabled: aiOn.checked, model: model.value.trim(), fallback: fbm.value.trim(), light: lightM.value.trim(), groqModel: groqM.value.trim(), route: route, perDay: +perDay.value, capPrompt: capPrompt.value.trim(), pollFallback: pollOn.checked }, uploadsNeedPerm: upPerm.checked, maxUploadMb: +maxMb.value }; if (tgTok.value.trim()) o.tgToken = tgTok.value.trim(); if (pxKey.value.trim()) o.pexelsKey = pxKey.value.trim(); if (pbKey.value.trim()) o.pixabayKey = pbKey.value.trim(); o.imgProvider = imgProv; if (groqTok.value.trim()) o.groqKey = groqTok.value.trim();
+    const o = { ai: { enabled: aiOn.checked, model: model.value.trim(), fallback: fbm.value.trim(), light: lightM.value.trim(), groqModel: groqM.value.trim(), cfModel: cfM.value.trim(), route: route, perDay: +perDay.value, capPrompt: capPrompt.value.trim(), pollFallback: pollOn.checked }, uploadsNeedPerm: upPerm.checked, maxUploadMb: +maxMb.value }; if (tgTok.value.trim()) o.tgToken = tgTok.value.trim(); if (pxKey.value.trim()) o.pexelsKey = pxKey.value.trim(); if (pbKey.value.trim()) o.pixabayKey = pbKey.value.trim(); o.imgProvider = imgProv; if (groqTok.value.trim()) o.groqKey = groqTok.value.trim(); if (cfAcc.value.trim()) o.cfAccount = cfAcc.value.trim(); if (cfTok.value.trim()) o.cfToken = cfTok.value.trim(); if (cfClear.checked) { o.cfAccount = ''; o.cfToken = ''; }
     if (gKeys.value.trim()) o.geminiKeys = gKeys.value.trim(); else if (clearKeys.checked) o.geminiKeys = '';
-    return withBusy(e.currentTarget, async function () { await API6.me('set_save', JSON.stringify(o)); await refreshBundle(); }, { busy: 'نحفظ…', done: 'حُفظت الإعدادات' }).then(function () { setTimeout(function () { showAdmin('settings'); }, 900); }).catch(function () {});
+    return withBusy(e.currentTarget, async function () { await API6.me('set_save', JSON.stringify(o)); await refreshBundle(); }, { busy: 'نحفظ…', done: 'حُفظت الإعدادات' }).then(function () { setTimeout(function () { if (/^#\/admin\/settings/.test(location.hash)) showAdmin('settings'); }, 900); }).catch(function () {});
   } }, [ico('check'), 'حفظ الإعدادات']));
 }
 
@@ -716,24 +754,16 @@ function tgForm(p) {
     return false;
   } }, { t: 'إلغاء' }] });
 }
-/* ---------- منشورات القناة: المرسل والمجدول ---------- */
-const TG_ST = { queued: ['مجدول', 'bl'], sent: ['أُرسل', 'gr'], failed: ['فشل', 'rd'], cancelled: ['أُلغي', ''] };
+/* ---------- منشورات القناة: صارت في التقويم (قائمة بالبحث والتصفية بالبرنامج والحال والتصدير). هنا الخلاصة وروابطها ---------- */
 async function aTg(body) {
-  let prog = '';
-  aHead(body, 'منشورات القناة', 'ما أُرسل إلى قنوات تليجرام من المنصة وما جُدول. القناة والقوالب الكتابية تُضبط من «البرامج والهويات»، ورمز البوت من الإعدادات. التعديل والنقل والتكرار من «التقويم والمهام».', [el('a', { class: 'btn dark', href: '#/cal' }, [ico('cal'), 'التقويم والمهام']), progSelect('', true, function (v) { prog = v; load(); })]);
+  aHead(body, 'منشورات القناة', 'تُدار من التقويم: قائمة كل المنشورات مع البحث والتصفية بالبرنامج والحال والتصدير. القناة والقوالب الكتابية من «البرامج والهويات».', [el('a', { class: 'btn dark', href: '#/cal?view=list&prog=all' }, [ico('cal'), 'افتح قائمة المنشورات'])]);
   const box = el('div'); body.appendChild(box);
-  async function load() {
-    box.innerHTML = ''; const sk = loading(box);
-    let list; try { list = await API6.me('tg_queue', prog); } catch (e) { sk.remove(); box.appendChild(el('p', { class: 'err', text: e.message })); return; }
-    sk.remove();
-    if (!list.length) { box.appendChild(el('p', { class: 'empty', text: 'لا منشورات بعد.' })); return; }
-    const tbl = el('div', { class: 'ailog' });
-    list.forEach(function (x) {
-      const st = TG_ST[x.status] || [x.status, ''];
-      tbl.appendChild(el('div', { class: 'airow' + (x.status === 'failed' ? ' bad' : '') }, [el('span', { class: 'tiny', text: fmtTime(x.when) }), el('b', { text: x.title || '—' }), el('span', { class: 'pill sm ' + st[1], text: st[0] }), el('span', { class: 'aiq', text: x.name + ' · ' + capPlain(x.caption || '').slice(0, 80) + (x.err ? ' · ' + x.err : '') }),
-        x.status === 'queued' ? el('button', { type: 'button', class: 'btn sm ghost', text: 'إلغاء', onclick: async function () { try { await API6.me('tg_cancel', x.id); load(); } catch (e) { toast(e.message); } } }) : (x.link ? el('a', { class: 'btn sm ghost', href: x.link, target: '_blank', rel: 'noopener', text: 'افتح' }) : el('span'))]));
-    });
-    box.appendChild(tbl);
-  }
-  load();
+  const sk = loading(box);
+  let list; try { list = await API6.me('tg_queue', ''); } catch (e) { sk.remove(); box.appendChild(el('p', { class: 'err', text: e.message })); return; }
+  sk.remove();
+  const n = function (st) { return list.filter(function (x) { return x.status === st; }).length; };
+  // كل رقم رابط إلى القائمة مصفّاةً بحاله
+  box.appendChild(el('div', { class: 'kpis' }, [['queued', 'مجدولة', 'تنتظر موعدها'], ['sent', 'أُرسلت', 'إلى القنوات'], ['failed', 'فشلت', 'تحتاج نظرة'], ['cancelled', 'أُلغيت', '']].map(function (s) {
+    const k = kpi(s[1], n(s[0]), s[2], s[0] === 'failed' && n(s[0]) ? 'warn' : ''); return el('a', { class: 'kpilink', href: '#/cal?view=list&prog=all&range=all&status=' + s[0], title: 'اعرضها في التقويم' }, [k]);
+  })));
 }

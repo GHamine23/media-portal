@@ -7,7 +7,7 @@ async function showMine6() {
   const tabs = segOf([['mine', 'تصاميمي'], ['team', 'تصاميم الفريق'], ['models', 'النماذج']], tab, function (v) { tab = v; ls('mineTab', v); fill(); });
   const search = el('input', { type: 'search', class: 'inp', placeholder: 'ابحث بالاسم…', 'aria-label': 'بحث', oninput: function (e) { q = norm(e.target.value); fill(); } });
   view(el('div', { class: 'wrap page' }, [
-    el('div', { class: 'phead' }, [H('h1', 'تصاميمي'), el('p', { class: 'muted rv', text: 'ما حفظته يبقى في حسابك وتجده من أي جهاز، وما شاركه فريق ' + (V6.prog ? V6.prog.name : 'برنامجك') + ' تبدأ منه بنسخة لك.' })]),
+    el('div', { class: 'phead' }, [H('h1', 'تصاميمي'), el('p', { class: 'muted rv', text: 'ما تحفظه لك وحدك حتى تشاركه، وتجده من أي جهاز. وما شاركه فريق ' + (V6.prog ? V6.prog.name : 'برنامجك') + ' تبدأ منه بنسخة لك.' })]),
     el('div', { class: 'gbar' }, [tabs, search]), grid
   ]));
   let list = [];
@@ -63,7 +63,7 @@ function showSlides6(tid) {
   view(
     el('section', { class: 'slhero wrap' }, [
       el('div', { class: 'slhero-t' }, [el('span', { class: 'eyebrow rv', text: 'بهوية ' + T.full.replace('ـ', '') }), H('h1', 'الشرائح'),
-        el('p', { class: 'muted rv', style: '--d:1', text: 'عروض للقاءات والمحاضرات: تُبنى من نقاطك أو من درس بالذكاء، بحركات دخول وانتقالات، ووسائط وسؤال وجواب ومؤقّت وملاحظات للمقدّم، وتُنزَّل PDF.' }),
+        el('p', { class: 'muted rv', style: '--d:1', text: 'عروض للقاءات والمحاضرات، من نقاطك أو من درس، تُعرض حيّة أو تُنزَّل PDF.' }),
         el('div', { class: 'row wrapr rv', style: '--d:2' }, [
           el('button', { type: 'button', class: 'btn dark', onclick: function () { openDeckNew(T.id, [{ tpl: 'sl_cover', d: {} }, { tpl: 'sl_points', d: {} }], 'عرض جديد'); } }, [ico('plus'), 'عرض جديد']),
           el('a', { class: 'btn line', href: '#/mine', onclick: function () { ls('mineTab', 'mine'); }, text: 'عروضي المحفوظة' })]),
