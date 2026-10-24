@@ -27,7 +27,12 @@ route6(/^\/arc\/(\d{4}-\d{2})\/([a-z0-9]+)$/, openArc, { page: 'editor', noVT: t
 route6(/^\/make(?:\?.*)?$/, showMake6, { page: 'make' });
 route6(/^\/mine$/, showMine6, { page: 'mine' });
 route6(/^\/cal(?:\?.*)?$/, showCal6, { page: 'cal' });
-route6(/^\/account$/, showAccount, { page: 'account' });
+route6(/^\/account(?:\?.*)?$/, showAccount, { page: 'account' });
+// روابط التطبيق تعمل في الموقع أيضاً: القوالب ← معرض آخر هوية، والمزيد ← حسابي، والإشعارات ← نافذة ما الجديد
+route6(/^\/tpl$/, function () { const t = TRACKS[ls('lastTrack')] ? ls('lastTrack') : (tracksOf()[0] || {}).id; if (t) return redirect6('#/g/' + t); redirect6('#/'); }, { page: 'home' });
+route6(/^\/more$/, function () { redirect6('#/account'); }, { page: 'account' });
+route6(/^\/(feedback|fb)$/, function () { redirect6('#/account?fb'); }, { page: 'account' });
+route6(/^\/news$/, function () { redirect6('#/'); setTimeout(function () { showNews(); }, 500); }, { page: 'home' });
 route6(/^\/tips(?:\/([a-z]+))?$/, showTips6, { page: 'tips' });
 route6(/^\/week$/, showWeek6, { page: 'account' });
 route6(/^\/reviews$/, showReviews6, { page: 'account' });

@@ -69,7 +69,7 @@ function showFeedback6(preset) {
     el('div', { class: 'fld' }, [el('label', { for: 'fb_text', text: 'ملاحظتك' }), withEmoji(ta)]),
     hasDesign ? el('label', { class: 'tog' }, [shotI, el('span', { text: 'أرفق صورة التصميم المفتوح' })]) : null,
     imgPick,
-    el('p', { class: 'tiny', text: 'يُرفق تلقائياً اسم الصفحة ونوع الجهاز وآخر الأخطاء التقنية، لنفهم المشكلة دون أسئلة كثيرة. وتتابع حالتها من «حسابي».' }),
+    el('p', { class: 'tiny', text: 'تتابع حالتها وردّ الفريق من «حسابي».' }),
     msg
   ], acts: [{ t: 'إرسال', cls: 'dark', keep: true, fn: async function (close) {
     if (ta.value.trim().length < 4) { msg.textContent = 'اكتب ملاحظتك أولاً.'; ta.focus(); return; }

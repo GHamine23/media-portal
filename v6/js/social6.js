@@ -102,10 +102,12 @@ function requestReview(ai) {
   } }, { t: 'إلغاء' }] });
 }
 // مراجعاتي
+// الصفحات الشخصية تُفتح من «حسابي»، فعليها رابط يعيد إليه (في التطبيق زر الرجوع يكفي)
+function acCrumb() { return document.body.classList.contains('mapp') ? null : el('a', { class: 'crumb rv', href: '#/account' }, [ico('chev'), 'حسابي']); }
 async function showReviews6() {
   document.title = 'مراجعاتي';
   const box = el('div', { class: 'rvlist' });
-  view(el('div', { class: 'wrap page' }, [el('div', { class: 'phead' }, [H('h1', 'مراجعاتي'), el('p', { class: 'muted', text: 'التصاميم التي طلبت فيها رأي إدارة أثر، وردودهم.' })]), box]));
+  view(el('div', { class: 'wrap page' }, [el('div', { class: 'phead' }, [acCrumb(), H('h1', 'مراجعاتي'), el('p', { class: 'muted', text: 'التصاميم التي طلبت فيها رأي إدارة أثر، وردودهم.' })]), box]));
   const sk = loading(box);
   let list; try { list = await API6.me('rv_mine'); } catch (e) { sk.remove(); box.appendChild(el('p', { class: 'err', text: e.message })); return; }
   sk.remove();
@@ -233,7 +235,7 @@ function paintWeek(box, w) {
   const maxH = Math.max(1, Math.max.apply(null, w.hist.map(function (h) { return h.exports; })));
   const C = me ? tipCat(me.focus) : null, ftip = C ? TIPS.filter(function (t) { return t.c === C.id; })[(new Date().getDate()) % Math.max(1, TIPS.filter(function (t) { return t.c === C.id; }).length)] : null;
   rc(box, 
-    el('div', { class: 'wkhero' }, [el('span', { class: 'eyebrow', text: 'أسبوعك في أثر' }), H('h1', 'أحسنت يا ' + nm),
+    el('div', { class: 'wkhero' }, [acCrumb(), el('span', { class: 'eyebrow', text: 'أسبوعك في أثر' }), H('h1', 'أحسنت يا ' + nm),
       el('p', { class: 'muted', text: 'هذا الأسبوع حتى الآن، وتقرير الأسبوع الماضي (' + (w.from || '') + ' — ' + (w.to || '') + ')، يتجدد كل سبت تلقائياً.' })]),
     el('div', { class: 'wkgrid' }, WK_N.map(function (k, i) { const n = el('b', { text: '0' }); countUp(n, L[k[0]] || 0, 1000 + i * 120); const prev = me ? me.c[k[0]] : null; return el('div', { class: 'wkstat rv', style: '--d:' + i }, [ico(k[2]), n, el('small', { text: k[1] }), prev != null ? el('span', { class: 'tiny', text: 'الأسبوع الماضي: ' + prev }) : null]); })),
     me ? el('div', { class: 'wkmsg rv' }, [el('div', { class: 'row' }, [ico('ai'), el('b', { text: (me.byAI ? 'من المصمّم الذكي: ' : '') + 'تقييم الأسبوع الماضي' })]), typeText(el('p', {}), me.msg),
