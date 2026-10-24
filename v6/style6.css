@@ -1090,3 +1090,8 @@ body.cal-dragging .cgd:not(.over):not(.empty){box-shadow:inset 0 0 0 1px var(--l
 .emowrap>textarea,.emowrap>input{width:100%;box-sizing:border-box}
 .cgd.past .cgn{color:var(--ink3)}
 a.chip,.chip{text-decoration:none}
+.apppromo{display:flex;align-items:center;gap:12px;background:#000;color:#fff;border-radius:18px;padding:12px 14px;margin:8px 0}
+.apppromo img{width:48px;height:48px;border-radius:12px;flex:none}
+.apppromo .grow{display:flex;flex-direction:column;min-width:0}.apppromo .tiny{color:rgba(255,255,255,.75)}
+.apppromo .btn.dark{background:#fff;color:#000}.apppromo .ib{color:#fff}
+.emowrap{min-width:0}

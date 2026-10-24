@@ -53,5 +53,30 @@ rel = '../docs/' + ('' if '--root' in sys.argv else 'v6/') + 'js/'
 demo_tags = '<script>window.DEMO = true;</script>\n<script src="../v6/gas/shim.js"></script>\n<script src="../v6/demo6.js"></script>\n' + '\n'.join(
     '<script src="%s%s?v=%s"></script>' % (rel, n, ver(parts[n])) if n != 'config.js' else "<script>const API_URL = '';</script>" for n in ORDER)
 (D / 'index.html').write_text(shell.replace('<!--SCRIPTS-->', demo_tags).replace('href="manifest.webmanifest"', 'href="#"'))
+# ---- تطبيق الجوال (PWA): docs/app/ يعيد استعمال ملفات js نفسها من docs/v6/js ويضيف وحداته ----
+APP = ROOT / 'docs' / 'app'; (APP / 'js').mkdir(parents=True, exist_ok=True); (APP / 'icons').mkdir(exist_ok=True)
+APP_ORDER = ['ios6.js', 'mscreens.js', 'meditor.js', 'minstall.js', 'mapp.js']
+app_parts = {n: (V6 / 'app' / 'js' / n).read_text() for n in APP_ORDER}
+for n in APP_ORDER: (APP / 'js' / n).write_text(app_parts[n])
+app_css = (V6 / 'app' / 'app.css').read_text()
+app_shell = (V6 / 'app' / 'shell.html').read_text().replace('/*SITE*/', site.replace('v6/', 'app/')).replace('<!--STYLE-->', '<style>\n' + css + '\n</style>').replace('<!--APPSTYLE-->', '<style>\n' + app_css + '\n</style>').replace('<!--MARK-->', brand['mark'])
+shared = [n for n in ORDER if n != 'app6.js']
+app_tags = '\n'.join('<script src="../v6/js/%s?v=%s"></script>' % (n, ver(parts[n])) for n in shared) + '\n' + '\n'.join('<script src="js/%s?v=%s"></script>' % (n, ver(app_parts[n])) for n in APP_ORDER)
+(APP / 'index.html').write_text(app_shell.replace('<!--SCRIPTS-->', app_tags))
+for n in ['icon-192.png', 'icon-512.png', 'apple-touch-icon.png']:
+    if (ICONS / n).exists(): shutil.copy(ICONS / n, APP / 'icons' / n)
+if (ICONS / 'og.png').exists(): shutil.copy(ICONS / 'og.png', APP / 'og.png')
+(APP / 'manifest.webmanifest').write_text(json.dumps({
+    'name': 'أثر — منصة الأثر الإعلامي', 'short_name': 'أثر', 'description': 'صمّم إعلانات برنامجك بهويته من هاتفك، وانشرها إلى القناة، وتابع تقويمك ومهامك.', 'lang': 'ar', 'dir': 'rtl', 'id': './', 'start_url': './?src=pwa', 'scope': './', 'display': 'standalone', 'orientation': 'portrait',
+    'background_color': '#f2f2f7', 'theme_color': '#f2f2f7', 'categories': ['productivity', 'education'],
+    'icons': [{'src': 'icons/icon-192.png', 'sizes': '192x192', 'type': 'image/png', 'purpose': 'any'}, {'src': 'icons/icon-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'any'}, {'src': 'icons/icon-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'}],
+    'shortcuts': [{'name': 'اصنع إعلانك', 'url': './#/make'}, {'name': 'التقويم والمهام', 'url': './#/cal'}, {'name': 'تصاميمي', 'url': './#/mine'}]}, ensure_ascii=False, indent=1))
+# عامل الخدمة: قائمة الملفات بإصداراتها حتى يُحدَّث الكاش مع كل بناء
+sw = (V6 / 'app' / 'sw.js').read_text()
+assets = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'] + ['../v6/js/%s?v=%s' % (n, ver(parts[n])) for n in shared] + ['js/%s?v=%s' % (n, ver(app_parts[n])) for n in APP_ORDER]
+(APP / 'sw.js').write_text(sw.replace('/*ASSETS*/', json.dumps(assets)).replace('/*VER*/', ver(''.join(parts[n] for n in shared) + ''.join(app_parts.values()) + app_css)))
+# نسخة التجربة للتطبيق
+app_demo_tags = '<script>window.DEMO = true;</script>\n<script src="../v6/gas/shim.js"></script>\n<script src="../v6/demo6.js"></script>\n' + '\n'.join('<script src="%s%s?v=%s"></script>' % (rel, n, ver(parts[n])) if n != 'config.js' else "<script>const API_URL = '';</script>" for n in shared) + '\n' + '\n'.join('<script src="../docs/app/js/%s?v=%s"></script>' % (n, ver(app_parts[n])) for n in APP_ORDER)
+(D / 'app.html').write_text(app_shell.replace('<!--SCRIPTS-->', app_demo_tags).replace('href="manifest.webmanifest"', 'href="#"'))
 size = sum((OUT / 'js' / n).stat().st_size for n in ORDER)
 print('v6 →', OUT.relative_to(ROOT), '|', size // 1024, 'KB js |', len(ORDER), 'files | api', bool(api_url), '| pitfalls', bad)

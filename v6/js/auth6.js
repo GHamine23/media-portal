@@ -200,7 +200,8 @@ async function showAccount() {
           el('dt', { text: 'الصلاحيات' }), el('dd', { text: permsText(me) })]),
         el('div', { class: 'row' }, [el('a', { class: 'btn dark', href: '#/password', text: 'تغيير كلمة المرور' })])]),
       el('div', { class: 'card rv', style: '--d:1' }, [el('h3', { text: 'الحركة في الواجهة' }), el('p', { class: 'muted small', text: 'اختر شدة الحركة التي تريحك.' }), motion]),
-      el('div', { class: 'card rv', style: '--d:2' }, [el('h3', { text: 'أين تذهب تصاميمك' }), el('p', { class: 'muted small', text: 'ما تحفظه يبقى في حسابك، ولا يراه فريقك إلا إن شاركته. وكل تصميم تنزّله أو تشاركه تُحفظ نسخة منه في أرشيف البرنامج، يطّلع عليها مشرف البرنامج ومدير المنصة.' })])
+      el('div', { class: 'card rv', style: '--d:2' }, [el('h3', { text: 'تطبيق الجوال' }), el('p', { class: 'muted small', text: 'للهاتف واجهة خاصة بروح التطبيقات: المحرر والتصميم ظاهر دائماً، والتقويم والنشر. افتح الرابط من هاتفك وثبّته على الشاشة الرئيسية.' }), el('div', { class: 'row wrapr' }, [el('a', { class: 'btn dark', href: '../app/', target: '_blank', rel: 'noopener' }, [ico('phone'), 'افتح التطبيق']), el('button', { type: 'button', class: 'btn line', onclick: function (e) { copyText(location.origin + location.pathname.replace(/v6\/?$/, '') + 'app/'); btnDone(e.currentTarget, 'نُسخ الرابط'); } }, [ico('link'), 'انسخ الرابط للهاتف'])])]),
+      el('div', { class: 'card rv', style: '--d:3' }, [el('h3', { text: 'أين تذهب تصاميمك' }), el('p', { class: 'muted small', text: 'ما تحفظه يبقى في حسابك، ولا يراه فريقك إلا إن شاركته. وكل تصميم تنزّله أو تشاركه تُحفظ نسخة منه في أرشيف البرنامج، يطّلع عليها مشرف البرنامج ومدير المنصة.' })])
     ]),
     el('h2', { class: 'sh rv', text: 'ملاحظاتي وبلاغاتي' }), fbList
   ]));

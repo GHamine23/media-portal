@@ -711,7 +711,7 @@ function tgForm(p) {
     el('h4', { class: 'psh', text: 'كيف يصوغ المساعد النص المصاحب لهذا البرنامج' }), el('p', { class: 'tiny', text: 'تعليمات ثابتة تُضاف إلى كل طلب صياغة لتصاميم هذا البرنامج (فوق تعليمات المنصة العامة). وللمستخدم أن يوجّه المساعد لكل رسالة على حدة.' }), withEmoji(capPromptI),
     el('h4', { class: 'psh', text: 'نماذج رسائلكم (يتعلم منها المساعد)' }), samples
   ], acts: [{ t: 'حفظ', cls: 'dark', keep: true, fn: function (close) {
-    const b = $$('.modal .acts .btn.dark').pop();
+    const b = $$('.modal .acts .btn.dark, .msheet .sacts .btn.dark').pop();
     withBusy(b, async function () { await API6.me('prog_save', JSON.stringify({ id: p.id, tg: { chat: chatI.value.trim(), chats: chats, link: linkI.value.trim(), hashtag: hashI.value.trim(), sign: signI.value.trim(), capPrompt: capPromptI.value.trim(), titles: titles }, captions: caps.filter(function (c) { return c.text && c.text.trim(); }), samples: samples.value })); await refreshBundle(); }, { busy: 'نحفظ…', done: 'حُفظ' }).then(function () { setTimeout(function () { close(); showAdmin('programs'); }, 600); }).catch(function () {});
     return false;
   } }, { t: 'إلغاء' }] });

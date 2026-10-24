@@ -52,6 +52,7 @@ function showHome() {
       clockCard(),
       aiDesignerBox()
     ]),
+    el('div', { class: 'wrap' }, [appPromo()]),
     el('div', { class: 'wrap hgrid2' }, [tipOfDayCard(), wkSlot]),
     el('div', { class: 'wrap' }, [el('section', { class: 'hsec', id: 'modelsec', hidden: true }, [el('div', { class: 'shead' }, [H('h2', 'نماذج جاهزة'), el('a', { class: 'btn sm line', href: '#/mine', onclick: function () { ls('mineTab', 'models'); }, text: 'كل النماذج' })]), stripNav(models)])].concat(idSections).concat([
       el('section', { class: 'hsec', id: 'recentsec', hidden: true }, [el('div', { class: 'shead' }, [H('h2', 'آخر تصاميمك'), el('a', { class: 'btn sm line', href: '#/mine', text: 'كل تصاميمي' })]), stripNav(recent)]),
@@ -63,6 +64,13 @@ function showHome() {
   rotateMessages(msg, src, nm);
 }
 
+/* ---------- دعوة إلى تطبيق الجوال (تظهر على الشاشات الصغيرة في الموقع) ---------- */
+function appPromo() {
+  if (document.body.classList.contains('mapp') || window.innerWidth > 760 || ls('appPromoOff')) return null;
+  const b = el('div', { class: 'apppromo rv' }, [el('img', { src: 'icons/icon-192.png', alt: '' }), el('div', { class: 'grow' }, [el('b', { text: 'تطبيق أثر للجوال' }), el('span', { class: 'tiny', text: 'واجهة مصمّمة للهاتف: المحرر دون إخفاء التصميم، والتقويم، والنشر. ويُثبّت على شاشتك الرئيسية.' })]),
+    el('a', { class: 'btn sm dark', href: '../app/', text: 'افتح التطبيق' }), el('button', { type: 'button', class: 'ib sm', 'aria-label': 'إخفاء', onclick: function () { ls('appPromoOff', true); b.remove(); } }, [ico('close')])]);
+  return b;
+}
 /* ---------- إشارة «المزيد في الأسفل»: تظهر حتى يبدأ التمرير ---------- */
 function scrollCue() {
   const c = el('a', { class: 'scue', href: '#modelsec', 'aria-label': 'انزل إلى الأقسام', onclick: function (e) { e.preventDefault(); const t = document.querySelector('.hgrid2') || document.querySelector('.hsec'); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }, [el('span', { class: 'scue-t', text: 'المزيد في الأسفل' }), el('span', { class: 'scue-m' }, [el('span', { class: 'scue-d' })])]);

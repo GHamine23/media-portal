@@ -188,7 +188,7 @@ function verifiedTextDialog(done) {
   let closeTop = function () {};
   seg.style.flex = 'none';
   modal({ title: 'آية أو حديث موثّق', wide: true, body: [el('div', { class: 'row' }, [seg, q, el('button', { type: 'button', class: 'btn sm dark', onclick: function () { return search(); } }, [ico('search')])]), el('div', { class: 'row wrapr' }, [srcSeg, hint]), weak, list], acts: [{ t: 'إغلاق' }] });
-  closeTop = function () { const m = $$('.modal').pop(); if (m) { const x = m.querySelector('.acts .btn'); if (x) x.click(); } };
+  closeTop = function () { const m = $$('.modal,.msheet').pop(); if (m) { const x = m.querySelector('.acts .btn,.sx'); if (x) x.click(); } };
   setTimeout(function () { q.focus(); }, 50);
 }
 // إدراج النص الموثّق: في الحقل النصي المحدد، أو طبقة نص جديدة

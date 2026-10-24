@@ -1,0 +1,251 @@
+/* ================= تطبيق الأثر للجوال — نظام تصميم بروح iOS =================
+   المبادئ (من دليل Apple للواجهات): عنوان كبير ينكمش عند التمرير، شريط تبويب سفلي مطموس الخلفية، أوراق سفلية بمقبض ومستويات
+   ارتفاع، قوائم مجمّعة بحواف ١٠ نقاط، أهداف لمس ≥ ٤٤ نقطة، حركة نابضة قصيرة، لمسة اهتزاز خفيفة، سحب من الحافة للرجوع. */
+:root{
+  --ios-bg:#f2f2f7; --ios-card:#ffffff; --ios-sep:rgba(60,60,67,.18); --ios-label:#000; --ios-label2:rgba(60,60,67,.6); --ios-label3:rgba(60,60,67,.3);
+  --ios-fill:rgba(120,120,128,.12); --ios-fill2:rgba(120,120,128,.2); --ios-blue:#007aff; --ios-green:#34c759; --ios-red:#ff3b30; --ios-orange:#ff9500; --ios-indigo:#5856d6;
+  --tint:#000; --tab-h:calc(50px + env(safe-area-inset-bottom,0px)); --nav-h:44px;
+  --spring:cubic-bezier(.32,.72,0,1); --ease:cubic-bezier(.25,.1,.25,1);
+  --r:12px; --r2:18px; --r3:26px;
+}
+html{height:100%;-webkit-text-size-adjust:100%;overscroll-behavior-y:none}
+body.mapp{margin:0;min-height:100dvh;background:var(--ios-bg);color:var(--ios-label);font-family:var(--ft);font-size:17px;line-height:1.5;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;touch-action:manipulation;overscroll-behavior-y:none}
+body.mapp *{-webkit-touch-callout:none}
+body.mapp input,body.mapp textarea,body.mapp [contenteditable]{-webkit-touch-callout:default;-webkit-user-select:text;user-select:text}
+body.mapp #top,body.mapp #banner,body.mapp #morecue,body.mapp #rprog{display:none!important}
+body.mapp #view{min-height:100dvh;padding-bottom:var(--tab-h);view-transition-name:none;position:relative}
+body.mapp.in-editor #view,body.mapp[data-page=login] #view{padding-bottom:0}
+body.mapp h1,body.mapp h2,body.mapp h3{text-wrap:balance}
+/* شاشة الترحيب */
+body.mapp #splash{background:#fff}
+/* ---------- الشاشة: عنوان كبير ينكمش ---------- */
+.mscreen{display:flex;flex-direction:column;min-height:calc(100dvh - var(--tab-h));animation:mPush .42s var(--spring) both}
+.mscreen.back{animation-name:mPop}
+@keyframes mPush{from{transform:translateX(-28%);opacity:0}}
+@keyframes mPop{from{transform:translateX(28%);opacity:0}}
+@media (prefers-reduced-motion:reduce){.mscreen{animation:none}}
+.mnav{position:sticky;top:0;z-index:40;background:rgba(242,242,247,.82);backdrop-filter:saturate(1.8) blur(20px);-webkit-backdrop-filter:saturate(1.8) blur(20px);padding-top:env(safe-area-inset-top,0px);border-bottom:1px solid transparent;transition:border-color .2s}
+.mnav.scrolled{border-bottom-color:var(--ios-sep)}
+.mnav .bar{height:var(--nav-h);display:flex;align-items:center;padding:0 8px;gap:4px;position:relative}
+.mnav .bar .ttl{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--fd);font-size:17px;font-weight:600;opacity:0;transform:translateY(6px);transition:opacity .2s,transform .25s var(--ease);pointer-events:none}
+.mnav.scrolled .bar .ttl{opacity:1;transform:none}
+.mnav .big{padding:2px 20px 10px;font-family:var(--fd);font-size:34px;font-weight:700;line-height:1.2;letter-spacing:-.01em;transition:opacity .2s,transform .25s var(--ease);transform-origin:right center}
+.mnav.scrolled .big{opacity:0;transform:scale(.9);height:0;padding:0;overflow:hidden}
+.mnav .sub{padding:0 20px 10px;color:var(--ios-label2);font-size:15px;margin-top:-6px}
+.mnav.scrolled .sub{display:none}
+.mback{display:inline-flex;align-items:center;gap:2px;border:0;background:transparent;color:var(--tint);font:inherit;font-size:17px;padding:8px 6px;min-height:44px;border-radius:12px}
+.mback svg{width:22px;height:22px;transform:scaleX(-1)}
+.mnav .nb{display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--tint);font:inherit;font-size:17px;min-width:44px;min-height:44px;border-radius:12px;padding:0 8px;text-decoration:none}
+.mnav .nb svg{width:24px;height:24px}
+.mnav .nb:active,.mback:active{opacity:.4}
+.mbody{padding:0 16px calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:18px;flex:1}
+/* ---------- شريط التبويب ---------- */
+.mtab{position:fixed;left:0;right:0;bottom:0;z-index:50;height:var(--tab-h);padding-bottom:env(safe-area-inset-bottom,0px);background:rgba(249,249,249,.86);backdrop-filter:saturate(1.8) blur(20px);-webkit-backdrop-filter:saturate(1.8) blur(20px);border-top:1px solid var(--ios-sep);display:grid;grid-template-columns:repeat(5,1fr);align-items:stretch;transition:transform .35s var(--spring)}
+body.in-editor .mtab,body[data-page=login] .mtab,body.sheet-up .mtab{transform:translateY(110%)}
+.mtab a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-decoration:none;color:var(--ios-label3);font-size:10px;font-weight:500;padding-top:6px;position:relative}
+.mtab a svg{width:26px;height:26px;transition:transform .3s var(--spring)}
+.mtab a.on{color:var(--tint)}
+.mtab a.on svg{transform:scale(1.08)}
+.mtab a:active svg{transform:scale(.88)}
+.mtab a.plus span.pl{width:44px;height:44px;border-radius:14px;background:var(--tint);color:#fff;display:grid;place-items:center;margin-top:-16px;box-shadow:0 8px 20px -8px rgba(0,0,0,.45);transition:transform .3s var(--spring)}
+.mtab a.plus:active span.pl{transform:scale(.9)}
+.mtab a.plus span.pl svg{width:24px;height:24px}
+.mtab .badge{position:absolute;top:4px;left:calc(50% - 20px);min-width:17px;height:17px;border-radius:9px;background:var(--ios-red);color:#fff;font-size:11px;display:grid;place-items:center;padding:0 4px;border:2px solid #fff}
+/* ---------- بطاقات وقوائم مجمّعة ---------- */
+.mcard{background:var(--ios-card);border-radius:var(--r2);padding:16px;box-shadow:0 1px 0 rgba(0,0,0,.02)}
+.mgroup{background:var(--ios-card);border-radius:var(--r);overflow:hidden}
+.mgroup .mrow{display:flex;align-items:center;gap:12px;min-height:50px;padding:10px 16px;border:0;background:transparent;width:100%;text-align:right;font:inherit;color:var(--ios-label);text-decoration:none;position:relative}
+.mgroup .mrow + .mrow::before{content:'';position:absolute;top:0;right:60px;left:0;border-top:1px solid var(--ios-sep)}
+.mgroup .mrow.noicon + .mrow::before{right:16px}
+.mgroup .mrow:active{background:var(--ios-fill)}
+.mrow .mi{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;color:#fff;flex:none}
+.mrow .mi svg{width:18px;height:18px}
+.mrow .mt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.mrow .mt b{font-weight:500;font-size:17px}
+.mrow .mt small{color:var(--ios-label2);font-size:14px}
+.mrow .mv{color:var(--ios-label2);font-size:16px;flex:none}
+.mrow .chev{width:14px;height:14px;color:var(--ios-label3);transform:scaleX(-1);flex:none}
+.mhead{padding:0 16px 6px;font-size:13px;color:var(--ios-label2);text-transform:none;margin-top:-6px}
+.mfoot{padding:6px 16px 0;font-size:13px;color:var(--ios-label2)}
+/* مفتاح iOS */
+.msw{appearance:none;width:51px;height:31px;border-radius:16px;background:var(--ios-fill2);position:relative;transition:background .25s;margin:0;flex:none}
+.msw::after{content:'';position:absolute;top:2px;right:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.15),0 1px 1px rgba(0,0,0,.16);transition:transform .25s var(--spring)}
+.msw:checked{background:var(--ios-green)}.msw:checked::after{transform:translateX(-20px)}
+/* قطعة متقطعة */
+body.mapp .seg{background:var(--ios-fill);border-radius:9px;padding:2px;gap:0}
+body.mapp .seg button{border-radius:7px;padding:6px 10px;font-size:13px;font-weight:500;color:var(--ios-label);flex:1 1 auto}
+body.mapp .seg button.on{background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.12),0 3px 1px rgba(0,0,0,.04)}
+/* أزرار */
+body.mapp .btn{border-radius:14px;min-height:50px;font-size:17px;font-weight:600;padding:0 18px}
+body.mapp .btn.sm{min-height:36px;font-size:15px;padding:0 14px;border-radius:10px}
+body.mapp .btn.dark{background:var(--tint)}
+body.mapp .btn.line{background:#fff;box-shadow:inset 0 0 0 1px var(--ios-sep)}
+body.mapp .btn.tint{background:var(--ios-fill);color:var(--tint)}
+body.mapp .btn:active{transform:scale(.97);opacity:.85}
+body.mapp .ib{min-width:44px;min-height:44px}
+/* حقول */
+body.mapp .inp,body.mapp .fld input,body.mapp .fld textarea,body.mapp .fld select{border-radius:12px;background:var(--ios-card);border-color:transparent;font-size:17px;padding:12px 14px}
+body.mapp .fld input:focus,body.mapp .fld textarea:focus,body.mapp .inp:focus{border-color:var(--tint);box-shadow:none}
+body.mapp .fld>label{font-size:13px;color:var(--ios-label2);padding:0 4px}
+/* ---------- الورقة السفلية (تحل محل كل النوافذ) ---------- */
+.msheet-wrap{position:fixed;inset:0;z-index:120;background:rgba(0,0,0,0);transition:background .3s;display:flex;align-items:flex-end;justify-content:center}
+.msheet-wrap.on{background:rgba(0,0,0,.32)}
+.msheet{width:100%;max-width:640px;background:var(--ios-card);border-radius:var(--r3) var(--r3) 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.2);transform:translateY(100%);transition:transform .45s var(--spring),height .3s var(--spring);display:flex;flex-direction:column;max-height:calc(100dvh - env(safe-area-inset-top,0px) - 10px);height:auto;will-change:transform;touch-action:none}
+.msheet-wrap.on .msheet{transform:none}
+.msheet.dragging{transition:none}
+.msheet .grab{width:36px;height:5px;border-radius:3px;background:var(--ios-label3);margin:8px auto 0;flex:none}
+.msheet .shd{display:flex;align-items:center;gap:8px;padding:6px 16px 8px;flex:none}
+.msheet .shd h3{flex:1;font-size:19px;font-weight:600;text-align:center;margin:0}
+.msheet .shd .sx{width:30px;height:30px;border-radius:50%;background:var(--ios-fill);border:0;display:grid;place-items:center;color:var(--ios-label2)}
+.msheet .shd .sx svg{width:14px;height:14px}
+.msheet .sbody{overflow:auto;overscroll-behavior:contain;padding:4px 16px 12px;display:flex;flex-direction:column;gap:14px;flex:1;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+.msheet .sacts{display:flex;flex-direction:column;gap:8px;padding:8px 16px calc(12px + env(safe-area-inset-bottom,0px));flex:none;border-top:1px solid var(--ios-sep)}
+.msheet .sacts .btn{width:100%}
+.msheet .sacts .btn:not(.dark):not(.danger){background:var(--ios-fill);color:var(--tint)}
+.msheet .sacts .btn.danger{background:rgba(255,59,48,.1);color:var(--ios-red)}
+/* ورقة الإجراءات */
+.mact{position:fixed;inset:0;z-index:130;display:flex;flex-direction:column;justify-content:flex-end;padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));background:rgba(0,0,0,0);transition:background .25s}
+.mact.on{background:rgba(0,0,0,.3)}
+.mact .grp{background:rgba(249,249,249,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:14px;overflow:hidden;transform:translateY(40px);opacity:0;transition:transform .35s var(--spring),opacity .25s}
+.mact.on .grp{transform:none;opacity:1}
+.mact .grp + .grp{margin-top:8px}
+.mact .grp .hd{padding:12px 16px 10px;text-align:center;font-size:13px;color:var(--ios-label2)}
+.mact .grp button,.mact .grp a{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:56px;border:0;background:transparent;font:inherit;font-size:19px;color:var(--ios-blue);text-decoration:none;border-top:1px solid var(--ios-sep)}
+.mact .grp .hd + button,.mact .grp > button:first-child,.mact .grp > a:first-child{border-top:0}
+.mact .grp button.danger{color:var(--ios-red)}
+.mact .grp button.cancel{font-weight:600}
+.mact .grp button:active{background:var(--ios-fill)}
+.mact .grp svg{width:22px;height:22px}
+/* إشعار علوي بأسلوب iOS */
+body.mapp .toast{top:calc(10px + env(safe-area-inset-top,0px));bottom:auto;left:50%;transform:translate(-50%,-20px);background:rgba(28,28,30,.92);backdrop-filter:blur(10px);border-radius:18px;padding:12px 18px;font-size:15px;z-index:300}
+body.mapp .toast.show{transform:translate(-50%,0)}
+/* ---------- الرئيسية ---------- */
+.mhero{display:flex;flex-direction:column;gap:4px}
+.mhero .greet{color:var(--ios-label2);font-size:15px}
+.mhero h2{font-family:var(--fd);font-size:26px;font-weight:600;line-height:1.3}
+.mquick{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.mq{display:flex;flex-direction:column;gap:10px;background:var(--ios-card);border-radius:var(--r2);padding:16px;text-decoration:none;color:var(--ios-label);min-height:118px;position:relative;overflow:hidden;transition:transform .25s var(--spring)}
+.mq:active{transform:scale(.96)}
+.mq .mi{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:#fff}
+.mq .mi svg{width:22px;height:22px}
+.mq b{font-size:17px;font-weight:600}
+.mq small{color:var(--ios-label2);font-size:13px;line-height:1.35}
+.mq.wide{grid-column:1/-1;flex-direction:row;align-items:center;min-height:0}
+.mq.wide .mt{flex:1}
+.mq.ai{background:linear-gradient(135deg,#1c1c1e,#3a3a3c);color:#fff}
+.mq.ai small{color:rgba(255,255,255,.7)}
+.mq.ai .mi{background:rgba(255,255,255,.15)}
+.mstrip{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 16px 8px;margin:0 -16px;scrollbar-width:none}
+.mstrip::-webkit-scrollbar{display:none}
+.mstrip > *{scroll-snap-align:start;flex:0 0 auto}
+.mcardsm{width:150px;background:var(--ios-card);border-radius:14px;overflow:hidden;text-decoration:none;color:var(--ios-label);display:flex;flex-direction:column;transition:transform .25s var(--spring)}
+.mcardsm:active{transform:scale(.96)}
+.mcardsm img,.mcardsm canvas{width:100%;aspect-ratio:4/5;object-fit:cover;background:var(--ios-fill);display:block}
+.mcardsm b{font-size:14px;font-weight:500;padding:8px 10px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mcardsm small{font-size:12px;color:var(--ios-label2);padding:0 10px 10px}
+.msec{display:flex;flex-direction:column;gap:10px}
+.msec .mh{display:flex;align-items:baseline;gap:8px;padding:0 2px}
+.msec .mh h3{font-family:var(--fd);font-size:20px;font-weight:600;flex:1}
+.msec .mh a{color:var(--ios-blue);text-decoration:none;font-size:15px}
+/* هويات */
+.mids{display:flex;gap:14px;overflow-x:auto;padding:4px 16px 6px;margin:0 -16px;scrollbar-width:none}
+.mids::-webkit-scrollbar{display:none}
+.mid{flex:0 0 auto;width:72px;display:flex;flex-direction:column;align-items:center;gap:6px;text-decoration:none;color:var(--ios-label)}
+.mid .av{width:64px;height:64px;border-radius:22px;background:#fff;display:grid;place-items:center;padding:10px;box-shadow:0 0 0 2px var(--tc,#ddd) inset;transition:transform .25s var(--spring)}
+.mid.on .av{box-shadow:0 0 0 3px var(--tc,#000)}
+.mid:active .av{transform:scale(.92)}
+.mid .av img{max-width:100%;max-height:100%}
+.mid .av span{font-size:12px;text-align:center;font-weight:600;color:var(--tc)}
+.mid small{font-size:12px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:72px}
+/* شبكة القوالب */
+.mtgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.mtc{background:var(--ios-card);border-radius:16px;overflow:hidden;text-decoration:none;color:var(--ios-label);display:flex;flex-direction:column;transition:transform .25s var(--spring);position:relative}
+.mtc:active{transform:scale(.96)}
+.mtc .th{background:var(--ios-fill);display:grid;place-items:center;aspect-ratio:4/5;overflow:hidden}
+.mtc .th canvas,.mtc .th img{width:100%!important;height:auto;display:block}
+.mtc b{font-size:14px;font-weight:500;padding:8px 10px 2px}
+.mtc small{font-size:12px;color:var(--ios-label2);padding:0 10px 10px}
+.mtc .new{position:absolute;top:8px;right:8px;background:var(--ios-orange);color:#fff;font-size:11px;border-radius:8px;padding:2px 7px}
+.mchips{display:flex;gap:8px;overflow-x:auto;padding:2px 16px 6px;margin:0 -16px;scrollbar-width:none}
+.mchips::-webkit-scrollbar{display:none}
+.mchip{flex:0 0 auto;border:0;background:var(--ios-card);border-radius:99px;padding:8px 14px;font:inherit;font-size:14px;color:var(--ios-label)}
+.mchip.on{background:var(--tint);color:#fff}
+.msearch{display:flex;align-items:center;gap:8px;background:var(--ios-fill);border-radius:12px;padding:0 10px;min-height:38px}
+.msearch svg{width:18px;height:18px;color:var(--ios-label2);flex:none}
+.msearch input{border:0;background:transparent;font:inherit;font-size:17px;flex:1;min-width:0;outline:none;padding:8px 0}
+/* ---------- التقويم في التطبيق ---------- */
+body.mapp .calpage .phead,body.mapp .callegend{display:none}
+body.mapp .calbar{margin-top:0;box-shadow:none;border-radius:14px;padding:8px 10px}
+body.mapp .calbar .caltitle{font-size:18px;min-width:0;flex:1}
+body.mapp .cgrid{gap:3px}
+body.mapp .cgd{min-height:58px;border-radius:10px;padding:6px 4px}
+body.mapp .clgroup{box-shadow:none;border-radius:16px}
+body.mapp .clitems{grid-template-columns:1fr}
+body.mapp .ccard.post{flex-direction:row;align-items:center}
+body.mapp .ccard.post .cthumb.big{width:64px;aspect-ratio:4/5;flex:none}
+/* ---------- حسابي / المزيد ---------- */
+.mprofile{display:flex;align-items:center;gap:14px;background:var(--ios-card);border-radius:var(--r2);padding:16px}
+.mprofile .pav{width:60px;height:60px;border-radius:50%;background:var(--tint);color:#fff;display:grid;place-items:center;font-family:var(--fd);font-size:24px;overflow:hidden;flex:none}
+.mprofile .pav img{width:100%;height:100%;object-fit:cover}
+.mprofile .mt b{font-size:19px;font-weight:600;display:block}
+.mprofile .mt small{color:var(--ios-label2)}
+/* ---------- تثبيت التطبيق ---------- */
+.minstall{display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center;padding:8px 0}
+.minstall .appicon{width:96px;height:96px;border-radius:22px;box-shadow:0 10px 30px -10px rgba(0,0,0,.4)}
+.minstall ol{text-align:right;margin:0;padding:0 18px 0 0;display:flex;flex-direction:column;gap:10px;font-size:16px}
+.minstall ol li b{font-weight:600}
+.minstall .shareic{display:inline-block;width:22px;height:22px;vertical-align:-5px;color:var(--ios-blue)}
+.mbanner{display:flex;align-items:center;gap:12px;background:var(--tint);color:#fff;border-radius:16px;padding:12px 14px}
+.mbanner img{width:44px;height:44px;border-radius:11px}
+.mbanner .mt{flex:1;min-width:0}.mbanner .mt b{display:block;font-size:15px}.mbanner .mt small{opacity:.75;font-size:13px}
+.mbanner .btn{min-height:36px;font-size:14px;background:#fff;color:#000;border-radius:10px;padding:0 14px}
+/* ---------- الدخول ---------- */
+body.mapp .login{min-height:100dvh;grid-template-columns:1fr;background:var(--ios-bg)}
+body.mapp .lgside{display:none}
+body.mapp .lgmain{padding:calc(40px + env(safe-area-inset-top,0px)) 20px 30px;max-width:460px;margin:0 auto}
+body.mapp .lgcard{border-radius:var(--r2);box-shadow:none}
+/* ---------- المحرر على الجوال: اللوحة دائماً ظاهرة، والأدوات ورقة لها مستويات ---------- */
+body.mapp .ed6{display:grid;grid-template-rows:auto 1fr;height:100dvh;background:#e9e9ee}
+body.mapp .e-top{height:auto;min-height:48px;padding:calc(4px + env(safe-area-inset-top,0px)) 8px 4px;gap:4px;flex-wrap:nowrap;background:rgba(249,249,249,.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--ios-sep)}
+body.mapp .e-top .e-tools,body.mapp .e-top .e-mode,body.mapp .e-top #e_reset,body.mapp .e-top .e-logo,body.mapp .e-top .e-rv,body.mapp .e-top .cmb,body.mapp .e-top .e-cap,body.mapp .e-top #e_share,body.mapp .e-top .e-back,body.mapp .e-top .ib[title="ملاحظة للفريق"]{display:none}
+body.mapp .e-top .e-name{flex:1;min-width:0;border:0;background:transparent;font-size:16px;font-weight:600;text-align:center}
+body.mapp .e-top #e_save,body.mapp .e-top #e_dl{min-height:36px;padding:0 12px;font-size:14px;border-radius:10px}
+body.mapp .e-top #e_dl{background:var(--tint)}
+body.mapp .e-main{display:block;position:relative;min-height:0;height:100%}
+body.mapp .e-rail,body.mapp .e-resize,body.mapp .e-mtabs{display:none}
+body.mapp .e-stage{position:absolute;inset:0;grid-template-rows:1fr auto}
+body.mapp .e-scroll{padding:14px 14px calc(var(--sheet-peek,112px) + 10px)}
+body.mapp .e-bottom{display:none}
+/* ورقة الأدوات */
+body.mapp .e-panel{position:fixed;left:0;right:0;bottom:0;z-index:60;height:var(--sheet-h,112px);border-radius:var(--r3) var(--r3) 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.18);transform:none!important;transition:height .4s var(--spring);display:flex;flex-direction:column;overflow:hidden;background:var(--ios-card);border:0;touch-action:none}
+body.mapp .e-panel.dragging{transition:none}
+body.mapp .e-panel .grab{display:block;width:36px;height:5px;border-radius:3px;background:var(--ios-label3);margin:8px auto 0;flex:none}
+body.mapp .e-panel .mrail{display:flex;gap:4px;overflow-x:auto;padding:8px 10px 6px;scrollbar-width:none;flex:none;touch-action:pan-x}
+body.mapp .e-panel .mrail::-webkit-scrollbar{display:none}
+body.mapp .e-panel .mrail button{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:60px;border:0;background:transparent;border-radius:12px;padding:6px 6px;font:inherit;font-size:11px;color:var(--ios-label2)}
+body.mapp .e-panel .mrail button svg{width:22px;height:22px}
+body.mapp .e-panel .mrail button.on{color:var(--tint);background:var(--ios-fill)}
+body.mapp .e-panel .pbody{overflow:auto;overscroll-behavior:contain;padding:4px 16px calc(16px + env(safe-area-inset-bottom,0px));flex:1;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+body.mapp .e-panel.peek .pbody{opacity:0;pointer-events:none}
+body.mapp .phd .sheet-x{display:none}
+body.mapp .phd h3{font-size:18px}
+/* الشريط السياقي فوق الورقة */
+body.mapp .e-tb{position:fixed!important;left:8px!important;right:8px!important;top:auto!important;bottom:calc(var(--sheet-h,112px) + 8px)!important;transform:none;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;border-radius:16px;z-index:61}
+body.mapp .e-tb::-webkit-scrollbar{display:none}
+body.mapp .ied6.mob{bottom:calc(var(--sheet-h,112px) + 8px)}
+body.mapp .e-panel .imgrid,body.mapp .e-panel .libg{grid-template-columns:repeat(4,1fr)}
+/* تحميل */
+.mskel{background:linear-gradient(90deg,var(--ios-fill) 0%,#fafafa 50%,var(--ios-fill) 100%);background-size:200% 100%;animation:shimmer 1.4s linear infinite;border-radius:14px}
+/* صفحة فارغة */
+.mempty{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:40px 20px;color:var(--ios-label2)}
+.mempty svg{width:44px;height:44px;color:var(--ios-label3)}
+/* سحب للتحديث */
+.mptr{height:0;display:grid;place-items:center;overflow:hidden;transition:height .3s var(--spring);color:var(--ios-label2)}
+.mptr .spin{border-top-color:var(--tint)}
+/* إخفاء عناصر سطح المكتب داخل شاشات معاد استعمالها */
+body.mapp .wrap.page .phead h1{font-size:28px}
+body.mapp .hsec .shead h2{font-size:20px}
+body.mapp .calbar .caltitle{width:100%;order:-1;text-align:center;flex:none;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0}
+body.mapp .calbar .calnav{margin-inline-end:auto}
+a.mprofile{text-decoration:none;color:inherit}
+body.mapp .capfgrid{grid-template-columns:1fr}.emowrap{width:100%;min-width:0}

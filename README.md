@@ -27,4 +27,5 @@ python3 v6/build_gs.py
 python3 v6/build6.py
 ```
 
+- `v6/app/` تطبيق الجوال (PWA) → يُبنى في `docs/app/` مع الواجهة. الرابط: https://ghamine23.github.io/media-portal/app/
 - خط «ثمانية» لا يُرفع إلى المستودع: يُرفع من لوحة الإدارة فيُحفظ في درايف.

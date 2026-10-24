@@ -1,0 +1,52 @@
+{
+ "name": "أثر — منصة الأثر الإعلامي",
+ "short_name": "أثر",
+ "description": "صمّم إعلانات برنامجك بهويته من هاتفك، وانشرها إلى القناة، وتابع تقويمك ومهامك.",
+ "lang": "ar",
+ "dir": "rtl",
+ "id": "./",
+ "start_url": "./?src=pwa",
+ "scope": "./",
+ "display": "standalone",
+ "orientation": "portrait",
+ "background_color": "#f2f2f7",
+ "theme_color": "#f2f2f7",
+ "categories": [
+  "productivity",
+  "education"
+ ],
+ "icons": [
+  {
+   "src": "icons/icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icons/icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icons/icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ],
+ "shortcuts": [
+  {
+   "name": "اصنع إعلانك",
+   "url": "./#/make"
+  },
+  {
+   "name": "التقويم والمهام",
+   "url": "./#/cal"
+  },
+  {
+   "name": "تصاميمي",
+   "url": "./#/mine"
+  }
+ ]
+}

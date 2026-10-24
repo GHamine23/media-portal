@@ -161,7 +161,7 @@ function moveDialog(x, day) {
   const target = new Date(day); target.setHours(old.getHours(), old.getMinutes(), 0, 0);
   const note = el('p', { class: 'muted small', text: 'ينتقل «' + (x.title || 'المنشور') + '» من ' + fmtTime(x.when) + ' إلى ' + dayTitle6(target) + '.' });
   modal({ title: 'نقل المنشور', body: [note, el('div', { class: 'row' }, [el('span', { class: 'tiny', text: 'الساعة' }), tI])], acts: [{ t: 'انقله', cls: 'dark', keep: true, fn: function (close) {
-    const b = $$('.modal .acts .btn.dark').pop(); const when = fromISO(dayKey6(day), tI.value || localHM(old)).getTime();
+    const b = $$('.modal .acts .btn.dark, .msheet .sacts .btn.dark').pop(); const when = fromISO(dayKey6(day), tI.value || localHM(old)).getTime();
     if (when < Date.now() + 60000) { toast('اختر موعداً في المستقبل'); return false; }
     withBusy(b, async function () { const r = await API6.me('tg_update', JSON.stringify({ id: x.id, when: when })); Object.assign(x, r); POSTS = null; }, { busy: 'ننقل…', done: 'نُقل' }).then(function () { setTimeout(function () { close(); CAL.redraw(); }, 500); }).catch(function () {});
     return false;
@@ -270,7 +270,7 @@ function postDialog(x) {
 function requeueDialog(x, closeParent) {
   const d = new Date(Date.now() + 3600000), dI = el('input', { type: 'date', class: 'inp sm', value: localISO(d), min: localISO() }), tI = el('input', { type: 'time', class: 'inp sm', value: localHM(d) });
   modal({ title: 'إعادة جدولة «' + (x.title || 'المنشور') + '»', body: [el('p', { class: 'muted small', text: 'يُنشر مرة أخرى بالصورة والنص نفسيهما في الموعد الذي تختاره.' }), el('div', { class: 'row wrapr' }, [dI, tI])], acts: [{ t: 'جدوله', cls: 'dark', keep: true, fn: function (close) {
-    const b = $$('.modal .acts .btn.dark').pop(), when = fromISO(dI.value, tI.value); if (!when || when.getTime() < Date.now() + 60000) { toast('اختر موعداً في المستقبل'); return false; }
+    const b = $$('.modal .acts .btn.dark, .msheet .sacts .btn.dark').pop(), when = fromISO(dI.value, tI.value); if (!when || when.getTime() < Date.now() + 60000) { toast('اختر موعداً في المستقبل'); return false; }
     withBusy(b, async function () { await API6.me('tg_requeue', x.id, when.getTime()); POSTS = null; }, { busy: 'نجدول…', done: 'جُدول' }).then(function () { setTimeout(function () { close(); if (closeParent) closeParent(); CAL.loaded = false; CAL.redraw && CAL.redraw(); }, 500); }).catch(function () {});
     return false;
   } }, { t: 'إلغاء' }] });
