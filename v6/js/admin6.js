@@ -467,7 +467,7 @@ async function aSettings(body) {
   const groqTok = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.groqOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'gsk_…', 'aria-label': 'مفتاح Groq' });
   const groqM = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.groqModel || 'openai/gpt-oss-120b', 'aria-label': 'نموذج Groq' });
   const route = Object.assign({}, s.routeDefault || {}, s.ai.route || {});
-  const ROUTE_N = [['intake', 'فهم الفكرة'], ['design', 'اقتراح التصاميم'], ['creative', 'دعه يبدع'], ['refine', 'تعديل اقتراح'], ['brief', 'تحسين الوصف'], ['caption', 'النص المصاحب'], ['outline', 'مخطط العرض'], ['imgq', 'كلمات الصور'], ['week', 'تقرير الأسبوع'], ['spell', 'التصحيح والتشكيل'], ['review', 'مراجعة التصميم']];
+  const ROUTE_N = [['intake', 'فهم الفكرة'], ['design', 'اقتراح التصاميم'], ['creative', 'دعه يبدع'], ['refine', 'تعديل اقتراح'], ['brief', 'تحسين الوصف'], ['caption', 'النص المصاحب'], ['outline', 'مخطط العرض'], ['imgq', 'كلمات الصور'], ['week', 'تقرير الأسبوع'], ['spell', 'التصحيح والتشكيل'], ['review', 'مراجعة التصميم'], ['help', 'مساعد المنصة «اسأل أثر»']];
   const cfAcc = el('input', { type: 'text', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.cfOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'Account ID (٣٢ حرفاً)', 'aria-label': 'رقم حساب Cloudflare' });
   const cfTok = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.cfOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'API Token', 'aria-label': 'رمز Cloudflare' });
   const cfM = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.cfModel || '@cf/openai/gpt-oss-120b', 'aria-label': 'نموذج Cloudflare' });
@@ -666,7 +666,7 @@ async function aModels(body) {
 }
 
 /* ---------- الذكاء الاصطناعي: ماذا يفعل، وكم استُعمل، ومن، وهل نجح ---------- */
-const AI_KIND_N = { intake: 'فهم الفكرة', design: 'اقتراح تصاميم', creative: 'دعه يبدع', caption: 'نص مصاحب', outline: 'مخطط عرض', slides: 'بناء شرائح', spell: 'تصحيح وتشكيل', imgq: 'كلمات بحث صور', review: 'مراجعة تصميم', week: 'تقرير الأسبوع', weekly: 'المهمة الأسبوعية', test: 'تجربة' };
+const AI_KIND_N = { intake: 'فهم الفكرة', design: 'اقتراح تصاميم', creative: 'دعه يبدع', caption: 'نص مصاحب', outline: 'مخطط عرض', slides: 'بناء شرائح', spell: 'تصحيح وتشكيل', imgq: 'كلمات بحث صور', review: 'مراجعة تصميم', week: 'تقرير الأسبوع', weekly: 'المهمة الأسبوعية', help: 'اسأل أثر', test: 'تجربة' };
 async function aAI(body) {
   let m = '', prog = '', data = null;
   const monthSel = el('select', { class: 'inp sm', 'aria-label': 'الشهر', onchange: function (e) { m = e.target.value; load(); } });
