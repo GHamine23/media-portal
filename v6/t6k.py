@@ -73,7 +73,7 @@ async def main():
         await pg.evaluate("Array.from(document.querySelectorAll('.seg button')).find(b=>b.textContent==='أسبوع').click()"); await pg.wait_for_timeout(700)
         ok(await pg.evaluate("document.querySelectorAll('.cweek .cwcol').length") == 7, 'week view has 7 columns')
         await pg.screenshot(path=OUT + 'k5_week.png')
-        await pg.evaluate("Array.from(document.querySelectorAll('.seg button')).find(b=>b.textContent==='القادم').click()"); await pg.wait_for_timeout(700)
+        await pg.evaluate("Array.from(document.querySelectorAll('.seg button')).find(b=>b.textContent==='قائمة').click()"); await pg.wait_for_timeout(700)
         ok(await pg.evaluate("document.querySelectorAll('.clgroup').length") >= 1 and await pg.evaluate("document.querySelectorAll('.ccard.post').length") >= 1, 'list view groups upcoming posts')
         await pg.screenshot(path=OUT + 'k6_list.png', full_page=True)
         # مهمة جديدة من المدير إلى أحمد
@@ -101,7 +101,7 @@ async def main():
         nts = await pg.evaluate("API6.me('nt_list')")
         ok(any(n['kind'] == 'task' and 'جهّز إعلان' in n['text'] for n in nts), 'ahmad notified about the task')
         await pg.evaluate("typeof ED!=='undefined' && ED.open && (ED.leaveOK=true)"); await pg.goto(URL + '#/cal'); await pg.wait_for_timeout(2500)
-        await pg.evaluate("Array.from(document.querySelectorAll('.seg button')).find(b=>b.textContent==='القادم').click()"); await pg.wait_for_timeout(700)
+        await pg.evaluate("Array.from(document.querySelectorAll('.seg button')).find(b=>b.textContent==='قائمة').click()"); await pg.wait_for_timeout(700)
         ok(await pg.evaluate("document.querySelectorAll('.ccard.task').length") == 1, 'ahmad sees the assigned task')
         await pg.click('.ccard.task .tchk'); await pg.wait_for_timeout(1200)
         ok(await pg.evaluate("document.querySelector('.ccard.task').classList.contains('done')"), 'ahmad completes the task from the card')

@@ -189,8 +189,6 @@ body.mapp .cgrid{gap:3px}
 body.mapp .cgd{min-height:58px;border-radius:10px;padding:6px 4px}
 body.mapp .clgroup{box-shadow:none;border-radius:16px}
 body.mapp .clitems{grid-template-columns:1fr}
-body.mapp .ccard.post{flex-direction:row;align-items:center}
-body.mapp .ccard.post .cthumb.big{width:64px;aspect-ratio:4/5;flex:none}
 /* ---------- حسابي / المزيد ---------- */
 .mprofile{display:flex;align-items:center;gap:14px;background:var(--ios-card);border-radius:var(--r2);padding:16px}
 .mprofile .pav{width:60px;height:60px;border-radius:50%;background:var(--ac);color:#fff;display:grid;place-items:center;font-family:var(--fd);font-size:24px;overflow:hidden;flex:none}
