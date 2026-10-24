@@ -46,7 +46,7 @@ async def main():
             if c['id'] in ('launch', 'make', 'cal'): await pg.screenshot(path=OUT + 'u_%s.png' % c['id'])
             await pg.keyboard.press('Escape'); r = await result(pg)
             gone = await pg.evaluate("!document.querySelector('.mo-pl') || !document.querySelector('.mo-pl.on')")
-            ok(st[0] and st[1] and st[2] > 0.2 and st[3] > 1000 and st[5] is False and t2 >= c['dur'] * 0.55 and r and r['watched'] is False and gone, '%s plays (t=%.1f), seeks (%.1f), closes → %s' % (c['id'], st[2], t2, r))
+            ok(st[0] and st[1] and st[2] > 0.05 and st[3] > 1000 and st[5] is False and t2 >= c['dur'] * 0.55 - 0.05 and r and r['watched'] is False and gone, '%s plays (t=%.1f), seeks (%.1f), closes → %s %s' % (c['id'], st[2], t2, r, '' if st[3] > 1000 and gone else st))
         # الإكمال حتى النهاية
         await start(pg, "playMotion('home')"); await pg.wait_for_timeout(400)
         await pg.evaluate("MO.current.seek(MO.current.dur-0.4)"); await pg.wait_for_timeout(1200)

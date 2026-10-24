@@ -1394,7 +1394,7 @@ const MO = (function () {
         const lb = A(t, 20, vh + 20, tw - 40, 50); css(lb, { fontFamily: 'var(--mo-fd)', fontSize: '31px', fontWeight: '700', textAlign: 'center', whiteSpace: 'nowrap' }); lb.textContent = q[0];
         if (i === 0) { vis.innerHTML = '<div style="text-align:center;padding:0 20px"><div style="font-family:var(--mo-fd);font-size:' + (S.v ? 36 : 32) + 'px;color:' + q[1] + ';line-height:1.6">﴿وَقُل رَّبِّ زِدْنِي عِلْمًا﴾</div><div style="font-size:20px;color:#777">طه: ١١٤</div></div>'; }
         else if (i === 1) { vis.innerHTML = '<div style="width:' + (vh * 0.62) + 'px;height:' + (vh * 0.62) + 'px;border-radius:14px;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.12)">' + qrSVG(21, '#111') + '</div>'; }
-        else if (i === 2) { vis.innerHTML = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px">' + ['star', 'book', 'mic', 'cal', 'leaf', 'moon'].map(function (n) { return ico(n, vh * 0.2, q[1], 2); }).join('') + '</div>'; }
+        else if (i === 2) { const isz = Math.round(Math.min(tw, vh) * 0.2); vis.innerHTML = '<div style="display:grid;grid-template-columns:repeat(3,' + isz + 'px);gap:' + Math.round(isz * 0.45) + 'px">' + ['star', 'book', 'mic', 'cal', 'leaf', 'moon'].map(function (n) { return ico(n, isz, q[1], 1.8); }).join('') + '</div>'; }
         else if (i === 3) { vis.innerHTML = '<div style="width:100%;height:100%">' + starPattern(q[1]) + '</div>'; }
         else if (i === 4) { vis.innerHTML = '<svg viewBox="0 0 300 200" width="100%" height="100%" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="mosky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd9a8"/><stop offset="1" stop-color="#ffefe0"/></linearGradient></defs><rect width="300" height="200" fill="url(#mosky)"/><circle cx="200" cy="90" r="34" fill="#ffb25b"/><path d="M0 150 70 95l60 45 50-35 120 70v25H0z" fill="#5a8f6a"/><path d="M0 170 90 125l70 40 60-25 80 40v20H0z" fill="#3c6e50"/></svg>'; }
         else { vis.innerHTML = '<div style="text-align:center;font-size:' + (S.v ? 34 : 30) + 'px;line-height:1.7"><div style="color:#b0b0ba;text-decoration:line-through">الاسبوع القادم</div><div style="color:' + q[1] + ';font-family:var(--mo-fd);font-weight:700">الأسبوعَ القادمَ</div></div>'; }
@@ -1593,7 +1593,7 @@ const MO = (function () {
     this.g2 = A(bg, this.W * 0.45, this.H * 0.55, this.W * 0.8, this.W * 0.8); css(this.g2, { borderRadius: '50%', background: 'radial-gradient(circle,' + rgba(PAL.or, 0.08) + ',transparent 62%)' });
     this.layer = A(st, 0, 0, this.W, this.H);
     this.over = A(st, 0, 0, this.W, this.H); this.over.style.pointerEvents = 'none';
-    this.bars = [C.ac3, C.ac, C.ac2].map(function (c) { const b = A(self.over, 0, 0, self.W * 1.15, self.H); css(b, { background: c }); T(b, { o: 0 }); return b; });
+    this.bars = [C.ac3, C.ac, C.ink].map(function (c) { const b = A(self.over, 0, 0, self.W * 1.15, self.H); css(b, { background: c }); T(b, { o: 0 }); return b; });
     this.flash = A(this.over, 0, 0, this.W, this.H); css(this.flash, { background: '#fff' }); T(this.flash, { o: 0 });
     this.sc = this.list.map(function () { return null; });
     this.sfx = [];
@@ -1768,7 +1768,7 @@ const MO = (function () {
         cancelAnimationFrame(raf);
         raf = requestAnimationFrame(function step(now) {
           if (closed || !playing) return;
-          t = t0 + (now - p0) / 1000;
+          t = t0 + Math.max(0, now - p0) / 1000;
           if (t >= pl.dur) { t = pl.dur; render(); playing = false; ended = true; stopAudio(); setPlayIcon(); showEnd(true); wake(true); return; }
           render(); pumpAudio();
           raf = requestAnimationFrame(step);
