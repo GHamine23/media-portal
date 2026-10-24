@@ -99,16 +99,17 @@ function scrollCue() {
 /* ---------- طرق البدء داخل كل هوية (تصاميمي في شريط التنقل، فلا تتكرر هنا) ---------- */
 function quickCards(tid) {
   return el('div', { class: 'quick' }, [
-    ['#/make?tid=' + tid, 'اصنع إعلانك', 'اكتب فكرتك، ونقترح التصاميم', 'ai', 't-pu'],
+    progFeat('ai') ? ['#/make?tid=' + tid, 'اصنع إعلانك', 'اكتب فكرتك، ونقترح التصاميم', 'ai', 't-pu'] : null,
     ['#/e/' + tid + '/blank', 'صفحة بيضاء', 'صمّم من الصفر بحرية كاملة', 'wand', 't-ink'],
-    ['#/s/' + tid, 'الشرائح', 'عروض للقاءات والمحاضرات', 'slides', 't-bl']
-  ].map(function (q, i) {
+    progFeat('slides') ? ['#/s/' + tid, 'الشرائح', 'عروض للقاءات والمحاضرات', 'slides', 't-bl'] : null
+  ].filter(Boolean).map(function (q, i) {
     return el('a', { href: q[0], class: 'qcard hover-lift rv', style: '--d:' + i, 'data-tour': 'q' + i }, [el('span', { class: 'icon-tile ' + q[4] }, [ico(q[3])]), el('div', {}, [el('b', { text: q[1] }), el('span', { text: q[2] })])]);
   }));
 }
 
 /* ---------- المصمّم الذكي في الرئيسية: فكرة بكلماتك، وحركة مستمرة لبطاقات تتشكّل ---------- */
 function aiDesignerBox() {
+  if (!progFeat('ai')) return null;
   const ta = el('textarea', { class: 'aita', rows: '2', dir: 'auto', 'aria-label': 'فكرة الإعلان', placeholder: 'اكتب فكرة إعلانك بكلماتك: لقاء، مسابقة، تهنئة، ورشة… أو اتركه يبدع' });
   const start = function (creative) { const t = ta.value.trim(); ls('make', Object.assign(ls('make') || {}, { text: t, creative: !!creative })); go('#/make' + (creative ? '?creative=1' : '')); };
   ta.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); start(false); } });

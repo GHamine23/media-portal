@@ -42,6 +42,7 @@ async function showMine6() {
 
 /* ---------- الشرائح: عينات جاهزة، أو من نقاطك، أو فارغ ---------- */
 function showSlides6(tid) {
+  if (!progFeat('slides')) return featOff('الشرائح');
   const T = trackOf(tid) || tracksOf()[0]; if (!T) return go('#/');
   S.track = T;
   document.title = 'الشرائح — ' + T.name;

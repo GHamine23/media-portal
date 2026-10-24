@@ -309,8 +309,8 @@ function fontChoices() {
 // أهداف الخط في التصميم الحالي: العناوين كلها، والنصوص كلها، ثم كل عنصر نصي
 function fontTargets() {
   const t = [
-    { id: 'all_title', label: 'كل العناوين', sample: 'لقاء مفتوح', get: function () { return FS.title; }, set: function (v) { FS.title = v; FS.tw = ''; }, base: true },
-    { id: 'all_body', label: 'كل النصوص', sample: 'الخميس ٨ مساءً', get: function () { return FS.body; }, set: function (v) { FS.body = v; }, base: true }
+    { id: 'all_title', label: 'كل العناوين', sample: 'لقاء مفتوح', get: function () { return FS.title; }, set: function (v) { FS.title = v; FS.tw = ''; S.fs = { title: FS.title, body: FS.body, tw: '' }; }, base: true },
+    { id: 'all_body', label: 'كل النصوص', sample: 'الخميس ٨ مساءً', get: function () { return FS.body; }, set: function (v) { FS.body = v; S.fs = { title: FS.title, body: FS.body, tw: FS.tw || '' }; }, base: true }
   ];
   Object.keys(LASTG).filter(function (g) { return !isLayer(g) && LASTT[g] && LASTT[g].length; }).forEach(function (g) {
     const smp = String(LASTT[g][0] || '').replace(/\*/g, '').split('\n')[0].trim() || gName(g);

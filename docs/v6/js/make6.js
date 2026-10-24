@@ -10,9 +10,12 @@ try { MK_LAST = JSON.parse(sessionStorage.getItem('mk_last') || 'null'); } catch
 function mkKeep() { MK_LAST = JSON.parse(JSON.stringify(MK)); MK_LAST.keptAt = Date.now(); try { sessionStorage.setItem('mk_last', JSON.stringify(MK_LAST)); } catch (e) {} }
 let MK = { text: '', tid: '', type: '', aud: '', tone: '', size: '', who: '', time: '', place: '', date: '', title: '', creative: false, results: null, dir: 0 };
 function aiReady() { const a = V6.settings && V6.settings.ai; return !!(a && a.enabled && a.ready && can('ai')); }
+// مهام ترى الصور (مراجعة التصميم) تحتاج Gemini
+function aiVision() { const a = V6.settings && V6.settings.ai; return aiReady() && !!(a && a.vision); }
 function mkSave() { ls('make', { text: MK.text, tid: MK.tid, type: MK.type, aud: MK.aud, tone: MK.tone, size: MK.size, who: MK.who, time: MK.time, place: MK.place, date: MK.date, title: MK.title, creative: MK.creative }); }
 
 function showMake6() {
+  if (!progFeat('ai')) return featOff('اصنع إعلانك');
   document.title = 'المصمّم الذكي';
   const saved = ls('make'); if (saved) MK = Object.assign(MK, saved, { results: null });
   const qs0 = location.hash.split('?')[1] || '';

@@ -33,22 +33,23 @@ function showNews(auto) {
   const nb = typeof notifsBlock === 'function' ? notifsBlock() : null;
   modal({ title: nb ? 'الإشعارات وما الجديد' : 'ما الجديد', wide: true, body: [
     nb,
+    typeof guideNewsCard === 'function' ? guideNewsCard() : null,
     el('div', { class: 'news' }, NEWS.log.slice(0, 6).map(function (v, i) {
       return el('article', { class: 'nitem' + (i === 0 ? ' first' : '') }, [
         el('div', { class: 'row' }, [el('span', { class: 'pill ' + (v.major ? 'pu' : ''), text: 'الإصدار ' + v.v }), el('span', { class: 'tiny', text: v.date || '' })]),
         el('h4', { text: v.title || '' }),
-        el('ul', { class: 'nlist' }, (v.items || []).map(function (it) { return el('li', {}, [el('b', { text: it.t }), it.d ? el('span', { text: ' — ' + it.d }) : null]); }))
+        el('ul', { class: 'nlist' }, (v.items || []).map(function (it) { return el('li', {}, [el('b', { text: it.t }), it.d ? el('span', { text: ' — ' + it.d }) : null, it.clip && typeof gClip === 'function' && gClip(it.clip) ? el('a', { class: 'nclip', href: '#/guide/' + it.clip, onclick: function () { closeModals(); } }, [ico('play'), 'شاهد']) : null]); }))
       ]);
     }).concat(tips.length ? [el('article', { class: 'nitem' }, [el('h4', { text: 'نصائح من الفريق' }), el('ul', { class: 'nlist' }, tips.map(function (b) { return el('li', {}, [el('b', { text: b.title }), el('span', { text: ' — ' + b.body })]); }))])] : [])
       .concat(NEWS.log.length ? [] : [el('p', { class: 'empty', text: 'لا جديد الآن.' })]))
-  ], acts: [{ t: auto ? 'ابدأ' : 'إغلاق', cls: 'dark' }, auto ? { t: 'خذني في جولة', fn: function () { setTimeout(function () { maybeTour('home', true); }, 300); } } : null] });
+  ], acts: [{ t: auto ? 'ابدأ' : 'إغلاق', cls: 'dark' }, auto ? (typeof gIntrosActive === 'function' && gIntrosActive() ? { t: 'دليل أثر', fn: function () { go('#/guide'); } } : { t: 'خذني في جولة', fn: function () { setTimeout(function () { maybeTour('home', true); }, 300); } }) : null] });
 }
 
 /* ---------- البلاغات والاقتراحات ---------- */
 function showFeedback6(preset) {
   let kind = (preset && preset.kind) || 'bug';
   const ta = el('textarea', { rows: '5', id: 'fb_text', placeholder: 'اكتب ما حدث أو فكرتك باختصار…' });
-  const hasDesign = !!(window.ED && ED.open);
+  const hasDesign = typeof ED !== 'undefined' && !!ED.open;   // ED ثابت (const) فلا يظهر على window
   const shotI = el('input', { type: 'checkbox', checked: hasDesign });
   const msg = el('p', { class: 'muted small', role: 'status' });
   const imgs = [], thumbs = el('div', { class: 'fbthumbs' });

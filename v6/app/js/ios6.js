@@ -103,10 +103,10 @@ closeModals = function () { $$('.msheet-wrap,.mact,.modal,.menu').forEach(functi
 function createSheet() {
   const tid = ls('lastTrack') && TRACKS[ls('lastTrack')] ? ls('lastTrack') : (tracksOf()[0] || {}).id;
   mactions(null, [
-    { t: 'اصنع إعلانك بالمساعد الذكي', ic: 'ai', fn: function () { go('#/make' + (tid ? '?tid=' + tid : '')); } },
+    !progFeat('ai') ? null : { t: 'اصنع إعلانك بالمساعد الذكي', ic: 'ai', fn: function () { go('#/make' + (tid ? '?tid=' + tid : '')); } },
     { t: 'من قالب جاهز', ic: 'grid', fn: function () { go('#/tpl'); } },
     tid ? { t: 'صفحة بيضاء', ic: 'wand', fn: function () { go('#/e/' + tid + '/blank'); } } : null,
-    tid && can('slides') ? { t: 'عرض شرائح', ic: 'slides', fn: function () { go('#/s/' + tid); } } : null,
+    tid && progFeat('slides') ? { t: 'عرض شرائح', ic: 'slides', fn: function () { go('#/s/' + tid); } } : null,
     { t: 'مهمة جديدة في التقويم', ic: 'check', fn: function () { go('#/cal'); setTimeout(function () { if (typeof taskDialog === 'function') taskDialog(null, new Date()); }, 700); } }
   ], 'ماذا تريد أن تصنع؟');
 }

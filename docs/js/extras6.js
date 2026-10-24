@@ -131,7 +131,7 @@ function qrSection(b) {
   const add = function () { const v = u.value.trim(); if (!/^https?:\/\/\S+$/.test(v)) { toast('اكتب رابطاً يبدأ بـ https://'); u.focus(); return; } addLayer6({ t: 'qr', url: v, w: 0.22, c: '', bg: '#ffffff' }); u.value = ''; };
   u.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); add(); } });
   b.appendChild(el('div', { class: 'row' }, [u, el('button', { type: 'button', class: 'btn sm dark', onclick: add }, [ico('plus'), 'أضف'])]));
-  const P = V6.prog && V6.prog.tg; if (P && P.link) b.appendChild(el('button', { type: 'button', class: 'chip', onclick: function () { u.value = P.link; add(); } }, ['رابط قناة البرنامج']));
+  const P = V6.prog && V6.prog.tg; if (P && P.link) b.appendChild(el('button', { type: 'button', class: 'chip', onclick: function () { u.value = P.link; add(); } }, ['رابط التسجيل المعتاد']));
 }
 // الأيقونات في قسم واحد: أيقونات الهوية أولاً ثم المجموعة الكاملة. البحث فوقها، وثلاثة صفوف تُمرَّر أفقياً بين صفحاتها
 const ICON_AR = { moon: 'هلال', layers: 'طبقات', mic: 'ميكروفون', clock: 'ساعة', cal: 'تقويم', pin: 'موقع', link: 'رابط', star: 'نجمة', book: 'كتاب', ring: 'حلقة', down: 'أسفل', up: 'أعلى' };
@@ -250,7 +250,7 @@ async function imgRequestsCard(body, prog) {
   let list; try { list = await API6.me('img_requests', prog); } catch (e) { return; }
   const open = list.filter(function (r) { return r.status === 'new'; });
   if (!open.length) return;
-  const card = el('div', { class: 'card hl' }, [el('h3', { text: 'صور اقترحها الفريق للمكتبة' }), el('p', { class: 'tiny', text: 'من الصور المجانية (Pexels). بالموافقة تُنسخ الصورة بأصلها إلى مكتبة البرنامج فيراها الجميع.' })]); body.appendChild(card);
+  const card = el('div', { class: 'card hl' }, [el('h3', { text: 'صور اقترحها الفريق للمكتبة' }), el('p', { class: 'tiny', text: 'من الصور المجانية (Openverse وويكيميديا وغيرها). بالموافقة تُنسخ الصورة بأصلها إلى مكتبة البرنامج فيراها الجميع.' })]); body.appendChild(card);
   open.forEach(function (r) {
     const row = el('div', { class: 'imgreq' }, [el('div', { class: 'imgreq-th', style: r.thumb ? 'background-image:url(' + r.thumb + ')' : '' }), el('div', { class: 'grow' }, [el('b', { text: r.title }), el('small', { class: 'tiny', text: 'اقترحها ' + r.name + ' · ' + fmtTime(r.at) + (r.by ? ' · تصوير ' + r.by : '') })]),
       el('button', { type: 'button', class: 'btn sm dark', text: 'أضفها للمكتبة', onclick: async function () { try { await API6.me('img_decide', r.id, true); row.remove(); toast('أُضيفت'); await refreshBundle(); } catch (e) { toast(e.message); } } }),

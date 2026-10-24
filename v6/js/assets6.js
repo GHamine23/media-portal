@@ -1,3 +1,6 @@
+let FS_PROG = null;
+// يطبّق خطوط التصميم العامة (fs) إن وُجدت، وإلا خط البرنامج
+function applyDocFonts(fs) { if (!FS_PROG) FS_PROG = { title: FS.title, body: FS.body, tw: FS.tw || '' }; const b = fs || FS_PROG; FS.title = b.title || FS_PROG.title; FS.body = b.body || FS_PROG.body; FS.tw = b.tw || ''; }
 /* ================= أصول البرامج: الهويات والشعارات والصور والخطوط =================
    كل ملف يُطلب من الخادم مرة، ثم يُحفظ في المتصفح (IndexedDB) فلا يُنزَّل ثانية إلا إذا تغيّر */
 const ASSET_URL = {};     // معرّف الأصل ← رابط محلي
@@ -102,6 +105,7 @@ async function useProgram(id, silent) {
   // خط القوالب الافتراضي لهذا البرنامج
   const pref = (p.fonts && p.fonts.title) || (FONT_REG.tajarib ? 'tajarib' : (FONT_REG.tajawal ? 'tajawal' : Object.keys(FONT_REG)[0]));
   FS.title = pref; FS.body = (p.fonts && p.fonts.body) || pref; FS.tw = '';
+  FS_PROG = { title: FS.title, body: FS.body, tw: '' };   // خط البرنامج؛ والتصميم الذي اختار خطاً لكل عناوينه يحمله في صفحته (fs)
   await ensureFonts([FS.title, FS.body]);
   document.body.classList.remove('loading-prog'); const pl = $('#progld'); if (pl) pl.remove();
   applyProgramColor(p);

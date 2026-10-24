@@ -37,6 +37,7 @@ route6(/^\/tips(?:\/([a-z]+))?$/, showTips6, { page: 'tips' });
 route6(/^\/week$/, showWeek6, { page: 'account' });
 route6(/^\/reviews$/, showReviews6, { page: 'account' });
 route6(/^\/admin(?:\/([a-z]+))?$/, showAdmin, { page: 'admin' });
+route6(/^\/guide(?:\/([a-z]+))?$/, showGuide6, { page: 'guide' });
 route6(/.*/, showHome, { page: 'home' });
 window.addEventListener('hashchange', function () { setTimeout(markNav, 0); });
 

@@ -184,7 +184,7 @@ async function loadCmCount() {
 }
 function reviewMenu(anchor) {
   popMenu(anchor, [{ hd: 'المراجعة والتعليقات' },
-    aiReady() ? { t: 'راجعه بالمصمّم الذكي', ic: 'ai', fn: aiReview } : null,
+    aiVision() ? { t: 'راجعه بالمصمّم الذكي', ic: 'ai', fn: aiReview } : null,
     { t: 'اطلب مراجعة من إدارة أثر', ic: 'review', fn: function () { requestReview(); } },
     { t: 'التعليقات', ic: 'comment', fn: function () { commentsDialog(); } },
     '-', { t: 'مراجعاتي', ic: 'history', href: '#/reviews' }]);
@@ -273,7 +273,7 @@ async function aWeek(body) {
 }
 
 /* ---------- مهارات المساعد في لوحة الإدارة ---------- */
-const SKILL_KINDS = [['review', 'مراجعة التصميم'], ['design', 'اقتراح تصاميم'], ['creative', 'دعه يبدع'], ['intake', 'فهم الفكرة'], ['caption', 'النص المصاحب'], ['outline', 'مخطط العرض'], ['spell', 'التصحيح'], ['imgq', 'كلمات الصور'], ['week', 'تقرير الأسبوع'], ['*', 'كل المهام']];
+const SKILL_KINDS = [['review', 'مراجعة التصميم'], ['design', 'اقتراح تصاميم'], ['creative', 'دعه يبدع'], ['intake', 'فهم الفكرة'], ['caption', 'النص المصاحب'], ['outline', 'مخطط العرض'], ['spell', 'التصحيح'], ['imgq', 'كلمات الصور'], ['week', 'تقرير الأسبوع'], ['help', 'مساعد المنصة'], ['*', 'كل المهام']];
 async function aiSkillsCard(body) {
   const card = el('div', { class: 'card skills' }, [el('span', { class: 'icon-tile t-pu' }, [ico('book')]), el('h3', { text: 'مهارات المساعد' }),
     el('p', { class: 'small muted', text: 'المهارة معرفة مكتوبة تُضاف تلقائياً إلى تعليمات المساعد في المهام التي تختارها: مبادئ التصميم، وقواعد الخط العربي، وأسلوب القناة، وغيرها. عدّلها أو أضف مهارات خاصة ببرامجك، فيتحسن أداؤه دون أي برمجة.' })]);

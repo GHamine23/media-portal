@@ -91,7 +91,7 @@ function showCal6() {
       el('span', { class: 'sp' }),
       el('div', { class: 'row wrapr' }, [
         el('button', { type: 'button', class: 'btn dark', onclick: function () { taskDialog(null, CAL.cursor); } }, [ico('plus'), 'مهمة جديدة']),
-        el('a', { class: 'btn line', href: '#/', title: 'صمّم إعلاناً ثم جدوله من «النص والقناة»' }, [ico('send'), 'منشور جديد'])
+        el('a', { class: 'btn line', href: '#/', title: 'صمّم إعلاناً ثم جدوله من «النشر»' }, [ico('send'), 'منشور جديد'])
       ])
     ]),
     bar,
@@ -160,7 +160,7 @@ function drawMonth(body, title) {
   });
   body.appendChild(grid);
   const n = CAL.posts.filter(function (x) { return x.status === 'queued' && M.days.some(function (d) { return sameDay6(d, x.when); }); }).length, nt = CAL.tasks.filter(function (t) { return t.status !== 'done' && t.due && M.days.some(function (d) { return sameDay6(d, t.due); }); }).length;
-  body.appendChild(el('p', { class: 'tiny calsum', text: (n ? n + ' منشوراً مجدولاً' : 'لا منشورات مجدولة') + ' · ' + (nt ? nt + ' مهمة مفتوحة' : 'لا مهام مفتوحة') + ' في هذا الشهر.' + (!n && !nt ? ' صمّم إعلاناً ثم جدوله من «النص والقناة»، أو أضف مهمة.' : '') }));
+  body.appendChild(el('p', { class: 'tiny calsum', text: (n ? n + ' منشوراً مجدولاً' : 'لا منشورات مجدولة') + ' · ' + (nt ? nt + ' مهمة مفتوحة' : 'لا مهام مفتوحة') + ' في هذا الشهر.' + (!n && !nt ? ' صمّم إعلاناً ثم جدوله من «النشر»، أو أضف مهمة.' : '') }));
 }
 // بطاقة صغيرة داخل خلية اليوم: المنشور بعنوان تصميمه وأيقونة حاله
 function calChip(it) {
@@ -387,7 +387,7 @@ function drawList(body, title) {
     const items = listItems6(), now = Date.now();
     exp.disabled = !items.length;
     if (!items.length) {
-      out.appendChild(CAL.q || CAL.range === 'all' ? el('p', { class: 'empty', text: 'لا نتائج.' }) : el('div', { class: 'section empty-prog rv' }, [el('span', { class: 'icon-tile t-bl' }, [ico('cal')]), el('h3', { text: 'لا شيء قادم بعد' }), el('p', { class: 'muted', text: 'صمّم إعلاناً ثم جدوله من «النص والقناة»، أو أضف مهمة لك أو لفريقك.' }), el('button', { type: 'button', class: 'btn dark', onclick: function () { taskDialog(null, new Date()); } }, [ico('plus'), 'مهمة جديدة'])]));
+      out.appendChild(CAL.q || CAL.range === 'all' ? el('p', { class: 'empty', text: 'لا نتائج.' }) : el('div', { class: 'section empty-prog rv' }, [el('span', { class: 'icon-tile t-bl' }, [ico('cal')]), el('h3', { text: 'لا شيء قادم بعد' }), el('p', { class: 'muted', text: 'صمّم إعلاناً ثم جدوله من «النشر»، أو أضف مهمة لك أو لفريقك.' }), el('button', { type: 'button', class: 'btn dark', onclick: function () { taskDialog(null, new Date()); } }, [ico('plus'), 'مهمة جديدة'])]));
       revealAll(out); return;
     }
     const groups = {}, order = []; items.forEach(function (it) { const k = it.kind === 'task' && !it.x.due ? 'nodue' : dayKey6(it.t); if (!groups[k]) { groups[k] = { d: new Date(it.t), items: [] }; order.push(k); } groups[k].items.push(it); });

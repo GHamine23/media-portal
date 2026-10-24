@@ -143,6 +143,9 @@ const EDIT_N = { content: 'المحتوى فقط', style: 'المحتوى وال
 function editLevel() { if (!V6.me || V6.me.role !== 'user') return 'full'; return V6.me.editLevel || (V6.prog && V6.prog.editLevel) || 'full'; }
 function can(p) { return V6.me && (V6.me.role !== 'user' || !!(V6.me.perms && V6.me.perms[p])); }
 // خيار مواقع التواصل: يتاح للمشرفين ومن مُنح الصلاحية، وإن سمح به البرنامج
+// ميزات يوقفها المدير لبرنامج كامل من «البرامج والهويات»: الشرائح، واصنع إعلانك بالذكاء
+function progFeat(k) { return !(V6.prog && V6.prog.features && V6.prog.features[k] === false); }
+function featOff(name) { view(el('div', { class: 'wrap page' }, [el('div', { class: 'empty' }, [el('h2', { text: name + ' متوقف في هذا البرنامج' }), el('p', { class: 'muted', text: 'أوقفه مدير المنصة لبرنامج ' + (V6.prog ? V6.prog.name : '') + '. اسأل الإشراف إن احتجته.' }), el('a', { class: 'btn dark', href: '#/', text: 'الرئيسية' })])])); }
 function canSocial() { return can('social') && !(V6.prog && V6.prog.features && V6.prog.features.social === false); }
 async function logout() {
   if (typeof ED !== 'undefined' && ED.open) ED.leaveOK = true; flushEv(); try { await API6.call('auth_logout', V6.token); } catch (e) {} V6.token = ''; ls('token', null); V6.me = null; go('#/login'); }
@@ -152,7 +155,7 @@ async function savePrefs6(patch) { V6.me.prefs = Object.assign({}, V6.me.prefs |
    كل وجهة في مكان واحد: الأقسام في شريط التنقل، وما يخصك (حسابك ونشاطك) في قائمة صورتك.
    على الشاشات الضيقة يختفي شريط التنقل، فتنتقل أقسامه إلى أعلى قائمة الصورة. */
 function navItems() {
-  return [['#/', 'home', 'الرئيسية', 'home'], ['#/make', 'make', 'اصنع إعلانك', 'ai'], ['#/mine', 'mine', 'تصاميمي', 'heart'], ['#/cal', 'cal', 'التقويم', 'cal'], ['#/tips', 'tips', 'نصائح', 'star'],
+  return [['#/', 'home', 'الرئيسية', 'home'], progFeat('ai') ? ['#/make', 'make', 'اصنع إعلانك', 'ai'] : null, ['#/mine', 'mine', 'تصاميمي', 'heart'], ['#/cal', 'cal', 'التقويم', 'cal'], ['#/tips', 'tips', 'نصائح', 'star'],
     isAdmin() ? ['#/admin', 'admin', 'الإدارة', 'gear'] : null].filter(Boolean);
 }
 function navHidden() { const n = $('#top .nav'); return !n || n.getBoundingClientRect().width === 0; }
@@ -175,7 +178,7 @@ function buildTop() {
         { t: 'أسبوعي في أثر', ic: 'chart', href: '#/week' },
         { t: 'مراجعاتي', ic: 'review', href: '#/reviews' },
         fbHidden ? { t: 'ملاحظة للفريق', ic: 'chat', fn: function () { showFeedback6(); } } : null,
-        { t: 'جولة تعريفية', ic: 'play', fn: function () { maybeTour(document.body.dataset.page || 'home', true); } },
+        { t: 'دليل أثر', ic: 'guide', href: '#/guide' },   // المقدمات والجولات والأسئلة في مكان واحد
         '-', { t: 'خروج', ic: 'logout', fn: logout }]).filter(Boolean));
   } });
   if (V6.me.avatar) av.appendChild(el('img', { src: V6.me.avatar, alt: '' }));

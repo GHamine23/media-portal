@@ -467,7 +467,7 @@ async function aSettings(body) {
   const groqTok = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.groqOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'gsk_…', 'aria-label': 'مفتاح Groq' });
   const groqM = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.groqModel || 'openai/gpt-oss-120b', 'aria-label': 'نموذج Groq' });
   const route = Object.assign({}, s.routeDefault || {}, s.ai.route || {});
-  const ROUTE_N = [['intake', 'فهم الفكرة'], ['design', 'اقتراح التصاميم'], ['creative', 'دعه يبدع'], ['refine', 'تعديل اقتراح'], ['brief', 'تحسين الوصف'], ['caption', 'النص المصاحب'], ['outline', 'مخطط العرض'], ['imgq', 'كلمات الصور'], ['week', 'تقرير الأسبوع'], ['spell', 'التصحيح والتشكيل'], ['review', 'مراجعة التصميم']];
+  const ROUTE_N = [['intake', 'فهم الفكرة'], ['design', 'اقتراح التصاميم'], ['creative', 'دعه يبدع'], ['refine', 'تعديل اقتراح'], ['brief', 'تحسين الوصف'], ['caption', 'النص المصاحب'], ['outline', 'مخطط العرض'], ['imgq', 'كلمات الصور'], ['week', 'تقرير الأسبوع'], ['spell', 'التصحيح والتشكيل'], ['review', 'مراجعة التصميم'], ['help', 'مساعد المنصة «اسأل أثر»']];
   const cfAcc = el('input', { type: 'text', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.cfOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'Account ID (٣٢ حرفاً)', 'aria-label': 'رقم حساب Cloudflare' });
   const cfTok = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.cfOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'API Token', 'aria-label': 'رمز Cloudflare' });
   const cfM = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.cfModel || '@cf/openai/gpt-oss-120b', 'aria-label': 'نموذج Cloudflare' });
@@ -493,7 +493,7 @@ async function aSettings(body) {
   const pollOn = el('input', { type: 'checkbox', checked: s.ai.pollFallback !== false });
   const capPrompt = el('textarea', { class: 'inp', rows: '4', dir: 'auto', placeholder: 'مثال: ابدأ كل رسالة بسطر ترحيبي قصير، واختم بالوسم ورابط القناة. لا تستعمل أكثر من رمزين تعبيريين. نبرة هادئة محفّزة.', 'aria-label': 'تعليمات النص المصاحب' }); capPrompt.value = s.ai.capPrompt || '';
   // هل الخادم المنشور هو نفسه نسخة الموقع؟ (يمنع حيرة «حفظتُ ولم يتغير شيء»)
-  const SRV_EXPECT = 'b2adbe69', srvOk = !!s.srvVer && s.srvVer === SRV_EXPECT;
+  const SRV_EXPECT = '5a532b23', srvOk = !!s.srvVer && s.srvVer === SRV_EXPECT;
   body.appendChild(el('div', { class: 'srvver ' + (srvOk ? 'ok' : 'old') }, [ico(srvOk ? 'check' : 'info'), el('span', { text: srvOk ? 'الخادم محدَّث ويطابق نسخة الموقع.' : 'الخادم المنشور أقدم من الموقع: بعض الإعدادات لن تُحفظ أو لن تعمل. الصق server/Code.gs في Apps Script، ثم «إدارة عمليات النشر» ← تعديل النشر الحالي ← «إصدار جديد» ← نشر.' }), el('small', { dir: 'ltr', text: (s.srvVer || '—') + ' / ' + SRV_EXPECT })]));
   body.appendChild(el('div', { class: 'grid two' }, [
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-pu' }, [ico('ai')]), el('h3', { text: 'اصنع إعلانك بالذكاء' }),
@@ -666,14 +666,14 @@ async function aModels(body) {
 }
 
 /* ---------- الذكاء الاصطناعي: ماذا يفعل، وكم استُعمل، ومن، وهل نجح ---------- */
-const AI_KIND_N = { intake: 'فهم الفكرة', design: 'اقتراح تصاميم', creative: 'دعه يبدع', caption: 'نص مصاحب', outline: 'مخطط عرض', slides: 'بناء شرائح', spell: 'تصحيح وتشكيل', imgq: 'كلمات بحث صور', review: 'مراجعة تصميم', week: 'تقرير الأسبوع', weekly: 'المهمة الأسبوعية', test: 'تجربة' };
+const AI_KIND_N = { intake: 'فهم الفكرة', design: 'اقتراح تصاميم', creative: 'دعه يبدع', caption: 'نص مصاحب', outline: 'مخطط عرض', slides: 'بناء شرائح', spell: 'تصحيح وتشكيل', imgq: 'كلمات بحث صور', review: 'مراجعة تصميم', week: 'تقرير الأسبوع', weekly: 'المهمة الأسبوعية', help: 'اسأل أثر', test: 'تجربة' };
 async function aAI(body) {
   let m = '', prog = '', data = null;
   const monthSel = el('select', { class: 'inp sm', 'aria-label': 'الشهر', onchange: function (e) { m = e.target.value; load(); } });
   aHead(body, 'الذكاء الاصطناعي', 'كل ما يطلبه المستخدمون من المساعد يُسجَّل هنا: من، ومتى، وماذا، وهل نجح. المفتاح والنموذج في الإعدادات.', [monthSel, progSelect('', true, function (v) { prog = v; load(); })]);
   body.appendChild(el('div', { class: 'card note' }, [el('b', { text: 'ماذا يفعل المساعد في المنصة؟' }), el('ul', { class: 'nlist small' }, [
     el('li', { text: 'فهم الفكرة: يستخرج من كلمات المستخدم النوع والجمهور والمقدّم والوقت والمكان، ليسأل فقط عمّا نقص.' }),
-    el('li', { text: 'اقتراح التصاميم: يختار قوالب من المكتبة ويكتب نصوصها، ويصمم تخطيطات حرة جديدة من ألوان الهوية. لا يولّد صوراً.' }),
+    el('li', { text: 'اقتراح التصاميم: يختار قوالب من المكتبة ويكتب نصوصها، ويصمم تخطيطات حرة جديدة من ألوان الهوية. وتوليد الصور متاح من تبويب «الصور» في المحرر.' }),
     el('li', { text: 'النص المصاحب: يصوغ رسالة تليجرام من معلومات التصميم على نماذج رسائل البرنامج.' }),
     el('li', { text: 'الشرائح: يحوّل نصاً أو ملفاً إلى مخطط عرض يراجعه المستخدم ثم إلى شرائح.' }),
     el('li', { text: 'مراجعة التصميم: يرى صورة التصميم ويقيّمه من ١٠٠ بمبادئ التصميم، ويقترح إصلاحات مرتبطة بنصائح المنصة.' }),

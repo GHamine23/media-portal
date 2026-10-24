@@ -6,10 +6,10 @@ function mHome() {
   if (!P) { const s0 = mscreen({ title: 'أثر' }, [mempty('palette', 'لا برنامج لحسابك بعد. اطلب من مدير المنصة إضافتك.')]); view(s0.node); return; }
   const tracks = tracksOf(), tid = ls('lastTrack') && TRACKS[ls('lastTrack')] ? ls('lastTrack') : (tracks[0] || {}).id;
   const quick = el('div', { class: 'mquick' }, [
-    el('a', { href: '#/make' + (tid ? '?tid=' + tid : ''), class: 'mq ai wide', onclick: function () { haptic(); } }, [el('span', { class: 'mi' }, [ico('ai')]), el('span', { class: 'mt' }, [el('b', { text: 'اصنع إعلانك' }), el('br'), el('small', { text: 'اكتب فكرتك بكلماتك، ويقترح المساعد تصاميم بهوية برنامجك' })]), ico('chev', 'chev')]),
+    !progFeat('ai') ? null : el('a', { href: '#/make' + (tid ? '?tid=' + tid : ''), class: 'mq ai wide', onclick: function () { haptic(); } }, [el('span', { class: 'mi' }, [ico('ai')]), el('span', { class: 'mt' }, [el('b', { text: 'اصنع إعلانك' }), el('br'), el('small', { text: 'اكتب فكرتك بكلماتك، ويقترح المساعد تصاميم بهوية برنامجك' })]), ico('chev', 'chev')]),
     // القوالب والتقويم في شريط التبويب، فلا يتكرران هنا
     tid ? el('a', { href: '#/e/' + tid + '/blank', class: 'mq', onclick: function () { haptic(); } }, [el('span', { class: 'mi', style: 'background:#5856d6' }, [ico('wand')]), el('b', { text: 'صفحة بيضاء' }), el('small', { text: 'صمّم من الصفر' })]) : null,
-    tid ? el('a', { href: '#/s/' + tid, class: 'mq', onclick: function () { haptic(); } }, [el('span', { class: 'mi', style: 'background:#ff9500' }, [ico('slides')]), el('b', { text: 'الشرائح' }), el('small', { text: 'عروض للقاءات والمحاضرات' })]) : null,
+    tid && progFeat('slides') ? el('a', { href: '#/s/' + tid, class: 'mq', onclick: function () { haptic(); } }, [el('span', { class: 'mi', style: 'background:#ff9500' }, [ico('slides')]), el('b', { text: 'الشرائح' }), el('small', { text: 'عروض للقاءات والمحاضرات' })]) : null,
     el('a', { href: '#/mine', class: 'mq', onclick: function () { haptic(); } }, [el('span', { class: 'mi', style: 'background:#34c759' }, [ico('heart')]), el('b', { text: 'تصاميمي' }), el('small', { text: 'ما حفظته وما شاركه فريقك' })]),
     el('a', { href: '#/tips', class: 'mq', onclick: function () { haptic(); } }, [el('span', { class: 'mi', style: 'background:#d9a400' }, [ico('star')]), el('b', { text: 'نصائح التصميم' }), el('small', { text: 'نصيحة جديدة كل يوم' })])
   ]);

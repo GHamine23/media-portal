@@ -33,6 +33,7 @@ function loadPage(i) {
   S.d = d; S.variant = tpl.variants.some(function (v) { return v.id === pg.variant; }) ? pg.variant : tpl.variants[0].id; S.k = pg.k || 1;
   S.hide = pg.hide || {}; S.ov = pg.ov || {}; S.pos = pg.pos || {}; S.gs = pg.gs || {}; S.layers = pg.layers || []; S.bgfx = pg.bgfx || null; S.sel = null;
   S.names = pg.names || {}; S.front = pg.front || [];
+  S.fs = pg.fs || null; if (typeof applyDocFonts === 'function') applyDocFonts(S.fs);
 }
 // تصاميم الإصدار الخامس وعروضه تُحوَّل إلى صفحات
 function docFromItem(item) {
@@ -211,6 +212,7 @@ function leaveEditor() {
   if (!ED.open) return;
   ED.leaveOK = false; ED.hash = null;
   commitPage(); saveDraft(true); if (ED.doc.id && ED.dirty) saveRemote(true);
+  if (typeof applyDocFonts === 'function') applyDocFonts(null);   // خارج المحرر: خط البرنامج
   ED.open = false; $('#top').hidden = false; document.body.classList.remove('in-editor');
   if (ED.stage) { ED.stage.destroy(); ED.stage = null; }
   $$('.cpop,.menu,.ied6').forEach(function (x) { x.remove(); });

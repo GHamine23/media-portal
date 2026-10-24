@@ -340,7 +340,7 @@ async function gSend(q) {
   if (typeof kbContext === 'function') { try { ctx = kbContext(route, role, extra) || ''; } catch (e) { ctx = ''; } }
   if (!ctx) ctx = gLocalContext(route, role, extra);
   const hist = GUIDE.chat.slice(-3).map(function (t) { return 'س: ' + clip6(t.q, 200) + '\nج: ' + clip6(t.a, 300); }).join('\n\n');
-  const prompt = (hist ? 'المحادثة السابقة:\n' + hist + '\n\n' : '') + 'الصفحة: ' + gWhere() + '\nالسؤال الآن: ' + q;
+  const prompt = 'السؤال الآن: ' + q + '\nالصفحة: ' + gWhere() + (hist ? '\n\nالمحادثة السابقة:\n' + hist : '');   // السؤال أولاً (يظهر في سجل الطلبات)
   let r = null, err = null;
   try {
     r = await API6.me('ai_make', JSON.stringify({ kind: 'help', system: G_RULES + '\n\n' + ctx + gClipList(), prompt: prompt, schema: G_SCHEMA, temperature: 0.2 }));

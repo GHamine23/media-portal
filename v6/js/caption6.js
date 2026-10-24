@@ -66,7 +66,7 @@ function tgErrHint(m) {
   m = String(m || '');
   if (/chat not found/i.test(m)) return 'لم يجد البوت القناة: تأكد من معرّفها وأن البوت مضاف إليها.';
   if (/not enough rights|administrator|kicked|forbidden|not a member/i.test(m)) return 'البوت ليس مشرفاً في القناة أو لا يملك صلاحية النشر فيها.';
-  if (/too big|too large|entity too large|file is too/i.test(m)) return 'الملف أكبر من حد تليجرام؛ جرّب «صورة فقط».';
+  if (/too big|too large|entity too large|file is too/i.test(m)) return 'الملف أكبر من حد تليجرام للصور (١٠ ميغابايت)؛ اختر «الملف الأصلي فقط» (حتى ٥٠ ميغابايت).';
   if (/too long/i.test(m)) return 'النص أطول من المسموح في تليجرام.';
   if (/fetch|network|timeout|timed out|اتصال/i.test(m)) return 'تعذّر الاتصال؛ تحقق من الإنترنت ثم حاول مرة أخرى.';
   if (/too many requests|retry after/i.test(m)) return 'تليجرام يطلب الانتظار قليلاً قبل الإرسال التالي.';
@@ -196,7 +196,7 @@ function captionDialog(opts) {
       })));
   }
   function fromFields() { manual = false; E.set(capFill(curTpl().text, vars)); }
-  const LIMIT = 1024;
+  const LIMIT = 1000;   // مثل الخادم: ما زاد يُرسل رسالةً ترد على الصورة
   function render() {
     const tg = E.get(); prev.innerHTML = capToHtml(tg); const n = capPlain(tg).length;
     cnt.textContent = n + ' / ' + LIMIT + (n > LIMIT ? ' — طويل: يُرسل نصاً مستقلاً تحت الصورة تلقائياً (حتى ٤٠٩٦)' : '');

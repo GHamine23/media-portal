@@ -184,7 +184,7 @@ async function loadCmCount() {
 }
 function reviewMenu(anchor) {
   popMenu(anchor, [{ hd: 'المراجعة والتعليقات' },
-    aiReady() ? { t: 'راجعه بالمصمّم الذكي', ic: 'ai', fn: aiReview } : null,
+    aiVision() ? { t: 'راجعه بالمصمّم الذكي', ic: 'ai', fn: aiReview } : null,
     { t: 'اطلب مراجعة من إدارة أثر', ic: 'review', fn: function () { requestReview(); } },
     { t: 'التعليقات', ic: 'comment', fn: function () { commentsDialog(); } },
     '-', { t: 'مراجعاتي', ic: 'history', href: '#/reviews' }]);
