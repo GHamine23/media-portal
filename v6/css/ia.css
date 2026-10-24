@@ -60,3 +60,9 @@
 }
 .wkmini .wkmore{color:#fff;opacity:.92}
 .wkmini .wknums small{opacity:.85}
+/* القائمة الجانبية للإدارة: تبقى ظاهرة كاملة، وتُمرَّر وحدها إن طالت عن الشاشة */
+@media (min-width:901px){
+  .anav{max-height:calc(100vh - var(--top) - 32px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+  .anav.grouped{gap:6px}
+  .anav a{padding:7px 12px}
+}

@@ -16,7 +16,14 @@ function adminNav(tabs, tab) {
   });
   const rest = tabs.filter(function (t) { return !seen[t[0]]; }); // قسم جديد لم يُصنَّف بعد يظهر في الآخر ولا يضيع
   if (rest.length) kids.push(el('div', { class: 'agrp' }, rest.map(link)));
-  return el('nav', { class: 'anav grouped', 'aria-label': 'أقسام الإدارة' }, kids);
+  const nav = el('nav', { class: 'anav grouped', 'aria-label': 'أقسام الإدارة' }, kids);
+  // ارتفاعها بقدر ما يظهر من الشاشة تحت موضعها، فيُرى آخرها دون النزول إلى أسفل الصفحة
+  const fit = function () { if (!nav.isConnected) return; if (innerWidth <= 900) { nav.style.maxHeight = ''; return; } nav.style.maxHeight = Math.max(240, innerHeight - Math.max(nav.getBoundingClientRect().top, 0) - 16) + 'px';
+    if (!nav._shown) { const on = nav.querySelector('a.on'); if (on) { nav._shown = true; const r = on.getBoundingClientRect(), rr = nav.getBoundingClientRect(); if (r.bottom > rr.bottom - 8 || r.top < rr.top) nav.scrollTop += r.bottom - rr.bottom + 24; } } };
+  window.addEventListener('scroll', fit, { passive: true }); window.addEventListener('resize', fit);
+  LEAVE.push(function () { window.removeEventListener('scroll', fit); window.removeEventListener('resize', fit); });
+  requestAnimationFrame(fit); setTimeout(fit, 400);
+  return nav;
 }
 function myAdminProgs() { return V6.bundle.programs.filter(function (p) { return isSuper() || (V6.me.role === 'sup' && V6.me.programs.indexOf(p.id) >= 0); }); }
 function showAdmin(tab) {
@@ -34,6 +41,7 @@ function showAdmin(tab) {
     ])
   ]));
   // على الشاشة الضيقة يصير التنقل شريطاً أفقياً: نُظهر القسم الحالي فيه
+  const an0 = $('.anav'), on0 = an0 && $('a.on', an0); if (on0 && an0.scrollHeight > an0.clientHeight + 4) { const r = on0.getBoundingClientRect(), rr = an0.getBoundingClientRect(); if (r.bottom > rr.bottom || r.top < rr.top) an0.scrollTop += r.top - rr.top - an0.clientHeight / 2; }   // القسم الحالي ظاهر في القائمة الطويلة
   const an = $('.anav'), on = an && $('a.on', an); if (on && an.scrollWidth > an.clientWidth + 4) an.scrollLeft += on.getBoundingClientRect().left - an.getBoundingClientRect().left - (an.clientWidth - on.offsetWidth) / 2;
   ({ reviews: aReviews, week: aWeek, overview: aOverview, archive: aArchive, models: aModels, ai: aAI, tg: aTg, accounts: aAccounts, programs: aPrograms, assets: aAssets, fonts: aFonts, feedback: aFeedback, broadcasts: aBroadcasts, changelog: aChangelog, settings: aSettings, audit: aAudit }[tab])(body);
 }

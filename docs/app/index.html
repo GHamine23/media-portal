@@ -1593,6 +1593,12 @@ html ::selection{background:var(--ac-t2,rgba(80,70,230,.18));color:var(--ac-ink,
 }
 .wkmini .wkmore{color:#fff;opacity:.92}
 .wkmini .wknums small{opacity:.85}
+/* القائمة الجانبية للإدارة: تبقى ظاهرة كاملة، وتُمرَّر وحدها إن طالت عن الشاشة */
+@media (min-width:901px){
+  .anav{max-height:calc(100vh - var(--top) - 32px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+  .anav.grouped{gap:6px}
+  .anav a{padding:7px 12px}
+}
 
 /* ===== slides.css ===== */
 /* ===== الشرائح: حركة العناصر، والانتقال بين الشرائح، والعرض الحي، ولوحة الحركة، وإعدادات الوسائط ===== */
@@ -2126,7 +2132,7 @@ body.mapp .card > h2.ch{font-size:18px}
 <script src="../v6/js/tips6.js?v=86b4f361a7"></script>
 <script src="../v6/js/social6.js?v=0eb674c8b4"></script>
 <script src="../v6/js/mine6.js?v=34484d7391"></script>
-<script src="../v6/js/admin6.js?v=41f08128c5"></script>
+<script src="../v6/js/admin6.js?v=e6b1a29831"></script>
 <script src="js/ios6.js?v=5abeaa346b"></script>
 <script src="js/mscreens.js?v=aede6bea37"></script>
 <script src="js/meditor.js?v=6ecbc80fa2"></script>
