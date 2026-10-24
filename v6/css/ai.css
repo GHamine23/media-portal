@@ -1,0 +1,39 @@
+/* المصمّم الذكي: مراحل الانتظار، «فهم المساعد»، بطاقة الاقتراح بزر «عدّل»، وشارة «الأنسب» */
+.mkwait2{max-width:560px;margin:10px auto;padding:26px 28px;display:flex;flex-direction:column;gap:14px}
+.mksteps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.mksteps li{display:flex;align-items:center;gap:12px;color:var(--mut,#707070);font-size:16px;transition:color .4s var(--ease)}
+.mksteps li i{width:28px;height:28px;border-radius:50%;flex:none;display:grid;place-items:center;background:var(--bg2,#f2f2f2);border:1.5px solid var(--line2,#d6d6d6);transition:background .4s var(--ease),border-color .4s var(--ease)}
+.mksteps li i svg{width:15px;height:15px}
+.mksteps li.done{color:var(--ink,#171717)}
+.mksteps li.done i{background:var(--ac);border-color:var(--ac);color:#fff;animation:mkpop .45s var(--spring,cubic-bezier(.34,1.56,.64,1))}
+.mksteps li.now{color:var(--ink,#171717);font-weight:500}
+.mksteps li.now i{border-color:var(--ac-t2);background:var(--ac-soft)}
+.mksteps li.now .spin{width:16px;height:16px;border-width:2px;border-color:var(--ac-t2);border-top-color:var(--ac)}
+@keyframes mkpop{0%{transform:scale(.6)}100%{transform:none}}
+.mkgot{display:flex;align-items:flex-start;gap:8px;margin:0 0 12px;padding:10px 14px;border-radius:14px;background:var(--ac-soft);color:var(--ac-ink);font-size:15px;line-height:1.7}
+.mkgot svg{width:18px;height:18px;flex:none;margin-top:4px}
+.mkcard{cursor:pointer}
+.mkcard:focus-visible{outline:2px solid var(--ac);outline-offset:3px}
+.mkcard .tmeta6.row{flex-direction:row;align-items:center;gap:10px}
+.mkcard .mkm{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.mkcard .mkm .tiny{overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.mkfix{flex:none;gap:6px;border-color:var(--ac-t2)!important;color:var(--ac-ink)!important}
+.mkfix:hover{background:var(--ac-soft)!important}
+.mkfix svg{width:15px;height:15px}
+.mkbest{position:absolute;top:22px;left:22px;background:var(--ac);color:#fff}
+@media (max-width:560px){
+  .mkcard .tmeta6.row{flex-direction:column;align-items:stretch;gap:6px}
+  .mkfix{justify-content:center}
+  .mkbest,.tnew{top:14px}.mkbest{left:14px}
+  .mkwait2{padding:20px}
+}
+/* الإعدادات: بطاقة المساعدين الإضافيين ونتيجة الاختبار */
+.aih{margin:14px 0 2px;font-size:15px;font-weight:600;padding-top:12px;border-top:1px solid var(--line,#eee)}
+.aitest{display:flex;flex-direction:column;gap:6px}
+.aitest:empty{display:none}
+.aitrow{display:flex;gap:10px;align-items:baseline;padding:8px 12px;border-radius:12px;font-size:14px;background:var(--bg2,#f5f5f5)}
+.aitrow b{min-width:92px}
+.aitrow.ok{background:#e9f7ee;color:#1f6b3a}
+.aitrow.bad{background:#fdecec;color:#a12a2a}
+.aitrow.off{color:var(--mut,#707070)}
+.mknote:empty{display:none}.mknote .mkask{margin-bottom:14px}.mknote .err{margin:0 0 10px}
