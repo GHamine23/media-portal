@@ -25,15 +25,16 @@ function buildPanel() {
   p.innerHTML = '';
   p.appendChild(el('div', { class: 'grab', 'aria-hidden': 'true' }));
   const body = el('div', { class: 'pbody' }); p.appendChild(body);
-  ({ content: pContent, tpls: pTpls, text: pText, els: pEls, imgs: pImgs, colors: pColors, fonts: pFonts, layers: pLayers, assist: pAssist, el: pEl, anim: pAnim, bg: pBg }[ED.tab] || pContent)(body);
-  if (ED.lastTab !== ED.tab) { body.classList.add('fresh'); Array.prototype.forEach.call(body.children, function (c, i) { c.style.setProperty('--i', Math.min(i, 14)); }); ED.lastTab = ED.tab; }
-  p.scrollTop = st;
+  ({ content: pContent, tpls: pTpls, text: pText, els: pEls, imgs: pImgs, colors: pColors, fonts: pFonts, layers: pLayers, assist: pAssist, el: pEl, anim: pAnim, bg: pBg, pub: pPub }[ED.tab] || pContent)(body);
+  // حركة هادئة عند تبديل اللوحة فقط (لا عند كل تعديل): ظهور خفيف، والأجزاء الأولى تتتابع قليلاً
+  if (ED.lastTab !== ED.tab) { body.classList.add('fresh'); Array.prototype.forEach.call(body.children, function (c, i) { c.style.setProperty('--i', Math.min(i, 8)); }); ED.lastTab = ED.tab; p.scrollTop = 0; }
+  else p.scrollTop = st;
 }
 
 /* ---------- المحتوى ---------- */
 function pContent(b) {
   const tpl = S.tpl, pg = ED.doc.pages[ED.cur], ph = pg.ph || {};
-  b.appendChild(panelHead('المحتوى', 'اكتب نصوصك، وما تتركه فارغاً لا يظهر.'));
+  b.appendChild(panelHead('المحتوى', 'اكتب نصوصك؛ ما تتركه فارغاً لا يظهر، وما بين *نجمتين* يظهر بلون مميز.'));
   b.appendChild(el('div', { class: 'row wrapr ctools' }, [el('button', { type: 'button', class: 'btn sm line', title: 'آية بنصها من المصحف أو حديث بحكم المحدث', onclick: function () { verifiedTextDialog(insertVerified); } }, [ico('book'), 'آية أو حديث موثّق']), aiReady() ? el('button', { type: 'button', class: 'btn sm line', title: 'يصحح الإملاء ويشكّل النصوص بالذكاء', onclick: spellDialog }, [ico('ai'), 'تصحيح وتشكيل']) : null]));
   if (tpl.id === 'blank') { b.appendChild(el('p', { class: 'muted small', text: 'هذه صفحة بيضاء: أضف النصوص والعناصر من الأدوات، أو اختر قالباً.' })); b.appendChild(el('button', { type: 'button', class: 'btn dark', text: 'ابدأ بالمساعد', onclick: function () { ED.mode = 'full'; openTab('assist'); } })); return; }
   const form = el('div', { class: 'pform' });
@@ -60,7 +61,6 @@ function pContent(b) {
     form.appendChild(el('div', { class: 'fld' + (hid ? ' hid' : '') }, [el('div', { class: 'lab' }, [el('label', { for: id, text: f.label }), el('span', { class: 'row' }, [cnt, emojiBtn(inp), eye])]), inp, f.hint ? el('small', { text: f.hint }) : null]));
   });
   b.appendChild(form);
-  b.appendChild(el('p', { class: 'tip6', html: 'ما تكتبه بين <b>*نجمتين*</b> يظهر بلون مميز. والنص الطويل يصغر وحده ليبقى في مكانه.' }));
   const hg = Object.keys(S.hide).filter(function (k) { return k.slice(0, 2) === 'g_' && S.hide[k]; });
   if (hg.length) b.appendChild(el('div', { class: 'psec' }, [el('h4', { text: 'عناصر أخفيتها' }), el('div', { class: 'row wrapr' }, hg.map(function (k) { return el('button', { type: 'button', class: 'btn sm line', text: 'إظهار ' + gName(k.slice(2)), onclick: function () { delete S.hide[k]; changed6(); buildPanel(); } }); }))]));
   b.appendChild(el('div', { class: 'psec' }, [el('button', { type: 'button', class: 'btn sm ghost', onclick: async function () {
@@ -84,7 +84,7 @@ function dateField6(f) {
     changed6(); buildPanel();
   }
   inp.addEventListener('change', fill); adj.addEventListener('change', function () { S.hijriAdj = +adj.value; fill(); });
-  return el('div', { class: 'fld datebox6' }, [el('label', { text: 'املأ التاريخ تلقائياً' }), el('div', { class: 'row' }, [inp, adj]), el('small', { text: 'تُملأ خانات التاريخ بالهجري والميلادي. وإن خالف الهجري تقويمكم فعدّله بيوم.' })]);
+  return el('div', { class: 'fld datebox6' }, [el('label', { text: 'املأ التاريخ تلقائياً' }), el('div', { class: 'row' }, [inp, adj]), el('small', { text: 'تُملأ خانات التاريخ بالهجري والميلادي؛ وعدّل الهجري بيوم إن خالف تقويمكم.' })]);
 }
 function imageField6(f) {
   const cur = S.d[f.k] && S.d[f.k].src;
@@ -168,29 +168,39 @@ function pText(b) {
 function libCanvas(fn, w, h) { const c = el('canvas', { width: (w || 80) * 2, height: (h || 80) * 2, style: 'width:' + (w || 80) + 'px;height:' + (h || 80) + 'px' }); const g = c.getContext('2d'); g.translate(c.width / 2, c.height / 2); fn(g, Math.min(c.width, c.height) * 0.72); return c; }
 function pEls(b) {
   const T = S.track, C = T.c;
-  b.appendChild(panelHead('العناصر', 'أضف ما تشاء، وغيّر لونه وحجمه من الشريط فوقه.'));
+  b.appendChild(panelHead('العناصر', 'أضف ما تشاء، ثم غيّر لونه وحجمه من الشريط فوقه.'));
   const sec = function (t) { b.appendChild(el('h4', { class: 'psh', text: t })); const g = el('div', { class: 'libg' }); b.appendChild(g); return g; };
   const g1 = sec('زخارف من الهوية');
   Object.keys(STICKERS).forEach(function (k) { const col = /star|sparkle/.test(k) ? C.a : C.p; g1.appendChild(el('button', { type: 'button', class: 'libb', title: STICKERS[k].name, 'aria-label': STICKERS[k].name, onclick: function () { addLayer6({ t: 'sticker', ref: k, w: k === 'line' ? 0.4 : 0.18, c: col }); } }, [libCanvas(function (g, s) { STICKERS[k].draw(g, s, col); }, 56, 56)])); });
-  const g2 = sec('أيقونات');
-  ICON_LIST.forEach(function (k) { g2.appendChild(el('button', { type: 'button', class: 'libb', title: k, onclick: function () { addLayer6({ t: 'icon', ref: k, w: 0.07, c: C.s }); } }, [libCanvas(function (g, s) { ICONS[k](g, s * 0.8, C.s); }, 56, 56)])); });
+  ticonSection(b);   // الأيقونات كلها في قسم واحد: أيقونات الهوية ثم المجموعة الكاملة، ببحث وتمرير
   const g3 = sec('شعارات');
   const blockL = (V6.prog && V6.prog.block && V6.prog.block.logos) || [];
   Object.keys(TRACKS).forEach(function (id) { const t = TRACKS[id]; (t.logos || [[t.logo, t.name]]).forEach(function (l) { if (!ASSETS[l[0]] || blockL.indexOf(l[0]) >= 0) return; const bt = el('button', { type: 'button', class: 'libb wide', title: t.name, onclick: function () { addLayer6({ t: 'logo', ref: l[0], w: 0.22, c: 'color' }); } }); bt.style.backgroundImage = 'url(' + ASSETS[l[0]] + ')'; g3.appendChild(bt); }); });
   ['academy', 'social'].forEach(function (k) { if (!IMG[k]) return; g3.appendChild(el('button', { type: 'button', class: 'libb wide', title: k === 'social' ? 'حسابات التواصل' : 'شعار البرنامج', onclick: function () { addLayer6({ t: 'logo', ref: k, w: 0.16, c: '#4a4a4a' }); } }, [libCanvas(function (g, s) { const im = tinted(k, '#4a4a4a'); if (im) { const w = s * 1.5, h = w * srcH(im) / srcW(im); g.drawImage(im, -w / 2, -h / 2, w, h); } }, 110, 50)])); });
   // عناصرك المحفوظة: مجموعة طبقات تعيد استعمالها
+  qrSection(b);
   const mine = V6.mine.filter(function (a) { return a.kind === 'element' && a.data && a.data.layers; });
-  const g4 = sec('عناصري المحفوظة');
-  if (!mine.length) g4.appendChild(el('p', { class: 'tiny', text: 'اختر طبقة أضفتها، ثم «احفظها عنصراً» من لوحة الطبقات لتجدها هنا في كل تصاميمك.' }));
+  b.appendChild(el('h4', { class: 'psh', text: 'عناصري المحفوظة' }));
+  if (!mine.length) b.appendChild(el('p', { class: 'tiny', text: 'احفظ ما أضفته من «الطبقات» ← «احفظه عنصراً»، فتجده هنا في كل تصاميمك.' }));
+  const g4 = el('div', { class: 'libg' }); b.appendChild(g4);
   mine.forEach(function (a) { const bt = el('button', { type: 'button', class: 'libb', title: a.name, onclick: function () { a.data.layers.forEach(function (L) { const c = JSON.parse(JSON.stringify(L)); addLayer6(c); }); } }); if (a.thumb) bt.style.backgroundImage = 'url(' + a.thumb + ')'; else bt.textContent = a.name; g4.appendChild(bt); });
-  ticonSection(b); qrSection(b);
-  if (typeof mediaPanelSection === 'function') mediaPanelSection(b);
+}
+// شريط أفقي بصفوف ثابتة يُمرَّر بين صفحاته: تظليل عند الحافة التي وراءها المزيد، وسهمان للتنقل
+function hPager(strip) {
+  const wrap = el('div', { class: 'hpager' }, [strip]);
+  const go = function (k) { strip.scrollBy({ left: -k * strip.clientWidth * 0.85, behavior: 'smooth' }); };   // RTL: التالي إلى اليسار
+  const nx = el('button', { type: 'button', class: 'hpnx', 'aria-label': 'المزيد', title: 'المزيد', onclick: function () { go(1); } }, [ico('chev')]);
+  const pv = el('button', { type: 'button', class: 'hppv', 'aria-label': 'السابق', title: 'السابق', onclick: function () { go(-1); } }, [ico('chev')]);
+  wrap.append(pv, nx);
+  const upd = function () { const max = strip.scrollWidth - strip.clientWidth, x = Math.abs(strip.scrollLeft); wrap.classList.toggle('more-l', max > 4 && x < max - 4); wrap.classList.toggle('more-r', x > 4); };
+  strip.addEventListener('scroll', upd, { passive: true }); wrap._upd = upd; setTimeout(upd, 60); setTimeout(upd, 500);
+  return wrap;
 }
 
 /* ---------- الخلفية: لون، ونقش، وصورة بتحكم كامل ---------- */
 function pBg(b) {
   const T = S.track, tpl = S.tpl, mine = V6.mine.filter(function (a) { return a.kind === 'image'; });
-  b.appendChild(panelHead('الخلفية', 'لون الخلفية، أو نقش فوقه، أو صورة تتحكم في تكبيرها وموضعها وتعتيمها.'));
+  b.appendChild(panelHead('الخلفية', 'لون، أو نقش فوقه، أو صورة تتحكم في تكبيرها وموضعها وتعتيمها.'));
   b.appendChild(el('h4', { class: 'psh', text: 'اللون' }));
   const sw = el('div', { class: 'bgsw' });
   const roles = [['', 'تلقائي'], ['paper', 'الورق'], ['warm', 'دافئ'], ['white', 'أبيض'], ['p', 'الأساسي'], ['pd', 'الأساسي الداكن'], ['pl', 'الأساسي الفاتح'], ['s', 'الثانوي'], ['sd', 'الثانوي الداكن'], ['teal', 'الأخضر المزرق'], ['a', 'التمييز'], ['ink', 'الحبر']];
@@ -206,6 +216,7 @@ function pBg(b) {
     g3.appendChild(el('button', { type: 'button', class: 'libb' + (cur === q[0] ? ' on' : ''), title: q[1], onclick: function () { S.bgfx = q[0] === 'plain' ? null : { p: q[0] }; changed6(); buildPanel(); } }, [c, el('small', { class: 'tiny', text: q[1] })]));
   });
   b.appendChild(el('h4', { class: 'psh', text: 'صورة خلفية' }));
+  b.appendChild(el('p', { class: 'tiny', text: 'من المكتبة أو صورك، وما تضيفه من الصور المجانية يظهر هنا أيضاً.' }));
   const isPhoto = S.bgfx && S.bgfx.p === 'photo';
   const g4 = el('div', { class: 'imgrid' }); b.appendChild(g4);
   const pick = function (src) { S.bgfx = Object.assign({ p: 'photo', dim: 0.45, tint: 0.25, z: 1, ox: 0, oy: 0, blur: 0 }, isPhoto ? S.bgfx : {}, { p: 'photo', src: src }); changed6(); buildPanel(); };
@@ -215,7 +226,7 @@ function pBg(b) {
     bt.style.backgroundImage = 'url(' + (a ? a.thumb : ASSETS[n]) + ')'; g4.appendChild(bt);
   });
   g4.appendChild(uploadBtn('ارفع صورة', function (res) { pick('asset:' + res.id); }));
-  b.appendChild(el('p', { class: 'tiny', text: 'الصور المجانية من تبويب «الصور»: أضف صورة إلى مكتبتك ثم اخترها هنا.' }));
+  b.appendChild(el('div', { class: 'row wrapr' }, [el('button', { type: 'button', class: 'chip', onclick: function () { openTab('imgs'); setTimeout(function () { const h = $('#free_imgs'); if (h) h.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 150); } }, [ico('search'), ' ابحث في الصور المجانية'])]));
   if (isPhoto) {
     const F = S.bgfx;
     b.appendChild(el('h4', { class: 'psh', text: 'ضبط الصورة' }));
@@ -232,8 +243,10 @@ function pBg(b) {
 
 /* ---------- الصور ---------- */
 function pImgs(b) {
-  b.appendChild(panelHead('الصور', 'صور المكتبة وصورك المرفوعة. تُحفظ بجودتها الأصلية.'));
+  const deck = ED.doc.kind === 'deck';
+  b.appendChild(panelHead(deck ? 'الوسائط' : 'الصور', deck ? 'صور وفيديو وصوت ويوتيوب لشرائحك، بجودتها الأصلية.' : 'صورك وصور المكتبة والصور المجانية، بجودتها الأصلية.'));
   b.appendChild(el('div', { class: 'imgrid big' }, [uploadBtn('ارفع صورة', function (res) { addLayer6({ t: 'img', ref: 'asset:' + res.id, w: 0.55 }); buildPanel(); })]));
+  if (deck && typeof mediaPanelSection === 'function') mediaPanelSection(b);   // الفيديو والصوت ويوتيوب هنا وحدها
   b.appendChild(el('h4', { class: 'psh', text: 'صوري' }));
   const g = el('div', { class: 'imgrid' }); b.appendChild(g);
   const mine = V6.mine.filter(function (a) { return a.kind === 'image'; });
@@ -247,7 +260,6 @@ function pImgs(b) {
   b.appendChild(el('h4', { class: 'psh', text: 'مكتبة البرنامج' }));
   const g2 = el('div', { class: 'imgrid' }); b.appendChild(g2);
   DATE_LIB.forEach(function (n) { const bt = el('button', { type: 'button', class: 'imb', title: LIB_NAMES[n] || '', onclick: function () { addLayer6({ t: 'img', ref: 'lib:' + n, w: 0.55 }); } }); bt.style.backgroundImage = 'url(' + ASSETS[n] + ')'; g2.appendChild(bt); });
-  b.appendChild(el('p', { class: 'tiny', text: 'خلفية التصميم لها تبويبها الخاص «الخلفية» في الشريط الجانبي.' }));
 }
 
 /* ---------- الألوان ---------- */
@@ -316,7 +328,7 @@ function fontSample(node, id, weightKey) {
   FONT_IO.observe(node);
 }
 function pFonts(b) {
-  b.appendChild(panelHead('الخطوط', 'اختر النص ثم خطه. مرّر الفأرة على أي خط لترى أثره في التصميم قبل أن تختاره.'));
+  b.appendChild(panelHead('الخطوط', 'اختر النص ثم خطه، ومرّر الفأرة على الخط لتراه في التصميم قبل اختياره.'));
   const C = fontChoices(), list = el('div', { class: 'ftargets' }); b.appendChild(list);
   fontTargets().forEach(function (t) {
     const open = ED.fontOpen === t.id;
@@ -352,7 +364,7 @@ function pFonts(b) {
   });
   if (can('fonts')) {
     b.appendChild(el('h4', { class: 'psh', text: 'خطك الخاص' }));
-    b.appendChild(el('p', { class: 'tiny', text: 'ارفع ملف خط (OTF أو TTF أو WOFF2) ليظهر لك في كل تصاميمك. ارفع كل وزن في ملف.' }));
+    b.appendChild(el('p', { class: 'tiny', text: 'ارفع ملف الخط فيظهر لك في كل تصاميمك، وكل وزن في ملف.' }));
     b.appendChild(fontUploader('user', ''));
   }
 }
@@ -411,7 +423,7 @@ function nameEditor(g, onDone) {
 }
 function icoOf(g) { if (!isLayer(g)) return LASTT[g] && LASTT[g].length ? 'text' : 'layers'; const L = layerById(g.slice(2)); return !L ? 'layers' : L.t === 'text' ? 'text' : L.t === 'img' ? 'image' : L.t === 'logo' ? 'star' : 'shapes'; }
 function pLayers(b) {
-  b.appendChild(panelHead('الطبقات', 'العناصر من الأعلى إلى الأسفل. انقر الاسم مرتين لتغييره، والقلم يفتح إعدادات العنصر.'));
+  b.appendChild(panelHead('الطبقات', 'العناصر من الأعلى إلى الأسفل. انقر الاسم مرتين لتغييره، والقلم لإعداداته.'));
   const o = stackOrder(), list = el('div', { class: 'llist6' });
   o.all.slice().reverse().forEach(function (g) {
     const hidden = !isLayer(g) && S.hide['g_' + g];
@@ -433,7 +445,7 @@ function pLayers(b) {
   });
   b.appendChild(list);
   if (S.layers && S.layers.length > 1) b.appendChild(el('button', { type: 'button', class: 'btn sm line', text: 'احفظ كل ما أضفته عنصراً واحداً', onclick: function () { saveElement(S.layers); } }));
-  b.appendChild(el('div', { class: 'psec' }, [el('button', { type: 'button', class: 'btn sm ghost', onclick: function () { if (S.pos) delete S.pos[S.size]; S.gs = {}; S.front = []; select(null); changed6(); buildPanel(); } }, [ico('reset'), 'إرجاع كل العناصر إلى مواضعها وأحجامها وترتيبها'])]));
+  b.appendChild(el('div', { class: 'psec' }, [el('button', { type: 'button', class: 'btn sm ghost', onclick: function () { if (S.pos) delete S.pos[S.size]; S.gs = {}; S.front = []; select(null); changed6(); buildPanel(); } }, [ico('reset'), 'أرجع المواضع والأحجام والترتيب'])]));
 }
 
 /* ---------- إعدادات عنصر واحد (يفتحها القلم) ---------- */

@@ -54,6 +54,25 @@ function capToHtml(t) {
 function capPlain(t) { return String(t || '').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&'); }
 function capTemplates() { const P = V6.prog || {}; return (P.captions || []).map(function (c) { return Object.assign({ own: true }, c); }).concat(CAP_BASE); }
 function canSend() { return V6.me && (V6.me.role !== 'user' || !!(V6.me.perms && V6.me.perms.send)) && V6.settings && V6.settings.tg && V6.prog && V6.prog.tg && V6.prog.tg.chat; }
+// لماذا لا يُرسل هذا المستخدم (جملة واحدة واضحة)، أو فارغ إن كان يستطيع
+function sendWhy() {
+  if (canSend()) return '';
+  if (!(V6.settings && V6.settings.tg)) return 'بوت تليجرام غير مضبوط بعد: يضيف المشرف رمز البوت من الإعدادات، ثم يصبح الإرسال المباشر متاحاً هنا.';
+  if (!(V6.prog && V6.prog.tg && (V6.prog.tg.chat || (V6.prog.tg.chats && S.track && V6.prog.tg.chats[S.track.id])))) return 'لم يحدد المشرف قناة هذا البرنامج أو المسار بعد (من «البرامج والهويات»).';
+  return 'الإرسال إلى القناة يحتاج صلاحية «الإرسال» من مشرف البرنامج.';
+}
+// أخطاء تليجرام الشائعة بجملة يفهمها المستخدم
+function tgErrHint(m) {
+  m = String(m || '');
+  if (/chat not found/i.test(m)) return 'لم يجد البوت القناة: تأكد من معرّفها وأن البوت مضاف إليها.';
+  if (/not enough rights|administrator|kicked|forbidden|not a member/i.test(m)) return 'البوت ليس مشرفاً في القناة أو لا يملك صلاحية النشر فيها.';
+  if (/too big|too large|entity too large|file is too/i.test(m)) return 'الملف أكبر من حد تليجرام؛ جرّب «صورة فقط».';
+  if (/too long/i.test(m)) return 'النص أطول من المسموح في تليجرام.';
+  if (/fetch|network|timeout|timed out|اتصال/i.test(m)) return 'تعذّر الاتصال؛ تحقق من الإنترنت ثم حاول مرة أخرى.';
+  if (/too many requests|retry after/i.test(m)) return 'تليجرام يطلب الانتظار قليلاً قبل الإرسال التالي.';
+  return '';
+}
+function pubChatName() { const tg = (V6.prog && V6.prog.tg) || {}; const c = (tg.chats && S.track && tg.chats[S.track.id]) || tg.chat || ''; return (tg.titles && tg.titles[c]) || c; }
 
 /* ---------- محرر شبيه بتليجرام: تنسيق بالأزرار بلا وسوم ظاهرة ---------- */
 // وسوم تليجرام → HTML للمحرر (contenteditable)
@@ -150,8 +169,10 @@ function repeatEditor(initial, onChange) {
   draw();
   return { node: el('div', { class: 'repbox' }, [el('div', { class: 'row wrapr' }, [ico('history'), every]), detail, summary]), get: get };
 }
-function captionDialog() {
+// opts: { later: يفتح على «في موعد»، caption: نص يبدأ به (لإعادة نشر منشور سابق) }
+function captionDialog(opts) {
   if (!ED.doc) return;
+  opts = opts || {};
   commitPage();
   const kindGuess = { ann: 'ann', comp: 'comp', thanks: 'thanks', quote: 'quote', daily: 'daily', cover: 'ann', yt: 'ann', social: 'ann' }[S.tpl.type] || 'ann';
   let date = new Date(), tplId = (ls('capTpl') || {})[S.tpl.type] || (capTemplates().find(function (c) { return c.kind === kindGuess; }) || CAP_BASE[0]).id;
@@ -186,6 +207,7 @@ function captionDialog() {
   E.ed.addEventListener('input', function () { manual = true; });
   sel.onchange = function () { tplId = sel.value; const m = ls('capTpl') || {}; m[S.tpl.type] = tplId; ls('capTpl', m); manual = false; drawFields(); fromFields(); };
   drawFields(); fromFields();
+  if (opts.caption) { E.set(opts.caption); manual = true; }
   // توجيه المساعد: تعليمات لهذه المرة، فوق تعليمات البرنامج/المنصة الثابتة (من الإدارة)
   const P = V6.prog || {}, fixedPrompt = (P.tg && P.tg.capPrompt) || (V6.settings && V6.settings.ai && V6.settings.ai.capPrompt) || '';
   const guide = el('textarea', { rows: '2', class: 'inp sm', dir: 'auto', placeholder: 'توجيه للمساعد هذه المرة (اختياري): مثلاً «اجعلها قصيرة وحماسية، وابدأ بسؤال»' });
@@ -212,62 +234,81 @@ function captionDialog() {
     el('button', { type: 'button', class: 'btn sm ghost', text: 'غداً ٨ م', onclick: function () { preset(1, '20:00'); } }),
     el('button', { type: 'button', class: 'btn sm ghost', text: 'بعد ساعة', onclick: function () { const d = new Date(Date.now() + 3600000); dI.value = localISO(d); tI.value = localHM(d); dirty(); } })]), rep.node]);
   const whenSeg = segOf([['now', 'الآن'], ['later', 'في موعد']], whenMode, function (v) { whenMode = v; schedBox.hidden = v !== 'later'; if (v === 'later' && !dI.value) preset(1, '08:00'); scheduled = null; sent = false; refreshBtn(); });
-  const sendBtn = el('button', { type: 'button', class: 'btn dark' }, [ico('share'), 'أرسل الآن']);
+  const sendBtn = el('button', { type: 'button', class: 'btn dark' }, [ico('send'), 'أرسل الآن']);
   const after = el('div', { class: 'row wrapr capafter', hidden: true });
-  let sent = false, lastSig = '';
+  let sent = false, lastSig = '', armed = false, armT = 0;
   function sig() { return [whenMs(), E.get(), mode, JSON.stringify(rep.get())].join('|'); }
   function refreshBtn() {
-    btnReset(sendBtn); sendBtn.classList.remove('done');
+    if (armed) disarm();
+    btnReset(sendBtn); sendBtn.classList.remove('done', 'arm'); sendBtn.title = ok ? '' : why;
     if (scheduled && sig() === lastSig) { btnDone(sendBtn, 'جُدول في ' + fmtTime(scheduled.when), 0, true); return; }
     if (sent && sig() === lastSig) { btnDone(sendBtn, 'أُرسل إلى القناة', 0, true); return; }
     if (scheduled) { sendBtn.replaceChildren(ico('cal'), 'حدّث الجدولة'); return; }
-    sendBtn.replaceChildren(ico(whenMode === 'later' ? 'cal' : 'share'), whenMode === 'later' ? 'جدول النشر' : (sent ? 'أرسل مرة أخرى' : 'أرسل الآن'));
+    sendBtn.replaceChildren(ico(whenMode === 'later' ? 'cal' : 'send'), whenMode === 'later' ? 'جدول النشر' : (sent ? 'أرسل مرة أخرى' : 'أرسل الآن'));
   }
   function dirty() { if (!ready || sendBtn._busyRun) return; refreshBtn(); }
-  const ok = canSend();
-  const why = ok ? '' : (!(V6.settings && V6.settings.tg) ? 'بوت تليجرام غير مضبوط بعد: يضيف المشرف رمز البوت من الإعدادات، ثم يصبح الإرسال المباشر متاحاً هنا.'
-    : !(V6.prog && V6.prog.tg && (V6.prog.tg.chat || (V6.prog.tg.chats && S.track && V6.prog.tg.chats[S.track.id]))) ? 'لم يحدد المشرف قناة هذا البرنامج أو المسار بعد (من «البرامج والهويات»).'
-    : 'الإرسال إلى القناة يحتاج صلاحية «الإرسال» من مشرف البرنامج.');
+  const ok = canSend(), why = sendWhy();
   if (!ok) { sendBtn.disabled = true; sendBtn.title = why; }
-  const chatOf = function () { const tg = V6.prog.tg || {}; const c = (tg.chats && S.track && tg.chats[S.track.id]) || tg.chat || ''; return (tg.titles && tg.titles[c]) || c; };
+  const chatOf = pubChatName;
   function thumbB64() { try { const c = document.createElement('canvas'); renderTo(c, S.tpl, S.size, snap(), S.track, 320 / SIZES[S.size].w); return c.toDataURL('image/jpeg', 0.72).split(',')[1]; } catch (e) { return ''; } }
-  async function send() {
-    const when = whenMs(); if (when < 0 || (when && when < Date.now() + 60000)) { toast('اختر موعداً في المستقبل'); dI.focus(); return; }
-    if (capPlain(E.get()).length > 4096) { toast('النص أطول من حد تليجرام (٤٠٩٦ حرفاً)'); return; }
+  // الإرسال الفوري بضغطتين على الزر نفسه (بلا نافذة تأكيد فوق النافذة): الأولى تسلّحه «اضغط مرة أخرى للتأكيد»، والثانية ترسل
+  function disarm() { armed = false; clearTimeout(armT); sendBtn.classList.remove('arm'); }
+  function showErr(msg) {
+    after.hidden = false; after.innerHTML = ''; after.classList.add('bad');
+    const hint = tgErrHint(msg);
+    [ico('close', 'errc'), el('div', { class: 'small errtx' }, [el('b', { text: 'لم يُنشر. ' }), hint || '', el('small', { class: 'tiny', dir: 'auto', text: (hint ? ' (' : '') + (msg || 'تعذّر الاتصال') + (hint ? ')' : '') })]), el('button', { type: 'button', class: 'btn sm line', onclick: function () { after.hidden = true; return send(true); } }, [ico('reset'), 'حاول مرة أخرى'])].forEach(function (x) { after.appendChild(x); });
+  }
+  async function send(confirmed) {
+    const when = whenMs(); if (when < 0 || (when && when < Date.now() + 60000)) { disarm(); toast('اختر موعداً في المستقبل'); dI.focus(); return; }
+    if (capPlain(E.get()).length > 4096) { disarm(); toast('النص أطول من حد تليجرام (٤٠٩٦ حرفاً)'); return; }
     const repeat = whenMode === 'later' ? rep.get() : null;
+    after.classList.remove('bad');
     // تعديل جدولة قائمة: نحدّث الموعد والنص والتكرار بلا إعادة رفع
     if (scheduled && when) {
-      await withBusy(sendBtn, async function () { await API6.me('tg_update', JSON.stringify({ id: scheduled.id, when: when, caption: E.get(), mode: mode, repeat: repeat })); scheduled.when = when; lastSig = sig(); POSTS = null; }, { busy: 'نحدّث…', done: 'حُدّثت: ' + fmtTime(when), keep: true });
-      showAfter(when); return;
+      try { await withBusy(sendBtn, async function () { await API6.me('tg_update', JSON.stringify({ id: scheduled.id, when: when, caption: E.get(), mode: mode, repeat: repeat })); scheduled.when = when; lastSig = sig(); POSTS = null; }, { busy: 'نحدّث…', done: 'حُدّثت: ' + fmtTime(when), keep: true }); }
+      catch (e) { showErr(e.message); return; }
+      showAfter(when); pubRefresh(); return;
     }
-    if (!when && !(await ask('إرسال إلى القناة', 'يُنشر التصميم مع هذا النص في قناة ' + V6.prog.name + (S.track ? ' (' + S.track.name + ')' : '') + ' الآن.', 'أرسل'))) return;
-    await withBusy(sendBtn, async function () {
+    if (!when && !armed && !confirmed) {
+      armed = true; btnReset(sendBtn); sendBtn.classList.add('arm');
+      sendBtn.replaceChildren(ico('send'), 'اضغط مرة أخرى للإرسال الآن');
+      sendBtn.title = 'يُنشر التصميم مع هذا النص في ' + (chatOf() || 'القناة') + ' فوراً';
+      armT = setTimeout(function () { disarm(); refreshBtn(); }, 6000);
+      return;
+    }
+    disarm(); btnReset(sendBtn); sendBtn.replaceChildren(ico(when ? 'cal' : 'send'), when ? 'جدول النشر' : 'أرسل الآن');   // ما يعود إليه الزر إن أخفق
+    try { await withBusy(sendBtn, async function () {
       await ensureFonts(fontsOfState(snap()));
       const c = document.createElement('canvas'); renderTo(c, S.tpl, S.size, snap(), S.track, 2);
       const png = c.toDataURL('image/png').split(',')[1];
       const r = await API6.me('tg_send', JSON.stringify({ program: V6.prog.id, track: S.track && S.track.id, name: ED.doc.name, item: ED.doc.id || '', caption: E.get(), png: mode === 'doc' ? '' : png, file: mode === 'photo' ? '' : png, fileName: fileName6('png'), fileMime: 'image/png', mode: mode, when: when || 0, repeat: repeat, thumb: thumbB64() }));
       track('tg', { tool: when ? 'schedule' : 'send' }); archive6('share'); POSTS = null;
+      if (ED.pubIds) ED.pubIds.push(r.id);   // منشورات هذه الجلسة تظهر في «النشر» ولو لم يُحفظ التصميم
       if (r.queued) { scheduled = { id: r.id, when: r.when }; sent = false; } else { sent = true; scheduled = null; if (r.link) lastLink = r.link; }
       lastSig = sig();
       notifyDone(r.queued ? 'جُدول النشر' : 'أُرسل إلى القناة', r.queued ? fmtTime(r.when) : '');
       showAfter(r.queued ? r.when : 0, r.link, r.next);
-    }, { busy: when ? 'نجدول…' : 'نرسل…', done: when ? 'جُدول في ' + fmtTime(when) : 'أُرسل إلى القناة', keep: true });
+      pubRefresh();
+    }, { busy: when ? 'نجدول…' : 'نرسل…', done: when ? 'جُدول في ' + fmtTime(when) : 'أُرسل إلى القناة', keep: true }); }
+    catch (e) { showErr(e.message); }
   }
   let lastLink = '';
   function showAfter(when, link, next) {
-    after.hidden = false; after.innerHTML = '';
+    after.hidden = false; after.innerHTML = ''; after.classList.remove('bad');
     [ico('check', 'okc'), el('span', { class: 'small', text: when ? 'في التقويم: ' + fmtTime(when) + (next ? ' · التالي ' + fmtTime(next) : '') : 'نُشر في قناة ' + V6.prog.name + (next ? ' · التالي ' + fmtTime(next) : '') }),
       el('a', { class: 'btn sm line', href: '#/cal' + (when ? '?d=' + localISO(new Date(when)) : ''), onclick: function () { closeAll(); } }, [ico('cal'), 'افتح التقويم']),
       link ? el('a', { class: 'btn sm ghost', href: link, target: '_blank', rel: 'noopener' }, [ico('link'), 'رابط المنشور']) : null,
-      when && scheduled ? el('button', { type: 'button', class: 'btn sm ghost', onclick: async function () { if (!(await ask('إلغاء الجدولة', 'لن يُنشر هذا المنشور.', 'ألغِ', true))) return; try { await API6.me('tg_cancel', scheduled.id); scheduled = null; POSTS = null; after.hidden = true; refreshBtn(); toast('أُلغيت الجدولة'); } catch (e) { toast(e.message); } } }, ['إلغاء الجدولة']) : null].forEach(function (x) { if (x) after.appendChild(x); });
+      when && scheduled ? el('button', { type: 'button', class: 'btn sm ghost', onclick: async function () { if (!(await ask('إلغاء الجدولة', 'لن يُنشر هذا المنشور.', 'ألغِ', true))) return; try { await API6.me('tg_cancel', scheduled.id); scheduled = null; POSTS = null; after.hidden = true; refreshBtn(); toast('أُلغيت الجدولة'); pubRefresh(); } catch (e) { toast(e.message); } } }, ['إلغاء الجدولة']) : null].forEach(function (x) { if (x) after.appendChild(x); });
     flashOk(after);
   }
   let closeAll = function () {};
   sendBtn.onclick = function () { return send(); };
-  const sendBox = el('div', { class: 'capsend' }, [el('div', { class: 'row' }, [el('h4', { class: 'psh', text: 'النشر في ' + (chatOf() || 'القناة') }), el('span', { class: 'sp' }), whenSeg]), schedBox, modeSeg,
+  if (opts.later && ok) { const lb = $$('button', whenSeg).find(function (x) { return /موعد/.test(x.textContent); }); if (lb) lb.click(); }
+  const sendBox = el('div', { class: 'capsend' }, [el('div', { class: 'row' }, [el('h4', { class: 'psh', text: 'النشر في ' + (chatOf() || 'القناة') }), el('span', { class: 'sp' }), whenSeg]),
+    ok ? el('small', { class: 'tiny', text: 'الآن أو في موعد تحدده، ويظهر كل منشور في «النشر» والتقويم.' }) : el('small', { class: 'tiny warnline', text: why + ' حتى ذلك الحين: انسخ النص وأرسله بنفسك.' }),
+    schedBox, modeSeg,
     el('div', { class: 'row wrapr' }, [sendBtn, el('button', { type: 'button', class: 'btn line', onclick: function (e) { copyText(capPlain(E.get())); btnDone(e.currentTarget, 'نُسخ'); } }, [ico('copy'), 'انسخ النص']), el('button', { type: 'button', class: 'btn sm ghost', title: 'للصق في بوت أو أداة تقبل وسوم HTML', onclick: function (e) { copyText(E.get()); btnDone(e.currentTarget, 'نُسخ'); } }, ['نسخ بالتنسيق'])]),
-    after,
-    ok ? el('small', { class: 'tiny', text: 'يُرسل البوت التصميم والنص إلى القناة مباشرة أو في الموعد الذي تحدده، ويظهر كل مجدول في «التقويم والمهام».' }) : el('small', { class: 'tiny warnline', text: why + ' حتى ذلك الحين: انسخ النص وأرسله بنفسك.' })]);
+    after]);
   const m = modal({ title: 'النص المصاحب والنشر', wide: true, body: [
     el('div', { class: 'capgrid' }, [
       el('div', { class: 'capl' }, [el('div', { class: 'row wrapr' }, [el('div', { class: 'fld grow' }, [el('label', { text: 'القالب الكتابي' }), sel]), el('div', { class: 'fld' }, [el('label', { text: 'تاريخ الفعالية' }), dateI])]), fieldsBox,
@@ -293,4 +334,75 @@ async function captionAI(current, tplId, date, vars0, guide) {
   const raw = await API6.call('ai_make', V6.token, JSON.stringify({ kind: 'caption', program: P.id, system: system, prompt: prompt, schema: { type: 'OBJECT', properties: { caption: { type: 'STRING' } }, required: ['caption'] }, temperature: 0.7 }));
   const r = JSON.parse(raw); if (!r.caption) throw new Error('لم يُعد المساعد نصاً');
   return String(r.caption).replace(/<(?!\/?(b|i|u|s|code|blockquote|a)\b)[^>]*>/g, '').trim();
+}
+
+/* ---------- لوحة «النشر» في المحرر: كل ما يخص نشر هذا التصميم في مكان واحد ----------
+   النص المصاحب والإرسال الآن أو الجدولة (النافذة نفسها)، ثم منشورات هذا التصميم بحالتها وموعدها: تعديل، إلغاء، إعادة جدولة، إعادة نشر.
+   المنشورات تُعرف بمعرّف التصميم (item)؛ وغير المحفوظ تظهر له منشورات هذه الجلسة. */
+const PUB = { list: null, at: 0, busy: false };
+function pubMine(x) { const d = ED.doc || {}, ids = ED.pubIds || []; return (d.id && x.item === d.id) || ids.indexOf(x.id) >= 0 || (x.seriesId && ids.indexOf(x.seriesId) >= 0); }
+async function pubLoad(force) {
+  if (!force && PUB.list && PUB.doc === (ED.doc && ED.doc.id) && Date.now() - PUB.at < 60000) return PUB.list;
+  const all = await API6.me('tg_queue', V6.prog ? V6.prog.id : '');
+  PUB.list = all; PUB.at = Date.now(); PUB.doc = ED.doc && ED.doc.id;
+  return all;
+}
+// بعد أي إرسال أو تعديل: نعيد رسم اللوحة إن كانت مفتوحة
+function pubRefresh() { PUB.at = 0; if (ED.open && ED.tab === 'pub') buildPanel(); }
+function pubRow(x) {
+  const st = (typeof TG_STATUS !== 'undefined' && TG_STATUS[x.status]) || ['', '', 'info'], queued = x.status === 'queued', canEdit = x.canEdit !== false;
+  const th = el('div', { class: 'cthumb pubth', 'data-id': x.id }); if (typeof CAL !== 'undefined' && CAL.thumbs[x.id]) { th.style.backgroundImage = 'url(' + CAL.thumbs[x.id] + ')'; th.classList.add('has'); }
+  const acts = el('div', { class: 'row wrapr pubacts' });
+  if (queued && canEdit) {
+    acts.appendChild(el('button', { type: 'button', class: 'btn sm line', onclick: function () { postDialog(x); } }, [ico('pencil'), 'عدّل']));
+    acts.appendChild(el('button', { type: 'button', class: 'btn sm ghost', onclick: async function (e) {
+      const b = e.currentTarget;
+      if (!(await ask('إلغاء الجدولة', 'لن يُنشر هذا المنشور' + (x.repeat ? '، ويتوقف تكراره' : '') + '.', 'ألغِ', true))) return;
+      await withBusy(b, async function () { await API6.me('tg_cancel', x.id); x.status = 'cancelled'; POSTS = null; }, { busy: 'نلغي…', done: 'أُلغي' }).then(function () { setTimeout(pubRefresh, 600); }).catch(function () {});
+    } }, ['ألغِ']));
+  } else if (canEdit) {
+    acts.appendChild(el('button', { type: 'button', class: 'btn sm line', title: 'بالصورة والنص نفسيهما في موعد جديد', onclick: function () { PUB.rq = { x: x, known: (PUB.list || []).map(function (y) { return y.id; }) }; requeueDialog(x); } }, [ico('cal'), 'أعد جدولته']));
+    acts.appendChild(el('button', { type: 'button', class: 'btn sm ghost', title: 'افتح نافذة النشر بهذا النص مع التصميم الحالي', onclick: function () { captionDialog({ caption: x.caption || '' }); } }, [ico('send'), 'انشره من جديد']));
+  }
+  if (x.link) acts.appendChild(el('a', { class: 'btn sm ghost', href: x.link, target: '_blank', rel: 'noopener' }, [ico('link'), 'في القناة']));
+  return el('div', { class: 'pubrow ' + (x.status || '') }, [
+    el('button', { type: 'button', class: 'pubmain', title: 'التفاصيل والنص', onclick: function () { postDialog(x); } }, [th,
+      el('div', { class: 'pubinfo' }, [
+        el('div', { class: 'row wrapr' }, [el('span', { class: 'pill ' + st[1] }, [ico(st[2]), st[0]]), x.repeat ? el('span', { class: 'pill' }, [ico('history'), repeatLabel(x.repeat)]) : null]),
+        el('b', { class: 'pubtime', text: fmtTime(x.status === 'sent' && x.sentAt ? x.sentAt : x.when) }),
+        el('small', { class: 'tiny pubcap', text: capPlain(x.caption || '').replace(/\s+/g, ' ').slice(0, 90) || 'بلا نص' }),
+        x.err ? el('small', { class: 'tiny err', text: 'سبب الفشل: ' + x.err }) : null,
+        !x.mine && x.name ? el('small', { class: 'tiny', text: 'نشره ' + x.name }) : null
+      ])]),
+    acts.children.length ? acts : null
+  ]);
+}
+function pPub(b) {
+  const ok = canSend();
+  b.appendChild(panelHead('النشر', 'النص المصاحب، والإرسال إلى قناة البرنامج الآن أو في موعد، ومتابعة ما نشرته من هذا التصميم.'));
+  b.appendChild(el('div', { class: 'pubto' + (ok ? '' : ' warn') }, [ico(ok ? 'send' : 'info'), el('span', { text: ok ? 'إلى ' + (pubChatName() || 'القناة') : sendWhy() + ' ويمكنك نسخ النص وإرساله بنفسك.' })]));
+  b.appendChild(el('div', { class: 'pubgo' }, [
+    el('button', { type: 'button', class: 'btn dark', id: 'pub_cap', onclick: function () { captionDialog(); } }, [ico('send'), ok ? 'اكتب النص وأرسل' : 'اكتب النص']),
+    ok ? el('button', { type: 'button', class: 'btn line', id: 'pub_later', onclick: function () { captionDialog({ later: true }); } }, [ico('cal'), 'جدوله في موعد']) : null
+  ]));
+  b.appendChild(el('h4', { class: 'psh', text: 'منشورات هذا التصميم' }));
+  b.appendChild(el('p', { class: 'tiny', text: 'ما أُرسل أو جُدول منه، بحالته وموعده. انقر منشوراً لتفاصيله وتعديل نصه.' }));
+  if (!ED.doc.id) b.appendChild(el('div', { class: 'pubsave' }, [el('span', { class: 'small', text: 'لم يُحفظ هذا التصميم بعد، فتظهر هنا منشورات هذه الجلسة فقط. احفظه ليُربط به كل ما تنشره منه.' }), el('button', { type: 'button', class: 'btn sm line', onclick: function () { saveDialog(function () { pubRefresh(); }); } }, [ico('heart'), 'احفظه'])]));
+  const box = el('div', { class: 'publist', 'aria-live': 'polite' }, [el('p', { class: 'tiny' }, [el('span', { class: 'spin' }), ' نجلب المنشورات…'])]);
+  b.appendChild(box);
+  b.appendChild(el('a', { class: 'btn sm ghost pubcal', href: '#/cal' }, [ico('cal'), 'كل منشورات البرنامج في التقويم']));
+  // إن عدّل منشوراً من نوافذ التقويم (التفاصيل، إعادة الجدولة) نعيد رسم القائمة هنا
+  if (typeof CAL !== 'undefined') CAL.redraw = function () { pubRefresh(); };
+  const doc = ED.doc;
+  pubLoad().then(function (all) {
+    if (ED.doc !== doc || !box.isConnected) return;
+    // ما أُعيدت جدولته من هنا نسخة جديدة بمعرّف جديد؛ نضمّها إلى منشورات الجلسة (للتصميم غير المحفوظ)
+    if (PUB.rq) all.forEach(function (y) { if (PUB.rq.known.indexOf(y.id) < 0 && y.caption === PUB.rq.x.caption && y.title === PUB.rq.x.title && ED.pubIds.indexOf(y.id) < 0) ED.pubIds.push(y.id); });
+    const mine = all.filter(pubMine), up = mine.filter(function (x) { return x.status === 'queued'; }).sort(function (a, c) { return a.when - c.when; }), past = mine.filter(function (x) { return x.status !== 'queued'; }).sort(function (a, c) { return (c.sentAt || c.when) - (a.sentAt || a.when); });
+    box.innerHTML = '';
+    if (!mine.length) { box.appendChild(el('div', { class: 'pubempty' }, [ico('send'), el('span', { text: 'لم يُنشر من هذا التصميم شيء بعد.' })])); return; }
+    if (up.length) { box.appendChild(el('div', { class: 'pubgrp', text: 'القادمة (' + up.length + ')' })); up.forEach(function (x) { box.appendChild(pubRow(x)); }); }
+    if (past.length) { box.appendChild(el('div', { class: 'pubgrp', text: 'السابقة (' + past.length + ')' })); past.slice(0, 20).forEach(function (x) { box.appendChild(pubRow(x)); }); }
+    if (typeof calThumbs === 'function') calThumbs(mine.map(function (x) { return x.id; }));
+  }).catch(function (e) { if (!box.isConnected) return; box.innerHTML = ''; box.appendChild(el('p', { class: 'err small', text: 'تعذّر جلب المنشورات: ' + e.message })); box.appendChild(el('button', { type: 'button', class: 'btn sm line', onclick: function () { pubRefresh(); } }, [ico('reset'), 'أعد المحاولة'])); });
 }

@@ -1,14 +1,14 @@
 /* ================= المحرر على الجوال: التصميم ظاهر دائماً، والأدوات ورقة سفلية بثلاثة مستويات (طرف، نصف، كامل) =================
    نعيد استعمال محرك المحرر كاملاً (Konva، اللوحات، الحفظ)، ونغيّر البنية والترتيب: الأهم أولاً، والباقي خلف «المزيد». */
 const MED = { detent: 'peek', h: { peek: 112, half: 0.5, full: 0.8 } };
-const M_RAIL_ORDER = ['content', 'colors', 'imgs', 'bg', 'tpls', 'anim', 'text', 'els', 'fonts', 'layers', 'assist'];
+const M_RAIL_ORDER = ['content', 'colors', 'imgs', 'bg', 'tpls', 'anim', 'pub', 'text', 'els', 'fonts', 'layers', 'assist'];
 // الترتيب حسب الأولوية على الجوال، وكل الأدوات متاحة (التحكم الكامل) ضمن حدود درجة التعديل
 const railItemsDesk = railItems;
 railItems = function () {
   if (!document.body.classList.contains('mapp')) return railItemsDesk();
   const lv = LEVEL_TABS[editLevel()];
   const all = RAIL.slice(); if (ED.doc && ED.doc.kind === 'deck') all.push(['anim', 'الحركة', 'sparkles', 1]);
-  return all.filter(function (r) { return !lv || lv.indexOf(r[0]) >= 0; }).sort(function (a, b) { return M_RAIL_ORDER.indexOf(a[0]) - M_RAIL_ORDER.indexOf(b[0]); });
+  return railAdjust(all.filter(function (r) { return !lv || lv.indexOf(r[0]) >= 0; })).sort(function (a, b) { return M_RAIL_ORDER.indexOf(a[0]) - M_RAIL_ORDER.indexOf(b[0]); });
 };
 function sheetPx(d) { const v = MED.h[d]; return v <= 1 ? Math.round(innerHeight * v) : v; }
 function sheetTo(d, animate) {
@@ -101,7 +101,7 @@ showEditor6 = function (doc, fromDraft) {
   const top = $('.e-top'); if (top && !top.querySelector('.e-more')) {
     const more = el('button', { type: 'button', class: 'ib e-more', 'aria-label': 'خيارات التصميم', onclick: function () {
       mactions(null, [
-        doc.kind !== 'deck' ? { t: 'النص المصاحب والنشر في القناة', ic: 'send', fn: function () { captionDialog(); } } : null,
+        doc.kind !== 'deck' ? { t: 'النص المصاحب والنشر في القناة', ic: 'send', fn: function () { openPublish(false); } } : null,
         { t: 'شارك بالرابط مع فريقك', ic: 'share', fn: function () { shareDialog(); } },
         { t: 'مراجعة التصميم', ic: 'review', fn: function () { const b = $('#e_rv'); if (b) reviewMenu(b); } },
         { t: 'التعليقات', ic: 'comment', fn: function () { commentsDialog(); } },
