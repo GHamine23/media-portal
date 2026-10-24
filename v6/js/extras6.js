@@ -180,13 +180,22 @@ function verifiedTextDialog(done) {
     list.innerHTML = '';
     const show = kind === 'ayah' ? items : items.filter(function (h) { return showWeak || h.sahih; });
     if (!show.length) { list.appendChild(el('p', { class: 'tiny', text: items.length ? 'كل النتائج ضعيفة الحكم؛ فعّل إظهارها إن أردت.' : 'لا نتائج.' })); return; }
+    // في العروض: الآيات المتتالية تُدرج معاً مع زر تلاوة بصوت قارئ
+    const tl = kind === 'ayah' && done === insertVerified && typeof addTilawaLayer === 'function' && typeof ED !== 'undefined' && ED.doc && ED.doc.kind === 'deck';
+    const run = tl && show.length > 1 && show.every(function (x, k) { return x.sn === show[0].sn && x.n === show[0].n + k; });
+    if (run) {
+      const a = show[0].n, b = show[show.length - 1].n, txt = show.map(function (x) { return x.text + ' (' + arabicDigits(x.n) + ')'; }).join(' '), ref = '[' + show[0].surah + ': ' + arabicDigits(a) + '–' + arabicDigits(b) + ']';
+      list.appendChild(el('div', { class: 'vrun' }, [el('span', { class: 'tiny', text: 'الآيات ' + arabicDigits(a) + '–' + arabicDigits(b) + ' معاً' }), el('span', { class: 'sp' }),
+        el('button', { type: 'button', class: 'btn sm dark', onclick: function () { done({ kind: 'ayah', text: txt, ref: ref, line: '﴿' + txt + '﴾ ' + ref }); addTilawaLayer({ s: show[0].sn, a: a, b: b }); closeTop(); } }, [ico('play'), el('span', { text: 'أدرجها مع التلاوة' })])]));
+    }
     show.forEach(function (it) {
       const ref = kind === 'ayah' ? '[' + it.surah + ': ' + arabicDigits(it.n) + ']' : (it.source ? it.source + (it.page ? ' ' + arabicDigits(it.page) : '') : '');
       const row = el('div', { class: 'vrow' + (kind === 'hadith' && !it.sahih ? ' weak' : '') }, [
         el('p', { class: 'vtext', text: kind === 'ayah' ? '﴿' + it.text + '﴾' : '«' + it.text + '»' }),
         kind === 'hadith' && it.full && it.full !== it.text ? el('details', { class: 'vfull' }, [el('summary', { class: 'tiny', text: 'النص كاملاً بالسند' }), el('p', { class: 'tiny', dir: 'rtl', text: it.full })]) : null,
         el('div', { class: 'row wrapr tiny' }, [el('span', { class: 'pill', text: kind === 'ayah' ? it.surah + ' ' + arabicDigits(it.n) : (it.grade || 'بلا حكم') }), kind === 'hadith' ? el('span', { text: [it.rawi && 'الراوي: ' + it.rawi, it.muhaddith && 'المحدث: ' + it.muhaddith, ref].filter(Boolean).join(' · ') }) : null,
-          el('span', { class: 'sp' }), el('button', { type: 'button', class: 'btn sm dark', text: 'أدرج', onclick: function () { done({ kind: kind, text: it.text, ref: ref, grade: it.grade || '', line: kind === 'ayah' ? '﴿' + it.text + '﴾ ' + ref : '«' + it.text + '» ' + (it.source ? '— ' + ref : '') }); closeTop(); } })])
+          el('span', { class: 'sp' }), el('button', { type: 'button', class: 'btn sm dark', text: 'أدرج', onclick: function () { done({ kind: kind, text: it.text, ref: ref, grade: it.grade || '', line: kind === 'ayah' ? '﴿' + it.text + '﴾ ' + ref : '«' + it.text + '» ' + (it.source ? '— ' + ref : '') }); closeTop(); } }),
+          tl && it.sn ? el('button', { type: 'button', class: 'btn sm line', title: 'النص وزر يُسمِع الآية بصوت قارئ في العرض', onclick: function () { done({ kind: 'ayah', text: it.text, ref: ref, line: '﴿' + it.text + '﴾ ' + ref }); addTilawaLayer({ s: it.sn, a: it.n, b: it.n }); closeTop(); } }, [ico('play'), el('span', { text: 'مع التلاوة' })]) : null])
       ]);
       list.appendChild(row);
     });

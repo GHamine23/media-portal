@@ -110,6 +110,13 @@ async def main():
         await m.evaluate("const r=document.querySelector('.mrail'); const rb=r.getBoundingClientRect(); const b=[...r.querySelectorAll('button')].find(x=>{const q=x.getBoundingClientRect(); return q.left>rb.left+20 && q.right<rb.right-20 && !x.classList.contains('on')}); b.click()"); await m.wait_for_timeout(120)
         x1 = await m.evaluate("document.querySelector('.mrail').scrollLeft")
         ok(abs(x1 - x0) < 2, 'tool rail keeps its position when a visible tool is tapped (%s → %s)' % (x0, x1))
+        # تعديل الصورة على الجوال: النقر على مرشّح لا يعيد اللوحة إلى أعلاها
+        await m.evaluate("addLayer6({t:'img', ref:'lib:img_dome', w:0.5}); openElPanel(S.sel); sheetTo('full')"); await m.wait_for_timeout(900)
+        y0 = await m.evaluate("const b=document.querySelector('#e_panel .pbody'); const t=document.querySelector('.fxrow'); b.scrollTop = t.getBoundingClientRect().top - b.getBoundingClientRect().top + b.scrollTop - 60; t.scrollLeft = -150; [b.scrollTop, t.scrollLeft]")
+        await m.evaluate("document.querySelectorAll('.fxrow .fxb')[3].click()"); await m.wait_for_timeout(500)
+        y1 = await m.evaluate("[document.querySelector('#e_panel .pbody').scrollTop, document.querySelector('.fxrow').scrollLeft]")
+        ok(y0[0] > 100 and abs(y1[0] - y0[0]) < 3 and abs(y1[1] - y0[1]) < 3, 'image edits keep the panel where it was on mobile (%s → %s)' % (y0, y1))
+        await m.screenshot(path=OUT + 'aa_m_fx.png')
         print('ERRORS', [e for e in errs if '404' not in e][:5]); await b.close()
 def document_has(t): return True
 if __name__ == "__main__": asyncio.run(main())

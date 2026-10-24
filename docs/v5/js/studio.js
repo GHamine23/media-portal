@@ -120,7 +120,7 @@ function drawLayer(ctx, W, H, L, T) {
     else if (L.t === 'audio') {
       ctx.fillStyle = L.c || T.c.p; rrect(ctx, -w / 2, -h / 2, w, h, h / 2); ctx.fill();
       const r = h * 0.3; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(w / 2 - h * 0.62 - r * 0.4, -r * 0.6); ctx.lineTo(w / 2 - h * 0.62 + r * 0.6, 0); ctx.lineTo(w / 2 - h * 0.62 - r * 0.4, r * 0.6); ctx.closePath(); ctx.fill();
-      line(ctx, L.title || 'صوت', w / 2 - h * 1.1, 0, { size: h * 0.42, color: '#ffffff', align: 'right', maxW: w - h * 1.4 });
+      line(ctx, L.title || (L.qr ? 'استمع للتلاوة' : 'صوت'), w / 2 - h * 1.1, 0, { size: h * 0.42, color: '#ffffff', align: 'right', maxW: w - h * 1.4 });
     }
     else if (src && L.t === 'img') drawImgLayer(ctx, src, w, h, L, T);
     else if (src) ctx.drawImage(src, -w / 2, -h / 2, w, h);

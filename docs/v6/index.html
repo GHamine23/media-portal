@@ -1980,7 +1980,8 @@ body.mapp .e-cropbar .crt { display: none; }
 
 /* --- الوسائط في لوحة العناصر --- */
 .mediasec{display:flex;flex-direction:column;gap:8px}
-.mdtiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mdtiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.mdtile.tl{grid-column:1/-1;grid-template-columns:auto 1fr;justify-items:start;min-height:56px;padding:10px 14px;font-weight:600;background:linear-gradient(135deg,var(--ac-soft),var(--card) 70%)}
 .mdtile{display:grid;justify-items:center;align-content:center;gap:6px;min-height:76px;padding:10px 6px;border:1px solid var(--line);border-radius:14px;background:var(--card);font-size:12.5px;color:var(--ink1);cursor:pointer;transition:border-color .2s,background .2s,transform .25s var(--spring)}
 .mdtile:hover{border-color:var(--ac);background:var(--ac-soft);transform:translateY(-1px)}
 .mdtile svg{width:24px;height:24px;color:var(--ac)}
@@ -2008,6 +2009,28 @@ body.mapp .e-cropbar .crt { display: none; }
 .cvst.done{background:var(--ac-soft)}
 .cvgo{align-self:flex-start;display:inline-flex;gap:8px}
 
+/* التلاوة في العرض الحي */
+.pmbox.pm-audio,.pmbox.pm-audio.playing::after{border-radius:999px}
+.pmbox.pm-tl{overflow:visible}
+.pm-tl .tlbar{position:absolute;inset:auto 14% 12% 14%;height:3px;border-radius:3px;background:rgba(255,255,255,.3);overflow:hidden;opacity:0;transition:opacity .3s;pointer-events:none}
+.pm-tl.playing .tlbar{opacity:1}
+.pm-tl .tlprog{display:block;height:100%;width:0;background:#fff;border-radius:3px;transition:width .25s linear}
+.pm-tl .tlnum{position:absolute;top:50%;left:-8px;transform:translate(-100%,-50%);min-width:2.2em;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font-size:clamp(11px,1.3vw,17px);text-align:center;pointer-events:none;animation:fadeIn .3s both}
+.pm-tl .tlqari{position:absolute;bottom:calc(100% + 8px);right:50%;transform:translateX(50%);white-space:nowrap;padding:5px 13px;border-radius:999px;border:0;background:rgba(0,0,0,.62);color:#fff;font:inherit;font-size:12.5px;cursor:pointer;opacity:0;transition:opacity .25s;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.pm-tl .tlqari::after{content:' ▾';opacity:.75}
+.present6.awake .pm-tl .tlqari,.present6.touch .pm-tl .tlqari,.pm-tl:hover .tlqari,.pm-tl .tlqari:focus-visible{opacity:1}
+.pm-tl .tlmenu{position:absolute;bottom:calc(100% + 44px);right:50%;transform:translateX(50%);z-index:5;max-height:min(58vh,420px);overflow:auto;min-width:230px;padding:6px;border-radius:14px;background:rgba(18,18,20,.94);box-shadow:0 14px 44px rgba(0,0,0,.45);animation:popIn .2s both}
+.pm-tl.tl-down .tlqari{bottom:auto;top:calc(100% + 8px)}
+.pm-tl.tl-down .tlmenu{bottom:auto;top:calc(100% + 44px)}
+.pm-tl .tlmenu button{display:block;width:100%;text-align:right;padding:8px 12px;border:0;border-radius:9px;background:none;color:#fff;font:inherit;font-size:14px;cursor:pointer}
+.pm-tl .tlmenu button:hover{background:rgba(255,255,255,.1)}
+.pm-tl .tlmenu button.on{background:rgba(255,255,255,.18);font-weight:600}
+.pm-tl .tlmenu small{display:block;opacity:.7;font-size:11.5px;font-weight:400}
+.tlrange{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tlrange label{display:grid;gap:4px;font-size:13px;color:var(--ink2)}
+.tlinfo{margin:-2px 0 4px;color:var(--ink2)}
+.vrun{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;border-radius:12px;background:var(--ac-soft)}
+
 </style>
 </head>
 <body class="app">
@@ -2025,7 +2048,7 @@ body.mapp .e-cropbar .crt { display: none; }
 <script src="js/templates3.js?v=0f2ff161cf"></script>
 <script src="js/templates4.js?v=2e2e28da1d"></script>
 <script src="js/core5.js?v=07c30ccba2"></script>
-<script src="js/studio.js?v=917f2a575e"></script>
+<script src="js/studio.js?v=83de3ac579"></script>
 <script src="js/slides.js?v=849b6bf589"></script>
 <script src="js/qr.js?v=4c79be1679"></script>
 <script src="js/ticons.js?v=d1041b1786"></script>
@@ -2037,16 +2060,17 @@ body.mapp .e-cropbar .crt { display: none; }
 <script src="js/home6.js?v=d347688218"></script>
 <script src="js/updates6.js?v=1210eaa02d"></script>
 <script src="js/motion6.js?v=c3c5dbc6be"></script>
-<script src="js/kb6.js?v=8f7305f987"></script>
+<script src="js/kb6.js?v=1f7cd63469"></script>
 <script src="js/guide6.js?v=c4636f695a"></script>
 <script src="js/editor6.js?v=002d51fc20"></script>
-<script src="js/panels6.js?v=6e86ec1e3f"></script>
+<script src="js/panels6.js?v=e315629e56"></script>
 <script src="js/docs6.js?v=3c32ecf75f"></script>
 <script src="js/make6.js?v=a6b2855dcb"></script>
 <script src="js/caption6.js?v=ee66ba7087"></script>
 <script src="js/cal6.js?v=5d32d6c604"></script>
-<script src="js/slides6.js?v=2e78ef139f"></script>
-<script src="js/extras6.js?v=2a5cdd3f4d"></script>
+<script src="js/slides6.js?v=971da2ab99"></script>
+<script src="js/tilawa6.js?v=11d3291d30"></script>
+<script src="js/extras6.js?v=707d5494bd"></script>
 <script src="js/tips6.js?v=86b4f361a7"></script>
 <script src="js/social6.js?v=05c796e7ed"></script>
 <script src="js/mine6.js?v=564318db7d"></script>

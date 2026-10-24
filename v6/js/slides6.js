@@ -211,7 +211,7 @@ function present6(fromView, startAt) {
   /* ---------- الوسائط فوق مكانها: تبقى ما دامت الشريحة نفسها، وتُضاف عند ظهورها بنقرة ---------- */
   function placeMedia(q, boxes, delay) {
     const sz = SIZES[q.size || 'slide'], r = stage.clientWidth / sz.w, fresh = mediaSlide !== i;
-    if (fresh) { media.innerHTML = ''; mediaSlide = i; if (delay) media.animate([{ opacity: 0 }, { opacity: 0, offset: 0.7 }, { opacity: 1 }], { duration: delay + 250 }); }
+    if (fresh) { $$('.pmbox', media).forEach(function (x) { if (x._stop) x._stop(); }); media.innerHTML = ''; mediaSlide = i; if (delay) media.animate([{ opacity: 0 }, { opacity: 0, offset: 0.7 }, { opacity: 1 }], { duration: delay + 250 }); }
     const keep = {};
     (q.layers || []).forEach(function (L) {
       if (!isMedia(L)) return;
@@ -226,7 +226,7 @@ function present6(fromView, startAt) {
         if (L.fr) { box.classList.add('fr'); box.style.setProperty('--frw', Math.max(1, Math.min(w, h) * 0.022) + 'px'); box.style.setProperty('--frc', L.fr === 'p' ? ((T && T.c && T.c.p) || '#fff') : L.fr); }
       }
     });
-    $$('.pmbox', media).forEach(function (x) { if (!keep[x.dataset.id]) x.remove(); });
+    $$('.pmbox', media).forEach(function (x) { if (!keep[x.dataset.id]) { if (x._stop) x._stop(); x.remove(); } });
   }
   function mediaBox(L, w, h, delay) {
     const box = el('div', { class: 'pmbox pm-' + L.t + (L.sh ? ' pmsh' : '') });
@@ -248,6 +248,7 @@ function present6(fromView, startAt) {
       if (L.auto) later(play, delay + 120);
       return box;
     }
+    if (L.t === 'audio' && L.qr && typeof tilawaBox === 'function') return tilawaBox(L, box, later, delay);
     const el2 = el(L.t === 'video' ? 'video' : 'audio', { class: L.t === 'video' ? 'pmvideo' : '', playsinline: '', preload: 'metadata' });
     const v = el2; v.muted = !!L.mute;
     if (L.t === 'video') { if (L.ctl !== false) v.controls = true; if (L.fit === 'cover') v.style.objectFit = 'cover'; }
@@ -338,7 +339,7 @@ function present6(fromView, startAt) {
   blank.addEventListener('click', hideBlank);
   grid.addEventListener('click', function (e) { if (e.target === grid) { grid.hidden = true; ov.focus(); } });
   function close() {
-    settle(); document.removeEventListener('keydown', key); window.removeEventListener('resize', onResize);
+    settle(); $$('.pmbox', media).forEach(function (x) { if (x._stop) x._stop(); }); document.removeEventListener('keydown', key); window.removeEventListener('resize', onResize);
     if (timer) clearInterval(timer); if (chan) chan.close(); ov.remove();
     try { if (wakeLock) wakeLock.release(); } catch (e) {}
     try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
@@ -501,7 +502,7 @@ function mediaPanelSection(b) {
   if (!ED.doc || ED.doc.kind !== 'deck') return;
   const mb = V6.settings.maxUploadMb || 20;
   const sec = el('div', { class: 'mediasec' });
-  sec.append(el('h4', { class: 'psh', text: 'فيديو وصوت ويوتيوب' }), el('p', { class: 'tiny', text: 'تعمل أثناء العرض الحي، وتبقى بطاقة في PDF. الملفات حتى ' + mb + ' ميغابايت.' }));
+  sec.append(el('h4', { class: 'psh', text: 'تلاوة وفيديو وصوت' }), el('p', { class: 'tiny', text: 'تعمل أثناء العرض الحي، وتبقى بطاقة في PDF. الملفات حتى ' + mb + ' ميغابايت.' }));
   // زر يعرض أنه يعمل ثم ✓ (withBusy يعرض الخطأ إن أخفق)
   function busy(btn, label, fn) { withBusy(btn, fn, { busy: label, done: 'أُضيف' }).catch(function () {}); }
   let vBtn, aBtn;
@@ -516,9 +517,10 @@ function mediaPanelSection(b) {
     busy(aBtn, 'نرفع الصوت…', async function () { const r = await uploadAsset(f, { kind: 'audio', name: f.name }); addLayer6({ t: 'audio', ref: 'asset:' + r.id, w: 0.26, title: f.name.replace(/\.[^.]+$/, '').slice(0, 30) }); });
   } });
   vBtn = el('button', { type: 'button', class: 'mdtile', onclick: function () { vf.click(); } }, [ico('play'), el('span', { text: 'فيديو من الجهاز' })]);
-  aBtn = el('button', { type: 'button', class: 'mdtile', onclick: function () { af.click(); } }, [ico('bell'), el('span', { text: 'صوت أو تلاوة' })]);
+  aBtn = el('button', { type: 'button', class: 'mdtile', onclick: function () { af.click(); } }, [ico('bell'), el('span', { text: 'ملف صوت' })]);
   const yBtn = el('button', { type: 'button', class: 'mdtile yt', onclick: ytDialog }, [svgOf('<rect x="8" y="22" width="84" height="56" rx="16" fill="currentColor"/><path d="M42 37v26l22-13z" fill="#fff"/>'), el('span', { text: 'رابط يوتيوب' })]);
-  sec.append(vf, af, el('div', { class: 'mdtiles' }, [yBtn, vBtn, aBtn]));
+  const tBtn = typeof tilawaDialog === 'function' ? el('button', { type: 'button', class: 'mdtile tl', onclick: function () { tilawaDialog(); } }, [ico('book'), el('span', { text: 'تلاوة آيات بصوت قارئ' })]) : null;
+  sec.append(vf, af, el('div', { class: 'mdtiles' }, [tBtn, yBtn, vBtn, aBtn]));
   b.appendChild(sec);
 }
 // إضافة يوتيوب: الرابط والعنوان في نافذة واحدة، مع صورة المقطع للتأكد
@@ -550,6 +552,7 @@ function fmtClock(n) { n = Math.floor(+n || 0); if (!n) return ''; const h = Mat
 const YT_AR = { '16:9': 9 / 16, '9:16': 16 / 9, '4:3': 3 / 4, '1:1': 1 };
 function mediaElSettings(L, b) {
   if (!isMedia(L)) return;
+  if (L.qr && typeof tilawaSettings === 'function') { tilawaSettings(L, b); return; }
   const vis = L.t !== 'audio', set = function (k, v) { if (v === undefined || v === '' || (v === false && k !== 'ctl')) delete L[k]; else L[k] = v; changed6(); };
   const box = el('div', { class: 'mset' });
   box.append.apply(box, anSection('في العرض الحي', L.t === 'yt' ? 'يعمل المقطع داخل العرض نفسه حين تصل إلى شريحته.' : 'يعمل الملف حين تصل إلى شريحته.'));

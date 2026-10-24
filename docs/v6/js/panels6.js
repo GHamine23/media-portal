@@ -21,14 +21,31 @@ function panelHead(title, note) {
 }
 function buildPanel() {
   const p = $('#e_panel'); if (!p) return;
-  const st = p.scrollTop;
+  const st = p.scrollTop, keep = panelState(p);
   p.innerHTML = '';
   p.appendChild(el('div', { class: 'grab', 'aria-hidden': 'true' }));
   const body = el('div', { class: 'pbody' }); p.appendChild(body);
   ({ content: pContent, tpls: pTpls, text: pText, els: pEls, imgs: pImgs, colors: pColors, fonts: pFonts, layers: pLayers, assist: pAssist, el: pEl, anim: pAnim, bg: pBg, pub: pPub }[ED.tab] || pContent)(body);
   // حركة هادئة عند تبديل اللوحة فقط (لا عند كل تعديل): ظهور خفيف، والأجزاء الأولى تتتابع قليلاً
   if (ED.lastTab !== ED.tab) { body.classList.add('fresh'); Array.prototype.forEach.call(body.children, function (c, i) { c.style.setProperty('--i', Math.min(i, 8)); }); ED.lastTab = ED.tab; p.scrollTop = 0; }
-  else p.scrollTop = st;
+  else { p.scrollTop = st; restorePanelState(p, keep); }
+  ED.lastElG = ED.elG;
+}
+// بعد إعادة بناء اللوحة للتبويب نفسه: يبقى موضع التمرير (الجوال يمرّر جسم اللوحة لا اللوحة) وصفوف التمرير الأفقي والأقسام المفتوحة
+function panelState(p) {
+  const b = p.querySelector('.pbody'); if (!b) return null;
+  const xs = {}, open = {};
+  $$('*', b).forEach(function (n) { if (n.scrollLeft && n.className) { const k = String(n.className); (xs[k] = xs[k] || []).push(n.scrollLeft); } });
+  $$('details', b).forEach(function (d) { const s = d.querySelector('summary'); if (s) open[s.textContent] = d.open; });
+  return { y: b.scrollTop, xs: xs, open: open, tab: ED.tab, g: ED.elG };
+}
+function restorePanelState(p, k) {
+  const b = p.querySelector('.pbody'); if (!b || !k || k.tab !== ED.tab || (ED.tab === 'el' && k.g !== ED.elG)) return;
+  $$('details', b).forEach(function (d) { const s = d.querySelector('summary'); if (s && k.open[s.textContent] != null) d.open = k.open[s.textContent]; });
+  Object.keys(k.xs).forEach(function (c) { const ns = $$('*', b).filter(function (n) { return String(n.className) === c; }); k.xs[c].forEach(function (x, i) { if (ns[i]) { ns[i].style.scrollBehavior = 'auto'; ns[i].scrollLeft = x; ns[i].style.scrollBehavior = ''; } }); });
+  b.scrollTop = k.y;
+  // بعض الأقسام تكتمل بعد لحظة (معاينات المرشحات): نعيد الموضع مرة أخرى
+  requestAnimationFrame(function () { if (b.isConnected && Math.abs(b.scrollTop - k.y) > 2) b.scrollTop = k.y; });
 }
 
 /* ---------- المحتوى ---------- */
@@ -245,7 +262,7 @@ function pBg(b) {
 /* ---------- الصور ---------- */
 function pImgs(b) {
   const deck = ED.doc.kind === 'deck';
-  b.appendChild(panelHead(deck ? 'الوسائط' : 'الصور', deck ? 'صور وفيديو وصوت ويوتيوب لشرائحك، بجودتها الأصلية.' : 'صورك وصور المكتبة والصور المجانية، بجودتها الأصلية.'));
+  b.appendChild(panelHead(deck ? 'الوسائط' : 'الصور', deck ? 'صور وتلاوة وفيديو وصوت ويوتيوب لشرائحك، بجودتها الأصلية.' : 'صورك وصور المكتبة والصور المجانية، بجودتها الأصلية.'));
   b.appendChild(el('div', { class: 'imgrid big' }, [uploadBtn('ارفع صورة', function (res) { addLayer6({ t: 'img', ref: 'asset:' + res.id, w: 0.55 }); buildPanel(); })]));
   if (deck && typeof mediaPanelSection === 'function') mediaPanelSection(b);   // الفيديو والصوت ويوتيوب هنا وحدها
   b.appendChild(el('h4', { class: 'psh', text: 'صوري' }));

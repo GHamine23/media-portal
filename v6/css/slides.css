@@ -118,7 +118,8 @@
 
 /* --- الوسائط في لوحة العناصر --- */
 .mediasec{display:flex;flex-direction:column;gap:8px}
-.mdtiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mdtiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.mdtile.tl{grid-column:1/-1;grid-template-columns:auto 1fr;justify-items:start;min-height:56px;padding:10px 14px;font-weight:600;background:linear-gradient(135deg,var(--ac-soft),var(--card) 70%)}
 .mdtile{display:grid;justify-items:center;align-content:center;gap:6px;min-height:76px;padding:10px 6px;border:1px solid var(--line);border-radius:14px;background:var(--card);font-size:12.5px;color:var(--ink1);cursor:pointer;transition:border-color .2s,background .2s,transform .25s var(--spring)}
 .mdtile:hover{border-color:var(--ac);background:var(--ac-soft);transform:translateY(-1px)}
 .mdtile svg{width:24px;height:24px;color:var(--ac)}
@@ -145,3 +146,25 @@
 .cvst{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:14px;color:var(--ink2);padding:10px 12px;border-radius:12px;background:var(--bg2)}
 .cvst.done{background:var(--ac-soft)}
 .cvgo{align-self:flex-start;display:inline-flex;gap:8px}
+
+/* التلاوة في العرض الحي */
+.pmbox.pm-audio,.pmbox.pm-audio.playing::after{border-radius:999px}
+.pmbox.pm-tl{overflow:visible}
+.pm-tl .tlbar{position:absolute;inset:auto 14% 12% 14%;height:3px;border-radius:3px;background:rgba(255,255,255,.3);overflow:hidden;opacity:0;transition:opacity .3s;pointer-events:none}
+.pm-tl.playing .tlbar{opacity:1}
+.pm-tl .tlprog{display:block;height:100%;width:0;background:#fff;border-radius:3px;transition:width .25s linear}
+.pm-tl .tlnum{position:absolute;top:50%;left:-8px;transform:translate(-100%,-50%);min-width:2.2em;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font-size:clamp(11px,1.3vw,17px);text-align:center;pointer-events:none;animation:fadeIn .3s both}
+.pm-tl .tlqari{position:absolute;bottom:calc(100% + 8px);right:50%;transform:translateX(50%);white-space:nowrap;padding:5px 13px;border-radius:999px;border:0;background:rgba(0,0,0,.62);color:#fff;font:inherit;font-size:12.5px;cursor:pointer;opacity:0;transition:opacity .25s;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.pm-tl .tlqari::after{content:' ▾';opacity:.75}
+.present6.awake .pm-tl .tlqari,.present6.touch .pm-tl .tlqari,.pm-tl:hover .tlqari,.pm-tl .tlqari:focus-visible{opacity:1}
+.pm-tl .tlmenu{position:absolute;bottom:calc(100% + 44px);right:50%;transform:translateX(50%);z-index:5;max-height:min(58vh,420px);overflow:auto;min-width:230px;padding:6px;border-radius:14px;background:rgba(18,18,20,.94);box-shadow:0 14px 44px rgba(0,0,0,.45);animation:popIn .2s both}
+.pm-tl.tl-down .tlqari{bottom:auto;top:calc(100% + 8px)}
+.pm-tl.tl-down .tlmenu{bottom:auto;top:calc(100% + 44px)}
+.pm-tl .tlmenu button{display:block;width:100%;text-align:right;padding:8px 12px;border:0;border-radius:9px;background:none;color:#fff;font:inherit;font-size:14px;cursor:pointer}
+.pm-tl .tlmenu button:hover{background:rgba(255,255,255,.1)}
+.pm-tl .tlmenu button.on{background:rgba(255,255,255,.18);font-weight:600}
+.pm-tl .tlmenu small{display:block;opacity:.7;font-size:11.5px;font-weight:400}
+.tlrange{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tlrange label{display:grid;gap:4px;font-size:13px;color:var(--ink2)}
+.tlinfo{margin:-2px 0 4px;color:var(--ink2)}
+.vrun{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;border-radius:12px;background:var(--ac-soft)}
