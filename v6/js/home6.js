@@ -63,8 +63,7 @@ function showHome() {
   view(
     el('section', { class: 'hero hero2 wrap' }, [
       el('div', { class: 'hgreet' }, [
-        progMark(P),
-        el('span', { class: 'eyebrow rv', text: timeGreeting(nm) + ' · ' + P.name }),
+        progMark(P, '', timeGreeting(nm)) || el('span', { class: 'eyebrow rv', text: timeGreeting(nm) + ' · ' + P.name }),
         msg, src,
         el('div', { class: 'searchrow rv', style: '--d:2' }, [ico('search'), search]),
         // القادم في التقويم بجانب الساعة: يملأ العمود ولا يترك فراغاً تحت التحية
@@ -95,27 +94,30 @@ function progLogoInfo(P) {
   const T = TRACKS[(ids.find(function (t) { return t.logo === key || (t.logos || []).some(function (l) { return l[0] === key; }); }) || {}).id] || null;
   return { key: key, T: T };
 }
-function progLogoCanvas(P, wCss) {
+// الشعار بارتفاع معيّن (لا بعرض)، بلونه الأصلي ورقم الدفعة، بلا إطار
+function progLogoCanvas(P, hCss) {
   const inf = progLogoInfo(P); if (!inf) return null;
-  const im = IMG[inf.key], ar = srcH(im) / srcW(im), dpr = Math.min(2, window.devicePixelRatio || 1);
-  const W = wCss * dpr, pad = W * 0.06, H = W * ar + pad * 2;
-  const cv = el('canvas', { class: 'pmark-cv', width: Math.round(W + pad * 2), height: Math.round(H), role: 'img', 'aria-label': 'شعار ' + P.name });
+  const im = IMG[inf.key], ar = srcW(im) / srcH(im), dpr = Math.min(3, Math.max(2, window.devicePixelRatio || 1));
+  const H = hCss * dpr, W = H * ar, pad = H * 0.08;
+  const cv = el('canvas', { class: 'pmark-cv', width: Math.round(W + pad * 2), height: Math.round(H + pad * 2), role: 'img', 'aria-label': 'شعار ' + P.name });
   const ctx = cv.getContext('2d'); ctx.imageSmoothingQuality = 'high';
-  const T = inf.T ? Object.assign({}, inf.T, { logo: inf.key }) : { logo: inf.key, c: { a: P.color || '#c08f4e', s: P.color || '#c08f4e' } };
+  const T = inf.T ? Object.assign({}, inf.T, { logo: inf.key }) : { logo: inf.key, c: { a: P.color || '#c08f4e', s: P.color || '#c08f4e', p: P.color || '#222222' } };
   LGO = lgoOf(T, null);
   try {
     const L = LGO, mode = L.col || 'color', src = mode === 'color' ? im : tinted(inf.key, mode);
-    placeImg(ctx, src, pad, pad, W, 'tl');
-    if (L.show && L.n) batchMark(ctx, T, { x: pad, y: pad, w: W, h: W * ar }, mode, L);
+    ctx.drawImage(src, pad, pad, W, H);
+    if (L.show && L.n) batchMark(ctx, T, { x: pad, y: pad, w: W, h: H }, mode, L);
   } finally { LGO = null; }
-  cv.style.width = Math.round((W + pad * 2) / dpr) + 'px';
+  cv.style.height = Math.round((H + pad * 2) / dpr) + 'px'; cv.style.width = 'auto';
   return cv;
 }
-function progMark(P, cls) {
-  P = P || V6.prog; const cv = P && progLogoCanvas(P, cls === 'm' ? 200 : 300); if (!cv) return null;
-  const T = (progLogoInfo(P) || {}).T, paper = (T && T.c && (T.c.warm || T.c.paper)) || '#f6f3ec';
-  return el('div', { class: 'pmark rv' + (cls ? ' pmark-' + cls : ''), style: '--pm-bg:' + paper + ';--pm-ac:' + ((T && T.c && T.c.a) || P.color || '#c08f4e') + ';--pm-ink:' + ((T && T.c && T.c.p) || P.color || '#222') }, [
-    cv, P.tagline ? el('span', { class: 'pmark-tag', text: P.tagline }) : null
+// سطر الترحيب في الرئيسية: شعار البرنامج المفتوح يُكتب من اليمين، ثم الدفعة والتحية
+function progMark(P, cls, greet) {
+  P = P || V6.prog; const cv = P && progLogoCanvas(P, cls === 'm' ? 40 : 54); if (!cv) return null;
+  const T = (progLogoInfo(P) || {}).T, gold = (T && T.c && T.c.a) || P.color || '#c08f4e';
+  return el('div', { class: 'pmark' + (cls ? ' pmark-' + cls : ''), style: '--pm-ac:' + gold }, [
+    el('span', { class: 'pmark-logo' }, [cv]),
+    el('span', { class: 'pmark-txt' }, [P.tagline ? el('b', { class: 'pmark-tag', text: P.tagline }) : null, greet ? el('span', { class: 'pmark-greet', text: greet }) : null])
   ]);
 }
 

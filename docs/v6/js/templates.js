@@ -144,10 +144,12 @@ const TEMPLATES = [
     }
     if (hasDate) {
       G(ctx, 'date');
-      const s1 = 52 * qu, s2 = 30 * qu, gap = 30 * qu, yc = y + 62 * qu;
-      const wH = Math.max(textW(ctx, d.h1, s1, 0.7), textW(ctx, d.h2, s2)), wG = Math.max(textW(ctx, d.g1, s1, 0.7), textW(ctx, d.g2, s2));
-      const ar = d.link ? 76 * qu : 0;
-      const total = wH + (wG ? gap * 2 + wG : 0) + (ar ? gap * 1.6 + ar : 0);
+      let s1 = 52 * qu, s2 = 30 * qu, gap = 30 * qu; const yc = y + 62 * qu;
+      let wH = Math.max(textW(ctx, d.h1, s1, 0.7), textW(ctx, d.h2, s2)), wG = Math.max(textW(ctx, d.g1, s1, 0.7), textW(ctx, d.g2, s2));
+      let ar = d.link ? 76 * qu : 0;
+      let total = wH + (wG ? gap * 2 + wG : 0) + (ar ? gap * 1.6 + ar : 0);
+      // تاريخ طويل: يُصغَّر كله ليبقى داخل الدائرة
+      const room = Dm * 0.86; if (total > room) { const f = room / total; s1 *= f; s2 *= f; gap *= f; ar *= f; wH *= f; wG *= f; total = room; }
       let x = cx + total / 2;
       line(ctx, d.h1, x, yc - 22 * qu, { size: s1, color: txt, align: 'right', bold: 0.7 });
       line(ctx, d.h2, x, yc + 34 * qu, { size: s2, color: soft, align: 'right' });
@@ -313,7 +315,7 @@ const TEMPLATES = [
     G(ctx, 'logo'); drawLogo(ctx, T, W - 64 * u, H - 58 * u, 132 * u, isDark(base) ? '#ffffff' : 'color', 'br'); G(ctx, null);
     const twoCols = has(d.bLabel) || has(d.bText);
     const infoH = (has(d.aLabel) || has(d.aText) || twoCols) ? 160 * u : 0;
-    const tf = fit(ctx, d.title, { maxW: W * 0.7, maxH: 260 * u, size: 116 * u * k, lh: 1.22, balance: true, bold: 1, title: true });
+    const tf = fit(ctx, d.title, { maxW: W * 0.7, maxH: Math.min(260 * u, H * 0.3), size: 116 * u * k, lh: 1.22, balance: true, bold: 1, title: true });
     const subF = fit(ctx, d.sub, { maxW: W * 0.76, size: 38 * u, lh: 1.4, maxLines: 2 });
     const textH = tf.h + (subF.h ? subF.h + 20 * u : 0) + infoH + 60 * u;
     const imgTop = 120 * u + Math.max(0, H - 1350 * u) * 0.3, imgBot = H - 150 * u - textH - Math.max(0, H - 1350 * u) * 0.15;
@@ -326,8 +328,12 @@ const TEMPLATES = [
     G(ctx, 'sub'); if (subF.h) { drawFit(ctx, subF, W / 2, y, { align: 'center', color: isDark(base) ? '#ffffff' : C.s }); y += subF.h + 20 * u; }
     G(ctx, 'date');
     if (infoH) {
-      const yc = y + 72 * u, s1 = 34 * u, s2 = 40 * u, lab = isDark(base) ? C.pl : C.p;
+      const yc = y + 72 * u, lab = isDark(base) ? C.pl : C.p;
+      let s1 = 34 * u, s2 = 40 * u;
       const bw = function (l, t) { return 52 * u + Math.max(textW(ctx, l, s1, 0.4) + (has(t) ? 70 * u : 0), textW(ctx, t, s2, 0.5)); };
+      // التاريخ الطويل يُصغَّر ليبقى في عرض التصميم
+      const need = twoCols ? bw(d.aLabel, d.aText) + bw(d.bLabel, d.bText) + 80 * u : bw(d.aLabel, d.aText);
+      if (need > W * 0.9) { const f = Math.max(0.5, W * 0.9 / need); s1 *= f; s2 *= f; }
       function block(xr, l, t) {
         icon(ctx, 'moon', xr - 20 * u, yc - 26 * u, 40 * u, lab);
         const x0 = xr - 52 * u;
@@ -367,7 +373,7 @@ const TEMPLATES = [
     G(ctx, 'footer'); area(0, H - fh, W, H); academy(ctx, fc, W - 64 * u, H - fh / 2 - 22 * u, 132 * u, 'tr');
     social(ctx, fc, 60 * u, H - fh / 2 - 22 * u, 128 * u, 'tl');
     G(ctx, 'logo'); drawLogo(ctx, T, W - 64 * u, 56 * u, 120 * u, fg, 'tr'); G(ctx, null);
-    const tf = fit(ctx, d.title, { maxW: W * 0.82, maxH: 300 * u, size: 116 * u * k, lh: 1.22, balance: true, bold: 0.9, title: true });
+    const tf = fit(ctx, d.title, { maxW: W * 0.82, maxH: Math.min(300 * u, H * 0.38), size: 116 * u * k, lh: 1.22, balance: true, bold: 0.9, title: true });
     const ty = Math.max(160 * u, H * 0.11);
     G(ctx, 'title'); drawFit(ctx, tf, W / 2, ty, { align: 'center', color: OV.title || fg });
     let y = ty + tf.h;
@@ -375,6 +381,7 @@ const TEMPLATES = [
     G(ctx, 'deco');
     if (!D()) return;
     const cy = (y + 40 * u + H - fh) / 2 + 30 * u, cx = W / 2, sz = Math.min(W * 0.62, (H - fh - y) * 0.95);
+    if (sz < 60 * u) return;   // لا مكان للرسمة تحت عنوان طويل
     if (d.deco === 'book') {
       const bw = sz, baseY = cy + sz * 0.22;
       fillRR(ctx, cx - bw * 0.56, baseY, bw * 1.12, sz * 0.07, 8 * u, isDark(base) ? band : C.p);
@@ -868,7 +875,7 @@ function compText(ctx, W, H, d, T, k, y, u, sv, base) {
   if (has(d.d1) || has(d.d2)) {
     const sx = w2 ? x2 - s * 1.6 : W / 2 + 120 * u;
     icon(ctx, 'down', sx - 24 * u, y + 56 * sv, 36 * sv, C.p);
-    line(ctx, d.d1, sx, y + 112 * sv, { size: 30 * sv, color: ink, align: 'right', bold: 0.4 });
-    line(ctx, d.d2, sx, y + 158 * sv, { size: 30 * sv, color: ink, align: 'right', bold: 0.4 });
+    line(ctx, d.d1, sx, y + 112 * sv, { size: 30 * sv, color: ink, align: 'right', bold: 0.4, maxW: sx - 40 * u });
+    line(ctx, d.d2, sx, y + 158 * sv, { size: 30 * sv, color: ink, align: 'right', bold: 0.4, maxW: sx - 40 * u });
   }
 }

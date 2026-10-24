@@ -15,7 +15,7 @@ async def make_omr(pg):
         b64 = base64.b64encode(open(LG + '/' + fn, 'rb').read()).decode()
         await pg.evaluate("""async ([b64, key, name]) => { const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); const f = new File([bin], key + '.png', {type: 'image/png'}); await uploadAsset(f, {kind:'logo', scope:'program', program:'omr', key: key, name: name, thumb: ''}); }""", [b64, key, name])
     ident = {'id': 'khartah', 'group': 'act', 'name': 'خارطة الثغور', 'full': 'خارطة الثغور', 'desc': '', 'logo': 'lg_khartah', 'logos': [[k, n] for k, n, _ in files], 'c': C, 'lgo': {'n': '٤', 'show': True, 'x': 0.1, 'y': 0.3, 's': 0.3}}
-    await pg.evaluate("p => API6.me('prog_save', JSON.stringify(p))", {'id': 'omr', 'identities': [ident], 'logo': 'lg_khartah', 'tagline': 'الدفعة الرابعة'})
+    await pg.evaluate("p => API6.me('prog_save', JSON.stringify(p))", {'id': 'omr', 'identities': [ident], 'logo': 'lg_khartah_word', 'tagline': 'الدفعة الرابعة'})
     await pg.evaluate("refreshBundle()"); await pg.wait_for_timeout(1500)
 async def main():
     async with async_playwright() as p:
@@ -28,7 +28,8 @@ async def main():
         ok('"n":"٤"' in saved, 'server keeps batch settings: ' + saved)
         await pg.evaluate("go('#/'); render()"); await pg.wait_for_timeout(2500)
         ok(await pg.evaluate("!!document.querySelector('.hero .pmark canvas')"), 'programme logo shown on home')
-        ok('الدفعة الرابعة' in await pg.inner_text('.pmark'), 'tagline under the logo')
+        ok('الدفعة الرابعة' in await pg.inner_text('.pmark'), 'tagline beside the logo')
+        await pg.wait_for_timeout(2200)
         await pg.screenshot(path=OUT + 'y1_home.png')
         # المحرر: الشعار في القالب برقم الدفعة، ثم تبديل النسخة واللون وإخفاء الرقم
         await pg.goto(URL + '#/e/khartah/ann_panel'); await pg.wait_for_timeout(3000)
