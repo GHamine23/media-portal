@@ -1,6 +1,7 @@
+import os; _R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # جذر المستودع (يعمل في أي نسخة عمل)
 """اختبار النص المصاحب والإرسال إلى القناة والجدولة والتقويم."""
 import asyncio, sys
-sys.path.insert(0, '/home/claude/media-portal/v6')
+sys.path.insert(0, _R + '/v6')
 from t6 import setup, URL, OUT
 from playwright.async_api import async_playwright
 def ok(c, m): print(('✓ ' if c else '✗ ') + m)

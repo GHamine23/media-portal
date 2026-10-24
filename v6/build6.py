@@ -31,6 +31,8 @@ def ver(t): return hashlib.sha1(t.encode()).hexdigest()[:10]
 for n in ORDER: (OUT / 'js' / n).write_text(parts[n])
 shell = (V6 / 'shell.html').read_text()
 css = (V6 / 'style6.css').read_text()
+# أوراق أنماط إضافية لكل قسم (v6/css/*.css) تُلحق بالترتيب الأبجدي، فلا تتزاحم التعديلات على ملف واحد
+css += ''.join('\n/* ===== ' + f.name + ' ===== */\n' + f.read_text() for f in sorted((V6 / 'css').glob('*.css'))) if (V6 / 'css').exists() else ''
 site = 'https://ghamine23.github.io/media-portal/' + ('' if '--root' in sys.argv else 'v6/')
 shell = shell.replace('/*SITE*/', site).replace('<!--STYLE-->', '<style>\n' + css + '\n</style>').replace('<!--MARK-->', brand['mark'])
 tags = '\n'.join('<script src="js/%s?v=%s"></script>' % (n, ver(parts[n])) for n in ORDER)
@@ -59,6 +61,7 @@ APP_ORDER = ['ios6.js', 'mscreens.js', 'meditor.js', 'minstall.js', 'mapp.js']
 app_parts = {n: (V6 / 'app' / 'js' / n).read_text() for n in APP_ORDER}
 for n in APP_ORDER: (APP / 'js' / n).write_text(app_parts[n])
 app_css = (V6 / 'app' / 'app.css').read_text()
+app_css += ''.join('\n/* ===== ' + f.name + ' ===== */\n' + f.read_text() for f in sorted((V6 / 'app' / 'css').glob('*.css'))) if (V6 / 'app' / 'css').exists() else ''
 app_shell = (V6 / 'app' / 'shell.html').read_text().replace('/*SITE*/', site.replace('v6/', 'app/')).replace('<!--STYLE-->', '<style>\n' + css + '\n</style>').replace('<!--APPSTYLE-->', '<style>\n' + app_css + '\n</style>').replace('<!--MARK-->', brand['mark'])
 shared = [n for n in ORDER if n != 'app6.js']
 app_tags = '\n'.join('<script src="../v6/js/%s?v=%s"></script>' % (n, ver(parts[n])) for n in shared) + '\n' + '\n'.join('<script src="js/%s?v=%s"></script>' % (n, ver(app_parts[n])) for n in APP_ORDER)

@@ -1,6 +1,7 @@
+import os; _R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # جذر المستودع (يعمل في أي نسخة عمل)
 """تجربة التطابق: كل قالب يُرسم في الإصدار الخامس والسادس بالحالة نفسها، وتُقارن الصورتان بكسلاً بكسلاً."""
 import asyncio, base64, io, sys
-sys.path.insert(0, '/home/claude/media-portal/v6')
+sys.path.insert(0, _R + '/v6')
 from t6 import setup, URL
 from PIL import Image, ImageChops
 from playwright.async_api import async_playwright

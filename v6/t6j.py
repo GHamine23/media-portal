@@ -1,6 +1,7 @@
+import os; _R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # جذر المستودع (يعمل في أي نسخة عمل)
 """اختبار: نصائح التصميم، والمراجعة الذكية، وطلب المراجعة، والتعليقات، والإشعارات، وصور الملاحظات، وأسبوعك في أثر، ومهارات المساعد."""
 import asyncio, sys, json
-sys.path.insert(0, '/home/claude/media-portal/v6')
+sys.path.insert(0, _R + '/v6')
 from t6 import setup, URL, OUT
 from playwright.async_api import async_playwright
 def ok(c, m): print(('✓ ' if c else '✗ ') + m)
@@ -88,7 +89,7 @@ async def main():
         await pg.goto(URL + '#/'); await pg.wait_for_timeout(1500); await clean(pg)
         await pg.click('#fbbtn'); await pg.wait_for_timeout(400)
         await pg.fill('#fb_text', 'اقتراح مع صورة توضيحية')
-        await pg.set_input_files('.modal .fbimgs input[type=file]', ['/home/claude/media-portal/assets/img/img_arch.webp'])
+        await pg.set_input_files('.modal .fbimgs input[type=file]', [_R + '/assets/img/img_arch.webp'])
         await pg.wait_for_timeout(600)
         ok(await pg.evaluate("document.querySelectorAll('.modal .fbthumb').length") == 1, 'image attached to feedback')
         await pg.screenshot(path=OUT + 'p8_feedback_img.png')

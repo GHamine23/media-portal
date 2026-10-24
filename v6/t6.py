@@ -1,8 +1,10 @@
+import os; _R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # جذر المستودع (يعمل في أي نسخة عمل)
 """اختبار الواجهة السادسة محلياً (يحتاج خادماً محلياً على المنفذ 8765 يخدم /home/claude)."""
 import asyncio, sys
 from playwright.async_api import async_playwright
-OUT = '/tmp/claude-0/-home-claude/c52b6293-5ec5-5831-a8f0-81095c1243b7/scratchpad/v6/'
-URL = 'http://localhost:8765/media-portal/dist6/index.html'
+OUT = '/tmp/claude-0/-home-claude/c52b6293-5ec5-5831-a8f0-81095c1243b7/scratchpad/v6/' + ('' if os.path.basename(_R) == 'media-portal' else os.path.basename(_R) + '/')
+os.makedirs(OUT, exist_ok=True)
+URL = 'http://localhost:8765/' + os.path.relpath(_R, '/home/claude') + '/dist6/index.html'
 THM = ['thmanyahserifdisplay-Medium.otf', 'thmanyahserifdisplay-Bold.otf', 'thmanyahserifdisplay-Black.otf', 'thmanyahseriftext-Light.otf', 'thmanyahseriftext-Regular.otf', 'thmanyahseriftext-Medium.otf']
 async def setup(pg, user='admin', pw='Admin#2026'):
     errs = []

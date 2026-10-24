@@ -1,15 +1,16 @@
+import os; _R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # جذر المستودع (يعمل في أي نسخة عمل)
 """اختبار تطبيق الجوال (dist6/app.html): الدخول، الرئيسية، القوالب، المحرر بورقة الأدوات، الأوراق السفلية، التقويم، المزيد، التثبيت، وعامل الخدمة في البناء."""
 import asyncio, sys, json, os
-sys.path.insert(0, '/home/claude/media-portal/v6')
+sys.path.insert(0, _R + '/v6')
 from t6 import THM, OUT
 from playwright.async_api import async_playwright
-APP = 'http://localhost:8765/media-portal/dist6/app.html'
+APP = 'http://localhost:8765/' + os.path.relpath(_R, '/home/claude') + '/dist6/app.html'
 def ok(c, m): print(('✓ ' if c else '✗ ') + m)
 async def main():
     # البناء
-    ok(os.path.exists('/home/claude/media-portal/docs/app/sw.js') and 'athar-app-' in open('/home/claude/media-portal/docs/app/sw.js').read(), 'service worker built with version')
-    mf = json.load(open('/home/claude/media-portal/docs/app/manifest.webmanifest')); ok(mf['display'] == 'standalone' and mf['dir'] == 'rtl' and len(mf['icons']) == 3, 'manifest standalone rtl icons')
-    html = open('/home/claude/media-portal/docs/app/index.html').read(); ok('apple-mobile-web-app-capable' in html and 'js/mapp.js' in html and '../v6/js/core6.js' in html, 'app shell references shared js + app modules')
+    ok(os.path.exists(_R + '/docs/app/sw.js') and 'athar-app-' in open(_R + '/docs/app/sw.js').read(), 'service worker built with version')
+    mf = json.load(open(_R + '/docs/app/manifest.webmanifest')); ok(mf['display'] == 'standalone' and mf['dir'] == 'rtl' and len(mf['icons']) == 3, 'manifest standalone rtl icons')
+    html = open(_R + '/docs/app/index.html').read(); ok('apple-mobile-web-app-capable' in html and 'js/mapp.js' in html and '../v6/js/core6.js' in html, 'app shell references shared js + app modules')
     async with async_playwright() as p:
         b = await p.chromium.launch()
         ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True, user_agent='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1')

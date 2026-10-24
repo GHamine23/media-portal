@@ -1,6 +1,7 @@
+import os; _R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # جذر المستودع (يعمل في أي نسخة عمل)
 """اختبارات وظيفية للواجهة السادسة في وضع التجربة."""
 import asyncio, sys
-sys.path.insert(0, '/home/claude/media-portal/v6')
+sys.path.insert(0, _R + '/v6')
 from t6 import setup, URL, OUT
 from playwright.async_api import async_playwright
 def ok(c, m):
@@ -65,7 +66,7 @@ async def main():
         ok(await pg.evaluate("S.d.title") == 'ورشة *إدارة الوقت*' and await pg.evaluate("S.layers.length") == 1, 'reopened saved design')
         # upload image
         await pg.click('#e_rail button[data-tab=imgs]'); await pg.wait_for_timeout(400)
-        await pg.set_input_files('.e-panel input[type=file]', '/home/claude/media-portal/assets/img/img_dome.webp'); await pg.wait_for_timeout(2500)
+        await pg.set_input_files('.e-panel input[type=file]', _R + '/assets/img/img_dome.webp'); await pg.wait_for_timeout(2500)
         ok(await pg.evaluate("S.layers.some(function(L){return L.t==='img' && /^asset:/.test(L.ref)})"), 'uploaded image added as layer')
         await pg.screenshot(path=OUT + 'b3_upload.png')
         # ---------- الشرائح ----------

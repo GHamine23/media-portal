@@ -1,6 +1,7 @@
+import os; _R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # جذر المستودع (يعمل في أي نسخة عمل)
 """اختبار: درجات التعديل، وحصر الهويات، والاسم والصورة، وإعدادات الخطوط، ومقاس يوتيوب، والطبقات والخطوط الجديدة."""
 import asyncio, sys
-sys.path.insert(0, '/home/claude/media-portal/v6')
+sys.path.insert(0, _R + '/v6')
 from t6 import setup, URL, OUT
 from playwright.async_api import async_playwright
 def ok(c, m): print(('✓ ' if c else '✗ ') + m)
@@ -49,7 +50,7 @@ async def main():
         # الاسم والصورة
         await pg.goto(URL + '#/account'); await pg.wait_for_timeout(1500)
         await pg.fill('#pf_name', 'أحمد الجديد')
-        await pg.set_input_files('.pfcard input[type=file]', '/home/claude/media-portal/v6/brand/png/icon-192.png'); await pg.wait_for_timeout(800)
+        await pg.set_input_files('.pfcard input[type=file]', _R + '/v6/brand/png/icon-192.png'); await pg.wait_for_timeout(800)
         await pg.click('.pfcard .btn.dark'); await pg.wait_for_timeout(1500)
         ok(await pg.evaluate("V6.me.name") == 'أحمد الجديد' and await pg.evaluate("!!document.querySelector('#avatar img')"), 'profile name + avatar saved and shown')
         await pg.screenshot(path=OUT + 'f4_account.png')
