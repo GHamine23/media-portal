@@ -14,11 +14,11 @@ async def main():
         pg = await b.new_page(viewport={'width': 1440, 'height': 900})
         errs = await setup(pg)
         # إعداد البوت والقناة
-        await pg.goto(URL + '#/admin/settings'); await pg.wait_for_timeout(1500)
+        await pg.evaluate("typeof ED!=='undefined' && ED.open && (ED.leaveOK=true)"); await pg.goto(URL + '#/admin/settings'); await pg.wait_for_timeout(1500)
         await pg.fill('input[aria-label="رمز البوت"]', '123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij'); await pg.click('#abody > .btn.dark'); await pg.wait_for_timeout(1500)
         await pg.evaluate("API6.me('prog_save', JSON.stringify({ id: 'academy', tg: { chat: '@jeel_demo', link: 'https://example.org/join' } }))"); await pg.evaluate("refreshBundle()"); await pg.wait_for_timeout(1200)
         # جدولة منشور متكرر من المحرر
-        await pg.goto(URL + '#/e/ithmar/ann_cards'); await pg.wait_for_timeout(2500); await clean(pg)
+        await pg.evaluate("typeof ED!=='undefined' && ED.open && (ED.leaveOK=true)"); await pg.goto(URL + '#/e/ithmar/ann_cards'); await pg.wait_for_timeout(2500); await clean(pg)
         await pg.fill('#f6_title', 'المقرر *الأسبوعي*'); await pg.click('#e_cap'); await pg.wait_for_timeout(900)
         when = datetime.datetime.now() + datetime.timedelta(days=3)
         await pg.click('.capsend .seg button:has-text("في موعد")'); await pg.wait_for_timeout(200)
@@ -32,7 +32,7 @@ async def main():
         await pg.screenshot(path=OUT + 'k1_sched_repeat.png')
         await clean(pg)
         # التقويم: الشهر
-        await pg.goto(URL + '#/cal?d=' + when.strftime('%Y-%m-%d')); await pg.wait_for_timeout(2500)
+        await pg.evaluate("typeof ED!=='undefined' && ED.open && (ED.leaveOK=true)"); await pg.goto(URL + '#/cal?d=' + when.strftime('%Y-%m-%d')); await pg.wait_for_timeout(2500)
         ok(await pg.evaluate("document.querySelectorAll('.cchip.post.queued').length") >= 1, 'month view shows the queued post chip')
         ok(await pg.evaluate("document.querySelectorAll('.cchip svg.crep').length") >= 1, 'repeat icon on chip')
         await pg.evaluate("Array.from(document.querySelectorAll('.seg button')).find(b=>b.textContent==='ميلادي').click()"); await pg.wait_for_timeout(600)
@@ -89,7 +89,7 @@ async def main():
         ok(len(tasks) == 1 and tasks[0]['to'] == ahmad and tasks[0]['prio'] == 'high', 'task assigned to ahmad with high priority')
         ok(await pg.evaluate("document.querySelectorAll('.ccard.task.high').length") >= 1, 'task card appears in list view')
         # الرئيسية: القادم
-        await pg.goto(URL + '#/'); await pg.wait_for_timeout(2500); await clean(pg)
+        await pg.evaluate("typeof ED!=='undefined' && ED.open && (ED.leaveOK=true)"); await pg.goto(URL + '#/'); await pg.wait_for_timeout(2500); await clean(pg)
         t = await pg.inner_text('.calmini')
         ok('القادم في التقويم' in t and 'كل أسبوع' in t, 'home widget lists upcoming post: ' + t.replace('\n', ' | ')[:100])
         ok(await pg.evaluate("document.querySelectorAll('.cal6 a.cd.has').length") >= 1, 'home calendar marks the scheduled day as link')
@@ -99,7 +99,7 @@ async def main():
         await pg.fill('#lg_id', 'ahmad'); await pg.fill('#lg_pw', 'Ahmad#2026'); await pg.click('.lgform button[type=submit]'); await pg.wait_for_selector('#top:not([hidden])', timeout=60000); await pg.wait_for_timeout(1500); await clean(pg)
         nts = await pg.evaluate("API6.me('nt_list')")
         ok(any(n['kind'] == 'task' and 'جهّز إعلان' in n['text'] for n in nts), 'ahmad notified about the task')
-        await pg.goto(URL + '#/cal'); await pg.wait_for_timeout(2500)
+        await pg.evaluate("typeof ED!=='undefined' && ED.open && (ED.leaveOK=true)"); await pg.goto(URL + '#/cal'); await pg.wait_for_timeout(2500)
         await pg.evaluate("Array.from(document.querySelectorAll('.seg button')).find(b=>b.textContent==='القادم').click()"); await pg.wait_for_timeout(700)
         ok(await pg.evaluate("document.querySelectorAll('.ccard.task').length") == 1, 'ahmad sees the assigned task')
         await pg.click('.ccard.task .tchk'); await pg.wait_for_timeout(1200)

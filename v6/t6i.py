@@ -20,11 +20,11 @@ async def main():
         errs = await setup(pg)
         await pg.evaluate("GAS._props.GEMINI_KEY='k-demo-AIzaSy0123456789abcdefghijklmnop'; " + MOCK + "; void 0"); await pg.evaluate("refreshBundle()"); await pg.wait_for_timeout(1200)
         # الإعدادات: مفتاح Pexels
-        await pg.goto(URL + '#/admin/settings'); await pg.wait_for_timeout(1500)
+        await pg.evaluate("typeof ED!=='undefined' && ED.open && (ED.leaveOK=true)"); await pg.goto(URL + '#/admin/settings'); await pg.wait_for_timeout(1500)
         await pg.fill('input[aria-label="مفتاح Pexels"]', 'PXDEMOKEY'); await pg.click('#abody > .btn.dark'); await pg.wait_for_timeout(1800)
         ok('Pexels' in await pg.inner_text('#abody') and 'بلا أي مفتاح' in await pg.inner_text('#abody'), 'pexels key saved as extra source')
         # المحرر: العناصر — QR وأيقونات
-        await pg.goto(URL + '#/e/ithmar/ann_cards'); await pg.wait_for_timeout(2500); await clean(pg)
+        await pg.evaluate("typeof ED!=='undefined' && ED.open && (ED.leaveOK=true)"); await pg.goto(URL + '#/e/ithmar/ann_cards'); await pg.wait_for_timeout(2500); await clean(pg)
         await pg.evaluate("openTab('els'); void 0"); await pg.wait_for_timeout(600)
         pt = await pg.inner_text('#e_panel')
         ok('رمز QR' in pt and 'أيقونات أكثر' in pt, 'elements panel has QR + Tabler sections')
@@ -90,7 +90,7 @@ async def main():
         # مستخدم عادي يقترح صورة للمكتبة، والمشرف يوافق
         await pg.evaluate("logout()"); await pg.wait_for_timeout(800)
         await pg.fill('#lg_id', 'ahmad'); await pg.fill('#lg_pw', 'Ahmad#2026'); await pg.click('.lgform button[type=submit]'); await pg.wait_for_selector('#top:not([hidden])', timeout=60000); await pg.wait_for_timeout(1500); await clean(pg)
-        await pg.goto(URL + '#/e/ithmar/ann_cards'); await pg.wait_for_timeout(2500); await clean(pg)
+        await pg.evaluate("typeof ED!=='undefined' && ED.open && (ED.leaveOK=true)"); await pg.goto(URL + '#/e/ithmar/ann_cards'); await pg.wait_for_timeout(2500); await clean(pg)
         await pg.evaluate("ls('imgSrc', 'keyed'); openTab('imgs'); void 0"); await pg.wait_for_timeout(500)
         await pg.fill('#e_panel input[aria-label="بحث عن صورة"]', 'garden'); await pg.keyboard.press('Enter'); await pg.wait_for_timeout(1200)
         await pg.check('#px_sug'); await pg.click('#e_panel .pxb'); await pg.wait_for_timeout(2500)
@@ -98,7 +98,7 @@ async def main():
         ok(len(L2) == 1 and L2[0]['scope'] == 'user' and L2[0].get('credit'), 'user pick lands in own library with credit')
         await pg.evaluate("logout()"); await pg.wait_for_timeout(800)
         await pg.fill('#lg_id', 'ADMIN'); await pg.fill('#lg_pw', 'Admin#2026'); await pg.click('.lgform button[type=submit]'); await pg.wait_for_selector('#top:not([hidden])', timeout=60000); await pg.wait_for_timeout(1500); await clean(pg)
-        await pg.goto(URL + '#/admin/assets'); await pg.wait_for_timeout(2500)
+        await pg.evaluate("typeof ED!=='undefined' && ED.open && (ED.leaveOK=true)"); await pg.goto(URL + '#/admin/assets'); await pg.wait_for_timeout(2500)
         ok('صور اقترحها الفريق' in await pg.inner_text('#abody') and await pg.query_selector('.imgreq') is not None, 'admin sees image request')
         await pg.screenshot(path=OUT + 'o6_request.png')
         before = await pg.evaluate("(async()=>{const l=await API6.me('asset_list','program','academy');return l.filter(a=>a.kind==='image'&&a.credit).length;})()")

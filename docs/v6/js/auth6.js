@@ -89,7 +89,7 @@ async function afterLogin() {
   try { ls('lastName', String(V6.me.name || '').split(' ')[0]); } catch (e) {}
   try { await loadBundle(); }
   catch (e) { splashHide(); view(el('div', { class: 'boot' }, [el('p', { class: 'err', text: 'تعذّر تحميل المنصة: ' + e.message }), el('button', { class: 'btn dark', text: 'إعادة المحاولة', onclick: afterLogin })])); return; }
-  setMotion((V6.me.prefs && V6.me.prefs.motion) || 'calm');
+  setMotion((V6.me.prefs && V6.me.prefs.motion) || 'calm'); applyAccent();
   buildTop();
   const after = ls('after'); ls('after', null);
   go(after && after !== '/login' ? '#' + after : '#/');
@@ -106,7 +106,7 @@ async function restore() {
   splash('نجهّز هوية برنامجك…');
   await loadBundle();
   splash('نصفّ القوالب صفّاً منتظماً…');
-  setMotion((V6.me.prefs && V6.me.prefs.motion) || 'calm');
+  setMotion((V6.me.prefs && V6.me.prefs.motion) || 'calm'); applyAccent();
   buildTop(); loadNews();
   return true;
 }
@@ -144,7 +144,8 @@ function editLevel() { if (!V6.me || V6.me.role !== 'user') return 'full'; retur
 function can(p) { return V6.me && (V6.me.role !== 'user' || !!(V6.me.perms && V6.me.perms[p])); }
 // خيار مواقع التواصل: يتاح للمشرفين ومن مُنح الصلاحية، وإن سمح به البرنامج
 function canSocial() { return can('social') && !(V6.prog && V6.prog.features && V6.prog.features.social === false); }
-async function logout() { flushEv(); try { await API6.call('auth_logout', V6.token); } catch (e) {} V6.token = ''; ls('token', null); V6.me = null; go('#/login'); }
+async function logout() {
+  if (typeof ED !== 'undefined' && ED.open) ED.leaveOK = true; flushEv(); try { await API6.call('auth_logout', V6.token); } catch (e) {} V6.token = ''; ls('token', null); V6.me = null; go('#/login'); }
 async function savePrefs6(patch) { V6.me.prefs = Object.assign({}, V6.me.prefs || {}, patch); try { await API6.call('prefs_save', V6.token, JSON.stringify(V6.me.prefs)); } catch (e) {} }
 
 /* ---------- الرأس ---------- */
@@ -199,8 +200,9 @@ async function showAccount() {
         el('dl', { class: 'kv' }, [el('dt', { text: 'اسم المستخدم' }), el('dd', { dir: 'auto', text: me.username }), el('dt', { text: 'البرامج' }), el('dd', { text: (me.programsInfo || []).map(function (p) { return p.name; }).join('، ') || '—' }),
           el('dt', { text: 'الصلاحيات' }), el('dd', { text: permsText(me) })]),
         el('div', { class: 'row' }, [el('a', { class: 'btn dark', href: '#/password', text: 'تغيير كلمة المرور' })])]),
+      el('div', { class: 'card rv', style: '--d:1' }, [el('h3', { text: 'لون الواجهة' }), el('p', { class: 'muted small', text: 'يلوّن الأزرار والتحديد والروابط في الموقع والتطبيق، ويتبعك على كل أجهزتك.' }), accentPicker(function (id, nm) { toast('لون الواجهة: ' + nm); })]),
       el('div', { class: 'card rv', style: '--d:1' }, [el('h3', { text: 'الحركة في الواجهة' }), el('p', { class: 'muted small', text: 'اختر شدة الحركة التي تريحك.' }), motion]),
-      el('div', { class: 'card rv', style: '--d:2' }, [el('h3', { text: 'تطبيق الجوال' }), el('p', { class: 'muted small', text: 'للهاتف واجهة خاصة بروح التطبيقات: المحرر والتصميم ظاهر دائماً، والتقويم والنشر. افتح الرابط من هاتفك وثبّته على الشاشة الرئيسية.' }), el('div', { class: 'row wrapr' }, [el('a', { class: 'btn dark', href: '../app/', target: '_blank', rel: 'noopener' }, [ico('phone'), 'افتح التطبيق']), el('button', { type: 'button', class: 'btn line', onclick: function (e) { copyText(location.origin + location.pathname.replace(/v6\/?$/, '') + 'app/'); btnDone(e.currentTarget, 'نُسخ الرابط'); } }, [ico('link'), 'انسخ الرابط للهاتف'])])]),
+      el('div', { class: 'card rv', style: '--d:2' }, [el('h3', { text: 'تطبيق الجوال' }), el('p', { class: 'muted small', text: 'للهاتف واجهة خاصة بروح التطبيقات: المحرر والتصميم ظاهر دائماً، والتقويم والنشر. افتح الرابط من هاتفك وثبّته على الشاشة الرئيسية.' }), el('div', { class: 'row wrapr' }, [el('a', { class: 'btn dark', href: '../app/', onclick: function () { ls('preferWeb', null); } }, [ico('phone'), 'افتح التطبيق']), el('button', { type: 'button', class: 'btn line', onclick: function (e) { copyText(location.origin + location.pathname.replace(/v6\/?$/, '') + 'app/'); btnDone(e.currentTarget, 'نُسخ الرابط'); } }, [ico('link'), 'انسخ الرابط للهاتف'])])]),
       el('div', { class: 'card rv', style: '--d:3' }, [el('h3', { text: 'أين تذهب تصاميمك' }), el('p', { class: 'muted small', text: 'ما تحفظه يبقى في حسابك، ولا يراه فريقك إلا إن شاركته. وكل تصميم تنزّله أو تشاركه تُحفظ نسخة منه في أرشيف البرنامج، يطّلع عليها مشرف البرنامج ومدير المنصة.' })])
     ]),
     el('h2', { class: 'sh rv', text: 'ملاحظاتي وبلاغاتي' }), fbList

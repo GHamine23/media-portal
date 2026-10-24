@@ -122,6 +122,7 @@ const LEVEL_TABS = { content: ['content', 'tpls', 'imgs'], style: ['content', 't
 function railItems() { const lv = LEVEL_TABS[editLevel()]; const items = RAIL.filter(function (r) { return (ED.mode === 'full' || r[3] || lv) && (!lv || lv.indexOf(r[0]) >= 0); }); if (ED.doc && ED.doc.kind === 'deck') items.splice(2, 0, ['anim', 'الحركة', 'sparkles', 1]); return items; }
 function showEditor6(doc, fromDraft) {
   ED.open = true; ED.doc = doc; ED.cur = 0; ED.undo = []; ED.redo = []; ED.autoFit = true; ED.proxies = {}; ED.editing = null;
+  ED.dirty = !!fromDraft; ED.leaveOK = false; ED.hash = location.hash;
   ED.mode = ls('emode') || 'simple';
   ED.tab = doc.pages[0].tpl === 'blank' ? 'assist' : 'content';
   if (ED.tab === 'assist') ED.mode = 'full';
@@ -133,8 +134,8 @@ function showEditor6(doc, fromDraft) {
   const back = (TRACKS[doc.track] ? '#/g/' + doc.track : '#/');
   const sizeSel = el('select', { class: 'e-size', 'aria-label': 'المقاس', id: 'e_size', onchange: function (e) { S.size = e.target.value; S.sel = null; changed6(); setTimeout(refit, 0); } });
   const topbar = el('header', { class: 'e-top' }, [
-    el('a', { href: back, class: 'ib', 'aria-label': 'رجوع', title: 'رجوع', onclick: function () { leaveEditor(); } }, [ico('chev')]),
-    el('a', { href: '#/', class: 'e-logo', 'aria-label': 'الرئيسية', onclick: function () { leaveEditor(); } }, [brandImg('mark')]),
+    el('a', { href: back, class: 'ib e-backl', 'aria-label': 'رجوع', title: 'رجوع' }, [ico('chev')]),
+    el('a', { href: '#/', class: 'e-logo', 'aria-label': 'الرئيسية' }, [brandImg('mark')]),
     nameI, el('span', { class: 'e-saved tiny', id: 'e_saved', text: fromDraft ? 'استعدنا مسودتك' : '' }),
     el('span', { class: 'sp' }),
     el('div', { class: 'e-tools' }, [
@@ -176,7 +177,7 @@ function showEditor6(doc, fromDraft) {
   const pw = +ls('pw'); if (pw >= 260 && pw <= 680) main.style.setProperty('--pw', pw + 'px');
   const v = view(el('div', { class: 'ed6' }, [topbar, main, mtabs]));
   v.classList.add('ed-view');
-  setupKonva();
+  setupKonva(); editorHistory();
   buildSizeSel(); buildRail(); buildPanel(); buildPages();
   ensureFonts(fontsOfState(snap())).then(function () { refit(); drawNow(); pushUndo6(true); });
   requestAnimationFrame(function () { refit(); });
@@ -199,6 +200,7 @@ function panelResizer() {
 }
 function leaveEditor() {
   if (!ED.open) return;
+  ED.leaveOK = false; ED.hash = null;
   commitPage(); saveDraft(true); if (ED.doc.id && ED.dirty) saveRemote(true);
   ED.open = false; $('#top').hidden = false; document.body.classList.remove('in-editor');
   if (ED.stage) { ED.stage.destroy(); ED.stage = null; }
@@ -297,9 +299,9 @@ async function shareDialog() {
     el('label', { class: 'tog' }, [coI, el('span', { text: 'يُسمح للفريق بتعديل التصميم نفسه (وإلا يفتح لهم نسخة)' })])
   ], acts: [{ t: 'إغلاق', cls: 'dark' }] });
 }
-function saveDialog() {
+function saveDialog(after) {
   const d = ED.doc;
-  if (d.teammate) { saveRemote(); return; }
+  if (d.teammate) { saveRemote().then(function (ok) { if (ok && after) after(); }); return; }
   const nameI = el('input', { type: 'text', id: 'sv_name', value: d.name || '' });
   const shareI = el('input', { type: 'checkbox', checked: !!d.shared });
   const pid = d.program || V6.prog.id, isAdm = canAdminProg(pid);
@@ -314,7 +316,7 @@ function saveDialog() {
     d.id ? el('div', { class: 'sharebox' }, [el('b', { text: 'روابط المشاركة' }), el('p', { class: 'tiny', text: 'تعمل لمن في فريق البرنامج وله حساب في المنصة. رابط العرض للمشاهدة، ورابط التعديل يفتح المحرر.' }),
       linkRow('رابط العرض', shareUrl('p', d.id)), linkRow('رابط التعديل', shareUrl('d', d.id))]) : el('p', { class: 'tiny', text: 'بعد الحفظ تظهر هنا روابط المشاركة مع الفريق.' }),
     el('p', { class: 'tiny', text: 'بعد الحفظ يُحفظ كل تعديل تلقائياً، وتجده من أي جهاز.' })
-  ], acts: [{ t: 'حفظ', cls: 'dark', fn: async function () { d.name = nameI.value.trim() || 'تصميمي'; d.shared = shareI.checked; d.coedit = shareI.checked && coI.checked; const n = $('.e-name'); if (n) n.value = d.name; const okSave = await saveRemote();
+  ], acts: [{ t: 'حفظ', cls: 'dark', fn: async function () { d.name = nameI.value.trim() || 'تصميمي'; d.shared = shareI.checked; d.coedit = shareI.checked && coI.checked; const n = $('.e-name'); if (n) n.value = d.name; const okSave = await saveRemote(); if (okSave && after) setTimeout(after, 0);
     if (okSave && modelI && modelI.checked !== !!d.model) { try { await API6.me('item_model', d.id, modelI.checked); d.model = modelI.checked; toast(d.model ? 'صار نموذجاً لكل مستخدمي البرنامج' : 'أُزيل من النماذج'); } catch (e) { toast(e.message); } } } }, { t: 'إلغاء' }] });
 }
 
@@ -438,3 +440,58 @@ document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape') { select(null); return; }
   if (e.key === 'Enter' && fieldsOfGroup(S.sel).length) { e.preventDefault(); openInline6(S.sel); }
 });
+
+/* ---------- الخروج من المحرر ----------
+   عند فتح المحرر نضع في السجل مدخلين للعنوان نفسه (قاعدة ثم قمة)، فزر الرجوع في الجهاز أو سحب الحافة يعيدنا إلى «القاعدة» دون مغادرة،
+   فنعيدك إلى التصميم أولاً: نغلق النافذة المفتوحة، ثم نطوي لوحة الأدوات، ثم نلغي التحديد. وإن بقي الخروج:
+   التصميم المحفوظ في حسابك تُحفظ تعديلاته ونخبرك، وغير المحفوظ (وقد عدّلته) نسألك قبل الخروج. */
+function editorHistory() { try { history.replaceState({ ed: 'base' }, ''); history.pushState({ ed: 'top' }, ''); } catch (e) {} }
+function editorBackStep() {
+  const top = document.querySelector('.msheet-wrap,.mact,.modal,.emopop,.cpop');
+  if (top) {
+    const x = top.matches('.msheet-wrap') ? top.querySelector('.sx') : null;
+    if (x) x.click(); else if (top.matches('.modal')) document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); else top.remove();
+    return true;
+  }
+  if (ED.editing && $('.ied6')) { $$('.ied6').forEach(function (x) { x.remove(); }); ED.editing = null; return true; }
+  if (typeof ED.backStep === 'function' && ED.backStep()) return true;
+  if (S.sel) { select(null); return true; }
+  return false;
+}
+function editorFallback() { return TRACKS[ED.doc && ED.doc.track] ? '#/g/' + ED.doc.track : '#/'; }
+function savedNotice() { if ((ED.doc.id || ED.doc.teammate) && ED.dirty) toast('حُفظت تعديلاتك في «تصاميمي»'); }
+window.addEventListener('popstate', function (e) {
+  if (!ED.open || ED.leaveOK || !e.state || e.state.ed !== 'base' || location.hash !== ED.hash) return;
+  if (editorBackStep()) { history.pushState({ ed: 'top' }, ''); return; }
+  try { commitPage(); } catch (x) {}
+  if (ED.doc.id || ED.doc.teammate || !ED.dirty) { savedNotice(); leaveNow(null, 1); return; }
+  history.pushState({ ed: 'top' }, '');
+  leaveAsk(null);
+});
+window.addEventListener('beforeunload', function (e) { if (ED.open && ED.doc && !ED.doc.id && ED.dirty) { try { commitPage(); saveDraft(true); } catch (x) {} e.preventDefault(); e.returnValue = ''; } });
+// تنقّل برابط أو زر داخل المنصة
+function editorGuard(target) {
+  if (!ED.open || ED.leaveOK || !ED.hash || target === ED.hash) return false;
+  try { commitPage(); } catch (e) {}
+  if (ED.doc.id || ED.doc.teammate || !ED.dirty) { savedNotice(); return false; }
+  history.replaceState({ ed: 'top' }, '', ED.hash);   // نبقى في المحرر حتى تقرر
+  leaveAsk(target);
+  return true;
+}
+// target: عنوان الوجهة، أو null للرجوع في السجل (steps خطوات)
+function leaveNow(target, steps) {
+  ED.leaveOK = true;
+  if (target) { if (location.hash === target) render(); else location.hash = target; return; }
+  const h = ED.hash; history.go(-(steps || 2));
+  setTimeout(function () { if (ED.open && location.hash === h) { location.hash = editorFallback(); } }, 450);   // لا صفحة قبله في السجل
+}
+function leaveAsk(target) {
+  const d = ED.doc;
+  modal({ title: 'تخرج من التصميم؟', body: [
+    el('p', { text: 'لم تحفظ «' + (d.name || 'تصميمك') + '» في تصاميمك بعد. إن خرجت تبقى مسودته على هذا الجهاز وحده، وتعود إليها إن فتحت القالب نفسه.' })
+  ], acts: [
+    { t: 'احفظه في تصاميمي ثم اخرج', cls: 'dark', fn: function () { setTimeout(function () { saveDialog(function () { leaveNow(target); }); }, 450); } },
+    { t: 'اخرج وأبقِه مسودة', fn: function () { saveDraft(true); leaveNow(target); } },
+    { t: 'ارجع إلى التصميم' }
+  ] });
+}

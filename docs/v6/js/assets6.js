@@ -79,7 +79,7 @@ async function loadBundle() {
 async function useProgram(id, silent) {
   const p = V6.bundle.programs.find(function (x) { return x.id === id; });
   if (!p) return;
-  V6.prog = p; ls('prog', id);
+  V6.prog = p; ls('prog', id); if (typeof applyAccent === 'function' && curAccent() === 'prog') applyAccent('prog');
   Object.keys(TRACKS).forEach(function (k) { delete TRACKS[k]; });
   (p.identities || []).forEach(function (t) { TRACKS[t.id] = finishTrack(JSON.parse(JSON.stringify(t))); });
   if (id === 'academy') PACK_IDS.forEach(function (t) { if (!TRACKS[t.id]) TRACKS[t.id] = t; });   // هويات أضافتها حزم المهمة الأسبوعية

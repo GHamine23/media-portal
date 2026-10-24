@@ -22,7 +22,8 @@ function mHome() {
     quick,
     msection('القادم في التقويم', '#/cal', [upcoming]),
     modelsSec, recentSec,
-    tracks.length ? msection('الهويات', '#/tpl', [el('div', { class: 'mids' }, tracks.map(function (t) { return midAvatar(t, false); }))]) : null
+    tracks.length ? msection('الهويات', '#/tpl', [el('div', { class: 'mids' }, tracks.map(function (t) { return midAvatar(t, false); }))]) : null,
+    el('button', { type: 'button', class: 'mweb', onclick: function () { haptic(); toWeb(); } }, [ico('globe'), el('span', { text: 'انتقل إلى نسخة الويب' }), el('small', { text: 'ويفتحها هذا الجهاز بعد ذلك' })])
   ]);
   view(sc.node);
   pullToRefresh(sc, async function () { CAL.loaded = false; POSTS = null; await Promise.all([fillUpcoming(), fillRecent()]); toast('حُدّث'); });
@@ -86,34 +87,57 @@ function mTemplates(tid, type) {
   view(sc.node); fill();
 }
 
-/* ---------- المزيد: الحساب والإعدادات والتثبيت ---------- */
+/* ---------- المزيد: الحساب والمظهر والتطبيق ----------
+   تصميم خاص بالمنصة (لا نسخة من إعدادات النظام): بطاقة شخصية بلون الواجهة، مربعات ملوّنة للأقسام، وبطاقات للمظهر والتطبيق. */
+function toWeb() { ls('preferWeb', true); const h = location.hash; location.href = '../v6/' + (/^#\/(tpl|more)\b/.test(h) ? '#/' : h || '#/'); }
+function mTile(t, ic, color, href, fn) {
+  return el(href ? 'a' : 'button', { class: 'mtile', type: href ? null : 'button', href: href || null, style: '--tc:' + color, onclick: function () { haptic(); M.dir = 'fwd'; if (fn) fn(); } }, [el('span', { class: 'ti' }, [ico(ic)]), el('b', { text: t })]);
+}
+function mCard(title, ic, kids) { return el('section', { class: 'mcard2' }, [el('h3', {}, [el('span', { class: 'ci' }, [ico(ic)]), title])].concat(kids.filter(Boolean))); }
+function mLine(t, sub, ic, act, opt) {
+  opt = opt || {};
+  return el(opt.href ? 'a' : 'button', { class: 'mline' + (opt.danger ? ' danger' : ''), type: opt.href ? null : 'button', href: opt.href || null, onclick: function () { haptic(); if (act) act(); } }, [el('span', { class: 'li' }, [ico(ic)]), el('span', { class: 'mt' }, [el('b', { text: t }), sub ? el('small', { text: sub }) : null]), opt.badge ? el('span', { class: 'lb', text: opt.badge }) : ico('chev', 'chev')]);
+}
 function mMore() {
   const me = V6.me;
   document.title = 'المزيد';
-  const notifOn = notifyOn();
-  const sc = mscreen({ title: 'المزيد' }, [
-    el('a', { class: 'mprofile', href: '#/account', onclick: function () { haptic(); M.dir = 'fwd'; } }, [el('span', { class: 'pav' }, [me.avatar ? el('img', { src: me.avatar, alt: '' }) : el('span', { text: String(me.name || '؟').trim().replace(/^(أ\.|د\.|م\.)\s*/, '').slice(0, 1) })]), el('span', { class: 'mt' }, [el('b', { text: me.name }), el('small', { text: (me.roleName || '') + (V6.prog ? ' · ' + V6.prog.name : '') })]), ico('chev', 'chev')]),
-    V6.bundle.programs.length > 1 ? mgroup([{ t: 'البرنامج الحالي', value: V6.prog ? V6.prog.name : '', ic: 'prog', color: V6.prog ? V6.prog.color : '#000', fn: function () { mactions(null, V6.bundle.programs.map(function (p) { return { t: p.name, sw: p.color, fn: async function () { await useProgram(p.id); go('#/'); toast('انتقلت إلى ' + p.name); } }; }), 'برامجك'); } }]) : null,
-    mgroup([
-      { t: 'تصاميمي', ic: 'heart', color: '#34c759', href: '#/mine' },
-      { t: 'التقويم والمهام', ic: 'cal', color: '#007aff', href: '#/cal' },
-      { t: 'أسبوعي في أثر', ic: 'chart', color: '#5856d6', href: '#/week' },
-      { t: 'مراجعاتي', ic: 'review', color: '#ff9500', href: '#/reviews' },
-      { t: 'نصائح التصميم', ic: 'star', color: '#ffcc00', href: '#/tips' }
-    ]),
-    mgroup([
-      { t: 'التنبيه بصوت وإشعار عند انتهاء المساعد', ic: 'bell', color: '#ff3b30', toggle: notifOn, onToggle: async function (on) { if (on) { await askNotify(); chime6(); } else ls('notify', false); } },
-      { t: 'الحركة في الواجهة', ic: 'sparkles', color: '#af52de', value: ({ calm: 'هادئة', normal: 'متوسطة', lively: 'حيوية' })[(me.prefs && me.prefs.motion) || 'normal'], fn: function () { mactions(null, [['calm', 'هادئة'], ['normal', 'متوسطة'], ['lively', 'حيوية']].map(function (o) { return { t: o[1], fn: function () { setMotion(o[0]); savePrefs6({ motion: o[0] }); mMore(); } }; }), 'شدة الحركة'); } }
-    ], 'التفضيلات'),
-    mgroup([
-      isStandalone() ? { t: 'التطبيق مثبّت على جهازك', ic: 'check', color: '#34c759', sub: 'يفتح من الشاشة الرئيسية' } : { t: 'ثبّت التطبيق على الشاشة الرئيسية', ic: 'download', color: '#007aff', fn: function () { installSheet(); } },
-      { t: 'النسخة الكاملة للحاسوب', ic: 'globe', color: '#8e8e93', sub: 'المحرر الموسّع ولوحة الإدارة', href: '../v6/#/' },
-      isAdmin() ? { t: 'لوحة الإدارة', ic: 'gear', color: '#000', sub: 'تُفتح في النسخة الكاملة', href: '../v6/#/admin' } : null,
-      { t: 'ملاحظة أو اقتراح للفريق', ic: 'chat', color: '#ff9500', fn: function () { showFeedback6(); } },
-      { t: 'ما الجديد', ic: 'megaphone', color: '#5ac8fa', fn: function () { showNews(); } }
-    ], 'التطبيق'),
-    mgroup([{ t: 'تغيير كلمة المرور', ic: 'key', color: '#8e8e93', href: '#/password' }, { t: 'خروج', ic: 'logout', color: '#ff3b30', fn: async function () { if (await ask('خروج', 'تخرج من حسابك على هذا الجهاز.', 'خروج', true)) logout(); } }]),
-    el('p', { class: 'mfoot', style: 'text-align:center', text: 'أثر · الإصدار ' + V6.version + (isStandalone() ? ' · تطبيق' : '') })
+  const initial = String(me.name || '؟').trim().replace(/^(أ\.|د\.|م\.)\s*/, '').slice(0, 1);
+  const progs = V6.bundle.programs || [];
+  const hero = el('section', { class: 'mpro' }, [
+    el('a', { class: 'pav', href: '#/account', 'aria-label': 'حسابي', onclick: function () { haptic(); M.dir = 'fwd'; } }, [me.avatar ? el('img', { src: me.avatar, alt: '' }) : el('span', { text: initial })]),
+    el('div', { class: 'pt' }, [el('b', { text: me.name }), el('small', { text: me.roleName || '' })]),
+    el('div', { class: 'pacts' }, [
+      el('a', { class: 'pchip', href: '#/account', onclick: function () { haptic(); M.dir = 'fwd'; } }, [ico('user'), 'حسابي']),
+      V6.prog ? el(progs.length > 1 ? 'button' : 'span', { class: 'pchip prog', type: progs.length > 1 ? 'button' : null, onclick: progs.length > 1 ? function () { mactions(null, progs.map(function (p) { return { t: p.name, sw: p.color, fn: async function () { await useProgram(p.id); go('#/'); toast('انتقلت إلى ' + p.name); } }; }), 'برامجك'); } : null }, [el('i', { style: 'background:' + (V6.prog.color || '#fff') }), V6.prog.name, progs.length > 1 ? ico('chevd') : null]) : null
+    ])
   ]);
+  const tiles = el('div', { class: 'mtiles' }, [
+    mTile('تصاميمي', 'heart', '#e0457b', '#/mine'),
+    mTile('التقويم', 'cal', '#2f7cf6', '#/cal'),
+    mTile('أسبوعي', 'chart', '#7c5cf0', '#/week'),
+    mTile('مراجعاتي', 'review', '#f08a1c', '#/reviews'),
+    mTile('نصائح', 'star', '#d9a400', '#/tips'),
+    mTile('ما الجديد', 'megaphone', '#14a38b', null, function () { showNews(); })
+  ]);
+  const motion = (me.prefs && me.prefs.motion) || 'normal';
+  const look = mCard('المظهر', 'palette', [
+    el('div', { class: 'msub', text: 'لون الواجهة' }),
+    accentPicker(function () { haptic('ok'); }),
+    el('div', { class: 'msub', text: 'الحركة في الواجهة' }),
+    segOf([['calm', 'هادئة'], ['normal', 'متوسطة'], ['lively', 'حيوية']], motion, function (v) { haptic(); setMotion(v); savePrefs6({ motion: v }); }),
+    el('label', { class: 'mtog' }, [el('span', { class: 'mt' }, [el('b', { text: 'نبّهني حين ينتهي المساعد' }), el('small', { text: 'صوت وإشعار إن كنت في تطبيق آخر' })]), el('input', { type: 'checkbox', class: 'msw', checked: notifyOn(), onchange: async function (e) { haptic(); if (e.target.checked) { await askNotify(); chime6(); } else ls('notify', false); } })])
+  ]);
+  const app = mCard('التطبيق', 'phone', [
+    isStandalone() ? mLine('التطبيق مثبّت على جهازك', 'يفتح من الشاشة الرئيسية', 'check', null, { badge: '✓' }) : mLine('ثبّت التطبيق على الشاشة الرئيسية', 'يفتح بملء الشاشة وأسرع', 'download', function () { installSheet(); }),
+    mLine('انتقل إلى نسخة الويب', 'المحرر الموسّع، ويفتحها هذا الجهاز بعد ذلك', 'globe', toWeb),
+    isAdmin() ? mLine('لوحة الإدارة', 'في نسخة الويب', 'gear', function () { ls('preferWeb', true); location.href = '../v6/#/admin'; }) : null,
+    mLine('ملاحظة أو اقتراح للفريق', null, 'chat', function () { showFeedback6(); })
+  ]);
+  const bottom = el('div', { class: 'mbtns' }, [
+    el('a', { class: 'btn tint', href: '#/password', onclick: function () { haptic(); M.dir = 'fwd'; } }, [ico('key'), 'كلمة المرور']),
+    el('button', { type: 'button', class: 'btn danger', onclick: async function () { if (await ask('خروج', 'تخرج من حسابك على هذا الجهاز.', 'خروج', true)) logout(); } }, [ico('logout'), 'خروج'])
+  ]);
+  const sc = mscreen({ title: 'المزيد' }, [hero, tiles, look, app, bottom,
+    el('p', { class: 'mfoot', style: 'text-align:center', text: 'أثر · الإصدار ' + V6.version + (isStandalone() ? ' · تطبيق' : '') })]);
   view(sc.node);
 }

@@ -74,7 +74,7 @@ if (ICONS / 'og.png').exists(): shutil.copy(ICONS / 'og.png', APP / 'og.png')
 # عامل الخدمة: قائمة الملفات بإصداراتها حتى يُحدَّث الكاش مع كل بناء
 sw = (V6 / 'app' / 'sw.js').read_text()
 assets = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'] + ['../v6/js/%s?v=%s' % (n, ver(parts[n])) for n in shared] + ['js/%s?v=%s' % (n, ver(app_parts[n])) for n in APP_ORDER]
-(APP / 'sw.js').write_text(sw.replace('/*ASSETS*/', json.dumps(assets)).replace('/*VER*/', ver(''.join(parts[n] for n in shared) + ''.join(app_parts.values()) + app_css)))
+(APP / 'sw.js').write_text(sw.replace('/*ASSETS*/', json.dumps(assets)).replace('/*VER*/', ver(''.join(parts[n] for n in shared) + ''.join(app_parts.values()) + app_css + css)))
 # نسخة التجربة للتطبيق
 app_demo_tags = '<script>window.DEMO = true;</script>\n<script src="../v6/gas/shim.js"></script>\n<script src="../v6/demo6.js"></script>\n' + '\n'.join('<script src="%s%s?v=%s"></script>' % (rel, n, ver(parts[n])) if n != 'config.js' else "<script>const API_URL = '';</script>" for n in shared) + '\n' + '\n'.join('<script src="../docs/app/js/%s?v=%s"></script>' % (n, ver(app_parts[n])) for n in APP_ORDER)
 (D / 'app.html').write_text(app_shell.replace('<!--SCRIPTS-->', app_demo_tags).replace('href="manifest.webmanifest"', 'href="#"'))

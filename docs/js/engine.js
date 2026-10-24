@@ -232,12 +232,14 @@ function fit(ctx, str, o) {
     pt = Math.max(0, (m1.actualBoundingBoxAscent || 0) - half) + size * 0.04;
     pb = Math.max(0, (m2.actualBoundingBoxDescent || 0) - half) + size * 0.04;
   }
-  return { size: size, lines: lines, lh: lh, h: empty ? 0 : lines.length * size * lh + pt + pb, pt: pt, pb: pb, w: widest, empty: empty, fam: fo.fam, stroke: fo.stroke };
+  return { size: size, lines: lines, lh: lh, h: empty ? 0 : lines.length * size * lh + pt + pb, pt: pt, pb: pb, w: widest, empty: empty, fam: fo.fam, stroke: fo.stroke, src: { str: str, o: o, g: CUR_G } };
 }
 
 /* يرسم نتيجة fit. x: الحافة اليمنى (align=right) أو الوسط (center) أو اليسرى (left). y: أعلى الكتلة */
 function drawFit(ctx, f, x, y, o) {
   if (f.empty) return y;
+  // قوالب كثيرة تقيس النص قبل أن تعلن مجموعته؛ فإن اختار المستخدم خطاً لهذه المجموعة نعيد القياس بخطها
+  if (f.src && f.src.g !== CUR_G && CUR_G) { const fo = fontOf(f.src.o.title ? 'title' : 'body', f.src.o.bold || 0); if (fo.fam !== f.fam) { const nf = fit(ctx, f.src.str, f.src.o); nf.src.g = CUR_G; Object.assign(f, nf); } }
   o = o || {};
   setF(ctx, f.size, f.fam);
   const sp = ctx.measureText(' ').width;

@@ -55,7 +55,11 @@ function msheet(opt) {
   const hd = el('div', { class: 'shd' }, [el('span', { style: 'width:30px' }), el('h3', { text: opt.title || '' }), el('button', { type: 'button', class: 'sx', 'aria-label': 'إغلاق', onclick: close }, [ico('close')])]);
   const body = el('div', { class: 'sbody' }, (opt.body || []).filter(Boolean));
   sheet.append(el('div', { class: 'grab' }), hd, body);
-  if (opt.acts && opt.acts.length) sheet.appendChild(el('div', { class: 'sacts' }, opt.acts.filter(Boolean).map(function (a) { return el('button', { type: 'button', class: 'btn ' + (a.cls || ''), text: a.t, onclick: function () { haptic(); if (a.fn && a.fn(close) === false) return; if (!a.keep) close(); } }); })));
+  // زر «إغلاق/إلغاء» بلا فعل مكرر لزر الإغلاق في الرأس، فنحذفه حين يوجد زر رئيسي
+  let acts = (opt.acts || []).filter(Boolean);
+  const isClose = function (a) { return !a.fn && /^(إغلاق|إلغاء)$/.test(a.t); };
+  if (acts.some(function (a) { return /dark/.test(a.cls || ''); }) || acts.every(isClose)) acts = acts.filter(function (a) { return !isClose(a); });
+  if (acts.length) sheet.appendChild(el('div', { class: 'sacts' }, acts.map(function (a) { return el('button', { type: 'button', class: 'btn ' + (a.cls || ''), text: a.t, onclick: function () { haptic(); if (a.fn && a.fn(close) === false) return; if (!a.keep) close(); } }); })));
   // سحب المقبض للإغلاق
   let sy = 0, dy = 0, drag = false;
   const down = function (e) { if (body.contains(e.target) && body.scrollTop > 0) return; sy = (e.touches ? e.touches[0] : e).clientY; drag = true; sheet.classList.add('dragging'); };

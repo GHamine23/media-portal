@@ -47,6 +47,7 @@ function route6(re, fn, opt) { ROUTES.push({ re: re, fn: fn, opt: opt || {} }); 
 function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
 let RENDER_N = 0;
 function render() {
+  if (typeof editorGuard === 'function' && editorGuard(location.hash || '#/')) return;
   const h = location.hash.replace(/^#/, '') || '/';
   const r = ROUTES.find(function (x) { return x.re.test(h); }) || ROUTES[ROUTES.length - 1];
   if (!r.opt.public && !V6.token) { if (h !== '/login') ls('after', h); return go('#/login'); }
@@ -83,6 +84,42 @@ function revealAll(root) {
   requestAnimationFrame(function () { $$('.rv,.bwrap', root).forEach(function (x) { IO.observe(x); }); });
 }
 function H(tag, text, cls) { const n = el(tag, { class: 'bwrap ' + (cls || '') }); blurWords(n, text); return n; }
+/* ---------- لون الواجهة ----------
+   لون واحد يقود الأزرار الرئيسية والتحديد والروابط والحالة النشطة، مع ظلال مشتقة منه (أفتح للخلفيات، أغمق للضغط).
+   يختاره المستخدم من «حسابي» أو «المزيد»، ويُحفظ في تفضيلاته فيتبعه على كل أجهزته. «لون البرنامج» يأخذ لون البرنامج الحالي. */
+const ACCENTS = [['indigo', 'نيلي', '#4f46e5'], ['teal', 'فيروزي', '#0d8478'], ['orange', 'برتقالي', '#e0631d'], ['plum', 'عنّابي', '#9d2b5e'], ['blue', 'أزرق', '#1668e3'], ['olive', 'زيتوني', '#467a2f'], ['ink', 'أسود كلاسيكي', '#141414'], ['prog', 'لون برنامجك', null]];
+function hexRgb(h) { h = String(h || '').replace('#', ''); if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join(''); const n = parseInt(h, 16); return isNaN(n) ? [79, 70, 229] : [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function rgbHex(c) { return '#' + c.map(function (v) { return ('0' + Math.round(Math.max(0, Math.min(255, v))).toString(16)).slice(-2); }).join(''); }
+function mixHex(a, b, t) { const x = hexRgb(a), y = hexRgb(b); return rgbHex(x.map(function (v, i) { return v + (y[i] - v) * t; })); }
+function accentHex(id) {
+  if (id === 'prog') { const c = (typeof V6 !== 'undefined' && V6.prog && V6.prog.color) || ''; if (/^#[0-9a-f]{3,6}$/i.test(c)) { const l = hexRgb(c).reduce(function (a, v, i) { return a + v * [0.299, 0.587, 0.114][i]; }, 0); return l > 170 ? mixHex(c, '#000000', 0.35) : c; } id = 'indigo'; }
+  return (ACCENTS.find(function (a) { return a[0] === id; }) || ACCENTS[0])[2];
+}
+function curAccent() { return (typeof V6 !== 'undefined' && V6.me && V6.me.prefs && V6.me.prefs.accent) || ls('accent') || 'indigo'; }
+function applyAccent(id) {
+  id = id || curAccent(); const h = accentHex(id), c = hexRgb(h), r = document.documentElement.style;
+  r.setProperty('--ac', h); r.setProperty('--ac2', mixHex(h, '#000000', 0.22)); r.setProperty('--ac3', mixHex(h, '#ffffff', 0.25));
+  r.setProperty('--ac-t', 'rgba(' + c.join(',') + ',.10)'); r.setProperty('--ac-t2', 'rgba(' + c.join(',') + ',.18)');
+  r.setProperty('--ac-ink', mixHex(h, '#000000', 0.3)); r.setProperty('--ac-soft', mixHex(h, '#ffffff', 0.93)); r.setProperty('--ac-bg', mixHex(h, '#f6f6f8', 0.965));
+  document.documentElement.dataset.accent = id;
+  const m = document.querySelector('meta[name=theme-color]'); if (m && document.body && document.body.classList.contains('mapp')) m.setAttribute('content', mixHex(h, '#f6f6f8', 0.965));
+  try { ls('accent', id); } catch (e) {}
+}
+// صف اختيار اللون: معاينة فورية، ويُحفظ في التفضيلات
+function accentPicker(onPick) {
+  const cur = curAccent();
+  const row = el('div', { class: 'acpick', role: 'radiogroup', 'aria-label': 'لون الواجهة' });
+  ACCENTS.forEach(function (a) {
+    const hex = a[0] === 'prog' ? accentHex('prog') : a[2];
+    row.appendChild(el('button', { type: 'button', class: 'acsw' + (a[0] === cur ? ' on' : '') + (a[0] === 'prog' ? ' prog' : ''), role: 'radio', 'aria-checked': a[0] === cur ? 'true' : 'false', 'aria-label': a[1], title: a[1], style: '--sw:' + hex, onclick: function (e) {
+      applyAccent(a[0]); $$('.acsw', row).forEach(function (b) { b.classList.remove('on'); b.setAttribute('aria-checked', 'false'); }); e.currentTarget.classList.add('on'); e.currentTarget.setAttribute('aria-checked', 'true');
+      if (typeof savePrefs6 === 'function' && typeof V6 !== 'undefined' && V6.me) savePrefs6({ accent: a[0] });
+      if (onPick) onPick(a[0], a[1]);
+    } }, [el('i', {}), el('small', { text: a[1] })]));
+  });
+  return row;
+}
+applyAccent(ls('accent') || 'indigo');
 function setMotion(level) { document.documentElement.style.setProperty('--k', level === 'lively' ? '0.8' : level === 'normal' ? '1' : '1.25'); }
 
 /* ---------- الرسائل والنوافذ ---------- */

@@ -1,6 +1,6 @@
 /* ================= المحرر على الجوال: التصميم ظاهر دائماً، والأدوات ورقة سفلية بثلاثة مستويات (طرف، نصف، كامل) =================
    نعيد استعمال محرك المحرر كاملاً (Konva، اللوحات، الحفظ)، ونغيّر البنية والترتيب: الأهم أولاً، والباقي خلف «المزيد». */
-const MED = { detent: 'peek', h: { peek: 112, half: 0.46, full: 0.86 } };
+const MED = { detent: 'peek', h: { peek: 112, half: 0.5, full: 0.8 } };
 const M_RAIL_ORDER = ['content', 'colors', 'imgs', 'bg', 'tpls', 'anim', 'text', 'els', 'fonts', 'layers', 'assist'];
 // الترتيب حسب الأولوية على الجوال، وكل الأدوات متاحة (التحكم الكامل) ضمن حدود درجة التعديل
 const railItemsDesk = railItems;
@@ -19,6 +19,8 @@ function sheetTo(d, animate) {
   document.documentElement.style.setProperty('--sheet-peek', sheetPx('peek') + 'px');
   if (animate !== false) setTimeout(function () { p.classList.remove('dragging'); }, 10);
   haptic();
+  // التصميم يصغر ويصعد فوق اللوحة فتبقى التعديلات ظاهرة
+  clearTimeout(MED.fitT); MED.fitT = setTimeout(function () { if (ED.open) { ED.autoFit = true; refit(); } }, animate === false ? 0 : 60);
 }
 function mRail() {
   const r = el('div', { class: 'mrail', role: 'tablist' });
@@ -35,7 +37,7 @@ buildPanel = function () {
   buildPanelDesk();
   if (!document.body.classList.contains('mapp')) return;
   const p = $('#e_panel'); if (!p) return;
-  const grab = p.querySelector('.grab'), rail = mRail();
+  const grab = p.querySelector('.grab'), rail = railHints(mRail());
   if (grab) grab.after(rail); else p.insertBefore(rail, p.firstChild);
   const pb = p.querySelector('.pbody'); if (pb) pb.classList.add('pbody');
   attachSheetDrag(p);
@@ -45,20 +47,30 @@ const openTabDesk = openTab;
 openTab = function (t) { if (!document.body.classList.contains('mapp')) return openTabDesk(t); ED.tab = t; buildPanel(); if (MED.detent === 'peek') sheetTo('half'); track('tool', { tool: 'tab_' + t }); };
 function attachSheetDrag(p) {
   if (p._mdrag) return; p._mdrag = true;
-  let sy = 0, sh = 0, drag = false, lastY = 0, lastT = 0, vel = 0;
+  let sx = 0, sy = 0, sh = 0, drag = false, decided = false, inRail = false, inBody = null, lastY = 0, lastT = 0, vel = 0;
+  // المقبض والشريط والعنوان تسحب الورقة عمودياً؛ الشريط يُمرَّر أفقياً بين الأدوات؛ جسم اللوحة يُمرَّر، وإن كان في أعلاه وسُحب للأسفل نزلت الورقة
   const start = function (e) {
-    const t = e.touches ? e.touches[0] : e; const inBody = e.target.closest('.pbody');
-    if (inBody && (MED.detent !== 'full' || inBody.scrollTop > 0)) return;   // في النصف يسحب الجسم الورقة؛ في الكامل يمرّر الجسم
-    sy = t.clientY; sh = p.getBoundingClientRect().height; drag = true; lastY = sy; lastT = Date.now(); vel = 0; p.classList.add('dragging');
+    const t = e.touches ? e.touches[0] : e;
+    if (e.target.closest('input,textarea,select,[contenteditable=true],.e-tb')) return;
+    inBody = e.target.closest('.pbody'); inRail = !!e.target.closest('.mrail');
+    sx = t.clientX; sy = t.clientY; sh = p.getBoundingClientRect().height; drag = true; decided = false; lastY = sy; lastT = Date.now(); vel = 0;
   };
   const move = function (e) {
-    if (!drag) return; const t = e.touches ? e.touches[0] : e; const dy = sy - t.clientY, h = Math.max(70, Math.min(innerHeight * 0.92, sh + dy));
+    if (!drag) return; const t = e.touches ? e.touches[0] : e; const dx = t.clientX - sx, dyRaw = t.clientY - sy;
+    if (!decided) {
+      if (Math.abs(dx) < 6 && Math.abs(dyRaw) < 6) return;
+      decided = true;
+      if (Math.abs(dx) > Math.abs(dyRaw)) { drag = false; return; }                        // تمرير أفقي (بين الأدوات)
+      if (inBody && !(dyRaw > 0 && inBody.scrollTop <= 0)) { drag = false; return; }        // تمرير المحتوى
+      p.classList.add('dragging');
+    }
+    const h = Math.max(70, Math.min(innerHeight * 0.92, sh - dyRaw));
     document.documentElement.style.setProperty('--sheet-h', h + 'px'); const now = Date.now(); vel = (t.clientY - lastY) / Math.max(1, now - lastT); lastY = t.clientY; lastT = now;
     p.classList.toggle('peek', h < sheetPx('peek') + 40);
     if (e.cancelable) e.preventDefault();
   };
   const end = function () {
-    if (!drag) return; drag = false; p.classList.remove('dragging');
+    if (!drag) return; drag = false; if (!decided) return; p.classList.remove('dragging');
     const h = p.getBoundingClientRect().height, ds = ['peek', 'half', 'full'];
     let best = ds.reduce(function (a, d) { return Math.abs(sheetPx(d) - h) < Math.abs(sheetPx(a) - h) ? d : a; }, 'peek');
     const idx = ds.indexOf(best);
@@ -67,7 +79,17 @@ function attachSheetDrag(p) {
     sheetTo(best);
   };
   p.addEventListener('touchstart', start, { passive: true }); p.addEventListener('touchmove', move, { passive: false }); p.addEventListener('touchend', end);
-  p.addEventListener('mousedown', function (e) { if (e.target.closest('.grab,.mrail')) { start(e); const mv = function (ev) { move(ev); }, up = function () { end(); document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); }; document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up); } });
+  p.addEventListener('mousedown', function (e) { if (e.target.closest('.grab,.phd')) { start(e); const mv = function (ev) { move(ev); }, up = function () { end(); document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); }; document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up); } });
+}
+// شريط الأدوات: تظليل الحافة التي وراءها أدوات أخرى، وسهم صغير يمرّر إليها
+function railHints(r) {
+  const wrap = el('div', { class: 'mrailw' }, [r]);
+  const nx = el('button', { type: 'button', class: 'mrnext', 'aria-label': 'أدوات أخرى', onclick: function () { r.scrollBy({ left: -r.clientWidth * 0.7, behavior: 'smooth' }); } }, [ico('chev')]);
+  const pv = el('button', { type: 'button', class: 'mrprev', 'aria-label': 'الأدوات السابقة', onclick: function () { r.scrollBy({ left: r.clientWidth * 0.7, behavior: 'smooth' }); } }, [ico('chev')]);
+  wrap.append(pv, nx);
+  const upd = function () { const max = r.scrollWidth - r.clientWidth, x = Math.abs(r.scrollLeft); wrap.classList.toggle('more-l', max > 4 && x < max - 4); wrap.classList.toggle('more-r', x > 4); };
+  r.addEventListener('scroll', upd, { passive: true }); setTimeout(upd, 60); setTimeout(upd, 400);
+  return wrap;
 }
 // بعد فتح المحرر: الشريط العلوي المختصر وقائمة «المزيد»
 const showEditor6Desk = showEditor6;
@@ -75,8 +97,9 @@ showEditor6 = function (doc, fromDraft) {
   showEditor6Desk(doc, fromDraft);
   if (!document.body.classList.contains('mapp')) return;
   MED.detent = null; ED.autoFit = true;
-  const top = $('.e-top'); if (top && !top.querySelector('.mmore')) {
-    const more = el('button', { type: 'button', class: 'ib mmore', 'aria-label': 'المزيد', onclick: function () {
+  ED.backStep = function () { if (MED.detent && MED.detent !== 'peek') { sheetTo('peek'); return true; } return false; };
+  const top = $('.e-top'); if (top && !top.querySelector('.e-more')) {
+    const more = el('button', { type: 'button', class: 'ib e-more', 'aria-label': 'خيارات التصميم', onclick: function () {
       mactions(null, [
         doc.kind !== 'deck' ? { t: 'النص المصاحب والنشر في القناة', ic: 'send', fn: function () { captionDialog(); } } : null,
         { t: 'شارك بالرابط مع فريقك', ic: 'share', fn: function () { shareDialog(); } },
@@ -89,7 +112,7 @@ showEditor6 = function (doc, fromDraft) {
         { t: 'ملاحظة للفريق', ic: 'chat', fn: function () { showFeedback6(); } }
       ], ED.doc.name);
     } }, [ico('more')]);
-    const nameI = top.querySelector(".e-name"); top.insertBefore(more, nameI);
+    const dl = top.querySelector('#e_dl'); if (dl) top.insertBefore(more, dl); else top.appendChild(more);
   }
   setTimeout(function () { sheetTo('peek', false); refit(); }, 50);
   window.addEventListener('resize', function onr() { if (!ED.open) { window.removeEventListener('resize', onr); return; } sheetTo(MED.detent || 'peek', false); });
@@ -107,6 +130,7 @@ const fitZoomDesk = fitZoom;
 fitZoom = function () {
   if (!document.body.classList.contains('mapp')) return fitZoomDesk();
   const box = $('.e-scroll'); if (!box || !S.size) return 1;
-  const sz = SIZES[S.size], avail = box.clientHeight - sheetPx('peek') - 36;
-  return Math.max(0.08, Math.min((box.clientWidth - 28) / sz.w, avail / sz.h, 2));
+  const sz = SIZES[S.size], tb = 60;   // مكان الشريط السياقي محجوز دائماً فلا يقفز التصميم عند التحديد
+  const avail = box.clientHeight - sheetPx(MED.detent || 'peek') - 28 - tb;
+  return Math.max(0.05, Math.min((box.clientWidth - 28) / sz.w, Math.max(60, avail) / sz.h, 2));
 };

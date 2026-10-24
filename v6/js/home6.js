@@ -66,9 +66,9 @@ function showHome() {
 
 /* ---------- دعوة إلى تطبيق الجوال (تظهر على الشاشات الصغيرة في الموقع) ---------- */
 function appPromo() {
-  if (document.body.classList.contains('mapp') || window.innerWidth > 760 || ls('appPromoOff')) return null;
+  if (document.body.classList.contains('mapp') || window.innerWidth > 760 || (ls('appPromoOff') && !ls('preferWeb'))) return null;
   const b = el('div', { class: 'apppromo rv' }, [el('img', { src: 'icons/icon-192.png', alt: '' }), el('div', { class: 'grow' }, [el('b', { text: 'تطبيق أثر للجوال' }), el('span', { class: 'tiny', text: 'واجهة مصمّمة للهاتف: المحرر دون إخفاء التصميم، والتقويم، والنشر. ويُثبّت على شاشتك الرئيسية.' })]),
-    el('a', { class: 'btn sm dark', href: '../app/', text: 'افتح التطبيق' }), el('button', { type: 'button', class: 'ib sm', 'aria-label': 'إخفاء', onclick: function () { ls('appPromoOff', true); b.remove(); } }, [ico('close')])]);
+    el('a', { class: 'btn sm dark', href: '../app/', text: 'افتح التطبيق', onclick: function () { ls('preferWeb', null); } }), el('button', { type: 'button', class: 'ib sm', 'aria-label': 'إخفاء', onclick: function () { ls('appPromoOff', true); b.remove(); } }, [ico('close')])]);
   return b;
 }
 /* ---------- إشارة «المزيد في الأسفل»: تظهر حتى يبدأ التمرير ---------- */
