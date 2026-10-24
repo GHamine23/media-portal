@@ -361,7 +361,7 @@ ok(J('ai_skills', adm).some(function (x) { return x.id === nsk.id && !x.builtin;
 call('ai_skill_reset', adm, 'coach'); ok(J('ai_skills', adm).some(function (x) { return x.id === 'coach' && !x.edited; }), 'skill reset');
 call('ai_make', adm, JSON.stringify({ kind: 'design', prompt: 'p', system: 'أنت مصمم', schema: { type: 'object' } }));
 const sys = JSON.parse(GAS._lastAi.opt.payload).systemInstruction.parts[0].text;
-ok(/مهارة: عين المصمّم/.test(sys) && /هوية عالم/.test(sys) && /الضوابط/.test(sys) && !/المدرّب/.test(sys), 'skills injected by kind');
+ok(/مهارة: كاتب الإعلانات/.test(sys) && !/مهارة: عين المصمّم/.test(sys) && /هوية عالم/.test(sys) && /الضوابط/.test(sys) && !/المدرّب/.test(sys), 'skills injected by kind');
 // ازدحام جوجل: إعادة المحاولة ثم النموذج الاحتياطي
 GAS._busy = 'gemini-3.8-flash';
 const fb = call('ai_make', adm, JSON.stringify({ kind: 'design', prompt: 'p', system: 's', schema: { type: 'object' } }));
@@ -377,7 +377,7 @@ GAS._busy = null;
 call('set_save', adm, JSON.stringify({ groqKey: 'gsk_test' }));
 ok(J('set_get', adm).groqOn === true, 'groq key saved');
 GAS._lastGroq = null; const gq = call('ai_make', adm, JSON.stringify({ kind: 'caption', prompt: 'p', system: 's', schema: { type: 'OBJECT', properties: { text: { type: 'STRING' } } } }));
-ok(JSON.parse(gq).text === 'من Groq' && JSON.parse(GAS._lastGroq.opt.payload).response_format.json_schema.schema.properties.text.type === 'string', 'caption routed to groq with converted schema');
+ok(JSON.parse(gq).text === 'من Groq' && [].concat(JSON.parse(GAS._lastGroq.opt.payload).response_format.json_schema.schema.properties.text.type)[0] === 'string', 'caption routed to groq with converted schema');
 GAS._lastGroq = null; call('ai_make', adm, JSON.stringify({ kind: 'review', prompt: 'p', system: 's', files: [{ mime: 'image/png', b64: 'AAAA' }] }));
 ok(!GAS._lastGroq, 'vision task stays on gemini');
 GAS._groqDown = true; GAS._lastAi = null; call('ai_make', adm, JSON.stringify({ kind: 'intake', prompt: 'p', system: 's' })); ok(!!GAS._lastAi, 'groq failure falls back to gemini'); GAS._groqDown = false;
@@ -398,4 +398,70 @@ ok(J('audit_list', adm).length > 5, 'audit log');
 call('auth_logout', at); fails('bundle', /انتهت/, at);
 // v5 api still works after v6 data exists
 ok(JSON.parse(call('api_tpl_list', l5.token)).length >= 1, 'v5 still works');
+
+/* ===================== المساعد الذكي (قسم الذكاء): السلسلة، إصلاح JSON، التفكير، الذاكرة المؤقتة، Cloudflare ===================== */
+(function () {
+  const base = GAS._fetch.handler, seen = []; let over = null;
+  GAS._fetch.handler = function (url, opt) { seen.push({ url: url, opt: opt }); if (over) { const r = over(url, opt); if (r) return r; } return base(url, opt); };
+  const last = function (re) { const l = seen.filter(function (x) { return re.test(x.url); }); return l[l.length - 1]; };
+  const pay = function (re) { const x = last(re); return x ? JSON.parse(x.opt.payload) : null; };
+  const SC = { type: 'OBJECT', properties: { title: { type: 'STRING' }, items: { type: 'ARRAY', items: { type: 'STRING' } }, n: { type: 'NUMBER' } }, required: ['title', 'items'] };
+  const gem = function (text) { return { code: 200, body: JSON.stringify({ candidates: [{ content: { parts: [{ text: text }] } }] }) }; };
+  const oai = function (text) { return { code: 200, body: JSON.stringify({ choices: [{ message: { content: text } }] }) }; };
+  call('set_save', adm, JSON.stringify({ ai: { enabled: true, perDay: 30 }, groqKey: 'gsk_test' }));
+  // التصميم يذهب إلى Gemini افتراضياً (أجود في العربية) بتفكير منخفض، والمخطط مقيّد
+  over = function (u) { if (/generativelanguage/.test(u)) return gem('{"title":"وقتك *رأس مالك*","items":["أ"]}'); };
+  let r = JSON.parse(call('ai_make', adm, JSON.stringify({ kind: 'design', prompt: 'p', system: 's', schema: SC })));
+  let g = pay(/generativelanguage/);
+  ok(r.title === 'وقتك *رأس مالك*' && /gemini-3\.8-flash/.test(last(/generativelanguage/).url) && g.generationConfig.thinkingConfig.thinkingLevel === 'low' && g.generationConfig.responseSchema.required[0] === 'title', 'design → gemini strong model, low thinking, schema');
+  call('ai_make', adm, JSON.stringify({ kind: 'review', prompt: 'p', system: 's', schema: SC, files: [{ mime: 'image/png', b64: 'AAAA' }] }));
+  ok(!pay(/generativelanguage/).generationConfig.thinkingConfig, 'review keeps default thinking');
+  // نموذج لا يقبل ضبط التفكير: يُعاد بدونه
+  let n400 = 0; over = function (u, o) { if (/generativelanguage/.test(u)) { if (JSON.parse(o.payload).generationConfig.thinkingConfig) { n400++; return { code: 400, body: '{"error":{"message":"thinking_level is not supported"}}' }; } return gem('{"title":"ب","items":[]}'); } };
+  r = JSON.parse(call('ai_make', adm, JSON.stringify({ kind: 'design', prompt: 'p', system: 's', schema: SC })));
+  ok(r.title === 'ب' && n400 === 1, 'thinking rejected → retried without it');
+  // Gemini يعيد JSON مكسوراً → ننتقل إلى Groq، وGroq يعيده داخل أسوار وبفاصلة زائدة فيُصلح وتُملأ الحقول الناقصة
+  over = function (u) { if (/generativelanguage/.test(u)) return gem('عذراً لا أستطيع'); if (/groq/.test(u)) return oai('```json\n{"title":"من Groq","n":"7",}\n```'); };
+  r = JSON.parse(call('ai_make', adm, JSON.stringify({ kind: 'design', prompt: 'p', system: 's', schema: SC })));
+  ok(r.title === 'من Groq' && Array.isArray(r.items) && r.n === 7, 'broken JSON from gemini → groq; fenced JSON repaired, required filled, types coerced');
+  // Groq: مخطط صارم وجهد استدلال منخفض للمهام الخفيفة
+  over = function (u) { if (/groq/.test(u)) return oai('{"title":"ج","items":[]}'); };
+  call('ai_make', adm, JSON.stringify({ kind: 'refine', prompt: 'p', system: 's', schema: SC }));
+  let q = pay(/groq/);
+  ok(q.response_format.json_schema.strict === true && q.response_format.json_schema.schema.additionalProperties === false && q.response_format.json_schema.schema.required.length === 3 && q.reasoning_effort === 'low' && q.include_reasoning === false, 'groq strict schema + low reasoning for refine');
+  call('ai_make', adm, JSON.stringify({ kind: 'outline', prompt: 'p', system: 's', schema: SC })); ok(pay(/groq/).reasoning_effort === 'medium', 'outline keeps medium reasoning');
+  // المخطط الصارم مرفوض → يُعاد بلا صرامة
+  let strictHits = 0; over = function (u, o) { if (/groq/.test(u)) { const b = JSON.parse(o.payload); if (b.response_format.json_schema.strict) { strictHits++; return { code: 400, body: '{}' }; } return oai('{"title":"د","items":[]}'); } };
+  r = JSON.parse(call('ai_make', adm, JSON.stringify({ kind: 'caption', prompt: 'p', system: 's', schema: SC })));
+  ok(r.title === 'د' && strictHits === 1, 'strict 400 → retried non-strict');
+  // Gemma: بلا مخطط مقيّد، والمخطط في التعليمات
+  call('set_save', adm, JSON.stringify({ ai: { enabled: true, perDay: 30, model: 'gemma-4-31b-it', route: { design: 'gemini' } } }));
+  over = function (u) { if (/generativelanguage/.test(u)) return gem('النتيجة: {"title":"هـ","items":[]}'); };
+  r = JSON.parse(call('ai_make', adm, JSON.stringify({ kind: 'design', prompt: 'p', system: 's', schema: SC })));
+  g = pay(/generativelanguage/);
+  ok(r.title === 'هـ' && !g.generationConfig.responseSchema && /أعد JSON فقط/.test(g.systemInstruction.parts[0].text) && !g.generationConfig.thinkingConfig, 'gemma: schema in instructions, JSON extracted');
+  call('set_save', adm, JSON.stringify({ ai: { enabled: true, perDay: 30 } }));
+  // الذاكرة المؤقتة: الطلب نفسه لا يُرسل مرتين ولا يُحسب
+  over = function (u) { if (/groq/.test(u)) return oai('{"title":"و","items":[]}'); };
+  const usedBefore = J('ai_status', adm).used, nBefore = seen.length;
+  const c1 = call('ai_make', adm, JSON.stringify({ kind: 'intake', prompt: 'نفس الفكرة', system: 's', schema: SC, cache: true }));
+  const c2 = call('ai_make', adm, JSON.stringify({ kind: 'intake', prompt: 'نفس الفكرة', system: 's', schema: SC, cache: true }));
+  ok(c1 === c2 && seen.length === nBefore + 1 && J('ai_status', adm).used === usedBefore + 1, 'cached request served once and counted once');
+  // Cloudflare اختياري: يُحفظ ويُستعمل حين يتعطل Gemini وGroq
+  fails('set_save', /Cloudflare/, adm, JSON.stringify({ cfAccount: 'not-an-id' }));
+  call('set_save', adm, JSON.stringify({ cfAccount: '0123456789abcdef0123456789abcdef', cfToken: 'cf_tok' }));
+  ok(J('set_get', adm).cfOn === true && J('bundle', adm).settings.ai.ready === true, 'cloudflare saved');
+  over = function (u) { if (/generativelanguage/.test(u)) return { code: 429, body: '{"error":{"message":"per day PerDay"}}' }; if (/groq/.test(u)) return { code: 500, body: '{}' }; if (/api\.cloudflare\.com/.test(u)) return oai('{"title":"من Cloudflare","items":[]}'); };
+  r = JSON.parse(call('ai_make', adm, JSON.stringify({ kind: 'design', prompt: 'p', system: 's', schema: SC })));
+  const cf = last(/api\.cloudflare\.com/);
+  ok(r.title === 'من Cloudflare' && /accounts\/0123456789abcdef0123456789abcdef\/ai\/v1\/chat\/completions/.test(cf.url) && cf.opt.headers.Authorization === 'Bearer cf_tok' && /أعد JSON فقط/.test(JSON.parse(cf.opt.payload).messages[0].content), 'gemini quota + groq down → cloudflare');
+  // فحص المساعدين من الإعدادات
+  over = function (u) { if (/generativelanguage/.test(u)) return gem('{"ok":"تم"}'); if (/groq/.test(u)) return { code: 401, body: '{}' }; if (/cloudflare|pollinations/.test(u)) return oai('{"ok":"تم"}'); };
+  const tst = J('ai_test', adm), by = {}; tst.forEach(function (x) { by[x.p] = x; });
+  ok(by.gemini.ok && !by.groq.ok && /401/.test(by.groq.err) && by.cf.ok && by.poll.ok, 'ai_test reports each provider: ' + JSON.stringify(tst.map(function (x) { return x.p + ':' + x.ok; })));
+  fails('ai_test', /للمدير العام/, sp);
+  call('set_save', adm, JSON.stringify({ cfAccount: '', cfToken: '', groqKey: '' }));
+  ok(J('set_get', adm).cfOn === false, 'cloudflare removed');
+  over = null; GAS._fetch.handler = base;
+})();
 console.log('server tests passed:', n);

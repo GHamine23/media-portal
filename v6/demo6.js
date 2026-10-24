@@ -1,7 +1,8 @@
 /* وضع التجربة المحلي (لا يُنشر): يشغّل ملف الخادم نفسه server/Code.gs داخل المتصفح عبر المحاكي.
    يُفتح من خادم محلي يخدم مجلد /home/claude: /media-portal/dist6/index.html */
 (function () {
-  const ROOT = '/media-portal/';
+  // جذر النسخة التي فُتحت منها صفحة التجربة (المستودع الرئيس أو نسخة عمل)، حتى يُختبر Code.gs الخاص بها
+  const ROOT = location.pathname.replace(/dist6\/[^/]*$/, '') || '/media-portal/';
   function syncGet(url, binary) {
     const x = new XMLHttpRequest(); x.open('GET', url, false);
     if (binary) x.overrideMimeType('text/plain; charset=x-user-defined');

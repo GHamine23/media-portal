@@ -443,7 +443,19 @@ async function aSettings(body) {
   const groqTok = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.groqOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'gsk_…', 'aria-label': 'مفتاح Groq' });
   const groqM = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.groqModel || 'openai/gpt-oss-120b', 'aria-label': 'نموذج Groq' });
   const route = Object.assign({}, s.routeDefault || {}, s.ai.route || {});
-  const ROUTE_N = [['intake', 'فهم الفكرة'], ['caption', 'النص المصاحب'], ['outline', 'مخطط العرض'], ['imgq', 'كلمات الصور'], ['week', 'تقرير الأسبوع'], ['spell', 'التصحيح والتشكيل'], ['design', 'اقتراح التصاميم'], ['creative', 'دعه يبدع'], ['review', 'مراجعة التصميم']];
+  const ROUTE_N = [['intake', 'فهم الفكرة'], ['design', 'اقتراح التصاميم'], ['creative', 'دعه يبدع'], ['refine', 'تعديل اقتراح'], ['brief', 'تحسين الوصف'], ['caption', 'النص المصاحب'], ['outline', 'مخطط العرض'], ['imgq', 'كلمات الصور'], ['week', 'تقرير الأسبوع'], ['spell', 'التصحيح والتشكيل'], ['review', 'مراجعة التصميم']];
+  const cfAcc = el('input', { type: 'text', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.cfOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'Account ID (٣٢ حرفاً)', 'aria-label': 'رقم حساب Cloudflare' });
+  const cfTok = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.cfOn ? '•••••••• (اترك فارغاً لإبقائه)' : 'API Token', 'aria-label': 'رمز Cloudflare' });
+  const cfM = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.cfModel || '@cf/openai/gpt-oss-120b', 'aria-label': 'نموذج Cloudflare' });
+  const cfClear = el('input', { type: 'checkbox' });
+  const PROV = { gemini: 'Gemini', groq: 'Groq', cf: 'Cloudflare', poll: 'Pollinations' };
+  const testOut = el('div', { class: 'aitest' });
+  const testBtn = el('button', { type: 'button', class: 'btn sm line', onclick: function (e) {
+    return withBusy(e.currentTarget, async function () {
+      const l = await API6.me('ai_test'); testOut.innerHTML = '';
+      l.forEach(function (x) { testOut.appendChild(el('div', { class: 'aitrow ' + (!x.on ? 'off' : x.ok ? 'ok' : 'bad') }, [el('b', { text: PROV[x.p] || x.p }), el('span', { text: !x.on ? 'غير مضبوط' : x.ok ? 'يعمل · ' + (x.ms / 1000).toFixed(1) + ' ث' : 'لا يعمل: ' + (x.err || '') })])); });
+    }, { busy: 'نختبر…', done: 'اختُبرت' });
+  } }, [ico('ai'), 'اختبر المساعدين']);
   const routeBox = el('div', { class: 'routes' }, ROUTE_N.map(function (r) { return el('div', { class: 'routerow' }, [el('span', { text: r[1] }), segOf([['gemini', 'Gemini'], ['groq', 'Groq']], route[r[0]] || 'gemini', function (v) { route[r[0]] = v; })]); }));
   const lightM = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite', 'aria-label': 'نموذج المهام الخفيفة' });
   const fbm = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 'aria-label': 'النماذج الاحتياطية' });
@@ -460,20 +472,30 @@ async function aSettings(body) {
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-pu' }, [ico('ai')]), el('h3', { text: 'اصنع إعلانك بالذكاء' }),
       el('p', { class: 'small ' + (s.aiKey ? 'ok' : 'err'), text: s.aiKey ? (s.aiKeys > 1 ? s.aiKeys + ' مفاتيح Gemini مضبوطة: تتناوب في الطلبات، وإذا بلغ أحدها حدّه انتقل الخادم إلى التالي تلقائياً.' : 'مفتاح Gemini مضبوط في الخادم.') : 'لم يُضبط مفتاح Gemini بعد (الصقه في خصائص السكربت، أو أضف مفاتيح هنا).' }),
       el('label', { class: 'tog' }, [aiOn, el('span', { text: 'مفعّل' })]),
-      el('div', { class: 'fld' }, [el('label', { text: 'مفاتيح Gemini إضافية (من حسابات جوجل أخرى) — تُحفظ في الخادم ولا تُعرض' }), gKeys, el('small', { text: 'كل مفتاح في سطر. الحصة المجانية لكل مفتاح على حدة، فكل حساب جوجل إضافي يضاعف ما يمكن طلبه يومياً. المفتاح الأساسي GEMINI_KEY يبقى كما هو.' }), s.aiKeys > 1 ? el('label', { class: 'tog tiny' }, [clearKeys, el('span', { text: 'احذف المفاتيح الإضافية المحفوظة' })]) : null]),
+      el('div', { class: 'fld' }, [el('label', { text: 'مفاتيح Gemini إضافية (من حسابات جوجل أخرى) — تُحفظ في الخادم ولا تُعرض' }), gKeys, el('small', { text: 'كل مفتاح في سطر. الحصة المجانية لكل مشروع جوجل، فأنشئ كل مفتاح في مشروع مختلف (ويُفضّل حساب جوجل آخر)؛ مفاتيح المشروع الواحد تتقاسم حصته. المفتاح الأساسي GEMINI_KEY يبقى كما هو.' }), s.aiKeys > 1 ? el('label', { class: 'tog tiny' }, [clearKeys, el('span', { text: 'احذف المفاتيح الإضافية المحفوظة' })]) : null]),
       el('div', { class: 'fld' }, [el('label', { text: 'النموذج' }), model, el('small', { text: 'أقوى نموذج مجاني الآن: gemini-3.8-flash' })]),
-      el('div', { class: 'fld' }, [el('label', { text: 'نموذج المهام الخفيفة' }), lightM, el('small', { text: 'فهم الفكرة والنص المصاحب والتصحيح والمخطط وتقرير الأسبوع. حصته المجانية ٥٠٠ طلب يومياً، بينما النموذج الأقوى ٢٠ فقط.' })]),
+      el('div', { class: 'fld' }, [el('label', { text: 'نموذج المهام الخفيفة' }), lightM, el('small', { text: 'فهم الفكرة وتعديل الاقتراحات والنص المصاحب والتصحيح والمخطط وتقرير الأسبوع. حصته اليومية أكبر من النموذج الأقوى؛ وتُرى حصصك الفعلية في aistudio.google.com/rate-limit.' })]),
       el('div', { class: 'fld' }, [el('label', { text: 'نماذج احتياطية عند ازدحام جوجل' }), fbm, el('small', { text: 'يُعيد المحاولة ثم ينتقل إليها بالترتيب. افصل بينها بفاصلة.' })]),
       el('div', { class: 'fld' }, [el('label', { text: 'حد الطلبات لكل مستخدم يومياً' }), perDay]),
       el('label', { class: 'tog' }, [pollOn, el('span', { text: 'مساعد احتياطي مجاني للنصوص حين تنفد الحصص (Pollinations، بلا مفتاح)' })]),
       el('small', { class: 'tiny', text: 'يُستعمل فقط إن تعطل Gemini وGroq معاً، وللمهام النصية دون الصور. لا تُرسل إليه بيانات شخصية.' }),
       el('div', { class: 'fld' }, [el('label', { text: 'كيف يصوغ المساعد النص المصاحب للتصاميم (لكل البرامج)' }), withEmoji(capPrompt), el('small', { text: 'تعليمات ثابتة تُضاف إلى كل طلب صياغة. ولكل برنامج تعليماته الخاصة من «البرامج والهويات ← قناة تليجرام».' })]),
       el('p', { class: 'tiny', text: 'في الخطة المجانية تستعمل جوجل الطلبات لتحسين منتجاتها، فلا تُرسل بيانات شخصية للطلاب. والمساعد لمن منحته صلاحيته.' })]),
-    el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-bl' }, [ico('ai')]), el('h3', { text: 'توزيع المهام بين المساعدين' }),
-      el('p', { class: 'small ' + (s.groqOn ? 'ok' : 'err'), text: s.groqOn ? 'مفتاح Groq مضبوط: المهام النصية تذهب إليه، وما يحتاج رؤية الصور يبقى مع Gemini.' : 'بلا مفتاح Groq: كل المهام على Gemini. المفتاح مجاني من console.groq.com/keys (ألف طلب يومياً، ولا يُدرَّب على بياناتكم).' }),
+    el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-bl' }, [ico('ai')]), el('h3', { text: 'المساعدون الإضافيون' }),
+      el('p', { class: 'small muted', text: 'كلها مجانية واختيارية. إن تعطل مساعد أو نفدت حصته أكمل التالي تلقائياً، فلا تتوقف الاقتراحات.' }),
+      el('h4', { class: 'aih', text: 'Groq: سريع جداً للمهام الخفيفة' }),
+      el('p', { class: 'small ' + (s.groqOn ? 'ok' : 'err'), text: s.groqOn ? 'مضبوط: فهم الفكرة والتعديل والنص المصاحب تذهب إليه، فتصل النتيجة في ثوانٍ.' : 'غير مضبوط. مفتاحه مجاني من console.groq.com/keys: ألف طلب يومياً، ولا يحتفظ بالبيانات.' }),
       el('div', { class: 'fld' }, [el('label', { text: 'مفتاح Groq (يُحفظ في الخادم ولا يُعرض)' }), groqTok]),
-      el('div', { class: 'fld' }, [el('label', { text: 'نموذج Groq' }), groqM]),
-      el('p', { class: 'tiny', text: 'من يتولى كل مهمة؟ (ما فيه صور أو ملف PDF يذهب إلى Gemini دائماً، وإن تعطل أحدهما أكمل الآخر)' }), routeBox]),
+      el('div', { class: 'fld' }, [el('label', { text: 'نموذج Groq' }), groqM, el('small', {}, ['للعربية جرّب أيضاً: ', el('bdi', { dir: 'ltr', text: 'qwen/qwen3.8-27b' })])]),
+      el('h4', { class: 'aih', text: 'Cloudflare: حصة يومية احتياطية' }),
+      el('p', { class: 'small ' + (s.cfOn ? 'ok' : 'err'), text: s.cfOn ? 'مضبوط: يكمل المهام النصية حين تنفد حصص Gemini وGroq.' : 'غير مضبوط. يضيف نحو خمسين اقتراحاً يومياً مجاناً حين تنفد الحصص، ولا يُدرَّب على بياناتكم.' }),
+      el('div', { class: 'fld' }, [el('label', { text: 'رقم الحساب (Account ID)' }), cfAcc, el('small', {}, ['يظهر في لوحة Cloudflare بصفحة ', el('bdi', { dir: 'ltr', text: 'Workers AI' }), '. والرمز من «إنشاء رمز» بقالب ', el('bdi', { dir: 'ltr', text: 'Workers AI' }), '.'])]),
+      el('div', { class: 'fld' }, [el('label', { text: 'رمز API (يُحفظ في الخادم ولا يُعرض)' }), cfTok]),
+      el('div', { class: 'fld' }, [el('label', { text: 'نموذج Cloudflare' }), cfM]),
+      s.cfOn ? el('label', { class: 'tog tiny' }, [cfClear, el('span', { text: 'احذف بيانات Cloudflare المحفوظة' })]) : null,
+      el('h4', { class: 'aih', text: 'من يتولى كل مهمة أولاً؟' }),
+      el('p', { class: 'tiny', text: 'Gemini أجود في كتابة العربية، وGroq أسرع. ما فيه صور أو ملف PDF يذهب إلى Gemini دائماً.' }), routeBox,
+      el('div', { class: 'row wrapr' }, [testBtn, el('small', { class: 'tiny', text: 'احفظ الإعدادات أولاً ثم اختبر.' })]), testOut]),
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-gr' }, [ico('send')]), el('h3', { text: 'بوت تليجرام' }),
       el('p', { class: 'small ' + (s.tgOn ? 'ok' : 'err'), text: s.tgOn ? 'رمز البوت مضبوط. أضف البوت مشرفاً في قناة كل برنامج، وحدد القناة من إعدادات البرنامج.' : 'لم يُضبط رمز البوت بعد. أنشئ بوتاً من BotFather والصق رمزه هنا.' }),
       el('div', { class: 'fld' }, [el('label', { text: 'رمز البوت (يُحفظ في الخادم ولا يُعرض)' }), tgTok]),
@@ -489,9 +511,9 @@ async function aSettings(body) {
       el('p', { class: 'tiny', text: 'الصورة التي يختارها المستخدم تُحفظ بأصلها كاملاً في مكتبته مع اسم المصوّر ورخصته، ويقترحها للبرنامج فتوافق أنت من «الشعارات والصور».' })])
   ]));
   body.appendChild(el('button', { type: 'button', class: 'btn dark', onclick: function (e) {
-    const o = { ai: { enabled: aiOn.checked, model: model.value.trim(), fallback: fbm.value.trim(), light: lightM.value.trim(), groqModel: groqM.value.trim(), route: route, perDay: +perDay.value, capPrompt: capPrompt.value.trim(), pollFallback: pollOn.checked }, uploadsNeedPerm: upPerm.checked, maxUploadMb: +maxMb.value }; if (tgTok.value.trim()) o.tgToken = tgTok.value.trim(); if (pxKey.value.trim()) o.pexelsKey = pxKey.value.trim(); if (pbKey.value.trim()) o.pixabayKey = pbKey.value.trim(); o.imgProvider = imgProv; if (groqTok.value.trim()) o.groqKey = groqTok.value.trim();
+    const o = { ai: { enabled: aiOn.checked, model: model.value.trim(), fallback: fbm.value.trim(), light: lightM.value.trim(), groqModel: groqM.value.trim(), cfModel: cfM.value.trim(), route: route, perDay: +perDay.value, capPrompt: capPrompt.value.trim(), pollFallback: pollOn.checked }, uploadsNeedPerm: upPerm.checked, maxUploadMb: +maxMb.value }; if (tgTok.value.trim()) o.tgToken = tgTok.value.trim(); if (pxKey.value.trim()) o.pexelsKey = pxKey.value.trim(); if (pbKey.value.trim()) o.pixabayKey = pbKey.value.trim(); o.imgProvider = imgProv; if (groqTok.value.trim()) o.groqKey = groqTok.value.trim(); if (cfAcc.value.trim()) o.cfAccount = cfAcc.value.trim(); if (cfTok.value.trim()) o.cfToken = cfTok.value.trim(); if (cfClear.checked) { o.cfAccount = ''; o.cfToken = ''; }
     if (gKeys.value.trim()) o.geminiKeys = gKeys.value.trim(); else if (clearKeys.checked) o.geminiKeys = '';
-    return withBusy(e.currentTarget, async function () { await API6.me('set_save', JSON.stringify(o)); await refreshBundle(); }, { busy: 'نحفظ…', done: 'حُفظت الإعدادات' }).then(function () { setTimeout(function () { showAdmin('settings'); }, 900); }).catch(function () {});
+    return withBusy(e.currentTarget, async function () { await API6.me('set_save', JSON.stringify(o)); await refreshBundle(); }, { busy: 'نحفظ…', done: 'حُفظت الإعدادات' }).then(function () { setTimeout(function () { if (/^#\/admin\/settings/.test(location.hash)) showAdmin('settings'); }, 900); }).catch(function () {});
   } }, [ico('check'), 'حفظ الإعدادات']));
 }
 
