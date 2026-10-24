@@ -1885,7 +1885,7 @@ function imgProvider_() {
 // Openverse: بلا مفتاح، ويعمل من المتصفح مباشرة أيضاً (المتصفح يستعمله أولاً، وهذا احتياط)
 function openverseSearch_(q, page, orient) {
   var ar = orient === 'portrait' ? 'tall' : orient === 'landscape' ? 'wide' : orient === 'square' ? 'square' : '';
-  var url = 'https://api.openverse.org/v1/images/?q=' + encodeURIComponent(q) + '&page_size=24&page=' + Math.max(1, +page || 1) + '&mature=false' + (ar ? '&aspect_ratio=' + ar : '') + '&license_type=commercial';
+  var url = 'https://api.openverse.org/v1/images/?q=' + encodeURIComponent(q) + '&page_size=20&page=' + Math.max(1, +page || 1) + '&mature=false' + (ar ? '&aspect_ratio=' + ar : '') + '&license_type=commercial';
   var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, headers: { 'User-Agent': 'AtharPlatform/6.0 (educational design platform)' } });
   if (res.getResponseCode() === 429) throw new Error('بلغنا حد البحث في Openverse الآن؛ جرّب بعد قليل');
   if (res.getResponseCode() !== 200) throw new Error('تعذّر البحث في Openverse (' + res.getResponseCode() + ')');

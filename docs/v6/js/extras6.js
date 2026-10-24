@@ -5,7 +5,7 @@
 const IMG_SRC = [['openverse', 'Openverse'], ['wikimedia', 'ويكيميديا'], ['keyed', 'Pixabay/Pexels'], ['ai', 'توليد بالذكاء']];
 async function openverseFind(q, page, orient) {
   const ar = orient === 'portrait' ? 'tall' : orient === 'landscape' ? 'wide' : orient === 'square' ? 'square' : '';
-  const r = await fetch('https://api.openverse.org/v1/images/?q=' + encodeURIComponent(q) + '&page_size=24&page=' + page + '&mature=false&license_type=commercial' + (ar ? '&aspect_ratio=' + ar : ''), { headers: { Accept: 'application/json' } });
+  const r = await fetch('https://api.openverse.org/v1/images/?q=' + encodeURIComponent(q) + '&page_size=20&page=' + page + '&mature=false&license_type=commercial' + (ar ? '&aspect_ratio=' + ar : ''), { headers: { Accept: 'application/json' } });
   if (r.status === 429) throw new Error('بلغنا حد البحث الآن في Openverse؛ انتظر دقيقة');
   if (!r.ok) throw new Error('Openverse ' + r.status);
   const j = await r.json();
@@ -62,7 +62,7 @@ function freeImagesSection(b) {
         res.appendChild(bt);
       });
       revealAll(res);
-      more.hidden = r.photos.length < 20;
+      more.hidden = r.photos.length < 18;
     } catch (e) { if (my !== gen) return; sk.remove(); res.appendChild(el('p', { class: 'err tiny', text: e.message })); }
   }
   async function pickFree(p, bt) {
