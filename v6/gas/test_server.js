@@ -507,6 +507,19 @@ ok(JSON.parse(call('api_tpl_list', l5.token)).length >= 1, 'v5 still works');
   r = JSON.parse(call('ai_make', adm, JSON.stringify({ kind: 'design', prompt: 'p', system: 's', schema: SC })));
   const cf = last(/api\.cloudflare\.com/);
   ok(r.title === 'من Cloudflare' && /accounts\/0123456789abcdef0123456789abcdef\/ai\/v1\/chat\/completions/.test(cf.url) && cf.opt.headers.Authorization === 'Bearer cf_tok' && /أعد JSON فقط/.test(JSON.parse(cf.opt.payload).messages[0].content), 'gemini quota + groq down → cloudflare');
+  ok(JSON.parse(cf.opt.payload).max_tokens === 8192, 'cloudflare asks for long answers (max_tokens)');
+  // الأدوار: الدرس إلى عرض على Cloudflare أولاً، ويمكن للمدير اختيار Cloudflare لأي مهمة
+  over = function (u) { if (/api\.cloudflare\.com/.test(u)) return oai('{"title":"مخطط","items":[]}'); if (/groq/.test(u)) return oai('{"title":"من Groq","items":[]}'); return gem('{"title":"g","items":[]}'); };
+  r = JSON.parse(call('ai_make', adm, JSON.stringify({ kind: 'outline', prompt: 'درس', system: 's', schema: SC })));
+  ok(r.title === 'مخطط', 'outline goes to cloudflare first');
+  call('set_save', adm, JSON.stringify({ ai: { enabled: true, perDay: 30, route: { caption: 'cf' } } }));
+  ok(J('set_get', adm).ai.route.caption === 'cf', 'cloudflare selectable per task');
+  r = JSON.parse(call('ai_make', adm, JSON.stringify({ kind: 'caption', prompt: 'x', system: 's', schema: SC })));
+  ok(r.title === 'مخطط', 'task routed to cloudflare by the admin');
+  // تجربة مساعد بعينه: للمدير العام فقط
+  r = JSON.parse(call('ai_make', adm, JSON.stringify({ kind: 'design', prompt: 'x', system: 's', schema: SC, force: 'groq', forceModel: 'llama-3.3-70b-versatile' })));
+  ok(r.title === 'من Groq' && JSON.parse(last(/groq/).opt.payload).model === 'llama-3.3-70b-versatile', 'super admin can force a provider and model');
+  call('set_save', adm, JSON.stringify({ ai: { enabled: true, perDay: 30, route: {} } }));
   // فحص المساعدين من الإعدادات
   over = function (u) { if (/generativelanguage/.test(u)) return gem('{"ok":"تم"}'); if (/groq/.test(u)) return { code: 401, body: '{}' }; if (/cloudflare|pollinations/.test(u)) return oai('{"ok":"تم"}'); };
   const tst = J('ai_test', adm), by = {}; tst.forEach(function (x) { by[x.p] = x; });

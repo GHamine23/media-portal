@@ -538,7 +538,7 @@ async function aSettings(body) {
       l.forEach(function (x) { testOut.appendChild(el('div', { class: 'aitrow ' + (!x.on ? 'off' : x.ok ? 'ok' : 'bad') }, [el('b', { text: PROV[x.p] || x.p }), el('span', { text: !x.on ? 'غير مضبوط' : x.ok ? 'يعمل · ' + (x.ms / 1000).toFixed(1) + ' ث' : 'لا يعمل: ' + (x.err || '') })])); });
     }, { busy: 'نختبر…', done: 'اختُبرت' });
   } }, [ico('ai'), 'اختبر المساعدين']);
-  const routeBox = el('div', { class: 'routes' }, ROUTE_N.map(function (r) { return el('div', { class: 'routerow' }, [el('span', { text: r[1] }), segOf([['gemini', 'Gemini'], ['groq', 'Groq']], route[r[0]] || 'gemini', function (v) { route[r[0]] = v; })]); }));
+  const routeBox = el('div', { class: 'routes' }, ROUTE_N.map(function (r) { return el('div', { class: 'routerow' }, [el('span', { text: r[1] }), segOf([['gemini', 'Gemini'], ['groq', 'Groq'], ['cf', 'Cloudflare']], route[r[0]] || 'gemini', function (v) { route[r[0]] = v; })]); }));
   const lightM = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite', 'aria-label': 'نموذج المهام الخفيفة' });
   const fbm = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 'aria-label': 'النماذج الاحتياطية' });
   const tgTok = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.tgOn ? '•••••••• (اترك فارغاً لإبقائه)' : '123456789:AAF…', 'aria-label': 'رمز البوت' });

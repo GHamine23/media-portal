@@ -538,7 +538,7 @@ async function aSettings(body) {
       l.forEach(function (x) { testOut.appendChild(el('div', { class: 'aitrow ' + (!x.on ? 'off' : x.ok ? 'ok' : 'bad') }, [el('b', { text: PROV[x.p] || x.p }), el('span', { text: !x.on ? 'غير مضبوط' : x.ok ? 'يعمل · ' + (x.ms / 1000).toFixed(1) + ' ث' : 'لا يعمل: ' + (x.err || '') })])); });
     }, { busy: 'نختبر…', done: 'اختُبرت' });
   } }, [ico('ai'), 'اختبر المساعدين']);
-  const routeBox = el('div', { class: 'routes' }, ROUTE_N.map(function (r) { return el('div', { class: 'routerow' }, [el('span', { text: r[1] }), segOf([['gemini', 'Gemini'], ['groq', 'Groq']], route[r[0]] || 'gemini', function (v) { route[r[0]] = v; })]); }));
+  const routeBox = el('div', { class: 'routes' }, ROUTE_N.map(function (r) { return el('div', { class: 'routerow' }, [el('span', { text: r[1] }), segOf([['gemini', 'Gemini'], ['groq', 'Groq'], ['cf', 'Cloudflare']], route[r[0]] || 'gemini', function (v) { route[r[0]] = v; })]); }));
   const lightM = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite', 'aria-label': 'نموذج المهام الخفيفة' });
   const fbm = el('input', { type: 'text', class: 'inp', dir: 'ltr', value: s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 'aria-label': 'النماذج الاحتياطية' });
   const tgTok = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: s.tgOn ? '•••••••• (اترك فارغاً لإبقائه)' : '123456789:AAF…', 'aria-label': 'رمز البوت' });
@@ -551,7 +551,7 @@ async function aSettings(body) {
   const pollOn = el('input', { type: 'checkbox', checked: s.ai.pollFallback !== false });
   const capPrompt = el('textarea', { class: 'inp', rows: '4', dir: 'auto', placeholder: 'مثال: ابدأ كل رسالة بسطر ترحيبي قصير، واختم بالوسم ورابط القناة. لا تستعمل أكثر من رمزين تعبيريين. نبرة هادئة محفّزة.', 'aria-label': 'تعليمات النص المصاحب' }); capPrompt.value = s.ai.capPrompt || '';
   // هل الخادم المنشور هو نفسه نسخة الموقع؟ (يمنع حيرة «حفظتُ ولم يتغير شيء»)
-  const SRV_EXPECT = '519e46ab', srvOk = !!s.srvVer && s.srvVer === SRV_EXPECT;
+  const SRV_EXPECT = '9db4f905', srvOk = !!s.srvVer && s.srvVer === SRV_EXPECT;
   body.appendChild(el('div', { class: 'srvver ' + (srvOk ? 'ok' : 'old') }, [ico(srvOk ? 'check' : 'info'), el('span', { text: srvOk ? 'الخادم محدَّث ويطابق نسخة الموقع.' : 'الخادم المنشور أقدم من الموقع: بعض الإعدادات لن تُحفظ أو لن تعمل. الصق server/Code.gs في Apps Script، ثم «إدارة عمليات النشر» ← تعديل النشر الحالي ← «إصدار جديد» ← نشر.' }), el('small', { dir: 'ltr', text: (s.srvVer || '—') + ' / ' + SRV_EXPECT })]));
   body.appendChild(el('div', { class: 'grid two' }, [
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-pu' }, [ico('ai')]), el('h3', { text: 'اصنع إعلانك بالذكاء' }),

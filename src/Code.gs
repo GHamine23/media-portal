@@ -980,7 +980,7 @@ function set_save(token, json) {
   var s = JSON.parse(json);
   return withLock_(function () {
     var cur = settings_();
-    if (s.ai) cur.ai = { enabled: !!s.ai.enabled, model: clip_(s.ai.model || 'gemini-3.8-flash', 60), fallback: clip_(s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 120), light: clip_(s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite', 60), groqModel: clip_(s.ai.groqModel || 'openai/gpt-oss-120b', 60), cfModel: clip_(s.ai.cfModel || '@cf/openai/gpt-oss-120b', 80), route: (function (r) { var o = {}; Object.keys(r || {}).forEach(function (k) { if (r[k] === 'groq' || r[k] === 'gemini') o[clip_(k, 20)] = r[k]; }); return o; })(s.ai.route), perDay: Math.max(0, Math.min(500, +s.ai.perDay || 0)), pollFallback: s.ai.pollFallback !== false, capPrompt: clip_(s.ai.capPrompt != null ? s.ai.capPrompt : (cur.ai.capPrompt || ''), 4000) };
+    if (s.ai) cur.ai = { enabled: !!s.ai.enabled, model: clip_(s.ai.model || 'gemini-3.8-flash', 60), fallback: clip_(s.ai.fallback != null ? s.ai.fallback : 'gemini-3.6-flash,gemini-3.5-flash-lite', 120), light: clip_(s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite', 60), groqModel: clip_(s.ai.groqModel || 'openai/gpt-oss-120b', 60), cfModel: clip_(s.ai.cfModel || '@cf/openai/gpt-oss-120b', 80), route: (function (r) { var o = {}; Object.keys(r || {}).forEach(function (k) { if (r[k] === 'groq' || r[k] === 'gemini' || r[k] === 'cf') o[clip_(k, 20)] = r[k]; }); return o; })(s.ai.route), perDay: Math.max(0, Math.min(500, +s.ai.perDay || 0)), pollFallback: s.ai.pollFallback !== false, capPrompt: clip_(s.ai.capPrompt != null ? s.ai.capPrompt : (cur.ai.capPrompt || ''), 4000) };
     // مفاتيح Gemini الإضافية: يلصقها المدير (لا تُعرض بعد الحفظ). سطر أو فاصلة بين كل مفتاح وآخر. نص فارغ يحذفها، و«keep» يبقيها
     if (s.geminiKeys != null && s.geminiKeys !== 'keep') { var gks = String(s.geminiKeys).split(/[\s,;]+/).map(function (k) { return k.trim(); }).filter(function (k) { return /^[\w\-.~+\/=:]{20,}$/.test(k); }); if (gks.length) props_().setProperty('GEMINI_KEYS', gks.join('\n')); else if (String(s.geminiKeys).trim()) throw new Error('لم يُفهم مفتاح Gemini: الصق المفتاح كما نسخته من AI Studio، كل مفتاح في سطر'); else props_().deleteProperty('GEMINI_KEYS'); }
     if (s.uploadsNeedPerm != null) cur.uploadsNeedPerm = !!s.uploadsNeedPerm;
@@ -1014,7 +1014,9 @@ function ai_status(token) {
    Gemini يرى الصور ويكتب العربية أجود، فهو للتصميم والمراجعة. Groq نصي سريع لا يحتفظ بالبيانات، فهو للمهام الخفيفة.
    Cloudflare Workers AI اختياري (حصة يومية مجانية، لا يُدرَّب على البيانات). Pollinations بلا مفتاح ملاذاً أخيراً للنصوص.
    كل طلب يمرّ على سلسلة: المساعد المختار للمهمة ← البقية المتاحة ← Pollinations. وما يُطلب بمخطط JSON يُتحقق منه ويُصلح، فإن فسد انتقلنا إلى التالي. */
-var AI_ROUTE_DEFAULT = { intake: 'groq', caption: 'groq', outline: 'groq', imgq: 'groq', week: 'groq', weekly: 'groq', design: 'gemini', creative: 'gemini', spell: 'groq', review: 'gemini', refine: 'groq', brief: 'groq', help: 'groq' };
+// الأدوار: Groq الأسرع للمهام التفاعلية القصيرة (سقفه ٨ آلاف رمز في الدقيقة)، وCloudflare للنصوص الطويلة (بلا سقف دقيقة، ١٢٨ ألف رمز)،
+// وGemini لما فيه صور أو ملفات وللتصميم. وكلٌّ احتياطٌ للآخرين: الأسرع أولاً
+var AI_ROUTE_DEFAULT = { intake: 'groq', caption: 'groq', outline: 'cf', imgq: 'groq', week: 'cf', weekly: 'cf', design: 'gemini', creative: 'gemini', spell: 'groq', review: 'gemini', refine: 'groq', brief: 'groq', help: 'groq' };
 // المهام الخفيفة: نموذج Gemini الخفيف (حصته أكبر) وتفكير قليل، وجهد استدلال منخفض في Groq
 var AI_FAST = { intake: 1, caption: 1, spell: 1, imgq: 1, outline: 1, week: 1, weekly: 1, refine: 1, brief: 1, help: 1 };
 function aiRoute_(kind) { var s = settings_(), r = (s.ai && s.ai.route) || {}; return r[kind] || AI_ROUTE_DEFAULT[kind] || 'gemini'; }
@@ -1022,7 +1024,8 @@ function aiHave_() { var p = props_(); return { gemini: hasGemini_(), groq: !!p.
 function aiChain_(req) {
   var have = aiHave_(), textOnly = !(req.files || []).length;
   if (!textOnly) return have.gemini ? ['gemini'] : [];
-  var order = [aiRoute_(req.kind), 'gemini', 'groq', 'cf'].filter(function (p, i, a) { return have[p] && a.indexOf(p) === i; });
+  if (req.force) return have[req.force] || req.force === 'poll' ? [req.force] : [];   // تجربة المدير العام لمساعد بعينه
+  var order = [aiRoute_(req.kind), 'groq', 'cf', 'gemini'].filter(function (p, i, a) { return have[p] && a.indexOf(p) === i; });
   if (settings_().ai.pollFallback !== false) order.push('poll');
   return order;
 }
@@ -1100,6 +1103,8 @@ function oaiCall_(cfg, req, who, why) {
   var sys = clip_(req.system, 30000), schemaIn = cfg.fmt === 'prompt' || cfg.fmt === 'object';
   if (req.schema && schemaIn) sys += '\n\nأعد JSON فقط يطابق هذا المخطط بدقة: ' + JSON.stringify(toJsonSchema_(req.schema));
   var body = { model: cfg.model, temperature: req.temperature != null ? +req.temperature : 0.8, messages: [{ role: 'system', content: sys }, { role: 'user', content: clip_(req.prompt, 60000) }] };
+  // طول الجواب: Cloudflare حدّه الافتراضي ٢٥٦ رمزاً فقط، فيرجع فارغاً في المهام الطويلة إن لم نحدده
+  if (cfg.maxTokens) body.max_tokens = cfg.maxTokens;
   var js = req.schema ? toJsonSchema_(req.schema) : null, strict = !!(js && cfg.fmt === 'schema' && cfg.strictOk && canStrict_(js));
   if (js && cfg.fmt === 'schema') body.response_format = { type: 'json_schema', json_schema: { name: 'athar', strict: strict, schema: strict ? strictSchema_(js) : js } };
   else if (js && cfg.fmt === 'object') body.response_format = { type: 'json_object' };
@@ -1137,13 +1142,13 @@ function pollCall_(req, who, why) {
 }
 function groqCall_(req, who) {
   var key = props_().getProperty('GROQ_KEY'); if (!key) throw new Error('لم يُضبط مفتاح Groq');
-  var s = settings_(), model = String((s.ai && s.ai.groqModel) || 'openai/gpt-oss-120b').replace(/[^\w.\-\/]/g, '');
+  var s = settings_(), model = String(req.forceModel || (s.ai && s.ai.groqModel) || 'openai/gpt-oss-120b').replace(/[^\w.\-\/]/g, '');
   return oaiCall_({ url: 'https://api.groq.com/openai/v1/chat/completions', key: key, model: model, tag: 'groq:' + model, label: 'Groq', fmt: 'schema', strictOk: /gpt-oss|qwen/.test(model), reasoning: /gpt-oss/.test(model), hideReasoning: true, retry: true }, req, who);
 }
 function cfCall_(req, who) {
   var p = props_(), acc = String(p.getProperty('CF_ACCOUNT') || '').replace(/[^\w]/g, ''), key = p.getProperty('CF_TOKEN'); if (!acc || !key) throw new Error('لم يُضبط Cloudflare');
-  var s = settings_(), model = String((s.ai && s.ai.cfModel) || '@cf/openai/gpt-oss-120b').replace(/[^\w.\-\/@]/g, '');
-  return oaiCall_({ url: 'https://api.cloudflare.com/client/v4/accounts/' + acc + '/ai/v1/chat/completions', key: key, model: model, tag: 'cf:' + model.replace('@cf/', ''), label: 'Cloudflare', fmt: 'prompt', reasoning: /gpt-oss/.test(model), retry: true }, req, who);
+  var s = settings_(), model = String(req.forceModel || (s.ai && s.ai.cfModel) || '@cf/openai/gpt-oss-120b').replace(/[^\w.\-\/@]/g, '');
+  return oaiCall_({ url: 'https://api.cloudflare.com/client/v4/accounts/' + acc + '/ai/v1/chat/completions', key: key, model: model, tag: 'cf:' + model.replace('@cf/', ''), label: 'Cloudflare', fmt: 'prompt', reasoning: /gpt-oss/.test(model), retry: true, maxTokens: 8192 }, req, who);
 }
 
 // نداء Gemini وحده (مع إعادة المحاولة والنماذج الاحتياطية)
@@ -1166,7 +1171,7 @@ function geminiOnly_(req, who) {
   (req.files || []).slice(0, 3).forEach(function (f) { if (f && f.b64 && /^(application\/pdf|image\/(png|jpeg|webp)|text\/plain)$/.test(f.mime || '') && f.b64.length < 28 * 1024 * 1024) parts.push({ inlineData: { mimeType: f.mime, data: f.b64 } }); });
   // المهام الخفيفة (فهم الفكرة، النص المصاحب، التصحيح، كلمات الصور، المخطط، تقرير الأسبوع، التعديل) على نموذج حصته اليومية أكبر،
   // والتصميم والمراجعة على النموذج الأقوى. الحصة المجانية لكل مشروع جوجل ولكل نموذج على حدة.
-  var model = String((AI_FAST[req.kind] && (s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite')) || s.ai.model || 'gemini-3.8-flash').replace(/[^\w.\-]/g, '');
+  var model = String(req.forceModel || (AI_FAST[req.kind] && (s.ai.light != null ? s.ai.light : 'gemini-3.5-flash-lite')) || s.ai.model || 'gemini-3.8-flash').replace(/[^\w.\-]/g, '');
   // جسم الطلب لكل نموذج: Gemini 3 فما بعد يفكّر افتراضياً (أبطأ)؛ نخفّض التفكير لكل شيء عدا مراجعة الصور والمخطط. Gemma بلا مخطط مقيّد فنصفه في التعليمات
   var noThink = {};
   var bodyFor = function (m) {
@@ -1231,6 +1236,9 @@ function ai_make(token, json) {
   if (help && used >= AI_HELP_PER_DAY) throw new Error('سألت «اسأل أثر» كثيراً اليوم (' + AI_HELP_PER_DAY + ' سؤالاً). عُد غداً، أو أرسل سؤالك إلى المشرفين من «ملاحظة للفريق».');
   if (!help && !isSuper_(a) && used >= s.ai.perDay) throw new Error('بلغت حد اليوم (' + s.ai.perDay + ' طلباً). جرّب غداً.');
   req.system = String(req.system || '') + skillsFor_(req.kind || 'design');
+  // تجربة مساعد ونموذج بعينه للمقارنة: للمدير العام وحده، ولا تُحفظ في الذاكرة المؤقتة
+  if (req.force && !(isSuper_(a) && /^(gemini|groq|cf|poll)$/.test(req.force))) delete req.force;
+  if (!req.force) delete req.forceModel; else hk = '';
   var out = geminiCall_(req, { uid: a.uid, name: a.name });
   c.put(ck, String(used + 1), 90000);
   if (hk && out.length < 90000) { try { c.put(hk, out, 21600); } catch (e) {} }
