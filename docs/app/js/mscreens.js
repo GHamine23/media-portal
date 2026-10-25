@@ -63,9 +63,10 @@ function mTemplates(tid, type) {
   tid = (tid || '').split('?')[0]; type = (type || 'all').split('?')[0];
   const T = trackOf(tid) || trackOf(ls('lastTrack')) || tracks[0]; ls('lastTrack', T.id);
   document.title = 'قوالب ' + T.name;
-  const VIS = visibleTpls(), types = TYPES.filter(function (ty) { return VIS.some(function (t) { return t.type === ty.id; }); });
-  let cur = type, q = '';
-  const ids = el('div', { class: 'mids' }, tracks.map(function (t) { return midAvatar(t, t.id === T.id, '#/g/' + t.id); }));
+  const sec = type === 'study' ? 'study' : 'design';
+  const VIS = visibleTpls().filter(function (t) { return sec === 'study' ? t.type === 'study' : t.type !== 'study'; }), types = sec === 'study' ? [] : TYPES.filter(function (ty) { return ty.id !== 'study' && VIS.some(function (t) { return t.type === ty.id; }); });
+  let cur = sec === 'study' ? 'all' : type, q = '';
+  const ids = el('div', { class: 'mids' }, tracks.map(function (t) { return midAvatar(t, t.id === T.id, '#/g/' + t.id + (sec === 'study' ? '/study' : '')); }));
   const chips = el('div', { class: 'mchips' }, [['all', 'الكل'], ['new', 'الجديد']].concat(types.map(function (t) { return [t.id, t.name]; })).map(function (c) {
     return el('button', { type: 'button', class: 'mchip' + (c[0] === cur ? ' on' : ''), text: c[1], onclick: function (e) { haptic(); cur = c[0]; $$('.mchip', chips).forEach(function (x) { x.classList.remove('on'); }); e.currentTarget.classList.add('on'); fill(); history.replaceState(null, '', '#/g/' + T.id + (cur === 'all' ? '' : '/' + cur)); } });
   }));
@@ -83,7 +84,7 @@ function mTemplates(tid, type) {
     });
   }
   const sc = mscreen({ title: 'القوالب', sub: T.full.replace('ـ', ''), right: [el('a', { class: 'nb', href: '#/e/' + T.id + '/blank', 'aria-label': 'صفحة بيضاء', onclick: function () { haptic(); } }, [ico('plus')])] }, [
-    ids, el('div', { class: 'msearch' }, [ico('search'), search]), chips, grid
+    ids, typeof mSecSeg === 'function' ? mSecSeg(T, sec) : null, el('div', { class: 'msearch' }, [ico('search'), search]), types.length ? chips : null, grid
   ]);
   view(sc.node); fill();
 }

@@ -38,7 +38,8 @@ route6(/^\/g\/([^/]+)(?:\/([^/]+))?$/, plain(mTemplates), { page: 'tpl', noVT: t
 route6(/^\/e\/([^/]+)\/([^/]+)$/, plain(openNew), { page: 'editor', noVT: true });
 route6(/^\/d\/([^/?]+)$/, plain(openItem), { page: 'editor', noVT: true });
 route6(/^\/p\/([^/?]+)$/, mwrap('عرض', showPresent, { back: '#/mine', noTitle: true }), { page: 'mine', noVT: true });
-route6(/^\/s\/([^/]+)$/, mwrap('الشرائح', showSlides6, { back: '#/tpl', noTitle: true }), { page: 'tpl', noVT: true });
+route6(/^\/s\/([^/]+)$/, mwrap('العروض والشرائح', showSlides6, { back: '#/tpl', noTitle: true }), { page: 'tpl', noVT: true });
+route6(/^\/sections(?:\?.*)?$/, mwrap('الأقسام', showSections6, { back: '#/', noTitle: true }), { page: 'tpl', noVT: true });
 route6(/^\/arc\/(\d{4}-\d{2})\/([a-z0-9]+)$/, plain(openArc), { page: 'editor', noVT: true });
 route6(/^\/make(?:\?.*)?$/, mwrap('المصمّم الذكي', showMake6, { back: '#/', noTitle: true }), { page: 'home', noVT: true });
 route6(/^\/mine$/, mwrap('تصاميمي', showMine6, { back: '#/', noTitle: true }), { page: 'home', noVT: true });

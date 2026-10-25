@@ -168,3 +168,4 @@
 .tlrange label{display:grid;gap:4px;font-size:13px;color:var(--ink2)}
 .tlinfo{margin:-2px 0 4px;color:var(--ink2)}
 .vrun{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;border-radius:12px;background:var(--ac-soft)}
+.pm-tl .pmaudio:focus{outline:none}.pm-tl .pmaudio:focus-visible{outline:2px solid #fff;outline-offset:2px;border-radius:999px}

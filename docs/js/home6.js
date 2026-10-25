@@ -72,7 +72,7 @@ function showHome() {
       clockCard(),
       aiDesignerBox()
     ]),
-    el('div', { class: 'wrap' }, [appPromo()]),
+    el('div', { class: 'wrap' }, [appPromo(), typeof homeSections === 'function' ? homeSections() : null]),
     el('div', { class: 'wrap hgrid2' }, [tipOfDayCard(), wkSlot]),
     el('div', { class: 'wrap' }, [el('section', { class: 'hsec', id: 'modelsec', hidden: true }, [el('div', { class: 'shead' }, [H('h2', 'نماذج جاهزة'), el('a', { class: 'btn sm line', href: '#/mine', onclick: function () { ls('mineTab', 'models'); }, text: 'كل النماذج' })]), stripNav(models)])].concat(idSections).concat([
       el('section', { class: 'hsec', id: 'recentsec', hidden: true }, [el('div', { class: 'shead' }, [H('h2', 'آخر تصاميمك'), el('a', { class: 'btn sm line', href: '#/mine', text: 'كل تصاميمي' })]), stripNav(recent)]),
@@ -140,7 +140,7 @@ function quickCards(tid) {
   return el('div', { class: 'quick' }, [
     progFeat('ai') ? ['#/make?tid=' + tid, 'اصنع إعلانك', 'اكتب فكرتك، ونقترح التصاميم', 'ai', 't-pu'] : null,
     ['#/e/' + tid + '/blank', 'صفحة بيضاء', 'صمّم من الصفر بحرية كاملة', 'wand', 't-ink'],
-    progFeat('slides') ? ['#/s/' + tid, 'الشرائح', 'عروض للقاءات والمحاضرات', 'slides', 't-bl'] : null
+    typeof secBar === 'function' ? null : progFeat('slides') ? ['#/s/' + tid, 'الشرائح', 'عروض للقاءات والمحاضرات', 'slides', 't-bl'] : null
   ].filter(Boolean).map(function (q, i) {
     return el('a', { href: q[0], class: 'qcard hover-lift rv', style: '--d:' + i, 'data-tour': 'q' + i }, [el('span', { class: 'icon-tile ' + q[4] }, [ico(q[3])]), el('div', {}, [el('b', { text: q[1] }), el('span', { text: q[2] })])]);
   }));
@@ -327,11 +327,14 @@ function showGallery6(tid, type) {
   const T = trackOf(tid); if (!T) return go('#/');
   ls('lastTrack', T.id);
   document.title = 'قوالب ' + T.name;
-  const VIS = visibleTpls();
-  const types = TYPES.filter(function (ty) { return VIS.some(function (t) { return t.type === ty.id; }); });
-  let cur = type;
+  // القسم: المواد التعليمية (/study) وحدها، والإعلانات والتصاميم بلا المواد التعليمية
+  const sec = type === 'study' ? 'study' : 'design';
+  const VIS = visibleTpls().filter(function (t) { return sec === 'study' ? t.type === 'study' : t.type !== 'study'; });
+  const types = sec === 'study' ? [] : TYPES.filter(function (ty) { return ty.id !== 'study' && VIS.some(function (t) { return t.type === ty.id; }); });
+  let cur = sec === 'study' ? 'all' : type;
+  document.title = (sec === 'study' ? 'المواد التعليمية' : 'الإعلانات والتصاميم') + ' — ' + T.name;
   const chips = el('div', { class: 'chips rv' }, [['all', 'الكل'], ['new', 'الجديد']].concat(types.map(function (t) { return [t.id, t.name]; })).map(function (c) {
-    return el('button', { type: 'button', class: 'chip' + (c[0] === cur ? ' on' : ''), onclick: function (e) { cur = c[0]; $$('.chip', chips).forEach(function (x) { x.classList.remove('on'); }); e.currentTarget.classList.add('on'); fill(); history.replaceState(null, '', '#/g/' + T.id + (cur === 'all' ? '' : '/' + cur)); } }, [c[1]]);
+    return el('button', { type: 'button', class: 'chip' + (c[0] === cur ? ' on' : ''), onclick: function (e) { cur = c[0]; $$('.chip', chips).forEach(function (x) { x.classList.remove('on'); }); e.currentTarget.classList.add('on'); fill(); history.replaceState(null, '', '#/g/' + T.id + (sec === 'study' ? '/study' : cur === 'all' ? '' : '/' + cur)); } }, [c[1]]);
   }));
   const search = el('input', { type: 'search', class: 'inp gsearch', placeholder: 'ابحث في القوالب…', value: decodeURIComponent(q0), 'aria-label': 'بحث' });
   const grid = el('div', { class: 'tgrid' });
@@ -359,7 +362,8 @@ function showGallery6(tid, type) {
       im ? el('img', { class: 'glogo rv', src: ASSETS[T.logo], alt: '' }) : null,
       el('div', { class: 'gt' }, [H('h1', T.full.replace('ـ', '')), el('div', { class: 'sw rv' }, ['pd', 'p', 'pl', 's', 'sd', 'a', 'a2'].map(function (k) { return el('i', { style: 'background:' + T.c[k], title: T.c[k] }); }))]),
     ]),
-    quickCards(T.id),
+    typeof secBar === 'function' ? secBar(T, sec) : null,
+    sec === 'study' ? null : quickCards(T.id),
     el('section', { class: 'hsec', id: 'gmodels', hidden: true }, [el('div', { class: 'shead' }, [H('h2', 'نماذج جاهزة لهذه الهوية')]), stripNav(el('div', { class: 'strip models-strip', id: 'gmstrip' }))]),
     el('div', { class: 'gbar' }, [chips, search]),
     grid, empty

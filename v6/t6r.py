@@ -26,7 +26,7 @@ async def main():
         errs = await setup(pg)
         # الرأس: الأقسام في التنقل، وما يخصك في قائمة الصورة
         nav = await pg.evaluate("Array.from(document.querySelectorAll('.nav a')).map(a=>a.textContent)")
-        ok(nav == ['الرئيسية', 'اصنع إعلانك', 'تصاميمي', 'التقويم', 'نصائح', 'دليل أثر', 'الإدارة'], 'top nav: ' + '،'.join(nav))
+        ok(nav == ['الرئيسية', 'الأقسام', 'اصنع إعلانك', 'تصاميمي', 'التقويم', 'نصائح', 'دليل أثر', 'الإدارة'], 'top nav: ' + '،'.join(nav))
         await pg.click('#avatar'); await pg.wait_for_timeout(300)
         menu = await pg.evaluate("Array.from(document.querySelectorAll('.menu a,.menu button')).map(a=>a.textContent.trim())")
         ok(not (set(menu) & set(nav)) and {'حسابي', 'أسبوعي في أثر', 'مراجعاتي', 'خروج'} <= set(menu), 'avatar menu personal only, no nav duplicates: ' + '،'.join(menu))
@@ -50,7 +50,7 @@ async def main():
         ok(len(d) > 16 and all(d[:12]), 'gallery: first 12 thumbnails drawn without scrolling (%d drawn of %d)' % (sum(d), len(d)))
         ok(not d[-1], 'gallery: thumbnails far below stay lazy')
         q = await pg.evaluate("Array.from(document.querySelectorAll('.quick .qcard b')).map(b=>b.textContent)")
-        ok(q == ['اصنع إعلانك', 'صفحة بيضاء', 'الشرائح'] and not await pg.query_selector('.ghead6 .btn'), 'identity page: one place per start action: ' + '،'.join(q))
+        ok(q == ['اصنع إعلانك', 'صفحة بيضاء'] and not await pg.query_selector('.ghead6 .btn'), 'identity page: one place per start action: ' + '،'.join(q))
         await pg.screenshot(path=OUT + 'r_gallery.png')
         await axe(pg, 'gallery')
         # حسابي
@@ -74,7 +74,7 @@ async def main():
         # الإدارة: أقسام مجمّعة، والروابط كما هي
         await pg.goto(URL + '#/admin/tg'); await pg.wait_for_timeout(1500)
         a = await pg.evaluate("[document.querySelectorAll('.anav .agrp').length, document.querySelectorAll('.anav a').length, (document.querySelector('.anav a.on')||{}).getAttribute ? document.querySelector('.anav a.on').getAttribute('href') : '', Array.from(document.querySelectorAll('.agh')).map(x=>x.textContent)]")
-        ok(a[0] == 5 and a[1] == 16 and a[2] == '#/admin/tg', 'admin: 16 sections in 5 groups, old hash still opens its tab: ' + '،'.join(a[3]))
+        ok(a[0] == 5 and a[1] == 17 and a[2] == '#/admin/tg', 'admin: 17 sections in 5 groups, old hash still opens its tab: ' + '،'.join(a[3]))
         await pg.goto(URL + '#/admin'); await pg.wait_for_timeout(1200)
         await pg.screenshot(path=OUT + 'r_admin.png')
         await axe(pg, 'admin')

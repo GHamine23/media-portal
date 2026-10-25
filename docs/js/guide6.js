@@ -10,6 +10,14 @@ const G_ICON = { launch: 'sparkles', home: 'home', gallery: 'grid', editor: 'pen
 const G_FALLBACK = [['launch', 'أثر في دقيقة', 'المنصة'], ['home', 'الرئيسية', 'الرئيسية'], ['gallery', 'القوالب والهويات', 'القوالب'], ['editor', 'المحرر', 'المحرر'], ['make', 'اصنع إعلانك', 'المصمّم الذكي'], ['publish', 'النشر إلى القناة', 'النشر'],
   ['cal', 'التقويم والمهام', 'التقويم'], ['slides', 'الشرائح', 'الشرائح'], ['mine', 'تصاميمي', 'تصاميمي'], ['app', 'تطبيق الجوال', 'التطبيق'], ['admin', 'لوحة الإدارة', 'الإدارة', 1]];
 const G_ROUTE = { home: '#/', gallery: '#/tpl', make: '#/make', cal: '#/cal', mine: '#/mine', admin: '#/admin' };
+// وجهة «اذهب إلى …» لكل مقدمة: route في بيانات المقاطع نمطٌ لمطابقة الصفحات (مثل ^/(s|p)/) وليس رابطاً، فلا يُستعمل رابطاً أبداً
+function gDest(c) {
+  const lt = (TRACKS[ls('lastTrack')] ? ls('lastTrack') : ((tracksOf()[0] || {}).id)) || '';
+  const m = { home: '#/', gallery: '#/sections', editor: lt ? '#/g/' + lt : '#/tpl', make: '#/make', publish: '#/mine', cal: '#/cal', slides: lt ? '#/s/' + lt : '#/sections', mine: '#/mine', admin: isAdmin() ? '#/admin' : '', app: '#/account' };
+  if (m[c.id] !== undefined) return m[c.id];
+  const r = String(c.route || G_ROUTE[c.id] || '');
+  return /^#\/[\w\/?=&-]*$/.test(r) ? r : '';
+}
 const G_PAGES = [[/^#\/?$/, 'الرئيسية'], [/^#\/(g\/|tpl)/, 'القوالب'], [/^#\/(e|d|arc)\//, 'المحرر'], [/^#\/make/, 'اصنع إعلانك'], [/^#\/cal/, 'التقويم والمهام'], [/^#\/s\//, 'الشرائح'], [/^#\/mine/, 'تصاميمي'], [/^#\/p\//, 'العرض'],
   [/^#\/account/, 'حسابي'], [/^#\/week/, 'أسبوعي في أثر'], [/^#\/reviews/, 'مراجعاتي'], [/^#\/tips/, 'نصائح التصميم'], [/^#\/admin/, 'لوحة الإدارة'], [/^#\/guide/, 'دليل أثر'], [/^#\/more/, 'المزيد']];
 const G_TABS = { content: 'المحتوى', tpls: 'القوالب', text: 'النصوص', els: 'العناصر', imgs: 'الصور', colors: 'الألوان', fonts: 'الخطوط', layers: 'الطبقات', assist: 'المساعد', el: 'العنصر', anim: 'الحركة', bg: 'الخلفية', pub: 'النشر' };
@@ -108,7 +116,7 @@ function gGuideKids() {
     ])
   ]) : null;
   const grid = el('ol', { class: 'gpath' }, path.map(function (c, i) {
-    const seen = !!p.seen[c.id], isNext = pr.next && pr.next.id === c.id && pr.seen > 0, route = c.route || G_ROUTE[c.id];
+    const seen = !!p.seen[c.id], isNext = pr.next && pr.next.id === c.id && pr.seen > 0, route = gDest(c);
     return el('li', { class: 'gstep rv' + (seen ? ' seen' : '') + (isNext ? ' next' : ''), style: '--d:' + Math.min(i, 8), 'data-clip': c.id }, [
       el('button', { type: 'button', class: 'gthumb', 'aria-label': 'شاهد ' + c.title, onclick: function () { return gPlay(c.id, {}); } }, [gPoster(c, 420), el('span', { class: 'gplay sm' }, [ico('play')]), c.dur ? el('span', { class: 'gdur', text: gDur(c.dur) }) : null]),
       el('div', { class: 'gmeta' }, [

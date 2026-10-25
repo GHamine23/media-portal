@@ -23,6 +23,7 @@ const SURAH_A = [7, 286, 200, 176, 120, 165, 206, 75, 129, 109, 123, 111, 43, 52
 const TL_MAX = 40;
 // نص الآية الأولى من كل سورة يأتي من المصدر مسبوقاً بالبسملة؛ وليست منها (إلا في الفاتحة)
 function noBasmala(t, s, n) {
+  t = String(t == null ? '' : t).replace(/\uFEFF/g, '');   // المصدر يضع أحياناً علامة BOM غير مرئية في أول النص
   if (n !== 1 || s === 1) return t;
   const w = String(t).split(/\s+/), k = function (x) { return String(x || '').replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, '').replace(/[ٱأإآ]/g, 'ا'); };
   return k(w[0]) === 'بسم' && k(w[1]) === 'الله' && k(w[2]) === 'الرحمن' && k(w[3]) === 'الرحيم' ? w.slice(4).join(' ') : t;

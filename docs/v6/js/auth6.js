@@ -155,7 +155,7 @@ async function savePrefs6(patch) { V6.me.prefs = Object.assign({}, V6.me.prefs |
    كل وجهة في مكان واحد: الأقسام في شريط التنقل، وما يخصك (حسابك ونشاطك) في قائمة صورتك.
    على الشاشات الضيقة يختفي شريط التنقل، فتنتقل أقسامه إلى أعلى قائمة الصورة. */
 function navItems() {
-  return [['#/', 'home', 'الرئيسية', 'home'], progFeat('ai') ? ['#/make', 'make', 'اصنع إعلانك', 'ai'] : null, ['#/mine', 'mine', 'تصاميمي', 'heart'], ['#/cal', 'cal', 'التقويم', 'cal'], ['#/tips', 'tips', 'نصائح', 'star'],
+  return [['#/', 'home', 'الرئيسية', 'home'], ['#/sections', 'sections', 'الأقسام', 'grid'], progFeat('ai') ? ['#/make', 'make', 'اصنع إعلانك', 'ai'] : null, ['#/mine', 'mine', 'تصاميمي', 'heart'], ['#/cal', 'cal', 'التقويم', 'cal'], ['#/tips', 'tips', 'نصائح', 'star'],
     ['#/guide', 'guide', 'دليل أثر', 'guide', 'nguide'], isAdmin() ? ['#/admin', 'admin', 'الإدارة', 'gear'] : null].filter(Boolean);
 }
 function navHidden() { const n = $('#top .nav'); return !n || n.getBoundingClientRect().width === 0; }

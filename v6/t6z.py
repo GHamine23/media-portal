@@ -13,7 +13,7 @@ async def main():
         errs = await setup(pg); print('setup done', flush=True)
         await pg.goto(URL + '#/g/ishraq'); await pg.wait_for_timeout(2500)
         txt = await pg.inner_text('#view')
-        ok('مواد تعليمية' in txt, 'gallery shows the new «مواد تعليمية» category')
+        ok('المواد التعليمية' in txt, 'gallery shows the «المواد التعليمية» section')
         n = await pg.evaluate("visibleTpls().filter(t=>t.type==='study').length"); ok(n == 7, 'seven study templates visible: %d' % n)
         ok(await pg.evaluate("!!visibleTpls().find(t=>t.id==='st_week' && t.type==='cover') && !!visibleTpls().find(t=>t.id==='st_cert' && t.type==='thanks')"), 'weekly table under covers, certificate under thanks')
         # الكتيّب

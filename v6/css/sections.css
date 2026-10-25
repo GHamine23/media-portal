@@ -1,0 +1,35 @@
+/* ===== الأقسام ===== */
+.sc-or{--sc:var(--or);--sct:var(--or-t)}.sc-bl{--sc:var(--bl);--sct:var(--bl-t)}.sc-gr{--sc:var(--gr);--sct:var(--gr-t)}
+.secbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:14px;margin-bottom:6px}
+.secb{position:relative;display:flex;align-items:center;gap:12px;padding:12px 14px;border:1.5px solid var(--line);border-radius:18px;background:var(--card);color:var(--ink1);text-decoration:none;transition:border-color .2s,background .2s,transform .25s var(--spring),box-shadow .25s}
+.secb:hover{border-color:var(--sc);transform:translateY(-1px)}
+.secb.on{border-color:var(--sc);background:var(--sct);box-shadow:0 8px 24px -16px var(--sc)}
+.secb .icon-tile{width:42px;height:42px}
+.secb-t b{display:block;font-size:15.5px;font-weight:700}
+.secb-t small{display:block;font-size:12.5px;color:var(--ink2);margin-top:1px}
+.secb.on .secb-t b{color:var(--sc)}
+.secstar{position:absolute;top:-8px;inset-inline-end:12px;font-size:11px}
+.homesecs{margin-top:10px}
+.hsecgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.hseccard{display:grid;gap:8px;align-content:start;padding:20px;border-radius:22px;border:1px solid var(--line);background:linear-gradient(160deg,var(--sct),var(--card) 62%);color:var(--ink1);text-decoration:none}
+.hseccard .icon-tile{width:50px;height:50px;border-radius:15px}
+.hseccard b{font-size:19px;font-weight:700}
+.hseccard:hover{border-color:var(--sc)}
+.hsecmeta{display:flex;align-items:center;gap:8px;margin-top:4px;color:var(--sc)}
+.hsecmeta small{font-size:12.5px;font-weight:600}
+.hsecmeta svg{width:16px;height:16px;margin-inline-start:auto;transform:scaleX(-1)}
+[dir=ltr] .hsecmeta svg{transform:none}
+.secgrid{display:grid;gap:16px;margin-top:8px}
+.seccard{display:grid;gap:14px;padding:20px;border-radius:22px;border:1.5px solid var(--line)}
+.seccard.on{border-color:var(--sc);box-shadow:0 12px 30px -20px var(--sc)}
+.sechead{display:flex;align-items:flex-start;gap:14px}
+.sechead h2{margin:0 0 2px;font-size:20px}
+.sechead .pill{margin-inline-start:auto}
+.sectracks{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.sectr{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--ink1);text-decoration:none;font-weight:600;font-size:14px}
+.sectr img{height:30px;width:auto;max-width:64px;object-fit:contain}
+.sectr i{width:22px;height:22px;border-radius:50%}
+.sectr svg{width:16px;height:16px;margin-inline-start:auto;color:var(--ink2);transform:scaleX(-1)}
+.sectr.last{border-color:var(--tc)}
+.sectr:hover{border-color:var(--sc)}
+@media (max-width:640px){.secbar{display:flex;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px}.secb{flex:0 0 auto;padding:10px 12px}.secb .icon-tile{width:36px;height:36px}.secb-t small{display:none}}

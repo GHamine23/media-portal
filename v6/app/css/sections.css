@@ -1,0 +1,5 @@
+/* ===== الأقسام في التطبيق ===== */
+.msecseg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;padding:4px;margin:4px 0 10px;border-radius:14px;background:var(--ios-card)}
+.msecb{display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 6px;border-radius:11px;color:var(--ios-label);text-decoration:none;font-size:14px;font-weight:600}
+.msecb svg{width:18px;height:18px}
+.msecb.on{background:var(--ac);color:#fff}

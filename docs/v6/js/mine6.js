@@ -45,7 +45,7 @@ function showSlides6(tid) {
   if (!progFeat('slides')) return featOff('الشرائح');
   const T = trackOf(tid) || tracksOf()[0]; if (!T) return go('#/');
   S.track = T;
-  document.title = 'الشرائح — ' + T.name;
+  document.title = 'العروض والشرائح — ' + T.name;
   const samples = sampleDecks(T), tracks = tracksOf();
   const ta = el('textarea', { id: 'sl_out', rows: '6', dir: 'auto', placeholder: '# عنوان العرض\n## القسم الأول\n- نقطة\n- نقطة\n> عبارة مختارة\n٨٠٪: نسبة الحضور' });
   // معاينة حية في الرأس: شرائح العيّنة تتبدل بحركة
@@ -62,8 +62,9 @@ function showSlides6(tid) {
   const idSel = tracks.length > 1 ? el('div', { class: 'row wrapr slids' }, tracks.map(function (t) { return el('a', { class: 'chip' + (t.id === T.id ? ' on' : ''), href: '#/s/' + t.id, text: t.name }); })) : null;
   const recent = el('div', { class: 'strip sldecks' }, [1, 2, 3].map(function () { return el('div', { class: 'skel', style: 'width:240px;aspect-ratio:16/9;flex:none' }); }));
   view(
+    typeof secBar === 'function' ? secBar(T, 'slides') : null,
     el('section', { class: 'slhero wrap' }, [
-      el('div', { class: 'slhero-t' }, [el('span', { class: 'eyebrow rv', text: 'بهوية ' + T.full.replace('ـ', '') }), H('h1', 'الشرائح'),
+      el('div', { class: 'slhero-t' }, [el('span', { class: 'eyebrow rv', text: 'بهوية ' + T.full.replace('ـ', '') }), H('h1', 'العروض والشرائح'),
         el('p', { class: 'muted rv', style: '--d:1', text: 'عروض للقاءات والمحاضرات، من نقاطك أو من درس، تُعرض حيّة أو تُنزَّل PDF.' }),
         el('div', { class: 'row wrapr rv', style: '--d:2' }, [
           el('button', { type: 'button', class: 'btn dark', onclick: function () { openDeckNew(T.id, [{ tpl: 'sl_cover', d: {} }, { tpl: 'sl_points', d: {} }], 'عرض جديد'); } }, [ico('plus'), 'عرض جديد']),
@@ -84,7 +85,7 @@ function showSlides6(tid) {
           el('div', { class: 'fld' }, [ta]), el('button', { type: 'button', class: 'btn dark', onclick: function () { if (!ta.value.trim()) { ta.focus(); return; } const sl = deckFromOutline(ta.value, T); if (!sl) { toast('لم نفهم المخطط'); return; } openDeckNew(T.id, sl, String(sl[0].d.title || 'عرض جديد').replace(/\n/g, ' ')); } }, [ico('slides'), 'اصنع العرض'])])
       ]),
       el('section', { class: 'hsec', id: 'mydecks' }, [el('div', { class: 'shead' }, [H('h2', 'عروضك الأخيرة'), el('a', { class: 'btn sm line', href: '#/mine', onclick: function () { ls('mineTab', 'mine'); }, text: 'كلها' })]), stripNav(recent)]),
-      el('section', { class: 'slfeat' }, [['sparkles', 'انتقالات وحركات', 'انتقال بين الشرائح، وحركة لكل عنصر، من تبويب «الحركة».'], ['play', 'عرض حي بملء الشاشة', 'ظهور بنقرة، ومؤقّت، وملاحظات، ونظرة على كل الشرائح.'], ['image', 'فيديو وصوت ويوتيوب', 'تعمل داخل العرض، ولكل مقطع إعدادات تشغيله.'], ['ai', 'من درس إلى عرض', 'الصق النص أو ارفع PDF أو Word ويرتّبه المساعد.']].map(function (f, i) {
+      el('section', { class: 'slfeat' }, [['trophy', 'أدوات الدرس', 'القلم والقرعة ونقاط الفرق وإجابات الطلاب أثناء العرض، وكاهوت وورقة العمل.'], ['sparkles', 'انتقالات وحركات', 'انتقال بين الشرائح، وحركة لكل عنصر، من تبويب «الحركة».'], ['play', 'عرض حي بملء الشاشة', 'ظهور بنقرة، ومؤقّت، وملاحظات، ونظرة على كل الشرائح.'], ['image', 'فيديو وصوت ويوتيوب', 'تعمل داخل العرض، ولكل مقطع إعدادات تشغيله.'], ['ai', 'من درس إلى عرض', 'الصق النص أو ارفع PDF أو Word ويرتّبه المساعد.']].map(function (f, i) {
         return el('div', { class: 'slf rv', style: '--d:' + i }, [el('span', { class: 'icon-tile t-pu' }, [ico(f[0])]), el('b', { text: f[1] }), el('small', { class: 'tiny', text: f[2] })]);
       }))
     ])
