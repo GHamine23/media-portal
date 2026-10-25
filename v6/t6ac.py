@@ -17,6 +17,11 @@ async def main():
         pg = await ctx.new_page()
         errs = await setup(pg)
         await pg.goto(URL + '#/s/ithmar'); await pg.wait_for_timeout(1500)
+        # عرض طويل (مثل ما يبنيه المساعد): اللوحة في مكانها وشريط الشرائح لا يدفعها خارج الشاشة، و«+» ظاهر
+        await pg.evaluate("openDeckNew('ithmar', [].concat(sampleDecks(trackOf('ithmar'))[1].slides, sampleDecks(trackOf('ithmar'))[1].slides, sampleDecks(trackOf('ithmar'))[1].slides), 'عرض طويل')"); await pg.wait_for_timeout(2500); await clean(pg)
+        lay = await pg.evaluate("(()=>{const s=document.querySelector('.e-scroll').getBoundingClientRect(),c=document.querySelector('.e-canvas').getBoundingClientRect(),a=document.querySelector('#e_pages .pg.add').getBoundingClientRect();return [Math.round(s.left),Math.round(c.left),Math.round(c.right-s.right),Math.round(a.left),document.documentElement.scrollWidth-innerWidth,ED.doc.pages.length]})()")
+        ok(lay[0] >= 0 and lay[1] >= lay[0] and lay[2] <= 0 and lay[3] >= 0 and lay[4] <= 0, 'long deck: slide centred in view, filmstrip scrolls, + visible: %s' % lay)
+        await pg.evaluate("ED.dirty=false; ED.leaveOK=true"); await pg.goto(URL + '#/s/ithmar'); await pg.wait_for_timeout(1200)
         await pg.evaluate("openDeckNew('ithmar', sampleDecks(trackOf('ithmar'))[1].slides, 'درس التجربة')"); await pg.wait_for_timeout(2500); await clean(pg)
         # كاهوت: ملف بالقالب الرسمي ثم استيراده إلى شرائح
         rows = await pg.evaluate("qs => { ED.doc.name='درس التجربة'; return kahootRows(qs, 20); }", QS)
