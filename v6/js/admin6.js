@@ -1,11 +1,11 @@
 /* ================= لوحة الإدارة: للمدير العام كل شيء، ولمشرف البرنامج ما يخص برنامجه ================= */
 const ADMIN_TABS = [
-  ['overview', 'نظرة عامة', 'chart', 0], ['archive', 'أرشيف التصاميم', 'archive', 0], ['accounts', 'الحسابات', 'users', 0], ['programs', 'البرامج والهويات', 'prog', 0],
+  ['overview', 'نظرة عامة', 'chart', 0], ['pstats', 'البرنامج بالأرقام', 'flag', 0], ['archive', 'أرشيف التصاميم', 'archive', 0], ['accounts', 'الحسابات', 'users', 0], ['programs', 'البرامج والهويات', 'prog', 0],
   ['assets', 'الشعارات والصور', 'image', 0], ['fonts', 'الخطوط', 'font', 0], ['models', 'النماذج والقوالب', 'model', 0], ['reviews', 'مراجعة التصاميم', 'review', 0], ['week', 'أسبوع الفريق', 'chart', 0], ['ai', 'الذكاء الاصطناعي', 'sparkles', 0], ['tg', 'منشورات القناة', 'send', 0], ['feedback', 'البلاغات', 'flag', 0], ['broadcasts', 'رسائل للمستخدمين', 'megaphone', 0],
   ['changelog', 'سجل التحديثات', 'history', 1], ['settings', 'الإعدادات', 'gear', 1], ['audit', 'سجل النشاط', 'shield', 1]
 ];
 // الأقسام نفسها مجمّعة بحسب الغرض، فيجد المشرف ما يريد دون أن يقرأ القائمة كلها. الروابط (#/admin/…) لم تتغير
-const ADMIN_GROUPS = [['المتابعة', ['overview', 'week', 'archive', 'audit']], ['الفريق', ['accounts', 'reviews', 'feedback']], ['الهوية والمحتوى', ['programs', 'assets', 'fonts', 'models']], ['النشر والتواصل', ['tg', 'broadcasts', 'changelog']], ['النظام', ['ai', 'settings']]];
+const ADMIN_GROUPS = [['المتابعة', ['overview', 'pstats', 'week', 'archive', 'audit']], ['الفريق', ['accounts', 'reviews', 'feedback']], ['الهوية والمحتوى', ['programs', 'assets', 'fonts', 'models']], ['النشر والتواصل', ['tg', 'broadcasts', 'changelog']], ['النظام', ['ai', 'settings']]];
 function adminNav(tabs, tab) {
   const byId = {}; tabs.forEach(function (t) { byId[t[0]] = t; });
   const seen = {}, kids = [];
@@ -43,7 +43,7 @@ function showAdmin(tab) {
   // على الشاشة الضيقة يصير التنقل شريطاً أفقياً: نُظهر القسم الحالي فيه
   const an0 = $('.anav'), on0 = an0 && $('a.on', an0); if (on0 && an0.scrollHeight > an0.clientHeight + 4) { const r = on0.getBoundingClientRect(), rr = an0.getBoundingClientRect(); if (r.bottom > rr.bottom || r.top < rr.top) an0.scrollTop += r.top - rr.top - an0.clientHeight / 2; }   // القسم الحالي ظاهر في القائمة الطويلة
   const an = $('.anav'), on = an && $('a.on', an); if (on && an.scrollWidth > an.clientWidth + 4) an.scrollLeft += on.getBoundingClientRect().left - an.getBoundingClientRect().left - (an.clientWidth - on.offsetWidth) / 2;
-  ({ reviews: aReviews, week: aWeek, overview: aOverview, archive: aArchive, models: aModels, ai: aAI, tg: aTg, accounts: aAccounts, programs: aPrograms, assets: aAssets, fonts: aFonts, feedback: aFeedback, broadcasts: aBroadcasts, changelog: aChangelog, settings: aSettings, audit: aAudit }[tab])(body);
+  ({ reviews: aReviews, week: aWeek, overview: aOverview, pstats: aProgStats, archive: aArchive, models: aModels, ai: aAI, tg: aTg, accounts: aAccounts, programs: aPrograms, assets: aAssets, fonts: aFonts, feedback: aFeedback, broadcasts: aBroadcasts, changelog: aChangelog, settings: aSettings, audit: aAudit }[tab])(body);
 }
 function aHead(body, title, note, acts) { body.appendChild(el('div', { class: 'ahead' }, [el('div', {}, [el('h2', { text: title }), note ? el('p', { class: 'muted small', text: note }) : null]), el('div', { class: 'row wrapr' }, acts || [])])); }
 function loading(body) { const s = el('div', { class: 'skel ldbox', style: 'height:180px' }, [loader6('', true)]); body.appendChild(s); return s; }

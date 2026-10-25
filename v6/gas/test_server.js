@@ -553,4 +553,27 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   fails('ai_make', /متوقف/, ht, HQ('سؤال'));
   call('set_save', adm, JSON.stringify({ ai: Object.assign({}, st.ai, { enabled: true }) }));
 })();
+// نماذج قوقل لأسئلة العروض
+(function () {
+  const nq = J('acc_save', adm, JSON.stringify({ username: 'quizt', name: 'معلّم', role: 'user', programs: ['academy'], perms: { slides: true } }));
+  let qt = J('auth_login', 'quizt', nq.temp).token; J('auth_password', qt, nq.temp, 'QuizT12345');
+  const items = [{ q: 'ما أول ما نزل؟', opts: ['الفاتحة', 'اقرأ', 'المدثر'], ans: 2 }, { q: 'كم عدد السور؟', opts: ['١١٤', '١١٠'], ans: 1 }, { q: 'سؤال بلا خيارات', opts: ['واحد'] }];
+  fails('quiz_form', /لا أسئلة صالحة/, qt, JSON.stringify({ program: 'academy', items: [{ q: 'x', opts: ['a'] }] }));
+  const r = J('quiz_form', qt, JSON.stringify({ program: 'academy', title: 'أسئلة الدرس', items: items }));
+  ok(r.items.length === 2 && /forms\.gle/.test(r.url) && r.qs[0] === 'ما أول ما نزل؟', 'quiz form created with the valid questions only');
+  const f = GAS._forms[r.id];
+  ok(f._quiz && f._items.length === 2 && f._items[0]._choices[1].c === true && f._items[0]._choices[0].c === false, 'quiz mode with the correct answer marked');
+  GAS._formAnswer(r.id, { 0: 'اقرأ', 1: '١١٤' }); GAS._formAnswer(r.id, { 0: 'الفاتحة' }); GAS._formAnswer(r.id, { 0: 'اقرأ', 1: '١١٠' });
+  const res = J('quiz_results', qt, r.id);
+  ok(res.n === 3 && res.items[0].counts['اقرأ'] === 2 && res.items[0].total === 3 && res.items[1].total === 2, 'results aggregated per question');
+  // التحديث يستبدل الأسئلة ويبقي الرابط
+  const r2 = J('quiz_form', qt, JSON.stringify({ id: r.id, program: 'academy', title: 'أسئلة الدرس', items: [items[1]], name: true }));
+  ok(r2.id === r.id && r2.url === r.url && f._items.length === 2 && f._items[0]._kind === 'text', 'update keeps the same form and link, optional name question');
+  ok(J('quiz_results', qt, r.id).items.length === 1, 'results follow the current questions');
+  call('quiz_accept', qt, r.id, false); ok(!f._acc && J('quiz_results', qt, r.id).accepting === false, 'responses can be closed');
+  const no = J('acc_save', adm, JSON.stringify({ username: 'other1', name: 'آخر', role: 'user', programs: ['other'], perms: {} }));
+  let ot = J('auth_login', 'other1', no.temp).token; J('auth_password', ot, no.temp, 'Other12345');
+  fails('quiz_results', /ليس من برامجك/, ot, r.id);
+  fails('quiz_form', /ليس من برامجك/, ot, JSON.stringify({ program: 'academy', items: items }));
+})();
 console.log('server tests passed:', n);

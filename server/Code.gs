@@ -119,7 +119,8 @@ function apiFns_() {
     img_search: img_search, img_test: img_test, img_pick: img_pick,
     cm_list: cm_list, cm_add: cm_add, cm_del: cm_del, cm_counts: cm_counts, nt_list: nt_list, nt_seen: nt_seen,
     rv_request: rv_request, rv_list: rv_list, rv_mine: rv_mine, rv_img: rv_img, rv_reply: rv_reply,
-    me_week: me_week, wk_admin: wk_admin, ai_skills: ai_skills, ai_skill_save: ai_skill_save, ai_skill_reset: ai_skill_reset, img_requests: img_requests, img_decide: img_decide, quran_find: quran_find, hadith_find: hadith_find
+    me_week: me_week, wk_admin: wk_admin, ai_skills: ai_skills, ai_skill_save: ai_skill_save, ai_skill_reset: ai_skill_reset, img_requests: img_requests, img_decide: img_decide, quran_find: quran_find, hadith_find: hadith_find,
+    quiz_form: quiz_form, quiz_results: quiz_results, quiz_accept: quiz_accept
   };
 }
 function doPost(e) {
@@ -972,7 +973,7 @@ function hasGemini_() { return geminiKeys_().length > 0; }
 function aiAny_(s) { var h = aiHave_(); return !!(h.gemini || h.groq || h.cf || (s.ai && s.ai.pollFallback !== false)); }
 function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: aiAny_(s), vision: hasGemini_(), capPrompt: (s.ai && s.ai.capPrompt) || '' }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN'), pexels: true, imgKeys: { pixabay: !!props_().getProperty('PIXABAY_KEY'), pexels: !!props_().getProperty('PEXELS_KEY') }, tgKnown: (s.tgKnown || []).length }; }
 // بصمة نسخة الخادم: يضعها البناء، ويقارنها الموقع ليخبر المدير إن كان الخادم المنشور أقدم
-var SRV_VER = '8d75a589';
+var SRV_VER = '519e46ab';
 function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.srvVer = SRV_VER; s.aiKey = hasGemini_(); s.aiKeys = geminiKeys_().length; s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); s.pixabayOn = !!props_().getProperty('PIXABAY_KEY'); s.groqOn = !!props_().getProperty('GROQ_KEY'); s.cfOn = !!(props_().getProperty('CF_ACCOUNT') && props_().getProperty('CF_TOKEN')); s.routeDefault = AI_ROUTE_DEFAULT; return JSON.stringify(s); }
 function set_save(token, json) {
   var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
@@ -2210,6 +2211,75 @@ function img_decide(token, id, ok) {
   });
 }
 // آيات بنص موثّق من alquran.cloud (رواية حفص، رسم إملائي مشكول يناسب خطوط التصميم)، وأحاديث من الدرر السنية بحكم المحدث
+/* ================= نماذج قوقل لأسئلة العروض =================
+   يُنشئ الخادم نموذج اختبار (Google Forms) من شرائح «سؤال وجواب»، فيجيب الطلاب من هواتفهم، ويعرض المقدّم النتائج مجمّعة.
+   لا يُطلب بريد ولا اسم إلا إن اختار المعلم سؤال الاسم. forms.json: { formId: {id, uid, program, doc, title, items: [itemId], url, edit, at, upd} }
+   أول مرة: شغّل الدالة authorizeForms من محرر Apps Script لمنح صلاحية النماذج. */
+function authorizeForms() { FormApp.getActiveForm(); return 'ok'; }
+function quizItems_(arr) {
+  return (arr || []).slice(0, 50).map(function (x) {
+    var opts = (x.opts || []).slice(0, 8).map(function (t) { return clip_(t, 200).replace(/\*/g, '').trim(); }).filter(Boolean);
+    return { q: clip_(x.q, 300).replace(/\*/g, '').trim(), opts: opts, ans: Math.round(+x.ans || 0) };
+  }).filter(function (x) { return x.q && x.opts.length >= 2; });
+}
+function quizRec_(a, id) {
+  var rec = readJson_('forms.json', {})[id];
+  if (!rec) throw new Error('النموذج غير موجود');
+  if (!(rec.uid === a.uid || inProg_(a, rec.program) || adminOf_(a, rec.program))) throw new Error('ليس من برامجك');
+  return rec;
+}
+function quiz_form(token, json) {
+  var a = auth_(token), o = JSON.parse(json || '{}'), pid = clip_(o.program || '', 30);
+  if (pid && !inProg_(a, pid) && !isSuper_(a)) throw new Error('ليس من برامجك');
+  var qs = quizItems_(o.items);
+  if (!qs.length) throw new Error('لا أسئلة صالحة: كل سؤال يحتاج خيارين على الأقل');
+  return withLock_(function () {
+    var reg = readJson_('forms.json', {}), cur = o.id ? reg[o.id] : null, f = null;
+    if (cur && cur.uid !== a.uid && !adminOf_(a, cur.program)) throw new Error('النموذج ليس لك');
+    if (cur) { try { f = FormApp.openById(cur.id); } catch (e) { f = null; cur = null; } }
+    // التحديث: تُستبدل الأسئلة، وتبقى الإجابات السابقة محفوظة في النموذج
+    if (f) f.getItems().forEach(function (it) { f.deleteItem(it); });
+    else { f = FormApp.create(clip_(o.title || 'أسئلة العرض', 120)); try { DriveApp.getFileById(f.getId()).moveTo(sub_('forms')); } catch (e) {} }
+    f.setTitle(clip_(o.title || 'أسئلة العرض', 120));
+    f.setDescription(clip_(o.desc || 'اختر الإجابة الصحيحة لكل سؤال، ثم اضغط «إرسال».', 500));
+    try { f.setIsQuiz(true); } catch (e) {}
+    try { f.setCollectEmail(false); } catch (e) {}
+    try { f.setShowLinkToRespondAgain(false); f.setAllowResponseEdits(false); f.setProgressBar(qs.length > 3); } catch (e) {}
+    f.setConfirmationMessage('شكراً لك، سُجّلت إجابتك.');
+    if (o.name) f.addTextItem().setTitle('اسمك (اختياري)').setRequired(false);
+    var ids = [];
+    qs.forEach(function (x) {
+      var it = f.addMultipleChoiceItem(); it.setTitle(x.q).setRequired(false);
+      try { it.setPoints(1); } catch (e) {}
+      it.setChoices(x.opts.map(function (t, i) { return it.createChoice(t, i + 1 === x.ans); }));
+      ids.push(String(it.getId()));
+    });
+    var url = f.getPublishedUrl(); try { url = f.shortenFormUrl(url); } catch (e) {}
+    var rec = { id: f.getId(), uid: a.uid, program: pid, doc: clip_(o.doc || '', 40), title: f.getTitle(), items: ids, qs: qs.map(function (x) { return x.q; }), url: url, edit: f.getEditUrl(), at: cur ? cur.at : now_(), upd: now_(), name: !!o.name };
+    reg[rec.id] = rec; writeJson_('forms.json', reg);
+    return JSON.stringify(rec);
+  });
+}
+// النتائج مجمّعة: لكل سؤال عدد من اختار كل خيار، وعدد من أجابوا
+function quiz_results(token, id) {
+  var a = auth_(token), rec = quizRec_(a, id), f = FormApp.openById(rec.id), at = {}, out = { n: 0, accepting: true, items: [] };
+  rec.items.forEach(function (iid, k) { at[iid] = k; out.items.push({ counts: {}, total: 0 }); });
+  f.getResponses().forEach(function (r) {
+    var any = false;
+    r.getItemResponses().forEach(function (ir) { var k = at[String(ir.getItem().getId())]; if (k == null) return; var v = String(ir.getResponse()), c = out.items[k]; c.counts[v] = (c.counts[v] || 0) + 1; c.total++; any = true; });
+    if (any) out.n++;
+  });
+  try { out.accepting = f.isAcceptingResponses(); } catch (e) {}
+  return JSON.stringify(out);
+}
+// إيقاف استقبال الإجابات بعد اللقاء، أو إعادة فتحه
+function quiz_accept(token, id, on) {
+  var a = auth_(token), rec = quizRec_(a, id);
+  if (rec.uid !== a.uid && !adminOf_(a, rec.program)) throw new Error('النموذج ليس لك');
+  FormApp.openById(rec.id).setAcceptingResponses(!!on);
+  return 'ok';
+}
+
 function quran_find(token, q) {
   auth_(token); q = clip_(q, 120).trim(); if (!q) throw new Error('اكتب كلمة من الآية أو اسم السورة ورقم الآية');
   var c = CacheService.getScriptCache(), ck = 'qr:' + Utilities.base64EncodeWebSafe(q).slice(0, 200), hit = c.get(ck); if (hit) return hit;

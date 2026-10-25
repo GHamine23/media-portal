@@ -81,6 +81,8 @@ function drawLayer(ctx, W, H, L, T) {
   ctx.save();
   ctx.globalAlpha = L.o == null ? 1 : L.o;
   if (L.t === 'text') {
+    // خط النص المضاف (L.f): يُطبَّق على عنصره وحده دون أن يُكتب في حالة التصميم
+    let gk = null; if (L.f && CUR_G) { gk = GST; GST = Object.assign({}, gk); GST[CUR_G] = Object.assign({}, gk[CUR_G], { f: L.f }); }
     const f = fit(ctx, L.txt || '', { maxW: w, size: (L.sz || 0.06) * W, lh: L.lh || 1.32, bold: L.b || 0, title: (L.b || 0) >= 0.7 });
     const al = L.al || 'center', x0 = al === 'right' ? cx + w / 2 : al === 'left' ? cx - w / 2 : cx;
     const y0 = cy - f.h / 2;
@@ -90,6 +92,7 @@ function drawLayer(ctx, W, H, L, T) {
     if (L.bgc && !f.empty) { const pd = f.size * (L.bgp == null ? 0.45 : L.bgp), bw = f.w + pd * 2, bh = f.h + pd * 1.2, bx = al === 'right' ? x0 - f.w - pd : al === 'left' ? x0 - pd : x0 - f.w / 2 - pd; fillRR(ctx, bx, y0 - pd * 0.6, bw, bh, Math.min(bw, bh) / 2 * (L.bgr == null ? 0.35 : L.bgr), L.bgc); }
     if (L.ts) { ctx.shadowColor = 'rgba(0,0,0,' + (0.25 + 0.4 * L.ts) + ')'; ctx.shadowBlur = f.size * 0.35 * L.ts; ctx.shadowOffsetY = f.size * 0.08 * L.ts; }
     drawFit(ctx, f, x0, y0, { align: al, color: L.c || T.c.ink, hl: L.hc || '', ol: L.olc || '', olw: L.olw });
+    if (gk) GST = gk;
   } else {
     let ar = 1, src = null;
     if (L.t === 'sticker') ar = (STICKERS[L.ref] && STICKERS[L.ref].ar) || 1;

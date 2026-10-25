@@ -1,0 +1,18 @@
+/* ===== البرنامج بالأرقام ===== */
+.pstats{display:grid;gap:14px}
+.pshead{display:flex;align-items:center;gap:8px;font-size:15px}
+.psdot{width:12px;height:12px;border-radius:50%}
+.psrow{display:flex;align-items:baseline;gap:8px}
+.psd{font-size:12px;font-weight:600;color:var(--ink2);direction:rtl;unicode-bidi:isolate}
+.psd.up{color:#1f7a42}.psd.down{color:#c0392b}
+.pstpls{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:14px;margin-top:6px}
+.pstpl{position:relative;display:grid;gap:4px;text-decoration:none;color:inherit}
+.pstpl .psth{border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--card);aspect-ratio:4/5;display:grid;place-items:center}
+.pstpl .psth canvas{width:100%;height:auto;display:block}
+.pstpl b{font-size:13px;font-weight:600}
+.pstpl:hover .psth{border-color:var(--ac)}
+.psrank{position:absolute;top:6px;inset-inline-start:6px;z-index:1;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--ink1,#111);color:#fff;font-size:12px;font-weight:700}
+.pspost{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.pspost li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:12px;background:var(--ac-soft)}
+.pspost b{display:block;font-size:13.5px}
+.pspost small{display:block;font-size:12px}

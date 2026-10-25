@@ -78,6 +78,7 @@ function pContent(b) {
     form.appendChild(el('div', { class: 'fld' + (hid ? ' hid' : '') }, [el('div', { class: 'lab' }, [el('label', { for: id, text: f.label }), el('span', { class: 'row' }, [cnt, emojiBtn(inp), eye])]), inp, f.hint ? el('small', { text: f.hint }) : null]));
   });
   b.appendChild(form);
+  if (typeof lessonPanel === 'function') lessonPanel(b);   // أدوات الدرس في العروض
   const hg = Object.keys(S.hide).filter(function (k) { return k.slice(0, 2) === 'g_' && S.hide[k]; });
   if (hg.length) b.appendChild(el('div', { class: 'psec' }, [el('h4', { text: 'عناصر أخفيتها' }), el('div', { class: 'row wrapr' }, hg.map(function (k) { return el('button', { type: 'button', class: 'btn sm line', text: 'إظهار ' + gName(k.slice(2)), onclick: function () { delete S.hide[k]; changed6(); buildPanel(); } }); }))]));
   b.appendChild(el('div', { class: 'psec' }, [el('button', { type: 'button', class: 'btn sm ghost', onclick: async function () {

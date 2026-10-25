@@ -131,6 +131,7 @@ function qrSection(b) {
   const add = function () { const v = u.value.trim(); if (!/^https?:\/\/\S+$/.test(v)) { toast('اكتب رابطاً يبدأ بـ https://'); u.focus(); return; } addLayer6({ t: 'qr', url: v, w: 0.22, c: '', bg: '#ffffff' }); u.value = ''; };
   u.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); add(); } });
   b.appendChild(el('div', { class: 'row' }, [u, el('button', { type: 'button', class: 'btn sm dark', onclick: add }, [ico('plus'), 'أضف'])]));
+  if (typeof tilawaDialog === 'function') b.appendChild(el('button', { type: 'button', class: 'btn sm line qrlisten', onclick: function () { tilawaDialog(null, null, { qr: true }); } }, [ico('book'), 'رمز استماع لآيات بصوت قارئ']));
   const P = V6.prog && V6.prog.tg; if (P && P.link) b.appendChild(el('button', { type: 'button', class: 'chip', onclick: function () { u.value = P.link; add(); } }, ['رابط التسجيل المعتاد']));
 }
 // الأيقونات في قسم واحد: أيقونات الهوية أولاً ثم المجموعة الكاملة. البحث فوقها، وثلاثة صفوف تُمرَّر أفقياً بين صفحاتها
@@ -182,11 +183,12 @@ function verifiedTextDialog(done) {
     if (!show.length) { list.appendChild(el('p', { class: 'tiny', text: items.length ? 'كل النتائج ضعيفة الحكم؛ فعّل إظهارها إن أردت.' : 'لا نتائج.' })); return; }
     // في العروض: الآيات المتتالية تُدرج معاً مع زر تلاوة بصوت قارئ
     const tl = kind === 'ayah' && done === insertVerified && typeof addTilawaLayer === 'function' && typeof ED !== 'undefined' && ED.doc && ED.doc.kind === 'deck';
-    const run = tl && show.length > 1 && show.every(function (x, k) { return x.sn === show[0].sn && x.n === show[0].n + k; });
+    const lq = kind === 'ayah' && done === insertVerified && typeof addListenQr === 'function' && !tl;   // في التصاميم: رمز استماع
+    const run = (tl || lq) && show.length > 1 && show.every(function (x, k) { return x.sn === show[0].sn && x.n === show[0].n + k; });
     if (run) {
-      const a = show[0].n, b = show[show.length - 1].n, txt = show.map(function (x) { return x.text + ' (' + arabicDigits(x.n) + ')'; }).join(' '), ref = '[' + show[0].surah + ': ' + arabicDigits(a) + '–' + arabicDigits(b) + ']';
+      const a = show[0].n, b = show[show.length - 1].n, txt = show.map(function (x) { return x.text + (x.rasm === 'uthmani' ? ' ۝' + arabicDigits(x.n) : ' (' + arabicDigits(x.n) + ')'); }).join(' '), ref = '[' + show[0].surah + ': ' + arabicDigits(a) + '–' + arabicDigits(b) + ']';
       list.appendChild(el('div', { class: 'vrun' }, [el('span', { class: 'tiny', text: 'الآيات ' + arabicDigits(a) + '–' + arabicDigits(b) + ' معاً' }), el('span', { class: 'sp' }),
-        el('button', { type: 'button', class: 'btn sm dark', onclick: function () { done({ kind: 'ayah', text: txt, ref: ref, line: '﴿' + txt + '﴾ ' + ref }); addTilawaLayer({ s: show[0].sn, a: a, b: b }); closeTop(); } }, [ico('play'), el('span', { text: 'أدرجها مع التلاوة' })])]));
+        el('button', { type: 'button', class: 'btn sm dark', onclick: function () { done({ kind: 'ayah', rasm: show[0].rasm, text: txt, ref: ref, line: '﴿' + txt + '﴾ ' + ref }); if (tl) addTilawaLayer({ s: show[0].sn, a: a, b: b }); else addListenQr({ s: show[0].sn, a: a, b: b }, true); closeTop(); } }, [ico('play'), el('span', { text: tl ? 'أدرجها مع التلاوة' : 'أدرجها مع رمز استماع' })])]));
     }
     show.forEach(function (it) {
       const ref = kind === 'ayah' ? '[' + it.surah + ': ' + arabicDigits(it.n) + ']' : (it.source ? it.source + (it.page ? ' ' + arabicDigits(it.page) : '') : '');
@@ -194,8 +196,9 @@ function verifiedTextDialog(done) {
         el('p', { class: 'vtext', text: kind === 'ayah' ? '﴿' + it.text + '﴾' : '«' + it.text + '»' }),
         kind === 'hadith' && it.full && it.full !== it.text ? el('details', { class: 'vfull' }, [el('summary', { class: 'tiny', text: 'النص كاملاً بالسند' }), el('p', { class: 'tiny', dir: 'rtl', text: it.full })]) : null,
         el('div', { class: 'row wrapr tiny' }, [el('span', { class: 'pill', text: kind === 'ayah' ? it.surah + ' ' + arabicDigits(it.n) : (it.grade || 'بلا حكم') }), kind === 'hadith' ? el('span', { text: [it.rawi && 'الراوي: ' + it.rawi, it.muhaddith && 'المحدث: ' + it.muhaddith, ref].filter(Boolean).join(' · ') }) : null,
-          el('span', { class: 'sp' }), el('button', { type: 'button', class: 'btn sm dark', text: 'أدرج', onclick: function () { done({ kind: kind, text: it.text, ref: ref, grade: it.grade || '', line: kind === 'ayah' ? '﴿' + it.text + '﴾ ' + ref : '«' + it.text + '» ' + (it.source ? '— ' + ref : '') }); closeTop(); } }),
-          tl && it.sn ? el('button', { type: 'button', class: 'btn sm line', title: 'النص وزر يُسمِع الآية بصوت قارئ في العرض', onclick: function () { done({ kind: 'ayah', text: it.text, ref: ref, line: '﴿' + it.text + '﴾ ' + ref }); addTilawaLayer({ s: it.sn, a: it.n, b: it.n }); closeTop(); } }, [ico('play'), el('span', { text: 'مع التلاوة' })]) : null])
+          el('span', { class: 'sp' }), el('button', { type: 'button', class: 'btn sm dark', text: 'أدرج', onclick: function () { done({ kind: kind, rasm: it.rasm, text: it.text, ref: ref, grade: it.grade || '', line: kind === 'ayah' ? '﴿' + it.text + '﴾ ' + ref : '«' + it.text + '» ' + (it.source ? '— ' + ref : '') }); closeTop(); } }),
+          lq && it.sn ? el('button', { type: 'button', class: 'btn sm line', title: 'النص ورمز QR يفتح تلاوة الآية بصوت قارئ', onclick: function () { done({ kind: 'ayah', rasm: it.rasm, text: it.text, ref: ref, line: '﴿' + it.text + '﴾ ' + ref }); addListenQr({ s: it.sn, a: it.n, b: it.n }, true); closeTop(); } }, [ico('play'), el('span', { text: 'مع رمز استماع' })]) : null,
+          tl && it.sn ? el('button', { type: 'button', class: 'btn sm line', title: 'النص وزر يُسمِع الآية بصوت قارئ في العرض', onclick: function () { done({ kind: 'ayah', rasm: it.rasm, text: it.text, ref: ref, line: '﴿' + it.text + '﴾ ' + ref }); addTilawaLayer({ s: it.sn, a: it.n, b: it.n }); closeTop(); } }, [ico('play'), el('span', { text: 'مع التلاوة' })]) : null])
       ]);
       list.appendChild(row);
     });
@@ -212,7 +215,11 @@ function verifiedTextDialog(done) {
   const seg = segOf([['ayah', 'آية'], ['hadith', 'حديث']], kind, function (v) { kind = v; items = []; list.innerHTML = ''; q.placeholder = v === 'ayah' ? 'كلمات من الآية، أو: الإسراء ٢٣' : 'كلمات من الحديث'; hintFor(); weak.hidden = v !== 'hadith'; srcSeg.hidden = v !== 'hadith'; });
   let closeTop = function () {};
   seg.style.flex = 'none';
-  modal({ title: 'آية أو حديث موثّق', wide: true, body: [el('div', { class: 'row' }, [seg, q, el('button', { type: 'button', class: 'btn sm dark', onclick: function () { return search(); } }, [ico('search')])]), el('div', { class: 'row wrapr' }, [srcSeg, hint]), weak, list], acts: [{ t: 'إغلاق' }] });
+  // الرسم: العثماني (كما في المصحف، ويُكتب بخط المصحف) أو الإملائي (بخط التصميم)
+  const rasmSeg = segOf([['uthmani', 'الرسم العثماني'], ['imlaei', 'الرسم الإملائي']], ls('rasm') === 'imlaei' ? 'imlaei' : 'uthmani', function (v) { ls('rasm', v); if (kind === 'ayah' && q.value.trim()) search(); });
+  rasmSeg.classList.add('rasmseg');
+  seg.addEventListener('click', function () { rasmSeg.hidden = kind !== 'ayah'; });
+  modal({ title: 'آية أو حديث موثّق', wide: true, body: [el('div', { class: 'row' }, [seg, q, el('button', { type: 'button', class: 'btn sm dark', onclick: function () { return search(); } }, [ico('search')])]), el('div', { class: 'row wrapr' }, [rasmSeg, srcSeg, hint]), weak, list], acts: [{ t: 'إغلاق' }] });
   closeTop = function () { const m = $$('.modal,.msheet').pop(); if (m) { const x = m.querySelector('.acts .btn,.sx'); if (x) x.click(); } };
   setTimeout(function () { q.focus(); }, 50);
 }
@@ -220,8 +227,10 @@ function verifiedTextDialog(done) {
 function insertVerified(r) {
   const g = S.sel && !isLayer(S.sel) ? S.sel : null;
   const f = g ? (S.tpl.fields || []).find(function (x) { return x.k && (x.kind === 'area' || !x.kind) && groupOfField(x.k) === g; }) : null;
-  if (f) { S.d[f.k] = r.kind === 'ayah' ? '﴿' + r.text + '﴾' : '«' + r.text + '»'; const src = (S.tpl.fields || []).find(function (x) { return /^(src|by|who|sub)$/.test(x.k) && groupOfField(x.k) !== g; }); if (src && !S.d[src.k]) S.d[src.k] = r.ref; changed6(); buildPanel(); toast('أُدرج في «' + f.label + '»'); }
-  else { addLayer6({ t: 'text', txt: r.line, al: 'center', c: '', sz: 0.045, b: 0.6, w: 0.8 }); }
+  const qf = r.kind === 'ayah' && r.rasm === 'uthmani' && FONTS.quran ? 'quran' : '';   // الرسم العثماني يُكتب بخط المصحف
+  if (qf) ensureFonts(['quran']).then(function () { if (ED.open) drawNow(); });
+  if (f) { if (qf) setGs(g, 'f', qf); S.d[f.k] = r.kind === 'ayah' ? '﴿' + r.text + '﴾' : '«' + r.text + '»'; const src = (S.tpl.fields || []).find(function (x) { return /^(src|by|who|sub)$/.test(x.k) && groupOfField(x.k) !== g; }); if (src && !S.d[src.k]) S.d[src.k] = r.ref; changed6(); buildPanel(); toast('أُدرج في «' + f.label + '»'); }
+  else { addLayer6(Object.assign({ t: 'text', txt: r.line, al: 'center', c: '', sz: 0.045, b: qf ? 0 : 0.6, w: 0.8 }, qf ? { f: qf, lh: 1.6 } : {})); }
   track('tool', { tool: r.kind });
 }
 
@@ -274,7 +283,10 @@ let Q_SURAHS = null;
 function arNorm(t) { return String(t || '').replace(/[ً-ٰٟۖ-ۭـ]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').trim(); }
 function surahLabel(n) { return String(n || '').replace(/[ً-ٰٟۖ-ۭ]/g, '').replace(/^سورة\s*/, '').trim(); }
 async function qget(path) { const r = await fetch(QAPI + path); if (!r.ok) throw new Error('q' + r.status); const j = await r.json(); if (j.code !== 200) throw new Error('q'); return j.data; }
-async function quranFind(q) {
+// ed: نص المصحف المطلوب — quran-uthmani (الرسم العثماني) أو quran-simple (الإملائي)
+function rasmEd() { return ls('rasm') === 'imlaei' ? 'quran-simple' : 'quran-uthmani'; }
+async function quranFind(q, ed) {
+  ed = ed || rasmEd();
   try {
     const m = /^(.+?)\s+(\d{1,3})(?:\s*[-–:]\s*(\d{1,3}))?$/.exec(q);
     if (m) {
@@ -284,8 +296,8 @@ async function quranFind(q) {
       if (s) {
         const a1 = +m[2], a2 = Math.min(a1 + 9, Math.max(a1, +(m[3] || a1)));
         const refs = []; for (let n = a1; n <= a2 && n <= s.numberOfAyahs; n++) refs.push(s.number + ':' + n);
-        const out = await Promise.all(refs.map(function (r) { return qget('ayah/' + r + '/quran-simple'); }));
-        return out.map(function (d) { return { text: d.text, surah: surahLabel(d.surah.name), sn: d.surah.number, n: d.numberInSurah }; });
+        const out = await Promise.all(refs.map(function (r) { return qget('ayah/' + r + '/' + ed); }));
+        return out.map(function (d) { return { text: typeof noBasmala === 'function' ? noBasmala(d.text, d.surah.number, d.numberInSurah) : d.text, surah: surahLabel(d.surah.name), sn: d.surah.number, n: d.numberInSurah, rasm: ed === 'quran-uthmani' && d.surah ? 'uthmani' : '' }; });
       }
     }
     // البحث بالكلمات في النص المجرّد من التشكيل، ثم جلب النص المشكول لكل نتيجة
@@ -293,8 +305,8 @@ async function quranFind(q) {
     let hits = [];
     try { hits = (await qget('search/' + encodeURIComponent(words) + '/all/quran-simple-clean')).matches || []; } catch (e) { hits = []; }
     hits = hits.slice(0, 15);
-    const full = await Promise.all(hits.map(function (h) { return qget('ayah/' + h.number + '/quran-simple').catch(function () { return h; }); }));
-    return full.map(function (d) { return { text: d.text, surah: surahLabel(d.surah.name), sn: d.surah.number, n: d.numberInSurah }; });
+    const full = await Promise.all(hits.map(function (h) { return qget('ayah/' + h.number + '/' + ed).catch(function () { return h; }); }));
+    return full.map(function (d) { return { text: typeof noBasmala === 'function' ? noBasmala(d.text, d.surah.number, d.numberInSurah) : d.text, surah: surahLabel(d.surah.name), sn: d.surah.number, n: d.numberInSurah, rasm: ed === 'quran-uthmani' && d.surah ? 'uthmani' : '' }; });
   } catch (e) {
     return await API6.me('quran_find', q);   // إن منع المتصفح الوصول، يبحث الخادم
   }

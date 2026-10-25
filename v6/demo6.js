@@ -37,7 +37,7 @@
     const b = syncGet(local, true); return b ? { code: 200, body: b } : { code: 404, body: '' };
   };
   const code = syncGet(ROOT + 'server/Code.gs');
-  const names = ['DriveApp', 'CacheService', 'PropertiesService', 'LockService', 'Utilities', 'ContentService', 'HtmlService', 'UrlFetchApp', 'ScriptApp'];
+  const names = ['DriveApp', 'CacheService', 'PropertiesService', 'LockService', 'Utilities', 'ContentService', 'HtmlService', 'UrlFetchApp', 'ScriptApp', 'FormApp'];
   const srv = new Function(names.join(','), code + '\nreturn { doPost: doPost, bootstrap: bootstrap, tgTick: tgTick };').apply(null, names.map(function (n) { return GAS[n]; }));
   try { const saved = localStorage.getItem('demo.gas'); if (saved) GAS._load(saved); } catch (e) {}
   // حفظ حالة التجربة: إن تجاوزت ذاكرة المتصفح (ملفات الخطوط كبيرة) نحفظها بلا محتوى الخطوط، فتبقى الحسابات والتصاميم بعد إعادة التحميل

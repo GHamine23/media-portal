@@ -116,7 +116,7 @@ function present6(fromView, startAt) {
   const bar = el('div', { class: 'pbar' }), counter = el('span', { class: 'pcount', dir: 'ltr' }), timerEl = el('div', { class: 'ptimer', hidden: true }), notesEl = el('aside', { class: 'pnotes', hidden: true });
   const prog = el('div', { class: 'pprog' }, [el('i')]), blank = el('div', { class: 'pblank', hidden: true }), grid = el('div', { class: 'pgrid', hidden: true });
   stage.appendChild(media);
-  const hint = touch ? 'اسحب للتنقل · المس الوسط للأزرار' : 'الأسهم أو النقر للتنقل · G الشرائح · N الملاحظات · T المؤقّت · B شاشة سوداء · Esc للخروج';
+  const hint = touch ? 'اسحب للتنقل · المس الوسط للأزرار' : 'الأسهم أو النقر للتنقل · G الشرائح · N الملاحظات · T المؤقّت · P القلم · R القرعة · S النقاط · Esc للخروج';
   const ov = el('div', { class: 'present6' + (touch ? ' touch' : ''), tabindex: '0' }, [stage, prog, blank, timerEl, notesEl, grid, bar, el('div', { class: 'phint', text: hint })]);
   let cur = null, chan = null, mediaSlide = -1, animTimers = [];
   try { chan = new BroadcastChannel('athar-present'); } catch (e) {}
@@ -206,6 +206,7 @@ function present6(fromView, startAt) {
     counter.textContent = (i + 1) + ' / ' + pages.length + (stepsOf(p).length ? ' · ' + step + '/' + stepsOf(p).length : '');
     prog.firstChild.style.width = ((i + 1) / pages.length * 100) + '%';
     notesEl.textContent = p.notes || 'لا ملاحظات لهذه الشريحة.';
+    if (ov._lesson) ov._lesson.slide(i, p, step, q);
     if (chan) { try { const nx = pages[i + 1]; const c2 = document.createElement('canvas'); if (nx) renderSlide(c2, nx, T, 0.2); chan.postMessage({ i: i, n: pages.length, step: step, notes: p.notes || '', cur: c.toDataURL('image/jpeg', 0.6), next: nx ? c2.toDataURL('image/jpeg', 0.6) : '' }); } catch (e) {} }
   }
   /* ---------- الوسائط فوق مكانها: تبقى ما دامت الشريحة نفسها، وتُضاف عند ظهورها بنقرة ---------- */
@@ -285,6 +286,7 @@ function present6(fromView, startAt) {
   function key(e) {
     if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
     if (document.querySelector('.modal')) return;
+    if (ov._lesson && ov._lesson.key(e)) { e.preventDefault(); return; }
     const k = e.key;
     if (k === 'Escape') { if (!grid.hidden) { grid.hidden = true; return; } if (!blank.hidden) { hideBlank(); return; } close(); return; }
     if (/^[0-9٠-٩]$/.test(k)) { numBuf += String('٠١٢٣٤٥٦٧٨٩'.indexOf(k) >= 0 ? '٠١٢٣٤٥٦٧٨٩'.indexOf(k) : k); clearTimeout(key.t); key.t = setTimeout(function () { numBuf = ''; }, 1500); return; }
@@ -326,6 +328,8 @@ function present6(fromView, startAt) {
     el('span', { class: 'psep' }),
     el('button', { type: 'button', class: 'pb', title: 'خروج (Esc)', 'aria-label': 'خروج', onclick: function () { close(); } }, [ico('close')])
   ].filter(Boolean));
+  // أدوات الدرس: القلم، والقرعة، ونقاط الفرق، ونتائج الأسئلة
+  if (typeof lessonPresent === 'function') ov._lesson = lessonPresent({ ov: ov, stage: stage, bar: bar, doc: doc, fromView: !!fromView });
   let hideT = 0; const wake = function () { ov.classList.add('awake'); clearTimeout(hideT); hideT = setTimeout(function () { ov.classList.remove('awake'); }, 2600); };
   ov.addEventListener('mousemove', wake); ov.addEventListener('touchstart', wake, { passive: true });
   // النقر: النصف الأيسر للتالية والأيمن للسابقة. السحب في الجوال: إلى اليمين للتالية (اتجاه العربية)
@@ -339,7 +343,7 @@ function present6(fromView, startAt) {
   blank.addEventListener('click', hideBlank);
   grid.addEventListener('click', function (e) { if (e.target === grid) { grid.hidden = true; ov.focus(); } });
   function close() {
-    settle(); $$('.pmbox', media).forEach(function (x) { if (x._stop) x._stop(); }); document.removeEventListener('keydown', key); window.removeEventListener('resize', onResize);
+    settle(); $$('.pmbox', media).forEach(function (x) { if (x._stop) x._stop(); }); if (ov._lesson) ov._lesson.close(); document.removeEventListener('keydown', key); window.removeEventListener('resize', onResize);
     if (timer) clearInterval(timer); if (chan) chan.close(); ov.remove();
     try { if (wakeLock) wakeLock.release(); } catch (e) {}
     try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}

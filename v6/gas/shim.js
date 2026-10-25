@@ -133,7 +133,35 @@
     newTrigger: function (fn) { const t = { getHandlerFunction: function () { return fn; } }; const b = { timeBased: function () { return b; }, everyHours: function () { return b; }, everyMinutes: function () { return b; }, onWeekDay: function () { return b; }, atHour: function () { return b; }, everyWeeks: function () { return b; }, create: function () { TRIG.push(t); return t; } }; return b; },
     getOAuthToken: function () { return 'tok'; }, WeekDay: { SATURDAY: 'SATURDAY', SUNDAY: 'SUNDAY' } };
 
-  const GAS = { DriveApp: DriveApp, CacheService: CacheService, PropertiesService: PropertiesService, LockService: LockService, Utilities: Utilities, ContentService: ContentService,
+  /* نماذج قوقل (FormApp) بالقدر الذي يستعمله الخادم: الأسئلة والإجابات في الذاكرة */
+  const FORMS = {}; let FSEQ = 0;
+  function mkItem(kind) {
+    const it = { _id: 100000 + (++FSEQ), _kind: kind, _title: '', _choices: [], _req: false, _pts: 0 };
+    it.getId = function () { return it._id; }; it.getTitle = function () { return it._title; };
+    it.setTitle = function (t) { it._title = String(t); return it; }; it.setRequired = function (b) { it._req = !!b; return it; }; it.setPoints = function (n) { it._pts = n; return it; };
+    it.createChoice = function (v, c) { return { v: String(v), c: !!c, getValue: function () { return String(v); }, isCorrectAnswer: function () { return !!c; } }; };
+    it.setChoices = function (a) { it._choices = a.slice(); return it; }; it.getChoices = function () { return it._choices.slice(); };
+    return it;
+  }
+  function mkForm(title) {
+    const id = 'f' + (++FSEQ) + 'x' + Math.random().toString(36).slice(2, 8), f = { _id: id, _title: String(title), _items: [], _resp: [], _acc: true, _desc: '', _quiz: false };
+    const self = function () { return f; };
+    ['setIsQuiz', 'setCollectEmail', 'setShowLinkToRespondAgain', 'setAllowResponseEdits', 'setProgressBar', 'setConfirmationMessage', 'setLimitOneResponsePerUser'].forEach(function (k) { f[k] = function (v) { if (k === 'setIsQuiz') f._quiz = !!v; return f; }; });
+    f.setDescription = function (d) { f._desc = d; return f; }; f.setTitle = function (t) { f._title = String(t); return f; };
+    f.getId = function () { return id; }; f.getTitle = function () { return f._title; };
+    f.getItems = function () { return f._items.slice(); }; f.deleteItem = function (it) { f._items = f._items.filter(function (x) { return x !== it; }); };
+    f.addTextItem = function () { const it = mkItem('text'); f._items.push(it); return it; }; f.addMultipleChoiceItem = function () { const it = mkItem('mc'); f._items.push(it); return it; };
+    f.getPublishedUrl = function () { return 'https://docs.google.com/forms/d/e/' + id + '/viewform'; }; f.shortenFormUrl = function () { return 'https://forms.gle/' + id; };
+    f.getEditUrl = function () { return 'https://docs.google.com/forms/d/' + id + '/edit'; };
+    f.isAcceptingResponses = function () { return f._acc; }; f.setAcceptingResponses = function (b) { f._acc = !!b; return f; };
+    f.getResponses = function () { return f._resp.map(function (r) { return { getItemResponses: function () { return r.map(function (x) { return { getItem: function () { return x[0]; }, getResponse: function () { return x[1]; } }; }); } }; }); };
+    void self; FORMS[id] = f; return f;
+  }
+  const FormApp = { create: mkForm, openById: function (id) { if (!FORMS[id]) throw new Error('No item with the given ID could be found.'); return FORMS[id]; }, getActiveForm: function () { return null; } };
+  // إجابة طالب: {رقم السؤال (من الأسئلة متعددة الخيارات بترتيبها): نص الخيار}
+  function formAnswer(id, ans) { const f = FORMS[id], mc = f._items.filter(function (x) { return x._kind === 'mc'; }), r = []; Object.keys(ans).forEach(function (k) { if (mc[+k]) r.push([mc[+k], ans[k]]); }); f._resp.push(r); }
+
+  const GAS = { DriveApp: DriveApp, FormApp: FormApp, _forms: FORMS, _formAnswer: formAnswer, CacheService: CacheService, PropertiesService: PropertiesService, LockService: LockService, Utilities: Utilities, ContentService: ContentService,
     HtmlService: HtmlService, UrlFetchApp: UrlFetchApp, ScriptApp: ScriptApp,
     _fetch: FETCH, _cache: CACHE, _props: PROPS,
     _dump: function () { return JSON.stringify({ st: ST, props: PROPS }); },

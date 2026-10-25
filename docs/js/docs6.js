@@ -259,7 +259,7 @@ async function saveRemote(quiet) {
   commitPage();
   const d = ED.doc;
   if (!d.id) d.id = newId() + newId();
-  const item = { id: d.id, kind: d.kind, name: d.name || 'تصميمي', shared: !!d.shared, coedit: !!d.coedit, tpl: d.pages[0].tpl, track: d.track, program: d.program || V6.prog.id, pages: d.pages, trans: d.trans || '', animMode: d.animMode || '', animStyle: d.animStyle || '', animSpeed: d.animSpeed || '', arc: d.arc || null, thumb: thumbOfDoc() };
+  const item = { id: d.id, kind: d.kind, name: d.name || 'تصميمي', shared: !!d.shared, coedit: !!d.coedit, tpl: d.pages[0].tpl, track: d.track, program: d.program || V6.prog.id, pages: d.pages, trans: d.trans || '', animMode: d.animMode || '', animStyle: d.animStyle || '', animSpeed: d.animSpeed || '', arc: d.arc || null, lesson: d.lesson || null, thumb: thumbOfDoc() };
   const sv = $('#e_saved'); if (sv) sv.textContent = 'جارٍ الحفظ…';
   try {
     await API6.me('item_save', JSON.stringify(item));

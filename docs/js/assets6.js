@@ -5,7 +5,10 @@ function applyDocFonts(fs) { if (!FS_PROG) FS_PROG = { title: FS.title, body: FS
    كل ملف يُطلب من الخادم مرة، ثم يُحفظ في المتصفح (IndexedDB) فلا يُنزَّل ثانية إلا إذا تغيّر */
 const ASSET_URL = {};     // معرّف الأصل ← رابط محلي
 const ASSET_IMG = {};     // معرّف الأصل ← صورة محمّلة
-const FONT_REG = {};      // العائلة ← {label, scope, files: [...]}
+const FONT_REG = {};
+// خط المصحف المدمج: «أميري قرآن» (رخصة OFL مفتوحة) للنصوص القرآنية بالرسم العثماني، من مجلد fonts بجوار ملفات الموقع
+const FONT_BASE = (function () { try { return document.currentScript.src.replace(/js\/[^/]*$/, ''); } catch (e) { return ''; } })();
+const QURAN_FONT = { family: 'quran', label: 'خط المصحف (أميري)', scope: 'builtin', files: [{ id: 'builtin_quran', weight: 400, local: FONT_BASE + 'fonts/amiri-quran-arabic.woff2', local2: FONT_BASE + 'fonts/amiri-quran-latin.woff2' }] };      // العائلة ← {label, scope, files: [...]}
 const FONT_LOADED = {};   // العائلة|الوزن ← وعد التحميل
 
 async function assetBlob(meta, pub) {
@@ -117,6 +120,7 @@ function applyProgramColor(p) {
 /* ---------- الخطوط للقوالب: كل عائلة بأوزانها، تُحمَّل عند أول استعمال ---------- */
 function registerFonts() {
   Object.keys(FONTS).forEach(function (k) { delete FONTS[k]; });
+  FONT_REG.quran = QURAN_FONT;
   Object.keys(FONT_REG).forEach(function (fam) {
     const r = FONT_REG[fam];
     if (r.scope === 'program' && r.program && V6.prog && r.program !== V6.prog.id) return;
@@ -146,9 +150,10 @@ async function ensureFonts(fams) {
       if (!f) return;
       const key = f.id;
       if (!FONT_LOADED[key]) FONT_LOADED[key] = (async function () {
-        const url = await assetURL(f, !!f.ui);
+        const url = f.local || await assetURL(f, !!f.ui);
         const ff = new FontFace(parts[0], 'url(' + url + ')', { weight: f.wrange || String(f.weight || 400), style: f.style || 'normal' });
         await ff.load(); document.fonts.add(ff);
+        if (f.local2) { const f2 = new FontFace(parts[0], 'url(' + f.local2 + ')', { weight: '400', unicodeRange: 'U+0000-00FF, U+2000-206F' }); await f2.load().catch(function () {}); if (f2.status === 'loaded') document.fonts.add(f2); }
       })().catch(function (e) { console.warn('font', fam, e); delete FONT_LOADED[key]; });
       jobs.push(FONT_LOADED[key]);
     });

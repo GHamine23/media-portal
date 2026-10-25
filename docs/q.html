@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>استمع للتلاوة</title>
+<meta name="description" content="استمع إلى الآيات بصوت القارئ الذي تختاره، وردّدها.">
+<meta name="theme-color" content="#f6f1e6">
+<style>
+@font-face{font-family:"mushaf";src:url(fonts/amiri-quran-arabic.woff2) format("woff2");font-display:swap}
+@font-face{font-family:"mushaf";src:url(fonts/amiri-quran-latin.woff2) format("woff2");unicode-range:U+0000-00FF,U+2000-206F;font-display:swap}
+:root{--bg:#f6f1e6;--paper:#fffdf8;--ink:#2a2620;--mute:#7d7466;--line:#e6dccb;--gold:#a8823e;--gold-soft:rgba(168,130,62,.14);--hl:rgba(168,130,62,.2);--btn:#2a2620;--btn-ink:#fffdf8;--shadow:0 18px 50px -24px rgba(60,44,20,.35)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#14130f;--paper:#1c1a15;--ink:#efe8d8;--mute:#a59c8a;--line:#2f2b23;--gold:#d2ad66;--gold-soft:rgba(210,173,102,.12);--hl:rgba(210,173,102,.2);--btn:#efe8d8;--btn-ink:#14130f;--shadow:0 18px 50px -24px rgba(0,0,0,.7)}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;
+  background-image:radial-gradient(circle at 1px 1px,var(--gold-soft) 1px,transparent 1.4px);background-size:22px 22px}
+main{flex:1;width:100%;max-width:760px;margin:0 auto;padding:28px 16px 150px}
+.top{text-align:center;margin:8px 0 22px}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--gold);letter-spacing:.02em}
+.eyebrow::before,.eyebrow::after{content:"";width:22px;height:1px;background:currentColor;opacity:.6}
+h1{font-family:"mushaf",serif;font-weight:400;font-size:clamp(34px,8vw,52px);margin:4px 0 0;line-height:1.75}
+.range{color:var(--mute);font-size:14px;margin-top:2px}
+.card{position:relative;background:var(--paper);border:1px solid var(--line);border-radius:22px;padding:30px 22px 26px;box-shadow:var(--shadow)}
+.card::before{content:"";position:absolute;inset:8px;border:1px solid var(--gold-soft);border-radius:16px;pointer-events:none}
+.basmala{font-family:"mushaf",serif;text-align:center;font-size:clamp(24px,5.6vw,34px);margin:0 0 14px;color:var(--ink)}
+.text{font-family:"mushaf",serif;font-size:clamp(25px,6.2vw,38px);line-height:2.25;text-align:center;margin:0;word-spacing:.04em}
+.v{cursor:pointer;border-radius:12px;padding:2px 4px;transition:background .35s,color .35s;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.v:hover{background:var(--gold-soft)}
+.v.on{background:var(--hl)}
+.n{color:var(--gold);white-space:nowrap}
+.state{text-align:center;color:var(--mute);font-size:15px;padding:40px 0}
+.note{text-align:center;color:var(--mute);font-size:12px;margin:18px 0 0;line-height:1.7}
+.bar{position:fixed;inset:auto 0 0 0;padding:12px 14px calc(14px + env(safe-area-inset-bottom,0px));background:linear-gradient(to top,var(--bg) 70%,transparent)}
+.player{max-width:760px;margin:0 auto;background:var(--paper);border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow);padding:12px 14px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px}
+.play{width:58px;height:58px;border-radius:50%;border:0;background:var(--btn);color:var(--btn-ink);display:grid;place-items:center;cursor:pointer;transition:transform .25s cubic-bezier(.3,1.5,.5,1)}
+.play:active{transform:scale(.94)}
+.play svg{width:26px;height:26px}
+.mid{min-width:0;display:grid;gap:6px}
+.now{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prog{height:4px;border-radius:4px;background:var(--line);overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--gold);transition:width .25s linear}
+.opts{display:flex;gap:6px;flex-wrap:wrap}
+select,.chip{font:inherit;font-size:13px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:999px;padding:6px 10px;cursor:pointer;max-width:100%}
+select{padding-left:8px}
+.chip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.nav{display:flex;gap:4px}
+.nav button{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--ink);display:grid;place-items:center;cursor:pointer}
+.nav svg{width:18px;height:18px}
+.row2{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:10px}
+.lab{font-size:12px;color:var(--mute);margin-inline-end:2px}
+.grp{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.pick{display:grid;gap:12px;max-width:420px;margin:0 auto}
+.pick label{display:grid;gap:6px;font-size:14px;color:var(--mute)}
+.pick select,.pick input{font:inherit;font-size:16px;border-radius:14px;padding:10px 12px;border:1px solid var(--line);background:var(--paper);color:var(--ink)}
+.pick .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.go{font:inherit;font-size:16px;border:0;border-radius:14px;padding:12px;background:var(--btn);color:var(--btn-ink);cursor:pointer}
+@media (max-width:420px){.player{grid-template-columns:auto 1fr}.nav{grid-column:1/-1;justify-content:center;order:3}main{padding-bottom:270px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <span class="eyebrow">استمع وردّد</span>
+    <h1 id="title">التلاوة</h1>
+    <div class="range" id="range"></div>
+  </header>
+  <section class="card" aria-live="polite">
+    <div id="body" class="state">يُحمَّل النص…</div>
+  </section>
+  <p class="note">النص من مصحف المدينة برواية حفص، والتلاوات من مكتبة «إيفري آية» المفتوحة. انقر أي آية لتبدأ منها.</p>
+</main>
+<div class="bar" id="bar" hidden>
+  <div class="player">
+    <button class="play" id="play" type="button" aria-label="تشغيل"></button>
+    <div class="mid"><div class="now" id="now">اضغط للاستماع</div><div class="prog"><i id="prog"></i></div></div>
+    <div class="nav"><button type="button" id="prev" aria-label="الآية السابقة"></button><button type="button" id="next" aria-label="الآية التالية"></button></div>
+    <div class="row2">
+      <div class="grp"><span class="lab">القارئ</span><select id="qari" aria-label="القارئ"></select></div>
+      <div class="grp" id="reps"><span class="lab">التكرار</span></div>
+      <div class="grp" id="rates"><span class="lab">السرعة</span></div>
+    </div>
+  </div>
+</div>
+<script>
+function ls(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem('mp6.' + k) || 'null'); localStorage.setItem('mp6.' + k, JSON.stringify(v)); } catch (e) { return null; } }
+function toast(m) { const n = document.getElementById('now'); if (n) n.textContent = m; }
+</script>
+<script src="js/tilawa6.js?v=091b8db96f"></script>
+<script>
+(function () {
+  const $ = function (id) { return document.getElementById(id); };
+  const ICON = { play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"/></svg>', pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1.2"/><rect x="13.5" y="5" width="4" height="14" rx="1.2"/></svg>',
+    next: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>', prev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>' };
+  $('play').innerHTML = ICON.play; $('next').innerHTML = ICON.next; $('prev').innerHTML = ICON.prev;
+  let q = parseListen(location.hash);
+  if (!q) { chooser(); return; }
+  let r = qariOf(q.r || ls('qari')).id, rep = q.rep || 1, rate = 1, k = 0, rc = 0, on = false, list = [];
+  const au = new Audio(); au.preload = 'auto';
+  document.title = 'استمع: سورة ' + SURAH_N[q.s - 1] + ' ' + arD(q.a) + (q.b > q.a ? '–' + arD(q.b) : '');
+  $('title').textContent = 'سورة ' + SURAH_N[q.s - 1];
+  $('range').textContent = q.b > q.a ? 'الآيات ' + arD(q.a) + '–' + arD(q.b) : 'الآية ' + arD(q.a);
+  // النص بالرسم العثماني، آيةً آية
+  fetch('https://api.alquran.cloud/v1/surah/' + q.s + '/quran-uthmani?offset=' + (q.a - 1) + '&limit=' + (q.b - q.a + 1)).then(function (x) { return x.json(); }).then(function (j) {
+    const ay = (j.data && j.data.ayahs) || []; const body = $('body'); body.className = ''; body.innerHTML = '';
+    if (q.a === 1 && q.s !== 1 && q.s !== 9) { const b = document.createElement('p'); b.className = 'basmala'; b.textContent = 'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ'; body.appendChild(b); }
+    const p = document.createElement('p'); p.className = 'text';
+    ay.forEach(function (a) {
+      const s = document.createElement('span'); s.className = 'v'; s.dataset.n = a.numberInSurah; s.tabIndex = 0; s.setAttribute('role', 'button'); s.setAttribute('aria-label', 'استمع من الآية ' + a.numberInSurah);
+      s.textContent = noBasmala(a.text, q.s, a.numberInSurah) + '\u00a0';
+      const n = document.createElement('span'); n.className = 'n'; n.textContent = '۝' + arD(a.numberInSurah); s.appendChild(n);
+      s.onclick = function () { jumpTo(a.numberInSurah); }; s.onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jumpTo(a.numberInSurah); } };
+      p.appendChild(s); p.appendChild(document.createTextNode(' '));
+    });
+    body.appendChild(p);
+  }).catch(function () { $('body').textContent = 'تعذّر جلب نص الآيات. الاستماع يعمل مع ذلك.'; });
+  // أدوات التشغيل
+  QARI.forEach(function (x) { const o = document.createElement('option'); o.value = x.id; o.textContent = x.n + (x.note ? ' — ' + x.note : ''); if (x.id === r) o.selected = true; $('qari').appendChild(o); });
+  $('qari').onchange = function () { r = this.value; ls('qari', r); const n = list[k] && list[k].n, was = on; build(); k = Math.max(0, list.findIndex(function (x) { return x.n === n; })); load(); if (was) play(); };
+  chips('reps', [[1, '١'], [2, '٢'], [3, '٣'], [5, '٥']], rep, function (v) { rep = v; rc = 0; });
+  chips('rates', [[0.75, 'هادئة'], [1, 'عادية']], rate, function (v) { rate = v; au.playbackRate = v; });
+  function chips(id, items, cur, fn) { const g = $(id); items.forEach(function (it) { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip' + (it[0] === cur ? ' on' : ''); b.textContent = it[1]; b.onclick = function () { [].forEach.call(g.querySelectorAll('.chip'), function (c) { c.classList.remove('on'); }); b.classList.add('on'); fn(it[0]); }; g.appendChild(b); }); }
+  function build() { list = tilawaList(q, r); }
+  function mark() {
+    const n = list[k] && list[k].n; [].forEach.call(document.querySelectorAll('.v'), function (s) { s.classList.toggle('on', on && +s.dataset.n === n); });
+    const cur = document.querySelector('.v.on'); if (cur) cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    $('now').textContent = !n ? (on ? 'البسملة' : 'اضغط للاستماع') : 'الآية ' + arD(n) + ' · ' + qariOf(r).n + (rep > 1 ? ' · التكرار ' + arD(rc + 1) + ' من ' + arD(rep) : '');
+  }
+  function load() { au.src = list[k].u; au.playbackRate = rate; if (list[k + 1]) { const pre = new Audio(); pre.preload = 'auto'; pre.src = list[k + 1].u; } mark(); }
+  function state(v) { on = v; $('play').innerHTML = v ? ICON.pause : ICON.play; $('play').setAttribute('aria-label', v ? 'إيقاف' : 'تشغيل'); mark(); }
+  function play() { au.play().then(function () { state(true); }).catch(function () { state(false); toast('تعذّر التشغيل. تأكد من الاتصال بالإنترنت.'); }); }
+  function jumpTo(n) { k = Math.max(0, list.findIndex(function (x) { return x.n === n; })); rc = 0; load(); play(); }
+  au.addEventListener('ended', function () {
+    if (list[k].n && ++rc < rep) { au.currentTime = 0; play(); return; }
+    rc = 0; if (k < list.length - 1) { k++; load(); play(); return; }
+    k = 0; load(); state(false); $('prog').style.width = '0';
+  });
+  au.addEventListener('timeupdate', function () { if (au.duration) $('prog').style.width = ((k + au.currentTime / au.duration) / list.length * 100).toFixed(1) + '%'; });
+  $('play').onclick = function () { if (on) { au.pause(); state(false); } else play(); };
+  $('next').onclick = function () { if (k < list.length - 1) { k++; rc = 0; load(); if (on) play(); } };
+  $('prev').onclick = function () { if (k > 0) { k--; rc = 0; load(); if (on) play(); } };
+  build(); load(); $('bar').hidden = false;
+  // اختيار آيات حين يُفتح الرابط بلا موضع
+  function chooser() {
+    $('title').textContent = 'اختر الآيات'; const body = $('body'); body.className = ''; body.innerHTML = '';
+    const f = document.createElement('div'); f.className = 'pick';
+    f.innerHTML = '<label>السورة<select id="cs"></select></label><div class="two"><label>من الآية<input id="ca" type="number" min="1" value="1" inputmode="numeric"></label><label>إلى الآية<input id="cb" type="number" min="1" value="7" inputmode="numeric"></label></div><button class="go" type="button" id="cgo">استمع</button>';
+    body.appendChild(f);
+    SURAH_N.forEach(function (n, i) { const o = document.createElement('option'); o.value = i + 1; o.textContent = arD(i + 1) + ' · ' + n; $('cs').appendChild(o); });
+    $('cgo').onclick = function () { location.hash = listenUrl({ s: +$('cs').value, a: +$('ca').value, b: +$('cb').value, r: ls('qari') || 'husary' }).split('#')[1]; location.reload(); };
+  }
+})();
+</script>
+</body>
+</html>
