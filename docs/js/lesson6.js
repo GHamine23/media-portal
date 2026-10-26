@@ -264,7 +264,7 @@ async function importQuiz(file) {
   toast('✓ أُضيف ' + arDig(qs.length) + ' سؤالاً شرائحَ «سؤال وجواب»');
 }
 
-/* ---------- ورقة عمل للطلاب من العرض: تُفتح في لسان جديد بقالب «ورقة عمل» A4 ---------- */
+/* ---------- ورقة عمل للطلاب من العرض: تُفتح في علامة تبويب جديدة بقالب «ورقة عمل» A4 ---------- */
 function worksheetFromDeck() {
   const tpl = TEMPLATES.find(function (t) { return t.id === 'st_work'; }); if (!tpl) { toast('قالب ورقة العمل غير متاح'); return; }
   const qs = deckQuiz(), lines = [];
@@ -283,13 +283,14 @@ function worksheetFromDeck() {
   ls('makePick', { tid: S.track.id, page: pg, back: false });
   const w = window.open(location.href.split('#')[0] + '#/e/' + S.track.id + '/st_work?make', '_blank');
   track('tool', { tool: 'worksheet' });
-  toast(w ? '✓ فُتحت ورقة العمل في لسان جديد: راجعها ثم نزّلها PDF أو اطبعها.' : 'المتصفح منع اللسان الجديد: اسمح بالنوافذ المنبثقة لهذا الموقع.');
+  toast(w ? '✓ فُتحت ورقة العمل في علامة تبويب جديدة: راجعها ثم نزّلها PDF أو اطبعها.' : 'المتصفح منع علامة التبويب الجديدة: اسمح بالنوافذ المنبثقة لهذا الموقع.');
 }
 
 /* ================= في العرض الحي ================= */
 function lessonPresent(o) {
   const ov = o.ov, stage = o.stage, bar = o.bar, doc = o.doc, L = doc.lesson || {};
   const api = {}; let idx = 0, page = null, qstate = null;
+  const emit = function (m) { if (o.emit) try { o.emit(m); } catch (e) {} };   // نافذة العرض تخبر نافذة المقدّم بما يظهر عند الطلاب
   const isQuiz = function () { return page && page.tpl === 'sl_quiz'; };
 
   /* ---- القلم والتحديد والليزر والممحاة ---- */
@@ -365,11 +366,12 @@ function lessonPresent(o) {
       busy = true; show.classList.remove('won'); box.classList.add('spin');
       let t = 0, delay = 45; const total = reducedMotion() ? 0 : 1900;
       (function tick() {
-        if (t >= total) { show.textContent = win; show.classList.add('won'); box.classList.remove('spin'); busy = false; info.textContent = noRep ? (pool.length ? 'بقي ' + arDig(pool.length) + ' في القرعة' : 'انتهت القائمة؛ تبدأ القرعة من جديد في المرة القادمة') : ''; if (noRep && !pool.length) pool = null; return; }
-        show.textContent = list[Math.floor(Math.random() * list.length)]; t += delay; delay = Math.min(260, delay * 1.13); setTimeout(tick, delay);
+        if (t >= total) { show.textContent = win; show.classList.add('won'); box.classList.remove('spin'); busy = false; info.textContent = noRep ? (pool.length ? 'بقي ' + arDig(pool.length) + ' في القرعة' : 'انتهت القائمة؛ تبدأ القرعة من جديد في المرة القادمة') : ''; if (noRep && !pool.length) pool = null; emit({ t: 'm-pick', on: true, name: win, won: true, info: info.textContent }); return; }
+        show.textContent = list[Math.floor(Math.random() * list.length)]; emit({ t: 'm-pick', on: true, name: show.textContent, won: false }); t += delay; delay = Math.min(260, delay * 1.13); setTimeout(tick, delay);
       })();
     }
-    const close = function () { box.remove(); document.removeEventListener('keydown', kd, true); ov.focus(); };
+    const close = function () { box.remove(); document.removeEventListener('keydown', kd, true); ov.focus(); emit({ t: 'm-pick', on: false }); };
+    box._close = close;
     const kd = function (e) { if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(); } else if (e.key === 'Enter' || e.key === ' ') { if (e.target && /INPUT/.test(e.target.tagName)) return; e.preventDefault(); e.stopImmediatePropagation(); go(); } };
     document.addEventListener('keydown', kd, true);
     box.append(el('div', { class: 'pkcard' }, [
@@ -380,7 +382,7 @@ function lessonPresent(o) {
         el('button', { type: 'button', class: 'btn dark pkgo', onclick: go }, [ico('dice'), 'اختر'])])
     ]));
     box.addEventListener('click', function (e) { e.stopPropagation(); if (e.target === box) close(); });
-    ov.appendChild(box);
+    ov.appendChild(box); emit({ t: 'm-pick', on: true, name: '؟', won: false });
   }
 
   /* ---- نقاط الفرق ---- */
@@ -391,7 +393,7 @@ function lessonPresent(o) {
     score.innerHTML = ''; const ts = teams(), top = Math.max.apply(null, ts.map(function (t) { return t.p || 0; }));
     ts.forEach(function (t) {
       const pts = el('b', { class: 'scp', text: arDig(t.p || 0) });
-      const bump = function (d) { t.p = Math.max(0, (t.p || 0) + d); if (!o.fromView) lessonDirty(); fillScore(); const nb = score.querySelector('[data-n="' + CSS.escape(t.n) + '"] .scp'); if (nb) { nb.classList.remove('bump'); void nb.offsetWidth; nb.classList.add(d > 0 ? 'bump' : 'drop'); } };
+      const bump = function (d) { t.p = Math.max(0, (t.p || 0) + d); if (!o.fromView) lessonDirty(); fillScore(); emitScore(); const nb = score.querySelector('[data-n="' + CSS.escape(t.n) + '"] .scp'); if (nb) { nb.classList.remove('bump'); void nb.offsetWidth; nb.classList.add(d > 0 ? 'bump' : 'drop'); } };
       score.appendChild(el('div', { class: 'sct' + (top > 0 && (t.p || 0) === top ? ' lead' : ''), 'data-n': t.n, style: '--tc:' + t.c }, [
         el('button', { type: 'button', class: 'scm', 'aria-label': 'أنقص نقطة من ' + t.n, onclick: function (e) { e.stopPropagation(); bump(-1); } }, ['−']),
         el('button', { type: 'button', class: 'scb', 'aria-label': 'أضف نقطة إلى ' + t.n, onclick: function (e) { e.stopPropagation(); bump(1); } }, [el('span', { class: 'scn', text: t.n }), pts])
@@ -399,7 +401,8 @@ function lessonPresent(o) {
     });
     score.appendChild(el('button', { type: 'button', class: 'scx', title: 'إخفاء النقاط (S)', 'aria-label': 'إخفاء النقاط', onclick: function (e) { e.stopPropagation(); toggleScore(); } }, [ico('close')]));
   }
-  function toggleScore() { score.hidden = !score.hidden; if (!score.hidden) fillScore(); btnScore.classList.toggle('on', !score.hidden); }
+  function toggleScore() { score.hidden = !score.hidden; if (!score.hidden) fillScore(); btnScore.classList.toggle('on', !score.hidden); emitScore(); }
+  function emitScore() { emit({ t: 'm-score', on: !score.hidden, teams: teams().map(function (t) { return { n: t.n, c: t.c, p: t.p || 0 }; }) }); }
   score.addEventListener('click', function (e) { e.stopPropagation(); });
 
   /* ---- نتائج الأسئلة ورمز الدخول (نموذج قوقل) ---- */
@@ -411,7 +414,7 @@ function lessonPresent(o) {
     clearTimeout(resT); if (!resOn) return;
     const f = (doc.lesson || {}).form, x = qOfPage();
     if (!f) { resBox.replaceChildren(el('p', { class: 'tiny', text: 'لا نموذج لأسئلة هذا العرض بعد: أنشئه من المحرر (أدوات الدرس ← إجابات الطلاب).' })); return; }
-    if (!x) { resBox.replaceChildren(el('div', { class: 'preshead' }, [el('b', { text: 'رمز الدخول للطلاب' }), closeRes()]), joinQr(f.url, 220)); return; }
+    if (!x) { resBox.replaceChildren(el('div', { class: 'preshead' }, [el('b', { text: 'رمز الدخول للطلاب' }), closeRes()]), joinQr(f.url, 220)); emit({ t: 'm-res', on: true, qr: true }); return; }
     let r; try { r = await API6.me('quiz_results', f.id); } catch (e) { resBox.replaceChildren(el('p', { class: 'tiny', text: srvErr(e) })); return; }
     if (!resOn) return;
     const k = (f.qs || []).indexOf(x.q), it = r.items[k >= 0 ? k : deckQuiz(doc).indexOf(x)] || { counts: {}, total: 0 };
@@ -419,6 +422,7 @@ function lessonPresent(o) {
     resBox.replaceChildren(el('div', { class: 'preshead' }, [el('b', { text: it.total ? arDig(it.total) + ' أجابوا' : 'بانتظار الإجابات…' }), el('span', { class: 'live' }), el('span', { class: 'sp' }),
       el('button', { type: 'button', class: 'btn sm ghost', onclick: function () { resBox.classList.toggle('withqr'); } }, [ico('qr')]), closeRes()]),
       resultBars(x, it, reveal), el('div', { class: 'presqr' }, [joinQr(f.url, 150)]));
+    emit({ t: 'm-res', on: true, total: it.total || 0 });
     resT = setTimeout(loadRes, 4000);
   }
   function closeRes() { return el('button', { type: 'button', class: 'ib', 'aria-label': 'إغلاق', onclick: function () { toggleRes(); } }, [ico('close')]); }
@@ -427,7 +431,7 @@ function lessonPresent(o) {
     const g = c.getContext('2d'); g.translate(px, px); try { drawQR(g, url, px * 2, '#111111', '#ffffff'); } catch (e) {}
     return el('div', { class: 'pjoin' }, [c, el('small', { dir: 'ltr', text: url.replace(/^https?:\/\//, '') })]);
   }
-  function toggleRes() { resOn = !resOn; resBox.hidden = !resOn; btnRes.classList.toggle('on', resOn); if (resOn) { resBox.replaceChildren(el('p', { class: 'tiny', text: 'نجلب الإجابات…' })); loadRes(); } else clearTimeout(resT); }
+  function toggleRes() { resOn = !resOn; resBox.hidden = !resOn; btnRes.classList.toggle('on', resOn); emit({ t: 'm-res', on: resOn }); if (resOn) { resBox.replaceChildren(el('p', { class: 'tiny', text: 'نجلب الإجابات…' })); loadRes(); } else clearTimeout(resT); }
 
   /* ---- أزرار الشريط ---- */
   const B = function (icon, label, fn) { return el('button', { type: 'button', class: 'pb', title: label, 'aria-label': label, onclick: function (e) { e.stopPropagation(); fn(); } }, [ico(icon)]); };
@@ -471,8 +475,8 @@ function lessonPresent(o) {
     if (m.t === 'tool') { if (m.k === 'res') toggleRes(); else if (m.k === 'score') toggleScore(); return; }
     if (m.t === 'pickopen') { if (!ov.querySelector('.ppick')) picker(); return; }
     if (m.t === 'pickgo') { if (!ov.querySelector('.ppick')) picker(); const b = ov.querySelector('.ppick .pkgo'); if (b) b.click(); return; }
-    if (m.t === 'pickclose') { const x = ov.querySelector('.ppick'); if (x) x.remove(); return; }
-    if (m.t === 'teams') { lessonOf(doc).teams = m.teams || []; score.hidden = !m.show; if (m.show) fillScore(); btnScore.classList.toggle('on', !!m.show); return; }
+    if (m.t === 'pickclose') { const x = ov.querySelector('.ppick'); if (x) { if (x._close) x._close(); else x.remove(); } return; }
+    if (m.t === 'teams') { lessonOf(doc).teams = m.teams || []; score.hidden = !m.show; if (m.show) fillScore(); btnScore.classList.toggle('on', !!m.show); emitScore(); return; }
   };
   api.pen = pen;
   return api;

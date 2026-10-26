@@ -1,0 +1,66 @@
+import os; _R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+"""عرض المقدّم في كروم: العرض في اللسان نفسه، ولوحة المقدّم نافذة عائمة (Document Picture-in-Picture)."""
+import asyncio, sys
+sys.path.insert(0, _R + '/v6')
+from t6 import setup, URL, OUT
+from playwright.async_api import async_playwright
+def ok(c, m): print(('✓ ' if c else '✗ ') + m, flush=True)
+async def clean(pg):
+    await pg.evaluate("document.querySelectorAll('.coach,.gintro,.gx-intro').forEach(x=>x.remove())")
+async def main():
+    async with async_playwright() as p:
+        b = await p.chromium.launch(); ctx = await b.new_context(viewport={'width': 1440, 'height': 900})
+        pg = await ctx.new_page()
+        errs = await setup(pg)
+        await pg.goto(URL + '#/s/ithmar'); await pg.wait_for_timeout(1500)
+        await pg.evaluate("openDeckNew('ithmar', sampleDecks(trackOf('ithmar'))[1].slides, 'درس المقدّم')"); await pg.wait_for_timeout(2500); await clean(pg)
+        await pg.evaluate("ED.doc.pages[0].notes = 'رحّب بالحضور، ثم اسألهم عن توقعاتهم.'")
+        ok(await pg.evaluate("'documentPictureInPicture' in window"), 'this browser supports the floating panel')
+        await pg.click('#e_presenter'); await pg.wait_for_selector('.modal .pci', timeout=5000)
+        intro = await pg.evaluate("({t: document.querySelector('.modal').textContent, cur: document.querySelector('.pci-b.cur b').textContent})")
+        ok('عائمة' in intro['t'] and 'سفاري' in intro['t'] and 'لسان' not in intro['t'] and 'علامة تبويب' in intro['t'] and 'كروم' in intro['cur'], 'intro explains the floating panel and how other browsers differ: %s' % intro['cur'])
+        await pg.screenshot(path=OUT + 'af0_intro.png')
+        async with ctx.expect_page() as pinfo:
+            await pg.click('.modal button:has-text("ابدأ العرض")')
+        pip = await pinfo.value
+        await pip.wait_for_selector('.pcon', timeout=10000); await pg.wait_for_timeout(1500)
+        pv = await pip.evaluate("({w: innerWidth, h: innerHeight, dir: document.documentElement.dir, thumbs: document.querySelectorAll('.pc-t').length, notes: document.querySelector('.pc-notes-t').textContent, status: document.querySelector('.pc-status').textContent, cv: document.querySelector('.pc-cv').width})")
+        ok(pv['dir'] == 'rtl' and pv['thumbs'] >= 4 and 'رحّب' in pv['notes'] and pv['cv'] > 100, 'the floating panel opens with the slide, notes and slides: %s' % pv)
+        sv = await pg.evaluate("({fol: !!document.querySelector('.present6.follower'), bar: getComputedStyle(document.querySelector('.present6 .pbar')).display, inline: !document.querySelector('.pcon')})")
+        ok(sv['fol'] and sv['bar'] == 'none' and sv['inline'], 'the presentation runs in the same tab, with no controls and no console in it: %s' % sv)
+        await pip.screenshot(path=OUT + 'af1_pip.png'); await pg.screenshot(path=OUT + 'af2_tab.png')
+        await pip.keyboard.press('ArrowLeft'); await pg.wait_for_timeout(900)
+        a = await pip.evaluate("document.querySelector('.pc-count').textContent"); s_txt = await pg.evaluate("document.querySelector('.pcount').textContent")
+        ok(a.split('·')[0].strip() == s_txt.split('·')[0].strip() and not a.startswith('1 /'), 'next in the panel moves the presentation: %s | %s' % (a, s_txt))
+        await pip.keyboard.press('b'); await pg.wait_for_timeout(400)
+        ok(await pg.evaluate("!document.querySelector('.pblank').hidden") and await pip.evaluate("!document.querySelector('.pcm-blank').hidden"), 'B blacks out the tab, and the panel shows it')
+        await pip.keyboard.press('b'); await pg.wait_for_timeout(300)
+        await pip.keyboard.press('z'); await pip.wait_for_timeout(200)
+        box = await pip.locator('.pc-ink').bounding_box()
+        await pip.mouse.click(box['x'] + box['width'] * .7, box['y'] + box['height'] * .6); await pg.wait_for_timeout(700)
+        ok(await pg.evaluate("document.querySelector('.pstage').classList.contains('pzoom')"), 'zoom from the panel magnifies the tab')
+        await pip.screenshot(path=OUT + 'af3_pip_zoom.png'); await pg.screenshot(path=OUT + 'af4_tab_zoom.png')
+        await pip.keyboard.press('z'); await pg.wait_for_timeout(600)
+        await pip.click('.pcb.fullb'); await pg.wait_for_timeout(800)
+        ok(await pg.evaluate("!!document.fullscreenElement"), 'the full-screen button in the panel fills the screen with the presentation')
+        await pip.keyboard.press('s'); await pip.wait_for_timeout(300)
+        await pip.click('.pc-team >> nth=0 >> .pcs.add'); await pg.wait_for_timeout(500)
+        scv = await pg.evaluate("(()=>{const x=document.querySelector('.pscore .sct .scp'); return {shown: !document.querySelector('.pscore').hidden, p: x && x.textContent}})()")
+        mir = await pip.evaluate("(()=>{const x=document.querySelector('.pcm-team b'); return {shown: !document.querySelector('.pcm-score').hidden, p: x && x.textContent, panel: document.querySelector('.pc-team b').textContent}})()")
+        ok(scv['shown'] and scv['p'] == '١' and mir['shown'] and mir['p'] == '١' and mir['panel'] == '١', 'team points show in the tab and in the panel: %s %s' % (scv, mir))
+        await pip.screenshot(path=OUT + 'af5_pip_tools.png')
+        # إغلاق اللوحة: يبقى العرض بأزراره المعتادة
+        await pip.close(); await pg.wait_for_timeout(800)
+        un = await pg.evaluate("({on: !!document.querySelector('.present6'), fol: !!document.querySelector('.present6.follower')})")
+        ok(un['on'] and not un['fol'], 'closing the panel leaves the presentation with its usual controls: %s' % un)
+        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300); await pg.keyboard.press('Escape'); await pg.wait_for_timeout(600)
+        ok(not await pg.evaluate("!!document.querySelector('.present6')"), 'Esc then ends it as usual')
+        # مرة ثانية: «إنهاء العرض» يغلق كل شيء
+        await pg.evaluate("ls('pconIntroOff2', 1)")
+        async with ctx.expect_page() as pinfo:
+            await pg.click('#e_presenter')
+        pip = await pinfo.value; await pip.wait_for_selector('.pcon', timeout=10000); await pg.wait_for_timeout(800)
+        await pip.click('.pc-end'); await pg.wait_for_timeout(1000)
+        ok(pip.is_closed() and not await pg.evaluate("!!document.querySelector('.present6')"), 'ending closes the panel and the presentation')
+        print('ERRORS', [e for e in errs if '404' not in e][:5]); await b.close()
+asyncio.run(main())

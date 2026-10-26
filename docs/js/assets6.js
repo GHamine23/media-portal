@@ -58,8 +58,10 @@ async function loadUiFonts() {
   if (!list.length) list = await Promise.race([fresh, new Promise(function (ok) { setTimeout(function () { ok([]); }, 6000); })]);
   await pool(list, 6, async function (f) {
     const url = await assetURL(f, true);
-    const ff = new FontFace(f.family, 'url(' + url + ')', { weight: f.wrange || f.weight || '400', style: f.style || 'normal', display: 'swap' });
+    const desc = { weight: f.wrange || f.weight || '400', style: f.style || 'normal', display: 'swap' };
+    const ff = new FontFace(f.family, 'url(' + url + ')', desc);
     await ff.load(); document.fonts.add(ff);
+    (window.UI_FONT_SRC = window.UI_FONT_SRC || []).push({ family: f.family, url: url, desc: desc });   // تُعاد في لوحة المقدّم العائمة
   });
 }
 

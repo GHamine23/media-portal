@@ -118,11 +118,11 @@ function present6(fromView, startAt, opts) {
   const prog = el('div', { class: 'pprog' }, [el('i')]), blank = el('div', { class: 'pblank', hidden: true }), grid = el('div', { class: 'pgrid', hidden: true });
   stage.appendChild(media);
   const hint = touch ? 'اسحب للتنقل · المس الوسط للأزرار' : 'الأسهم أو النقر للتنقل · G الشرائح · N الملاحظات · T المؤقّت · P القلم · R القرعة · S النقاط · Esc للخروج';
-  const FOL = opts.follower || '';   // نافذة العرض في «عرض المقدّم»: الشرائح وحدها، والأوامر من نافذة المقدّم
+  let FOL = opts.follower || (opts.bus ? 'local' : '');   // نافذة العرض في «عرض المقدّم»: الشرائح وحدها، والأوامر من نافذة المقدّم
   const ov = el('div', { class: 'present6' + (touch ? ' touch' : '') + (FOL ? ' follower' : ''), tabindex: '0' }, [stage, prog, blank, timerEl, notesEl, grid, bar, el('div', { class: 'phint', text: hint })]);
   let cur = null, chan = null, mediaSlide = -1, animTimers = [];
   try { chan = new BroadcastChannel('athar-present'); } catch (e) {}
-  let fch = null; try { if (FOL) fch = new BroadcastChannel('athar-stage-' + FOL); } catch (e) {}
+  let fch = opts.bus || null; try { if (!fch && opts.follower) fch = new BroadcastChannel('athar-stage-' + opts.follower); } catch (e) {}
   const later = function (fn, ms) { animTimers.push(setTimeout(fn, ms)); };
   function fitStage() {
     const sz = SIZES[pages[i].size || 'slide'], W = ov.clientWidth || innerWidth, H = ov.clientHeight || innerHeight, aw = W - (notesOn ? 320 : 0), r = Math.min(aw / sz.w, H / sz.h);
@@ -210,6 +210,7 @@ function present6(fromView, startAt, opts) {
     prog.firstChild.style.width = ((i + 1) / pages.length * 100) + '%';
     notesEl.textContent = p.notes || 'لا ملاحظات لهذه الشريحة.';
     if (ov._lesson) ov._lesson.slide(i, p, step, q);
+    if (stage.classList.contains('pzoom')) { clearTimeout(zoomT); stage.classList.remove('pzoom'); stage.style.removeProperty('--pz'); }
     if (fch) { try { fch.postMessage({ t: 'state', i: i, step: step }); } catch (e) {} }
     if (chan) { try { const nx = pages[i + 1]; const c2 = document.createElement('canvas'); if (nx) renderSlide(c2, nx, T, 0.2); chan.postMessage({ i: i, n: pages.length, step: step, notes: p.notes || '', cur: c.toDataURL('image/jpeg', 0.6), next: nx ? c2.toDataURL('image/jpeg', 0.6) : '' }); } catch (e) {} }
   }
@@ -274,8 +275,16 @@ function present6(fromView, startAt, opts) {
   function next() { hideBlank(); const st = stepsOf(pages[i]); if (step < st.length) { step++; draw('stepf'); return; } if (i < pages.length - 1) { i++; step = 0; draw('next'); } }
   function prev() { hideBlank(); if (step > 0) { step--; draw('stepb'); return; } if (i > 0) { i--; step = 0; draw('prev'); } }
   function goTo(n) { hideBlank(); n = Math.max(0, Math.min(pages.length - 1, n)); if (n === i && !step) return; const back = n < i; i = n; step = 0; draw(back ? 'prev' : 'next'); }
-  function hideBlank() { blank.hidden = true; }
-  function toggleBlank(color) { if (!blank.hidden && blank.dataset.c === color) { blank.hidden = true; return; } blank.dataset.c = color; blank.hidden = false; }
+  // التكبير من لوحة المقدّم: تُكبَّر الشريحة والوسائط والكتابة معاً حول النقطة المختارة
+  let zoomT = 0;
+  function setZoom(z, x, y) {
+    clearTimeout(zoomT);
+    if (!z || z <= 1) { if (!stage.classList.contains('pzoom')) return; stage.style.setProperty('--pz', 'none'); zoomT = setTimeout(function () { stage.classList.remove('pzoom'); stage.style.removeProperty('--pz'); }, 460); return; }
+    const h = 0.5 / z, cx = Math.max(h, Math.min(1 - h, x)), cy = Math.max(h, Math.min(1 - h, y));
+    stage.classList.add('pzoom'); stage.style.setProperty('--pz', 'scale(' + z + ') translate(' + ((0.5 - cx) * 100) + '%,' + ((0.5 - cy) * 100) + '%)');
+  }
+  function hideBlank() { if (fch && !blank.hidden) { try { fch.postMessage({ t: 'm-blank', c: '' }); } catch (e) {} } blank.hidden = true; }
+  function toggleBlank(color) { if (!blank.hidden && blank.dataset.c === color) { hideBlank(); return; } blank.dataset.c = color; blank.hidden = false; if (fch) { try { fch.postMessage({ t: 'm-blank', c: color }); } catch (e) {} } }
   // نظرة على كل الشرائح: انقر شريحة للذهاب إليها
   function toggleGrid() {
     if (!grid.hidden) { grid.hidden = true; ov.focus(); return; }
@@ -333,7 +342,7 @@ function present6(fromView, startAt, opts) {
     el('button', { type: 'button', class: 'pb', title: 'خروج (Esc)', 'aria-label': 'خروج', onclick: function () { close(); } }, [ico('close')])
   ].filter(Boolean));
   // أدوات الدرس: القلم، والقرعة، ونقاط الفرق، ونتائج الأسئلة
-  if (typeof lessonPresent === 'function') ov._lesson = lessonPresent({ ov: ov, stage: stage, bar: bar, doc: doc, fromView: !!fromView });
+  if (typeof lessonPresent === 'function') ov._lesson = lessonPresent({ ov: ov, stage: stage, bar: bar, doc: doc, fromView: !!fromView, emit: fch ? function (m) { fch.postMessage(m); } : null });
   let hideT = 0; const wake = function () { ov.classList.add('awake'); clearTimeout(hideT); hideT = setTimeout(function () { ov.classList.remove('awake'); }, 2600); };
   ov.addEventListener('mousemove', wake); ov.addEventListener('touchstart', wake, { passive: true });
   // النقر: النصف الأيسر للتالية والأيمن للسابقة. السحب في الجوال: إلى اليمين للتالية (اتجاه العربية)
@@ -368,14 +377,20 @@ function present6(fromView, startAt, opts) {
       }
       if (m.t === 'blank') { if (!m.c) hideBlank(); else { blank.dataset.c = m.c; blank.hidden = false; } return; }
       if (m.t === 'media') { const b = media.querySelector('.pmbox'); if (!b) return; const v = b.querySelector('video,audio'); const btn = b.querySelector('.pmyt,.pmaudio,.pmtap,.tlplay,button'); if (v && !btn) { if (v.paused) v.play().catch(function () {}); else v.pause(); } else if (btn) btn.click(); return; }
-      if (m.t === 'end') { close(); setTimeout(function () { try { window.close(); } catch (er) {} }, 150); return; }
+      if (m.t === 'end') { close(); if (opts.follower) setTimeout(function () { try { window.close(); } catch (er) {} }, 150); return; }
+      if (m.t === 'zoom') { setZoom(m.s, m.x, m.y); return; }
+      if (m.t === 'fs') { if (document.fullscreenElement) document.exitFullscreen().catch(function () {}); else if (ov.requestFullscreen) ov.requestFullscreen().catch(function () {}); return; }
+      if (m.t === 'unfollow') { FOL = ''; ov.classList.remove('follower'); wake(); return; }
       if (ov._lesson && ov._lesson.cmd) ov._lesson.cmd(m);
     };
     fch.postMessage({ t: 'ready' });
+    const fsTell = function () { if (!ov.isConnected) { document.removeEventListener('fullscreenchange', fsTell); return; } try { fch.postMessage({ t: 'm-fs', on: !!document.fullscreenElement }); } catch (e) {} }; document.addEventListener('fullscreenchange', fsTell); setTimeout(fsTell, 400);
+    let medOn = null; const medTell = function () { const on = !!media.querySelector('.pmbox.playing'); if (on !== medOn) { medOn = on; try { fch.postMessage({ t: 'm-media', on: on }); } catch (e) {} } };
+    new MutationObserver(function () { setTimeout(medTell, 50); }).observe(media, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
     // أول ثوانٍ: تنبيه صغير يختفي، يذكّر بأن هذه هي النافذة التي تُشارَك
-    const tip = el('div', { class: 'pstage-tip', text: 'هذه نافذة العرض: شاركها في لقائك. للتنقل استعمل نافذة المقدّم.' }); ov.appendChild(tip); setTimeout(function () { tip.remove(); }, 5000);
+    if (opts.follower) { const tip = el('div', { class: 'pstage-tip', text: 'هذه نافذة العرض: شاركها في لقائك. للتنقل استعمل نافذة المقدّم.' }); ov.appendChild(tip); setTimeout(function () { tip.remove(); }, 5000); }
   }
-  if (!FOL && ov.requestFullscreen) ov.requestFullscreen().then(function () { if (touch && screen.orientation && screen.orientation.lock) return screen.orientation.lock('landscape'); }).catch(function () {});
+  if (!opts.follower && ov.requestFullscreen) ov.requestFullscreen().then(function () { if (touch && screen.orientation && screen.orientation.lock) return screen.orientation.lock('landscape'); }).catch(function () {});
   try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wakeLock = w; }).catch(function () {}); } catch (e) {}
   // الجوال عمودياً: تلميح بإدارة الهاتف لعرض أكبر
   if (touch && innerHeight > innerWidth) { const rot = el('div', { class: 'prot', text: 'أدِر الهاتف أفقياً لعرض أكبر' }); ov.appendChild(rot); setTimeout(function () { rot.remove(); }, 3800); }
@@ -613,7 +628,7 @@ function mediaElSettings(L, b) {
   b.appendChild(box);
 }
 
-/* ---------- افتح في كانفا: ملف PDF للعرض ثم كانفا في لسان جديد ---------- */
+/* ---------- افتح في كانفا: ملف PDF للعرض ثم كانفا في علامة تبويب جديدة ---------- */
 async function openInCanva() {
   if (!ED.doc || ED.doc.kind !== 'deck') return;
   const st = el('div', { class: 'cvst' }, [el('span', { class: 'spin' }), el('span', { text: 'نجهّز ملف PDF للعرض…' })]);

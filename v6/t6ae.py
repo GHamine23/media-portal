@@ -16,8 +16,11 @@ async def main():
         await pg.evaluate("openDeckNew('ithmar', sampleDecks(trackOf('ithmar'))[1].slides, 'درس المقدّم')"); await pg.wait_for_timeout(2500); await clean(pg)
         await pg.evaluate("ED.doc.pages[0].notes = 'رحّب بالحضور، ثم اسألهم عن توقعاتهم.'")
         ok(await pg.locator('#e_presenter').count() == 1, 'editor has the «عرض المقدّم» button')
+        await pg.evaluate("window.PCON_NO_PIP = true")   # طريقة النافذتين: الاحتياط للمتصفحات التي لا تدعم اللوحة العائمة
+        await pg.click('#e_presenter'); await pg.wait_for_selector('.modal .pci', timeout=5000)
+        ok('نافذتان' in await pg.evaluate("document.querySelector('.modal').textContent"), 'intro explains the two-window method')
         async with ctx.expect_page() as pinfo:
-            await pg.click('#e_presenter')
+            await pg.click('.modal button:has-text("ابدأ العرض")')
         st = await pinfo.value
         st_errs = []; st.on('pageerror', lambda e: st_errs.append(str(e)))
         await st.wait_for_selector('.present6.follower', timeout=30000); await st.wait_for_timeout(1500)
@@ -33,6 +36,7 @@ async def main():
         await pg.keyboard.press('ArrowLeft'); await pg.wait_for_timeout(900)
         a = await pg.evaluate("document.querySelector('.pc-count').textContent"); s_txt = await st.evaluate("document.querySelector('.pcount').textContent")
         ok(a.split('·')[0].strip() == s_txt.split('·')[0].strip() and not a.startswith('1 /'), 'next from the console moves the stage: %s | %s' % (a, s_txt))
+        await pg.keyboard.press('g'); await pg.wait_for_timeout(500)
         await pg.click('.pc-t >> nth=3'); await pg.wait_for_timeout(900)
         ok((await st.evaluate("document.querySelector('.pcount').textContent")).startswith('4 /'), 'clicking a thumbnail jumps the stage to that slide')
         # التنقل من نافذة العرض يعود إلى المقدّم
@@ -43,6 +47,16 @@ async def main():
         ok(await st.evaluate("!document.querySelector('.pblank').hidden && document.querySelector('.pblank').dataset.c === '#000'"), 'B in the console blacks out the stage')
         await pg.keyboard.press('b'); await st.wait_for_timeout(400)
         ok(await st.evaluate("document.querySelector('.pblank').hidden"), 'B again brings the slide back')
+        # التكبير: نقرة على الشريحة في لوحة المقدّم تكبّر تلك المنطقة عند الطلاب
+        await pg.keyboard.press('z'); await pg.wait_for_timeout(200)
+        box = await pg.locator('.pc-ink').bounding_box()
+        await pg.mouse.click(box['x'] + box['width'] * .25, box['y'] + box['height'] * .3); await st.wait_for_timeout(700)
+        zm = await st.evaluate("({on: document.querySelector('.pstage').classList.contains('pzoom'), pz: document.querySelector('.pstage').style.getPropertyValue('--pz')})")
+        rect = await pg.evaluate("!document.querySelector('.pcm-zoom').hidden")
+        ok(zm['on'] and 'scale(2)' in zm['pz'] and rect, 'zoom from the console magnifies that area on the stage, and the console marks it: %s' % zm)
+        await pg.screenshot(path=OUT + 'ae5_console_zoom.png'); await st.screenshot(path=OUT + 'ae6_stage_zoom.png')
+        await pg.keyboard.press('z'); await st.wait_for_timeout(700)
+        ok(not await st.evaluate("document.querySelector('.pstage').classList.contains('pzoom')"), 'Z again returns the full slide')
         # القلم: ما يُكتب في نافذة المقدّم يظهر على الشريحة عند الطلاب
         await pg.keyboard.press('p'); await pg.wait_for_timeout(200)
         box = await pg.locator('.pc-ink').bounding_box()
