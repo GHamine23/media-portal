@@ -104,6 +104,8 @@ function pageAtStep(p, step) {
   if (p.tpl === 'sl_quiz' && st.indexOf('__answer') >= step) q.d.reveal = false;
   return q;
 }
+// الشريحة التالية/السابقة الظاهرة (المخفية لا تُعرض، ويُقفز إلى ما بعدها). -1 إن لم توجد
+function shownAfter(pages, i, d) { for (let k = i + d; k >= 0 && k < pages.length; k += d) if (!pages[k].skip) return k; return -1; }
 function renderSlide(c, p, T, scale, collect) { const tpl = TEMPLATES.find(function (t) { return t.id === p.tpl; }); return renderTo(c, tpl, p.size || 'slide', p, T, scale, collect); }
 function reducedMotion() { return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }
 function isMedia(L) { return L && (L.t === 'video' || L.t === 'yt' || L.t === 'audio'); }
@@ -272,8 +274,8 @@ function present6(fromView, startAt, opts) {
     if (L.auto) later(function () { v.play().catch(function () {}); }, delay + 120);
     return box;
   }
-  function next() { hideBlank(); const st = stepsOf(pages[i]); if (step < st.length) { step++; draw('stepf'); return; } if (i < pages.length - 1) { i++; step = 0; draw('next'); } }
-  function prev() { hideBlank(); if (step > 0) { step--; draw('stepb'); return; } if (i > 0) { i--; step = 0; draw('prev'); } }
+  function next() { hideBlank(); const st = stepsOf(pages[i]); if (step < st.length) { step++; draw('stepf'); return; } const n = shownAfter(pages, i, 1); if (n >= 0) { i = n; step = 0; draw('next'); } }
+  function prev() { hideBlank(); if (step > 0) { step--; draw('stepb'); return; } const n = shownAfter(pages, i, -1); if (n >= 0) { i = n; step = 0; draw('prev'); } }
   function goTo(n) { hideBlank(); n = Math.max(0, Math.min(pages.length - 1, n)); if (n === i && !step) return; const back = n < i; i = n; step = 0; draw(back ? 'prev' : 'next'); }
   // التكبير من لوحة المقدّم: تُكبَّر الشريحة والوسائط والكتابة معاً حول النقطة المختارة
   let zoomT = 0;
@@ -378,6 +380,7 @@ function present6(fromView, startAt, opts) {
       if (m.t === 'blank') { if (!m.c) hideBlank(); else { blank.dataset.c = m.c; blank.hidden = false; } return; }
       if (m.t === 'media') { const b = media.querySelector('.pmbox'); if (!b) return; const v = b.querySelector('video,audio'); const btn = b.querySelector('.pmyt,.pmaudio,.pmtap,.tlplay,button'); if (v && !btn) { if (v.paused) v.play().catch(function () {}); else v.pause(); } else if (btn) btn.click(); return; }
       if (m.t === 'end') { close(); if (opts.follower) setTimeout(function () { try { window.close(); } catch (er) {} }, 150); return; }
+      if (m.t === 'skip') { if (pages[m.i]) { if (m.on) pages[m.i].skip = true; else delete pages[m.i].skip; } return; }
       if (m.t === 'zoom') { setZoom(m.s, m.x, m.y); return; }
       if (m.t === 'fs') { if (document.fullscreenElement) document.exitFullscreen().catch(function () {}); else if (ov.requestFullscreen) ov.requestFullscreen().catch(function () {}); return; }
       if (m.t === 'unfollow') { FOL = ''; ov.classList.remove('follower'); wake(); return; }

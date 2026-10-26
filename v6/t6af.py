@@ -24,7 +24,7 @@ async def main():
             await pg.click('.modal button:has-text("ابدأ العرض")')
         pip = await pinfo.value
         await pip.wait_for_selector('.pcon', timeout=10000); await pg.wait_for_timeout(1500)
-        pv = await pip.evaluate("({w: innerWidth, h: innerHeight, dir: document.documentElement.dir, thumbs: document.querySelectorAll('.pc-t').length, notes: document.querySelector('.pc-notes-t').textContent, status: document.querySelector('.pc-status').textContent, cv: document.querySelector('.pc-cv').width})")
+        pv = await pip.evaluate("({w: innerWidth, h: innerHeight, dir: document.documentElement.dir, thumbs: document.querySelectorAll('.pc-t').length, notes: document.querySelector('.pc-notes-t').value, status: document.querySelector('.pc-status').textContent, cv: document.querySelector('.pc-cv').width})")
         ok(pv['dir'] == 'rtl' and pv['thumbs'] >= 4 and 'رحّب' in pv['notes'] and pv['cv'] > 100, 'the floating panel opens with the slide, notes and slides: %s' % pv)
         sv = await pg.evaluate("({fol: !!document.querySelector('.present6.follower'), bar: getComputedStyle(document.querySelector('.present6 .pbar')).display, inline: !document.querySelector('.pcon')})")
         ok(sv['fol'] and sv['bar'] == 'none' and sv['inline'], 'the presentation runs in the same tab, with no controls and no console in it: %s' % sv)
@@ -49,6 +49,47 @@ async def main():
         mir = await pip.evaluate("(()=>{const x=document.querySelector('.pcm-team b'); return {shown: !document.querySelector('.pcm-score').hidden, p: x && x.textContent, panel: document.querySelector('.pc-team b').textContent}})()")
         ok(scv['shown'] and scv['p'] == '١' and mir['shown'] and mir['p'] == '١' and mir['panel'] == '١', 'team points show in the tab and in the panel: %s %s' % (scv, mir))
         await pip.screenshot(path=OUT + 'af5_pip_tools.png')
+        # الفرق: إضافة فريق وتغيير اسمه
+        await pip.click('.pc-tadd'); await pip.wait_for_timeout(300)
+        await pip.fill('.pc-team >> nth=2 >> .pc-tname', 'الصقور'); await pg.wait_for_timeout(900)
+        tn = await pg.evaluate("[...document.querySelectorAll('.pscore .sct .scn')].map(x=>x.textContent)")
+        ok(len(tn) == 3 and tn[2] == 'الصقور', 'a third team can be added and renamed from the panel: %s' % tn)
+        await pip.keyboard.press('Escape'); await pip.click('.pcb[aria-label=النقاط]'); await pip.wait_for_timeout(200)
+        # القرعة: الإعداد من اللوحة، والمرآة بشكل بطاقة الطلاب
+        await pip.keyboard.press('r'); await pip.wait_for_timeout(500)
+        await pip.fill('.pc-pkr input >> nth=1', '5'); await pip.press('.pc-pkr input >> nth=1', 'Tab'); await pg.wait_for_timeout(500)
+        ok(await pg.evaluate("document.querySelector('.ppick input[aria-label=إلى]').value") == '5', 'the range set in the panel reaches the draw on the stage')
+        await pip.click('.pc-go'); await pg.wait_for_timeout(2600)
+        won = await pg.evaluate("document.querySelector('.ppick .pkname').textContent")
+        mir = await pip.evaluate("(()=>{const c=document.querySelector('.pcm-pkc'); return {card: !!c, name: c && c.querySelector('.pcm-pkn').textContent, won: c && c.querySelector('.pcm-pkn').classList.contains('won'), txt: c && c.textContent}})()")
+        ok(won in '١٢٣٤٥' and mir['card'] and mir['name'] == won and mir['won'] and 'null' not in mir['txt'], 'the panel mirrors the draw card as the students see it: %s / %s' % (won, mir))
+        acts = await pg.evaluate("getComputedStyle(document.querySelector('.ppick .pkacts')).display")
+        ok(acts == 'none', 'students do not see the draw buttons')
+        await pip.screenshot(path=OUT + 'af6_pip_pick.png'); await pg.screenshot(path=OUT + 'af7_tab_pick.png')
+        await pip.keyboard.press('r'); await pip.wait_for_timeout(300)
+        # المؤقّت: الرقم ظاهر
+        await pip.keyboard.press('t'); await pip.wait_for_timeout(300)
+        col = await pip.evaluate("(()=>{const x=document.querySelector('.pc-min'); const s=getComputedStyle(x); return [s.color, s.backgroundColor]})()")
+        ok(col[0] != col[1] and col[0].startswith('rgb(24') , 'the timer minutes are readable: %s' % col)
+        await pip.screenshot(path=OUT + 'af8_pip_timer.png')
+        await pip.keyboard.press('Escape'); await pip.click('.pc-panel .ib'); await pip.wait_for_timeout(200)
+        # الملاحظات: تُكتب أثناء العرض وتُحفظ في الشريحة
+        await pip.click('.pc-notes-t'); await pip.keyboard.type('سؤال للنقاش: لماذا؟'); await pip.wait_for_timeout(300)
+        cur = await pip.evaluate("+document.querySelector('.pc-count').textContent.split('/')[0]-1")
+        ok(await pg.evaluate("ED.doc.pages[%d].notes" % cur) == 'سؤال للنقاش: لماذا؟', 'notes written during the presentation are saved on the slide')
+        await pip.keyboard.press('Escape')
+        # إخفاء شريحة: يُقفز عنها
+        await pip.keyboard.press('g'); await pip.wait_for_timeout(500)
+        await pip.click('.pc-tup', timeout=2000) if False else None
+        await pip.click('.pc-gh .pcz[aria-label="تكبير الشرائح"]'); await pip.wait_for_timeout(500)
+        nxt = cur + 1
+        await pip.hover('.pc-t >> nth=%d' % nxt); await pip.click('.pc-t >> nth=%d >> .pc-teye' % nxt); await pip.wait_for_timeout(500)
+        ok(await pg.evaluate("ED.doc.pages[%d].skip === true" % nxt), 'a slide can be hidden from the grid')
+        await pip.screenshot(path=OUT + 'af9_pip_grid.png')
+        await pip.keyboard.press('Escape'); await pip.wait_for_timeout(200)
+        steps = await pg.evaluate("stepsOf(ED.doc.pages[%d]).length" % cur)
+        for _ in range(steps + 1): await pip.keyboard.press('ArrowLeft'); await pg.wait_for_timeout(500)
+        ok((await pg.evaluate("document.querySelector('.pcount').textContent")).startswith('%d /' % (nxt + 2)), 'next skips the hidden slide: %s' % await pg.evaluate("document.querySelector('.pcount').textContent"))
         # إغلاق اللوحة: يبقى العرض بأزراره المعتادة
         await pip.close(); await pg.wait_for_timeout(800)
         un = await pg.evaluate("({on: !!document.querySelector('.present6'), fol: !!document.querySelector('.present6.follower')})")

@@ -25,7 +25,7 @@ async def main():
         st_errs = []; st.on('pageerror', lambda e: st_errs.append(str(e)))
         await st.wait_for_selector('.present6.follower', timeout=30000); await st.wait_for_timeout(1500)
         await pg.wait_for_timeout(800)
-        con = await pg.evaluate("({on: !!document.querySelector('.pcon'), thumbs: document.querySelectorAll('.pc-t').length, notes: document.querySelector('.pc-notes-t').textContent, status: document.querySelector('.pc-status').textContent})")
+        con = await pg.evaluate("({on: !!document.querySelector('.pcon'), thumbs: document.querySelectorAll('.pc-t').length, notes: document.querySelector('.pc-notes-t').value, status: document.querySelector('.pc-status').textContent})")
         ok(con['on'] and con['thumbs'] >= 4 and 'رحّب' in con['notes'], 'console: thumbnails, current slide and notes: %s' % con)
         sv = await st.evaluate("({title: document.title, bar: getComputedStyle(document.querySelector('.present6 .pbar')).display, top: document.querySelector('#top').hidden, cv: !!document.querySelector('.present6 .pslide canvas')})")
         ok(sv['title'].startswith('عرض:') and sv['bar'] == 'none' and sv['top'] and sv['cv'], 'stage window shows the slides alone, titled for sharing: %s' % sv)

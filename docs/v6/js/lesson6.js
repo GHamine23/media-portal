@@ -348,15 +348,17 @@ function lessonPresent(o) {
 
   /* ---- القرعة ---- */
   let pool = null;
-  function picker() {
+  function picker(cfg) {
+    cfg = cfg || {};
     const names = (doc.lesson && doc.lesson.names) || [];
-    let mode = names.length ? 'names' : 'nums', from = 1, to = 30, noRep = true, busy = false;
+    let mode = cfg.mode === 'nums' || !names.length ? 'nums' : 'names', from = cfg.from || 1, to = cfg.to || 30, noRep = cfg.noRep !== false, busy = false;
     const box = el('div', { class: 'ppick', role: 'dialog', 'aria-label': 'القرعة' });
     const show = el('div', { class: 'pkname', 'aria-live': 'polite', text: '؟' }), info = el('small', { class: 'pkinfo' });
-    const fIn = el('input', { type: 'number', min: '1', value: '1', class: 'inp sm', 'aria-label': 'من' }), tIn = el('input', { type: 'number', min: '2', value: '30', class: 'inp sm', 'aria-label': 'إلى' });
+    const fIn = el('input', { type: 'number', min: '1', value: String(from), class: 'inp sm', 'aria-label': 'من' }), tIn = el('input', { type: 'number', min: '2', value: String(to), class: 'inp sm', 'aria-label': 'إلى' });
     const nums = el('div', { class: 'pknums', hidden: mode !== 'nums' }, [el('span', { text: 'من' }), fIn, el('span', { text: 'إلى' }), tIn]);
     const all = function () { if (mode === 'names') return names.slice(); const a = []; from = Math.max(1, +fIn.value || 1); to = Math.max(from + 1, Math.min(999, +tIn.value || 30)); for (let k = from; k <= to; k++) a.push(arDig(k)); return a; };
     const reset = function () { pool = null; info.textContent = ''; };
+    const st = function (m) { m.t = 'm-pick'; m.mode = mode; m.from = Math.max(1, +fIn.value || 1); m.to = Math.max(m.from + 1, +tIn.value || 30); m.info = m.info || ''; return m; };
     fIn.addEventListener('change', reset); tIn.addEventListener('change', reset);
     function go() {
       if (busy) return; const list = all(); if (!list.length) return;
@@ -366,8 +368,8 @@ function lessonPresent(o) {
       busy = true; show.classList.remove('won'); box.classList.add('spin');
       let t = 0, delay = 45; const total = reducedMotion() ? 0 : 1900;
       (function tick() {
-        if (t >= total) { show.textContent = win; show.classList.add('won'); box.classList.remove('spin'); busy = false; info.textContent = noRep ? (pool.length ? 'بقي ' + arDig(pool.length) + ' في القرعة' : 'انتهت القائمة؛ تبدأ القرعة من جديد في المرة القادمة') : ''; if (noRep && !pool.length) pool = null; emit({ t: 'm-pick', on: true, name: win, won: true, info: info.textContent }); return; }
-        show.textContent = list[Math.floor(Math.random() * list.length)]; emit({ t: 'm-pick', on: true, name: show.textContent, won: false }); t += delay; delay = Math.min(260, delay * 1.13); setTimeout(tick, delay);
+        if (t >= total) { show.textContent = win; show.classList.add('won'); box.classList.remove('spin'); busy = false; info.textContent = noRep ? (pool.length ? 'بقي ' + arDig(pool.length) + ' في القرعة' : 'انتهت القائمة؛ تبدأ القرعة من جديد في المرة القادمة') : ''; if (noRep && !pool.length) pool = null; emit(st({ on: true, name: win, won: true, info: info.textContent })); return; }
+        show.textContent = list[Math.floor(Math.random() * list.length)]; emit(st({ on: true, name: show.textContent, won: false })); t += delay; delay = Math.min(260, delay * 1.13); setTimeout(tick, delay);
       })();
     }
     const close = function () { box.remove(); document.removeEventListener('keydown', kd, true); ov.focus(); emit({ t: 'm-pick', on: false }); };
@@ -382,7 +384,14 @@ function lessonPresent(o) {
         el('button', { type: 'button', class: 'btn dark pkgo', onclick: go }, [ico('dice'), 'اختر'])])
     ]));
     box.addEventListener('click', function (e) { e.stopPropagation(); if (e.target === box) close(); });
-    ov.appendChild(box); emit({ t: 'm-pick', on: true, name: '؟', won: false });
+    // تغيير الإعداد من لوحة المقدّم دون إعادة فتح القرعة
+    box._set = function (c) {
+      if (c.from) fIn.value = c.from; if (c.to) tIn.value = c.to; if (c.noRep != null) { noRep = c.noRep !== false; const cb = box.querySelector('.pkacts input[type=checkbox]'); if (cb) cb.checked = noRep; }
+      const m = c.mode === 'names' && names.length ? 'names' : 'nums'; if (m !== mode) { mode = m; nums.hidden = m !== 'nums'; $$('.tseg button', box).forEach(function (b, k) { b.classList.toggle('on', (k === 0 ? 'names' : 'nums') === m); }); }
+      reset(); show.textContent = '؟'; show.classList.remove('won'); emit(st({ on: true, name: '؟', won: false }));
+    };
+    box._names = names.join('\n');
+    ov.appendChild(box); emit(st({ on: true, name: '؟', won: false }));
   }
 
   /* ---- نقاط الفرق ---- */
@@ -474,6 +483,12 @@ function lessonPresent(o) {
     if (m.t === 'laser') { const now = performance.now(); pen.laser = (m.pts || []).map(function (q) { return [q[0], q[1], now - (q[2] || 0)]; }); render(); return; }
     if (m.t === 'tool') { if (m.k === 'res') toggleRes(); else if (m.k === 'score') toggleScore(); return; }
     if (m.t === 'pickopen') { if (!ov.querySelector('.ppick')) picker(); return; }
+    if (m.t === 'pickset') {
+      const l = lessonOf(doc), nn = (m.names || []).join('\n'), x = ov.querySelector('.ppick');
+      if (m.names) l.names = m.names;
+      if (x && x._names === nn && x._set) { x._set(m); return; }
+      if (x) { if (x._close) x._close(); else x.remove(); } picker(m); return;
+    }
     if (m.t === 'pickgo') { if (!ov.querySelector('.ppick')) picker(); const b = ov.querySelector('.ppick .pkgo'); if (b) b.click(); return; }
     if (m.t === 'pickclose') { const x = ov.querySelector('.ppick'); if (x) { if (x._close) x._close(); else x.remove(); } return; }
     if (m.t === 'teams') { lessonOf(doc).teams = m.teams || []; score.hidden = !m.show; if (m.show) fillScore(); btnScore.classList.toggle('on', !!m.show); emitScore(); return; }

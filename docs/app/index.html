@@ -2169,6 +2169,70 @@ body.stage6{background:#000}
 .pstage.pzoom>.pslide,.pstage.pzoom>.pmedia,.pstage.pzoom>canvas.pdraw{transform:var(--pz)!important;transition:transform .45s cubic-bezier(.2,.7,.2,1)}
 @media (prefers-reduced-motion:reduce){.pc-dot,.pstage-tip,.pcb.fullb.nudge{animation:none}.pstage.pzoom>*,.pcm-zoom{transition:none!important}}
 
+/* -- إضافات: القرعة كما تظهر عند الطلاب، والكتابة في اللوحة، والفرق، والشرائح المخفية -- */
+.pc-frame{container-type:inline-size}
+.pcm-pick{inset:0;border-radius:0;background:rgba(0,0,0,.45);place-content:center;justify-items:center}
+.pcm-pkc{width:39cqw;display:grid;gap:.85cqw;padding:1.4cqw 1.5cqw 1.6cqw;border-radius:1.8cqw;background:#fff;color:#1d1d1f;box-shadow:0 2cqw 5cqw rgba(0,0,0,.45);text-align:start}
+.pcm-pkt{font-size:1.25cqw;font-weight:700}
+.pcm-pkr{display:flex;align-items:center;justify-content:center;gap:.6cqw;font-size:1.1cqw;color:#1d1d1f}
+.pcm-pkr i{font-style:normal;min-width:5.8cqw;text-align:center;padding:.5cqw 0;border-radius:99px;box-shadow:inset 0 0 0 1px #d9d9de}
+.pcm-pkn{text-align:center;font-weight:700;font-size:4.4cqw;line-height:1.35;padding:1.25cqw .5cqw;border-radius:1.4cqw;background:#f4f4f6;color:#1d1d1f}
+.pcm-pkn.spin{color:#6b6b72}
+.pcm-pkn.won{background:#1a71fd;color:#fff}
+.pcm-pick .pcm-info{display:block;text-align:center;font-size:1.1cqw;color:#6b6b72}
+/* نافذة العرض: لا أزرار في القرعة، ولا تحديد للنص */
+.present6.follower{user-select:none;-webkit-user-select:none}
+.present6.follower .ppick .pkacts,.present6.follower .ppick .pkhead .ib{display:none}
+.present6.follower .ppick input{pointer-events:none}
+
+/* حقول اللوحة على الخلفية الداكنة */
+.pcon .inp,.pcon textarea.pc-names{background:#0f1016;color:#f2f2f7;border:1px solid #3a3b4a;border-radius:10px}
+.pcon .inp:focus,.pcon textarea.pc-names:focus{border-color:var(--pc-ac);outline:none}
+.pc-min{width:92px;font-size:16px;text-align:center}
+.pc-num{width:74px;text-align:center}
+.pc-pkr{justify-content:flex-start}
+.pc-names{width:100%;box-sizing:border-box;padding:8px 10px;font:inherit;font-size:14px;line-height:1.6;resize:vertical;min-height:90px}
+.pc-pkn{display:grid;gap:4px}
+.pc-seg{display:inline-flex;justify-self:start;padding:3px;border-radius:10px;background:#0f1016;box-shadow:inset 0 0 0 1px #2c2d3a}
+.pc-seg button{border:0;background:transparent;color:#b9b9c8;padding:5px 14px;border-radius:8px;cursor:pointer;font-size:13px}
+.pc-seg button.on{background:#2c2d3a;color:#fff}
+/* ملاحظاتك: تُكتب مباشرة */
+textarea.pc-notes-t{width:100%;height:100%;box-sizing:border-box;border:0;background:transparent;color:#f2f2f7;font:inherit;resize:none;padding:2px 0;outline:none}
+textarea.pc-notes-t::placeholder{color:#6e6e80;font-size:15px}
+.pc-notes:focus-within{box-shadow:inset 0 0 0 1.5px rgba(240,140,58,.55)}
+/* الفرق */
+.pc-team{grid-template-columns:10px minmax(0,1fr) auto 32px 32px 26px}
+.pc-tname{min-width:0;width:100%;border:0;border-bottom:1px dashed transparent;background:transparent;color:#ececf3;font:inherit;font-size:14.5px;padding:3px 2px}
+.pc-tname:hover{border-bottom-color:#3a3b4a}
+.pc-tname:focus{outline:none;border-bottom-color:var(--pc-ac)}
+.pcs.del{width:26px;height:26px;display:grid;place-items:center;background:transparent;color:#8e8fa3}
+.pcs.del svg{width:14px;height:14px}
+.pcs.del:hover{background:#2a1c20;color:#ff9d95}
+.pc-tfoot{display:flex;align-items:center;gap:8px}
+.pcon .btn.line{background:transparent;color:#dcdce6;border-color:#3a3b4a}
+.pcon .btn.line:hover{background:#232430}
+/* كل الشرائح: حجم قابل للتكبير، وإخفاء شريحة */
+.pc-grid{background:#0f1016}
+.pc-ghint{color:var(--pc-mute);font-size:12px}
+.pc-thumbs{grid-template-columns:repeat(auto-fill,minmax(var(--tw,240px),1fr))}
+.pc-tgo{display:block;width:100%;border:0;padding:0;background:transparent;cursor:pointer;border-radius:9px}
+.pc-teye{position:absolute;top:6px;inset-inline-end:6px;width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:8px;background:rgba(16,17,24,.78);color:#ddd;cursor:pointer;opacity:0;transition:opacity .2s}
+.pc-teye svg{width:16px;height:16px}
+.pc-t:hover .pc-teye,.pc-teye:focus-visible,.pc-t.skip .pc-teye{opacity:1}
+.pc-t.skip canvas{opacity:.3;filter:grayscale(.6)}
+.pc-tskip{position:absolute;inset:auto 0 42% 0;margin:auto;width:max-content;font-size:12px;font-weight:600;padding:3px 10px;border-radius:99px;background:#2c2d3a;color:#ececf3;pointer-events:none}
+.pcz:disabled{opacity:.35;cursor:default}
+/* في المحرر: الشريحة المخفية في العرض */
+.pg.skip canvas{opacity:.35}
+.pg-skip{position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:6px;background:#fff;color:#444;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.pg-skip svg{width:13px;height:13px}
+.pcon [hidden]{display:none!important}
+.pc-side{max-height:70vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#33343f transparent}
+@media (max-height:760px){.pc-aside:has(.pc-side:not(:empty)) .pc-next{display:none}}
+.pcon .inp.pc-num{width:74px;flex:none;text-align:center}
+.pcon .inp.pc-min{width:92px;flex:none}
+.pc-panel,.pc-panel .row{min-width:0}
+
 /* ===== progmark.css ===== */
 /* شعار البرنامج المفتوح في الرئيسية: سطر واحد مكان التحية، الشعار يُكتب من اليمين ثم يظهر خط ذهبي والدفعة */
 .pmark { display: flex; align-items: center; gap: 14px; margin: 0; max-width: 100%; }
@@ -2879,19 +2943,19 @@ body.mapp .card > h2.ch{font-size:18px}
 <script src="../v6/js/sections6.js?v=798f2452b2"></script>
 <script src="../v6/js/updates6.js?v=1210eaa02d"></script>
 <script src="../v6/js/motion6.js?v=c3c5dbc6be"></script>
-<script src="../v6/js/kb6.js?v=17967b0436"></script>
+<script src="../v6/js/kb6.js?v=864b1b8b77"></script>
 <script src="../v6/js/guide6.js?v=e56f204b50"></script>
 <script src="../v6/js/about6.js?v=79d95a379c"></script>
 <script src="../v6/js/editor6.js?v=002d51fc20"></script>
 <script src="../v6/js/panels6.js?v=40bf4adab7"></script>
-<script src="../v6/js/docs6.js?v=baea6fea5b"></script>
+<script src="../v6/js/docs6.js?v=18cd99b81e"></script>
 <script src="../v6/js/make6.js?v=a6b2855dcb"></script>
 <script src="../v6/js/caption6.js?v=ee66ba7087"></script>
 <script src="../v6/js/cal6.js?v=5d32d6c604"></script>
-<script src="../v6/js/slides6.js?v=789fc9c6bf"></script>
-<script src="../v6/js/presenter6.js?v=22bf95c172"></script>
+<script src="../v6/js/slides6.js?v=5899b490d5"></script>
+<script src="../v6/js/presenter6.js?v=2442603204"></script>
 <script src="../v6/js/tilawa6.js?v=908a88e136"></script>
-<script src="../v6/js/lesson6.js?v=f72fe16406"></script>
+<script src="../v6/js/lesson6.js?v=68a3226328"></script>
 <script src="../v6/js/extras6.js?v=1fd6891d43"></script>
 <script src="../v6/js/tips6.js?v=86b4f361a7"></script>
 <script src="../v6/js/social6.js?v=05c796e7ed"></script>

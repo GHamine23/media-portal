@@ -19,7 +19,7 @@ function newPage(tpl, T, generic) {
 function pageOfState() {
   const s = snap(); const old = ED.doc.pages[ED.cur] || {};
   // ما يخص الشريحة في العرض الحي (الخطوات والملاحظات والانتقال) ليس من حالة المحرر، فيبقى
-  const keep = {}; ['steps', 'notes', 'trans', 'anim'].forEach(function (k) { if (old[k] !== undefined) keep[k] = old[k]; });
+  const keep = {}; ['steps', 'notes', 'trans', 'anim', 'skip'].forEach(function (k) { if (old[k] !== undefined) keep[k] = old[k]; });
   return Object.assign({ tpl: S.tpl.id, ph: old.ph || {} }, s, keep);
 }
 function commitPage() { if (ED.doc && S.tpl) ED.doc.pages[ED.cur] = pageOfState(); }
@@ -421,8 +421,8 @@ function refreshPageThumb(i) { commitPage(); const b = $$('#e_pages .pg')[i]; if
 function buildPages() {
   const box = $('#e_pages'); if (!box) return; box.innerHTML = '';
   ED.doc.pages.forEach(function (p, i) {
-    box.appendChild(el('button', { type: 'button', class: 'pg' + (i === ED.cur ? ' on' : ''), title: pageWord() + ' ' + (i + 1), onclick: function () { if (i === ED.cur) return; commitPage(); loadPage(i); select(null); buildPanel(); drawNow(); buildPages(); pushUndo6(true); },
-      oncontextmenu: function (e) { e.preventDefault(); pageMenu(e.currentTarget, i); } }, [pageThumb(i), el('small', { text: String(i + 1) })]));
+    box.appendChild(el('button', { type: 'button', class: 'pg' + (i === ED.cur ? ' on' : '') + (p.skip ? ' skip' : ''), title: pageWord() + ' ' + (i + 1) + (p.skip ? ' (مخفية في العرض)' : ''), onclick: function () { if (i === ED.cur) return; commitPage(); loadPage(i); select(null); buildPanel(); drawNow(); buildPages(); pushUndo6(true); },
+      oncontextmenu: function (e) { e.preventDefault(); pageMenu(e.currentTarget, i); } }, [pageThumb(i), el('small', { text: String(i + 1) }), p.skip ? el('span', { class: 'pg-skip', title: 'مخفية في العرض' }, [ico('eyeoff')]) : null]));
   });
   box.appendChild(el('button', { type: 'button', class: 'pg add', title: ED.doc.kind === 'book' ? 'صفحة جديدة' : 'شريحة جديدة', onclick: function (e) { addPageMenu(e.currentTarget); } }, [ico('plus')]));
   box.appendChild(el('button', { type: 'button', class: 'ib sm', title: ED.doc.kind === 'book' ? 'خيارات الصفحة' : 'خيارات الشريحة', 'aria-label': ED.doc.kind === 'book' ? 'خيارات الصفحة' : 'خيارات الشريحة', onclick: function (e) { pageMenu(e.currentTarget, ED.cur); } }, [ico('more')]));
@@ -434,6 +434,7 @@ function pageMenu(anchor, i) {
     i > 0 ? { t: 'تحريكها للأمام', ic: 'chev', fn: function () { commitPage(); const p = ED.doc.pages.splice(i, 1)[0]; ED.doc.pages.splice(i - 1, 0, p); loadPage(i - 1); afterPages(); } } : null,
     i < n - 1 ? { t: 'تحريكها للخلف', ic: 'chev', fn: function () { commitPage(); const p = ED.doc.pages.splice(i, 1)[0]; ED.doc.pages.splice(i + 1, 0, p); loadPage(i + 1); afterPages(); } } : null,
     ED.doc.kind === 'deck' ? { t: 'الحركة والظهور بنقرة والملاحظات', ic: 'sparkles', fn: function () { slideSettings(i); } } : null,
+    ED.doc.kind === 'deck' ? { t: ED.doc.pages[i].skip ? 'إظهارها في العرض' : 'إخفاؤها في العرض', ic: ED.doc.pages[i].skip ? 'eye' : 'eyeoff', fn: function () { commitPage(); const p = ED.doc.pages[i]; if (p.skip) delete p.skip; else p.skip = true; afterPages(); toast(p.skip ? 'لن تظهر في العرض، ويُنتقل إلى ما بعدها.' : 'ستظهر في العرض.'); } } : null,
     { t: ED.doc.kind === 'book' ? 'تطبيق ألوانها وخلفيتها على كل الصفحات' : 'تطبيق ألوانها وخلفيتها على كل الشرائح', ic: 'palette', fn: function () { commitPage(); const src = ED.doc.pages[i]; ED.doc.pages.forEach(function (p) { p.variant = src.variant; p.ov = Object.assign({}, src.ov); p.bgfx = src.bgfx ? Object.assign({}, src.bgfx) : null; }); loadPage(ED.cur); afterPages(); toast('طُبّقت على ' + n + ' شرائح'); } },
     n > 1 ? '-' : null,
     n > 1 ? { t: 'حذف ' + pageWord(), ic: 'trash', fn: function () { commitPage(); ED.doc.pages.splice(i, 1); loadPage(Math.max(0, Math.min(i, ED.doc.pages.length - 1))); afterPages(); } } : null

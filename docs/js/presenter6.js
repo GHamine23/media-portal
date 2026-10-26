@@ -102,7 +102,10 @@ function presenterConsole(doc, T, key, startAt, fromView, win, openWin, opt) {
   curBox.append(el('span', { class: 'pc-live' }, [el('i'), 'ما يراه الطلاب الآن']), frame);
   const mirror = { pick: null, score: null, res: null, media: false };
   const nextCv = el('canvas', { class: 'pc-cv' }), nextLbl = el('small', { class: 'pc-nl' });
-  const notes = el('div', { class: 'pc-notes-t', style: 'font-size:' + notesPx + 'px' });
+  // ملاحظاتك: تُكتب هنا أثناء العرض، وتُحفظ في الشريحة (إلا إن كان العرض من رابط مشاركة)
+  const notes = el('textarea', { class: 'pc-notes-t', dir: 'auto', style: 'font-size:' + notesPx + 'px', 'aria-label': 'ملاحظاتك لهذه الشريحة', placeholder: fromView ? 'اكتب ملاحظاتك لهذه الشريحة. (العرض من رابط مشاركة، فلا تُحفظ فيه)' : 'اكتب ملاحظاتك لهذه الشريحة، وتُحفظ معها.' });
+  notes.addEventListener('input', function () { pages[i].notes = notes.value; if (!fromView) lessonDirty(); });
+  notes.addEventListener('keydown', function (e) { e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); notes.blur(); ov.focus(); } });
   const counter = el('b', { class: 'pc-count', dir: 'ltr' });
   // زر الأدوات: أيقونة وتحتها اسم قصير، والاختصار في التلميح
   const B = function (icon, label, keyHint, fn, cls) { return el('button', { type: 'button', class: 'pcb' + (cls ? ' ' + cls : ''), title: label + (keyHint ? ' (' + keyHint + ')' : ''), 'aria-label': label, onclick: function (e) { e.stopPropagation(); fn(e); } }, [ico(icon), el('span', { text: label })]); };
@@ -128,7 +131,13 @@ function presenterConsole(doc, T, key, startAt, fromView, win, openWin, opt) {
   [['#e5132b', 'أحمر'], ['#1a71fd', 'أزرق'], ['#2f9e5c', 'أخضر'], ['#111111', 'أسود'], ['#ffffff', 'أبيض']].forEach(function (c) { penBar.appendChild(el('button', { type: 'button', class: 'pcc', 'data-c': c[0], title: c[1], 'aria-label': c[1], style: 'background:' + c[0], onclick: function () { pen.color = c[0]; if (pen.tool === 'eraser' || pen.tool === 'laser') pen.tool = 'pen'; syncPen(); } })); });
   penBar.appendChild(el('button', { type: 'button', class: 'pp', title: 'امسح الشريحة (C)', 'aria-label': 'امسح ما كُتب على الشريحة', onclick: function () { delete inks[i]; drawInk(); sendInk(); } }, [ico('trash')]));
 
-  const gridBox = el('div', { class: 'pc-grid', hidden: true }, [el('div', { class: 'pc-gh' }, [el('b', { text: 'كل الشرائح' }), el('span', { class: 'sp' }), el('button', { type: 'button', class: 'pcz', 'aria-label': 'إغلاق', onclick: function () { gridToggle(false); } }, [ico('close')])]), thumbs]);
+  const TW = [170, 240, 330, 460]; let tw = Math.max(0, Math.min(3, +ls('pcongrid') || 1));
+  const twSet = function (d) { tw = Math.max(0, Math.min(3, tw + d)); ls('pcongrid', tw); thumbs.style.setProperty('--tw', TW[tw] + 'px'); twDn.disabled = tw === 0; twUp.disabled = tw === 3; buildThumbs(); };
+  const twDn = el('button', { type: 'button', class: 'pcz', title: 'تصغير الشرائح', 'aria-label': 'تصغير الشرائح', onclick: function () { twSet(-1); } }, [ico('zoomout')]);
+  const twUp = el('button', { type: 'button', class: 'pcz', title: 'تكبير الشرائح', 'aria-label': 'تكبير الشرائح', onclick: function () { twSet(1); } }, [ico('zoomin')]);
+  thumbs.style.setProperty('--tw', TW[tw] + 'px');
+  const gridBox = el('div', { class: 'pc-grid', hidden: true }, [el('div', { class: 'pc-gh' }, [el('b', { text: 'كل الشرائح' }), el('small', { class: 'pc-ghint', text: 'انقر شريحة للانتقال إليها، والعين لإخفائها من العرض.' }), el('span', { class: 'sp' }), twDn, twUp,
+    el('button', { type: 'button', class: 'pcz', 'aria-label': 'إغلاق', onclick: function () { gridToggle(false); } }, [ico('close')])]), thumbs]);
   const ov = el('div', { class: 'pcon' + (PIP ? ' pip' : ''), role: 'dialog', 'aria-label': 'عرض المقدّم', tabindex: '0' }, [
     el('header', { class: 'pc-top' }, [
       el('div', { class: 'pc-title' }, [el('span', { class: 'pc-dot' }), el('b', { text: doc.name || 'عرض' }), status, reopen]),
@@ -175,16 +184,20 @@ function presenterConsole(doc, T, key, startAt, fromView, win, openWin, opt) {
   function drawNext() {
     const st = steps(), w = nextCv.parentNode.clientWidth || 300;
     if (step < st.length) { render(nextCv, pages[i], i, step + 1, w, w * 0.6); nextLbl.textContent = st[step] === '__answer' ? 'نقرة تكشف الجواب' : 'نقرة تُظهر العنصر التالي'; nextCv.hidden = false; }
-    else if (i < pages.length - 1) { render(nextCv, pages[i + 1], i + 1, 0, w, w * 0.6); nextLbl.textContent = 'الشريحة ' + arN(i + 2); nextCv.hidden = false; }
+    else if (shownAfter(pages, i, 1) >= 0) { const n = shownAfter(pages, i, 1); render(nextCv, pages[n], n, 0, w, w * 0.6); nextLbl.textContent = 'الشريحة ' + arN(n + 1); nextCv.hidden = false; }
     else { nextCv.hidden = true; nextLbl.textContent = 'نهاية العرض'; }
   }
   function buildThumbs() {
     thumbs.innerHTML = '';
     pages.forEach(function (p, k) {
       const c = el('canvas', { class: 'pc-tcv' });
-      const b = el('button', { type: 'button', class: 'pc-t', role: 'listitem', 'aria-label': 'الشريحة ' + (k + 1), onclick: function () { goTo(k); } }, [c, el('small', { text: arN(k + 1) })]);
+      const eye = el('button', { type: 'button', class: 'pc-teye', title: p.skip ? 'إظهارها في العرض' : 'إخفاؤها من العرض', 'aria-label': (p.skip ? 'إظهار' : 'إخفاء') + ' الشريحة ' + (k + 1), 'aria-pressed': p.skip ? 'true' : 'false', onclick: function (e) { e.stopPropagation(); skipToggle(k); } }, [ico(p.skip ? 'eyeoff' : 'eye')]);
+      const b = el('div', { class: 'pc-t' + (p.skip ? ' skip' : ''), role: 'listitem' }, [
+        el('button', { type: 'button', class: 'pc-tgo', 'aria-label': 'انتقل إلى الشريحة ' + (k + 1) + (p.skip ? ' (مخفية)' : ''), onclick: function () { goTo(k); } }, [c]),
+        el('small', { text: arN(k + 1) }), p.skip ? el('span', { class: 'pc-tskip', text: 'مخفية' }) : null, eye]);
       thumbs.appendChild(b);
-      setTimeout(function () { if (ov.isConnected) render(c, p, k, steps(k).length, 150, 90); }, 30 + k * 25);
+      const w = TW[tw] * 1.5;
+      setTimeout(function () { if (ov.isConnected) render(c, p, k, steps(k).length, w, w * 0.6); }, 30 + k * 25);
     });
   }
   function markThumbs() { $$('.pc-t', thumbs).forEach(function (b, k) { b.classList.toggle('on', k === i); b.setAttribute('aria-current', k === i ? 'true' : 'false'); }); const on = thumbs.children[i]; if (on) on.scrollIntoView({ block: 'nearest' }); }
@@ -192,15 +205,20 @@ function presenterConsole(doc, T, key, startAt, fromView, win, openWin, opt) {
     drawCur(); drawNext(); markThumbs();
     const p = pages[i], st = steps();
     counter.textContent = (i + 1) + ' / ' + pages.length + (st.length ? ' · ' + step + '/' + st.length : '');
-    notes.textContent = p.notes || 'لا ملاحظات لهذه الشريحة.'; notes.classList.toggle('empty', !p.notes);
-    bPrev.disabled = i === 0 && step === 0; bNext.disabled = i === pages.length - 1 && step >= st.length;
+    if (D.activeElement !== notes || notes._i !== i) { notes.value = p.notes || ''; notes._i = i; }
+    bPrev.disabled = step === 0 && shownAfter(pages, i, -1) < 0; bNext.disabled = step >= st.length && shownAfter(pages, i, 1) < 0;
     if (zoom.s) { zoom.s = 0; drawZoom(); if (push !== false) send({ t: 'zoom', s: 1 }); }
     if (push !== false) send({ t: 'go', i: i, step: step });
     if (scoreOpen) fillScore();
   }
-  function next() { const st = steps(); if (step < st.length) step++; else if (i < pages.length - 1) { i++; step = 0; } else return; if (blank) setBlank(''); update(); }
-  function prev() { if (step > 0) step--; else if (i > 0) { i--; step = 0; } else return; if (blank) setBlank(''); update(); }
+  function next() { const st = steps(); if (step < st.length) step++; else { const n = shownAfter(pages, i, 1); if (n < 0) return; i = n; step = 0; } if (blank) setBlank(''); update(); }
+  function prev() { if (step > 0) step--; else { const n = shownAfter(pages, i, -1); if (n < 0) return; i = n; step = 0; } if (blank) setBlank(''); update(); }
   function goTo(k) { k = Math.max(0, Math.min(pages.length - 1, k)); gridToggle(false); if (k === i && !step) return; i = k; step = 0; if (blank) setBlank(''); update(); ov.focus(); }
+  function skipToggle(k) {
+    const p = pages[k]; if (p.skip) delete p.skip; else p.skip = true;
+    if (!fromView) lessonDirty(); send({ t: 'skip', i: k, on: !!p.skip });
+    buildThumbs(); markThumbs(); drawNext(); update(false);
+  }
   function gridToggle(on) { on = on == null ? gridBox.hidden : on; gridBox.hidden = !on; bGrid.classList.toggle('on', on); if (on) { markThumbs(); } else ov.focus(); }
   /* -- التكبير: نقرة على الشريحة تكبّر تلك المنطقة عند الطلاب، والعجلة تغيّر الدرجة -- */
   const clampZ = function (v, s) { const h = 0.5 / s; return Math.max(h, Math.min(1 - h, v)); };
@@ -224,7 +242,10 @@ function presenterConsole(doc, T, key, startAt, fromView, win, openWin, opt) {
   function setBlank(c, local) { blank = c; if (!local) send({ t: 'blank', c: c }); mBlank.hidden = !c; mBlank.dataset.c = c || ''; mBlank.textContent = c === '#000' ? 'الطلاب يرون شاشة سوداء' : c === '#fff' ? 'الطلاب يرون شاشة بيضاء' : ''; bBlack.classList.toggle('on', c === '#000'); bWhite.classList.toggle('on', c === '#fff'); }
   function drawMirror() {
     const pk = mirror.pick; mPick.hidden = !(pk && pk.on);
-    if (pk && pk.on) mPick.replaceChildren(el('small', { text: 'القرعة' }), el('b', { class: pk.won ? 'won' : '', text: pk.name || '؟' }), pk.info ? el('small', { class: 'pcm-info', text: pk.info }) : null);
+    if (pk && pk.on) mPick.replaceChildren(el('div', { class: 'pcm-pkc' }, [el('b', { class: 'pcm-pkt', text: 'القرعة' }),
+      pk.mode === 'nums' && pk.from ? el('div', { class: 'pcm-pkr' }, [el('span', { text: 'من' }), el('i', { text: String(pk.from) }), el('span', { text: 'إلى' }), el('i', { text: String(pk.to) })]) : null,
+      el('div', { class: 'pcm-pkn' + (pk.won ? ' won' : '') + (pk.won === false && pk.name !== '؟' ? ' spin' : ''), text: pk.name || '؟' }),
+      pk.info ? el('small', { class: 'pcm-info', text: pk.info }) : null]));
     const sc = mirror.score; mScore.hidden = !(sc && sc.on && sc.teams && sc.teams.length);
     if (!mScore.hidden) { const top = Math.max.apply(null, sc.teams.map(function (t) { return t.p || 0; })); mScore.replaceChildren.apply(mScore, sc.teams.map(function (t) { return el('span', { class: 'pcm-team' + (top > 0 && (t.p || 0) === top ? ' lead' : ''), style: '--tc:' + t.c }, [el('i'), t.n, el('b', { text: arN(t.p || 0) })]); })); }
     const rs = mirror.res; mRes.hidden = !(rs && rs.on); if (rs && rs.on) mRes.textContent = 'إجابات الطلاب ظاهرة' + (rs.total ? ' · ' + arN(rs.total) + ' أجابوا' : rs.qr ? ' · رمز الدخول' : '');
@@ -297,30 +318,67 @@ function presenterConsole(doc, T, key, startAt, fromView, win, openWin, opt) {
   /* -- القرعة والنقاط: تُدار من هنا وتظهر عند الطلاب -- */
   let pickOpen = false, scoreOpen = false, scoreShown = false;
   function closeSide() { side.innerHTML = ''; pickOpen = false; scoreOpen = false; bPick.classList.remove('on'); bScore.classList.toggle('on', scoreShown); }
+  // إعداد القرعة من هنا، ويظهر عند الطلاب كما هو
+  const pk = { mode: '', from: 1, to: 30, noRep: true };
+  function pickSend() { send({ t: 'pickset', mode: pk.mode, from: pk.from, to: pk.to, noRep: pk.noRep, names: lessonOf(doc).names || [] }); }
   function pickPanel() {
     if (pickOpen) { send({ t: 'pickclose' }); closeSide(); return; }
-    closeSide(); pickOpen = true; bPick.classList.add('on'); send({ t: 'pickopen' });
+    closeSide(); pickOpen = true; bPick.classList.add('on');
+    const names = function () { return lessonOf(doc).names || []; };
+    if (!pk.mode) pk.mode = names().length ? 'names' : 'nums';
+    send({ t: 'pickopen' }); pickSend();
+    const fIn = el('input', { type: 'number', min: '1', value: String(pk.from), class: 'inp sm pc-num', 'aria-label': 'من' }), tIn = el('input', { type: 'number', min: '2', value: String(pk.to), class: 'inp sm pc-num', 'aria-label': 'إلى' });
+    const numsRow = el('div', { class: 'row pc-pkr' }, [el('span', { text: 'من' }), fIn, el('span', { text: 'إلى' }), tIn]);
+    const onNums = function () { pk.from = Math.max(1, +fIn.value || 1); pk.to = Math.max(pk.from + 1, Math.min(999, +tIn.value || 30)); pickSend(); };
+    fIn.addEventListener('change', onNums); tIn.addEventListener('change', onNums);
+    const ta = el('textarea', { class: 'pc-names', rows: '5', dir: 'auto', placeholder: 'اسم في كل سطر' }); ta.value = names().join('\n');
+    const saveNames = function () { const l = ta.value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean); lessonOf(doc).names = l; if (!fromView) lessonDirty(); if (l.length && pk.mode === 'nums') { pk.mode = 'names'; drawMode(); } if (!l.length) { pk.mode = 'nums'; drawMode(); } pickSend(); };
+    let nT = 0; ta.addEventListener('input', function () { clearTimeout(nT); nT = setTimeout(saveNames, 500); });
+    ta.addEventListener('keydown', function (e) { e.stopPropagation(); });
+    const namesBox = el('div', { class: 'pc-pkn' }, [ta, el('small', { class: 'tiny', text: fromView ? 'لهذه الجلسة فقط.' : 'تُحفظ مع العرض.' })]);
+    const seg = el('div', { class: 'pc-seg', role: 'radiogroup', 'aria-label': 'نوع القرعة' });
+    function drawMode() {
+      seg.replaceChildren.apply(seg, [['nums', 'أرقام'], ['names', 'أسماء']].map(function (x) { return el('button', { type: 'button', role: 'radio', 'aria-checked': pk.mode === x[0] ? 'true' : 'false', class: pk.mode === x[0] ? 'on' : '', onclick: function () { pk.mode = x[0]; drawMode(); pickSend(); } }, [x[1]]); }));
+      numsRow.hidden = pk.mode !== 'nums'; namesBox.hidden = pk.mode !== 'names';
+    }
+    drawMode();
+    const rep = el('input', { type: 'checkbox', checked: pk.noRep, onchange: function (e) { pk.noRep = e.target.checked; pickSend(); } });
     side.append(el('div', { class: 'pc-panel' }, [el('div', { class: 'pc-nh' }, [el('b', { text: 'القرعة' }), el('span', { class: 'sp' }), el('button', { type: 'button', class: 'ib sm', 'aria-label': 'إغلاق القرعة', onclick: function () { send({ t: 'pickclose' }); closeSide(); } }, [ico('close')])]),
-      el('p', { class: 'tiny', text: 'تظهر القرعة عند الطلاب. اضغط «اختر» أو المسافة.' }),
-      el('button', { type: 'button', class: 'btn dark pc-go', onclick: function () { send({ t: 'pickgo' }); } }, [ico('dice'), 'اختر'])]));
+      seg, numsRow, namesBox,
+      el('div', { class: 'row' }, [el('label', { class: 'tog' }, [rep, el('span', { text: 'بلا تكرار' })]), el('span', { class: 'sp' }),
+        el('button', { type: 'button', class: 'btn dark pc-go', onclick: function () { send({ t: 'pickgo' }); } }, [ico('dice'), 'اختر'])]),
+      el('p', { class: 'tiny', text: 'المسافة أو Enter تختار أيضاً.' })]));
   }
   function teams() { const l = lessonOf(doc); if (!l.teams || !l.teams.length) l.teams = [{ n: TEAM_NAMES[0], c: TEAM_COL[0], p: 0 }, { n: TEAM_NAMES[1], c: TEAM_COL[1], p: 0 }]; return l.teams; }
   function sendTeams() { send({ t: 'teams', teams: teams(), show: scoreShown }); }
+  let tnT = 0;
   function fillScore() {
     const box = side.querySelector('.pc-teams'); if (!box) return; box.innerHTML = '';
-    teams().forEach(function (t, k) {
+    const ts = teams();
+    ts.forEach(function (t, k) {
       // الفريق بموضعه لا بنسخته: في اللوحة العائمة يتشارك العرض والمقدّم الدرس نفسه، والعرض يستبدل القائمة عند كل تحديث
-      const bump = function (d) { const tt = teams()[k] || t; tt.p = Math.max(0, (tt.p || 0) + d); if (!fromView) lessonDirty(); fillScore(); sendTeams(); };
-      box.appendChild(el('div', { class: 'pc-team', style: '--tc:' + t.c }, [el('i'), el('span', { text: t.n }), el('b', { text: arN(t.p || 0) }),
-        el('button', { type: 'button', class: 'pcs', 'aria-label': 'أنقص نقطة من ' + t.n, onclick: function () { bump(-1); } }, ['−']), el('button', { type: 'button', class: 'pcs add', 'aria-label': 'أضف نقطة إلى ' + t.n, onclick: function () { bump(1); } }, ['+'])]));
+      const cur = function () { return teams()[k] || t; };
+      const bump = function (d) { const tt = cur(); tt.p = Math.max(0, (tt.p || 0) + d); if (!fromView) lessonDirty(); fillScore(); sendTeams(); };
+      const nm = el('input', { class: 'pc-tname', value: t.n, maxlength: '24', 'aria-label': 'اسم الفريق' });
+      nm.addEventListener('keydown', function (e) { e.stopPropagation(); if (e.key === 'Enter' || e.key === 'Escape') { nm.blur(); ov.focus(); } });
+      nm.addEventListener('input', function () { cur().n = nm.value.trim() || TEAM_NAMES[k] || 'فريق'; if (!fromView) lessonDirty(); clearTimeout(tnT); tnT = setTimeout(sendTeams, 300); });
+      box.appendChild(el('div', { class: 'pc-team', style: '--tc:' + t.c }, [el('i'), nm, el('b', { text: arN(t.p || 0) }),
+        el('button', { type: 'button', class: 'pcs', 'aria-label': 'أنقص نقطة من ' + t.n, onclick: function () { bump(-1); } }, ['−']), el('button', { type: 'button', class: 'pcs add', 'aria-label': 'أضف نقطة إلى ' + t.n, onclick: function () { bump(1); } }, ['+']),
+        ts.length > 2 ? el('button', { type: 'button', class: 'pcs del', title: 'احذف الفريق', 'aria-label': 'احذف ' + t.n, onclick: function () { teams().splice(k, 1); if (!fromView) lessonDirty(); fillScore(); sendTeams(); } }, [ico('close')]) : el('span')]));
     });
+    const foot = side.querySelector('.pc-tfoot'); if (foot) {
+      foot.replaceChildren(
+        ts.length < TEAM_COL.length ? el('button', { type: 'button', class: 'btn sm line pc-tadd', onclick: function () { const l = teams(), n = l.length; l.push({ n: TEAM_NAMES[n] || ('الفريق ' + arN(n + 1)), c: TEAM_COL.filter(function (c) { return !l.some(function (x) { return x.c === c; }); })[0] || TEAM_COL[n % TEAM_COL.length], p: 0 }); if (!fromView) lessonDirty(); fillScore(); sendTeams(); } }, [ico('plus'), 'فريق']) : null,
+        el('span', { class: 'sp' }),
+        el('button', { type: 'button', class: 'btn sm line', onclick: function () { teams().forEach(function (x) { x.p = 0; }); if (!fromView) lessonDirty(); fillScore(); sendTeams(); } }, [ico('reset'), 'صفّر النقاط']));
+    }
   }
   function scorePanel() {
     if (scoreOpen) { closeSide(); return; }
     closeSide(); scoreOpen = true; scoreShown = true; bScore.classList.add('on'); sendTeams();
     const showT = el('input', { type: 'checkbox', checked: true, onchange: function (e) { scoreShown = e.target.checked; sendTeams(); } });
     side.append(el('div', { class: 'pc-panel' }, [el('div', { class: 'pc-nh' }, [el('b', { text: 'نقاط الفرق' }), el('span', { class: 'sp' }), el('button', { type: 'button', class: 'ib sm', 'aria-label': 'إغلاق النقاط', onclick: closeSide }, [ico('close')])]),
-      el('div', { class: 'pc-teams' }), el('label', { class: 'tog' }, [showT, el('span', { text: 'تظهر للطلاب' })])]));
+      el('div', { class: 'pc-teams' }), el('div', { class: 'row pc-tfoot' }), el('label', { class: 'tog' }, [showT, el('span', { text: 'تظهر للطلاب' })])]));
     fillScore();
   }
 
@@ -346,7 +404,7 @@ function presenterConsole(doc, T, key, startAt, fromView, win, openWin, opt) {
     if (m.t === 'ready') { live = true; update(); setBlank(blank); Object.keys(inks).forEach(function (k) { send({ t: 'ink', i: +k, strokes: inks[k] }); }); if (scoreShown) sendTeams(); if (zoom.s) zoomSend(); }
     else if (m.t === 'state') { live = true; if (m.i !== i || m.step !== step) { i = m.i; step = m.step; update(false); } }
     else if (m.t === 'pong') live = true;
-    else if (m.t === 'm-pick') { mirror.pick = m; drawMirror(); }
+    else if (m.t === 'm-pick') { mirror.pick = m; if (m.mode) { pk.mode = m.mode; } drawMirror(); }
     else if (m.t === 'm-fs') { if (bFull) { bFull.classList.toggle('on', !!m.on); bFull.classList.toggle('nudge', !m.on); } }
     else if (m.t === 'm-score') { mirror.score = m; drawMirror(); }
     else if (m.t === 'm-res') { mirror.res = m; drawMirror(); }
