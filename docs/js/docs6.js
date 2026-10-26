@@ -477,7 +477,11 @@ document.addEventListener('keydown', function (e) {
   const k = e.shiftKey ? 10 : 1;
   const m = { ArrowLeft: [-k, 0], ArrowRight: [k, 0], ArrowUp: [0, -k], ArrowDown: [0, k] }[e.key];
   if (m) { e.preventDefault(); moveSel(m[0], m[1]); changed6(true); return; }
-  if ((e.key === 'Delete' || e.key === 'Backspace') && L) { e.preventDefault(); delLayer6(L.id); return; }
+  // زر الحذف: يحذف العنصر المضاف، ويزيل عنصر القالب (ويعود من «الطبقات»)
+  if ((e.key === 'Delete' || e.key === 'Backspace') && !document.querySelector('.modal, .menu')) {
+    if (L) { e.preventDefault(); delLayer6(L.id); toast('حُذف العنصر. Ctrl+Z للتراجع'); return; }
+    if (!isLayer(S.sel) && LASTG && LASTG[S.sel]) { e.preventDefault(); S.hide['g_' + S.sel] = true; select(null); changed6(); buildPanel(); toast('أُزيل العنصر، ويعود من «الطبقات» أو Ctrl+Z'); return; }
+  }
   if (mod && (e.key === 'd' || e.key === 'ي') && L) { e.preventDefault(); dupLayer(L); return; }
   if (e.key === 'Escape') { select(null); return; }
   if (e.key === 'Enter' && fieldsOfGroup(S.sel).length) { e.preventDefault(); openInline6(S.sel); }
