@@ -440,7 +440,7 @@ function gDecorate() {
   gFabEnsure();
   // محرر الموقع: زر صغير في الشريط العلوي
   const top = $('.e-top');
-  if (top && !gInApp() && !$('#e_help', top)) { const sv = $('#e_save', top); const b = el('button', { type: 'button', class: 'ib', id: 'e_help', title: 'اسأل أثر', 'aria-label': 'اسأل أثر', onclick: function () { askAthar(); } }, [ico('help')]); if (sv) top.insertBefore(b, sv); else top.appendChild(b); }
+  if (top && !gInApp() && !$('#e_help', top)) { const sv = $('#e_save', top), grp = $('.e-team', top); const b = el('button', { type: 'button', class: 'ib', id: 'e_help', title: 'اسأل أثر', 'aria-label': 'اسأل أثر', onclick: function () { askAthar(); } }, [ico('help')]); if (grp) grp.appendChild(b); else if (sv) top.insertBefore(b, sv); else top.appendChild(b); }
   // التطبيق: «؟» في رأس كل شاشة
   if (gInApp()) $$('.mscreen .mnav .bar').forEach(function (bar) { if (!$('.gx-q', bar)) bar.appendChild(el('button', { type: 'button', class: 'nb gx-q', 'aria-label': 'اسأل أثر', onclick: function () { if (typeof haptic === 'function') haptic(); askAthar(); } }, [ico('help')])); });
   if (GUIDE.panel) GUIDE.panel.where.textContent = 'أنت في: ' + gWhere();

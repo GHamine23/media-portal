@@ -153,8 +153,6 @@
 body.pcon-open{overflow:hidden}
 body.pip-con{margin:0;background:#0f1016;overflow:hidden}
 
-/* زر «عرض المقدّم» في رأس المحرر: أيقونة وحدها في الشاشات الأضيق */
-@media (max-width:1500px){.e-presenter span{display:none}}
 
 /* تنبيه ما قبل البدء */
 .pci-lead{margin:0 0 14px;line-height:1.8}

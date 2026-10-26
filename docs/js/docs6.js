@@ -154,22 +154,30 @@ function showEditor6(doc, fromDraft) {
     el('h1', { class: 'e-h1' }, [nameI]),   // اسم التصميم هو عنوان الصفحة (h1) بلا تغيير في شكله
     el('span', { class: 'e-saved tiny', id: 'e_saved', text: fromDraft ? 'استعدنا مسودتك' : '' }),
     el('span', { class: 'sp' }),
-    el('div', { class: 'e-tools' }, [
+    // التحرير: تراجع وإعادة وإرجاع القالب والمقاس ونمط الأدوات
+    el('div', { class: 'e-tools e-grp' }, [
       el('button', { type: 'button', class: 'ib', id: 'e_undo', title: 'تراجع (Ctrl+Z)', 'aria-label': 'تراجع', onclick: undo6, disabled: true }, [ico('undo')]),
       el('button', { type: 'button', class: 'ib', id: 'e_redo', title: 'إعادة (Ctrl+Shift+Z)', 'aria-label': 'إعادة', onclick: redo6, disabled: true }, [ico('redo')]),
-      el('button', { type: 'button', class: 'btn sm line e-reset', id: 'e_reset', title: 'إرجاع الصفحة إلى أصل القالب: النصوص والمواضع والألوان والخطوط', onclick: resetPage6 }, [ico('reset'), el('span', { class: 'hide-s', text: 'إعادة الضبط' })]),
+      el('button', { type: 'button', class: 'ib e-reset', id: 'e_reset', title: 'إعادة الضبط: إرجاع الصفحة إلى أصل القالب (النصوص والمواضع والألوان والخطوط)', 'aria-label': 'إعادة الضبط', onclick: resetPage6 }, [ico('reset')]),
+      el('span', { class: 'e-gsep' }),
       sizeSel,
       el('div', { class: 'e-mode', title: 'البسيط يعرض الأساسيات، والكامل يفتح كل الأدوات' }, [segOf([['simple', 'بسيط'], ['full', 'تحكم كامل']], ED.mode, function (v) { ED.mode = v; ls('emode', v); buildRail(); if (!railItems().some(function (r) { return r[0] === ED.tab; })) { ED.tab = 'content'; } buildPanel(); })])
     ]),
-    el('button', { type: 'button', class: 'ib', id: 'e_share', title: 'شارك بالرابط مع فريقك', 'aria-label': 'مشاركة بالرابط', onclick: function () { shareDialog(); } }, [ico('share')]),
-    doc.kind !== 'deck' ? el('button', { type: 'button', class: 'btn line e-cap', id: 'e_cap', title: 'النص المصاحب والإرسال إلى القناة، ومنشورات هذا التصميم', onclick: function () { openPublish(true); } }, [ico('send'), el('span', { class: 'hide-s', text: 'النشر' })]) : null,
+    // الفريق: المراجعة والتعليقات والملاحظة والمشاركة (ويُضاف إليها «اسأل أثر»)
+    el('div', { class: 'e-grp e-team' }, [
+      el('button', { type: 'button', class: 'ib e-rv', id: 'e_rv', title: 'مراجعة التصميم بالمصمّم الذكي أو من إدارة أثر، والتعليقات', 'aria-label': 'مراجعة', onclick: function (e) { reviewMenu(e.currentTarget); } }, [ico('review'), el('span', { text: 'مراجعة' })]),
+      el('button', { type: 'button', class: 'ib cmb', id: 'e_cm', title: 'التعليقات', 'aria-label': 'التعليقات', onclick: function () { commentsDialog(); } }, [ico('comment'), el('b', {})]),
+      el('button', { type: 'button', class: 'ib', title: 'ملاحظة للفريق', 'aria-label': 'ملاحظة', onclick: function () { showFeedback6(); } }, [ico('chat')]),
+      el('button', { type: 'button', class: 'ib', id: 'e_share', title: 'شارك بالرابط مع فريقك', 'aria-label': 'مشاركة بالرابط', onclick: function () { shareDialog(); } }, [ico('share')])
+    ]),
     doc.fromMake ? el('a', { class: 'btn line e-back', href: '#/make?back=1', title: 'العودة إلى اقتراحات المصمّم الذكي' }, [ico('chev'), el('span', { class: 'hide-s', text: 'الاقتراحات' })]) : null,
-    el('button', { type: 'button', class: 'btn line e-rv', id: 'e_rv', title: 'مراجعة التصميم بالمصمّم الذكي أو من إدارة أثر، والتعليقات', onclick: function (e) { reviewMenu(e.currentTarget); } }, [ico('review'), el('span', { class: 'hide-s', text: 'مراجعة' })]),
-    el('button', { type: 'button', class: 'ib cmb', id: 'e_cm', title: 'التعليقات', 'aria-label': 'التعليقات', onclick: function () { commentsDialog(); } }, [ico('comment'), el('b', {})]),
-    el('button', { type: 'button', class: 'ib', title: 'ملاحظة للفريق', 'aria-label': 'ملاحظة', onclick: function () { showFeedback6(); } }, [ico('chat')]),
     el('button', { type: 'button', class: 'btn line', id: 'e_save', onclick: function () { saveDialog(); } }, [ico('heart'), el('span', { class: 'hide-s', text: doc.id ? 'محفوظ' : 'حفظ' })]),
-    doc.kind === 'deck' ? el('button', { type: 'button', class: 'btn e-present', id: 'e_present', title: 'اعرض بملء الشاشة (من الشريحة الحالية)', onclick: function () { present6(false, ED.cur); } }, [ico('play'), el('span', { text: 'اعرض' })]) : null,
-    doc.kind === 'deck' && typeof presenterMode === 'function' && !matchMedia('(pointer: coarse)').matches ? el('button', { type: 'button', class: 'btn line e-presenter', id: 'e_presenter', title: 'عرض المقدّم: شارك الشرائح وحدها في لقاء عن بُعد، وأمامك الملاحظات والمؤقّت والأدوات', onclick: function () { presenterMode(ED.cur, false); } }, [ico('slides'), el('span', { text: 'عرض المقدّم' })]) : null,
+    doc.kind !== 'deck' ? el('button', { type: 'button', class: 'btn line e-cap', id: 'e_cap', title: 'النص المصاحب والإرسال إلى القناة، ومنشورات هذا التصميم', onclick: function () { openPublish(true); } }, [ico('send'), el('span', { class: 'hide-s', text: 'النشر' })]) : null,
+    // العرض: «اعرض» و«عرض المقدّم» زرّان متلاصقان
+    doc.kind === 'deck' ? el('div', { class: 'e-play' }, [
+      el('button', { type: 'button', class: 'btn e-present', id: 'e_present', title: 'اعرض بملء الشاشة (من الشريحة الحالية)', onclick: function () { present6(false, ED.cur); } }, [ico('play'), el('span', { text: 'اعرض' })]),
+      typeof presenterMode === 'function' && !matchMedia('(pointer: coarse)').matches ? el('button', { type: 'button', class: 'btn e-presenter', id: 'e_presenter', title: 'عرض المقدّم: شارك الشرائح وحدها في لقاء عن بُعد، وأمامك الملاحظات والمؤقّت والأدوات', 'aria-label': 'عرض المقدّم', onclick: function () { presenterMode(ED.cur, false); } }, [ico('slides'), el('span', { text: 'عرض المقدّم' })]) : null
+    ]) : null,
     el('button', { type: 'button', class: 'btn dark', id: 'e_dl', onclick: function (e) { dlMenu(e.currentTarget); } }, [ico('download'), el('span', { class: 'hide-s', text: 'تنزيل' })])
   ]);
   const rail = el('nav', { class: 'e-rail', 'aria-label': 'الأدوات', id: 'e_rail' });
