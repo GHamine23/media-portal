@@ -74,6 +74,13 @@ const MO = (function () {
 
   /* ---------- الأيقونات (خطوط) ---------- */
   const IC = {
+    // أيقونات أدوات الدرس وعرض المقدّم (كما في الموقع)
+    pen: '<path d="M4 20l1.2-4.6L15.6 5a2.1 2.1 0 0 1 3 3L8.2 18.4z"/><path d="M13.5 7l3 3"/>',
+    marker: '<path d="M9 14l-4 4v2h4l4-4"/><path d="M9 14l6-9 4 4-9 6z"/><path d="M3 21h18" opacity=".5"/>',
+    dice: '<rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1.3" fill="currentColor"/><circle cx="15" cy="15" r="1.3" fill="currentColor"/><circle cx="15" cy="9" r="1.3" fill="currentColor"/><circle cx="9" cy="15" r="1.3" fill="currentColor"/>',
+    trophy: '<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7M10 17h4"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    zoomin: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M8 11h6M11 8v6"/>',
     home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
     grid: '<rect x="3" y="3" width="7" height="9" rx="1.6"/><rect x="14" y="3" width="7" height="5" rx="1.6"/><rect x="14" y="12" width="7" height="9" rx="1.6"/><rect x="3" y="16" width="7" height="5" rx="1.6"/>',
     text: '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>',
@@ -1314,6 +1321,130 @@ const MO = (function () {
   /* ================= المشاهد ================= */
   function camera(root, d) { const cam = A(root, 0, 0, null, null); css(cam, { left: '0', top: '0', right: '0', bottom: '0', transformOrigin: '50% 50%' }); return { e: cam, up: function (lt) { T(cam, { s: 1 + 0.035 * (1 - E.o3(P(lt, 0, 0.9))) }); } }; }   // دخول بتقريب يستقر سريعاً ثم ثبات: التكبير البطيء المستمر كان يُرى اهتزازاً في النصوص
   // مشهد قياسي: رأس + مكوّن
+  /* ---------- شريحة الدرس المشتركة بين مشهدَي «أدوات الدرس» و«عرض المقدّم» ---------- */
+  function lessonSlide(parent, x, y, sw, sh, C) {
+    const el = A(parent, x, y, sw, sh); css(el, { overflow: 'hidden', borderRadius: Math.max(6, sw * 0.012) + 'px', background: '#fff' });
+    const inner = A(el, 0, 0, sw, sh); css(inner, { transformOrigin: '50% 50%' });
+    const bar = A(inner, sw - sw * 0.012, 0, sw * 0.012, sh); css(bar, { background: C.ac });
+    const t = A(inner, sw * 0.05, sh * 0.09, sw * 0.9, null, 'mo-kt'); css(t, { fontSize: (sw * 0.056) + 'px', textAlign: 'right', color: '#14141c' }); t.textContent = 'ثلاث صفات للقدوة';
+    const rowY = function (k) { return sh * 0.3 + k * sh * 0.17; };
+    const rows = ['يعمل بما يقول', 'قريبٌ من الناس', 'ثابتٌ على المبدأ'].map(function (q, k) {
+      const r = A(inner, sw * 0.05, rowY(k), sw * 0.9, sh * 0.12); css(r, { display: 'flex', alignItems: 'center', gap: (sw * 0.02) + 'px', fontSize: (sw * 0.036) + 'px', color: '#24242e' });
+      r.innerHTML = '<b style="flex:none;width:' + (sw * 0.05) + 'px;height:' + (sw * 0.05) + 'px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:' + (sw * 0.026) + 'px;background:' + [C.ac, PAL.or, PAL.te][k] + '">' + ar(k + 1) + '</b><span>' + q + '</span>';
+      return r;
+    });
+    return { el: el, inner: inner, rows: rows, rowY: rowY };
+  }
+
+  /* ---------- أدوات الدرس: القلم والتحديد، والقرعة، ونقاط الفرق ---------- */
+  function cLesson(S, o) {
+    const v = !!o.v, W = v ? 920 : 1240, H = v ? 1180 : 780, c = comp(W, H), e = c.el, C = S.C, b = o.b || {}, sfx = o.sfx || noop;
+    e.style.background = '#16161f';
+    const sw = v ? 860 : 1000, sh = sw * 9 / 16, sx = (W - sw) / 2, sy = v ? 150 : 34;
+    const ls = lessonSlide(e, sx, sy, sw, sh, C), sl = ls.inner;
+    // القلم: خط تحت السطر الثاني، يُرسم كما يُكتب
+    const uy = ls.rowY(1) + sh * 0.105, x1 = sw * 0.9, x2 = sw * 0.5;
+    const ink = A(sl, 0, 0, sw, sh, null, '<svg viewBox="0 0 ' + sw + ' ' + sh + '" width="' + sw + '" height="' + sh + '" style="width:' + sw + 'px;height:' + sh + 'px;overflow:visible"><path pathLength="1" d="M' + x1 + ' ' + uy + ' Q ' + ((x1 + x2) / 2) + ' ' + (uy + 9) + ' ' + x2 + ' ' + (uy - 3) + '" fill="none" stroke="#e5132b" stroke-width="' + (sw * 0.0065) + '" stroke-linecap="round" stroke-dasharray="1" stroke-dashoffset="1"/></svg>');
+    const pen = ink.querySelector('path');
+    // التحديد: لون شفاف يمتد على السطر الثالث
+    const mk = A(sl, sw * 0.5, ls.rowY(2) + sh * 0.015, sw * 0.4, sh * 0.09); css(mk, { background: 'rgba(255,212,0,.42)', borderRadius: '4px', transformOrigin: '100% 50%' });
+    // نقاط الفرق أعلى الشريحة
+    const scb = A(sl, 0, sh * 0.025, sw, sh * 0.08); css(scb, { display: 'flex', justifyContent: 'center', gap: (sw * 0.012) + 'px' });
+    const teams = [['الفريق الأول', '#e5484d', 2], ['الفريق الثاني', '#1a71fd', 1], ['الصقور', '#2f9e5c', 0]].map(function (t) {
+      const p = h('span', null, scb); css(p, { display: 'inline-flex', alignItems: 'center', gap: (sw * 0.008) + 'px', padding: '0 ' + (sw * 0.016) + 'px', height: (sh * 0.075) + 'px', borderRadius: '99px', background: 'rgba(16,17,24,.86)', color: '#fff', fontSize: (sw * 0.02) + 'px' });
+      p.innerHTML = '<i style="width:' + (sw * 0.011) + 'px;height:' + (sw * 0.011) + 'px;border-radius:50%;background:' + t[1] + ';display:block"></i><span>' + t[0] + '</span><b style="font-family:var(--mo-fd);min-width:1.2em;text-align:center">' + ar(t[2]) + '</b>';
+      return { e: p, b: p.querySelector('b'), n: t[2] };
+    });
+    // القرعة كما تظهر للطلاب
+    const dim = A(sl, 0, 0, sw, sh); css(dim, { background: 'rgba(0,0,0,.45)' });
+    const cw = sw * 0.44, card = A(dim, (sw - cw) / 2, sh * 0.13, cw, null); css(card, { background: '#fff', borderRadius: (sw * 0.024) + 'px', padding: (sw * 0.02) + 'px', display: 'flex', flexDirection: 'column', gap: (sw * 0.012) + 'px', boxShadow: '0 30px 80px rgba(0,0,0,.45)' });
+    card.innerHTML = '<b style="font-size:' + (sw * 0.022) + 'px">القرعة</b><div style="display:flex;align-items:center;justify-content:center;gap:' + (sw * 0.008) + 'px;font-size:' + (sw * 0.018) + 'px"><span>من</span><i style="font-style:normal;min-width:' + (sw * 0.07) + 'px;text-align:center;padding:' + (sw * 0.005) + 'px 0;border-radius:99px;box-shadow:inset 0 0 0 1px #d9d9de">1</i><span>إلى</span><i style="font-style:normal;min-width:' + (sw * 0.07) + 'px;text-align:center;padding:' + (sw * 0.005) + 'px 0;border-radius:99px;box-shadow:inset 0 0 0 1px #d9d9de">30</i></div><div class="pkn" style="text-align:center;font-family:var(--mo-fd);font-weight:700;font-size:' + (sw * 0.07) + 'px;line-height:1.3;padding:' + (sw * 0.016) + 'px 0;border-radius:' + (sw * 0.018) + 'px;background:#f4f4f6;color:#6b6b72">؟</div><small class="pki" style="text-align:center;color:#6b6b72;font-size:' + (sw * 0.017) + 'px;min-height:1.3em"></small>';
+    const pkn = card.querySelector('.pkn'), pki = card.querySelector('.pki');
+    // شريط الأدوات تحت الشريحة
+    const tools = [['pen', 'القلم', 'pen'], ['marker', 'التحديد', 'mark'], ['dice', 'القرعة', 'pick'], ['trophy', 'النقاط', 'sc']];
+    const dy = sy + sh + (v ? 50 : 24), dock = A(e, 0, dy, W, 96); css(dock, { display: 'flex', justifyContent: 'center', gap: '12px' });
+    const tEls = tools.map(function (t) { const d = h('div', null, dock); css(d, { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', width: (v ? 150 : 132) + 'px', height: '92px', borderRadius: '20px', background: 'rgba(255,255,255,.07)', color: '#cfcfdb', fontSize: '19px' }); d.innerHTML = ico(t[0], 30, 'currentColor', 2) + '<span>' + t[1] + '</span>'; return { e: d, k: t[2], on: null }; });
+    const won = b.pick != null ? b.pick + 1.9 : null;
+    if (b.pen != null) sfx(b.pen, 'swish', { d: 0.6, v: 0.25 });
+    if (b.mark != null) sfx(b.mark, 'swish', { d: 0.5, v: 0.2 });
+    if (b.pick != null) { sfx(b.pick, 'pop', { p: 0.9, v: 0.35 }); for (let k = 0; k < 9; k++) sfx(b.pick + 0.35 + k * 0.17, 'tick', { p: 1 + k * 0.04 }); sfx(won, 'impact', { v: 0.5 }); sfx(won + 0.05, 'shimmer', { f: 1320, v: 0.06 }); }
+    if (b.sc != null) { sfx(b.sc, 'pop', { p: 1, v: 0.3 }); sfx(b.sc + 0.7, 'pop', { p: 1.2, v: 0.3 }); }
+    if (b.bump != null) sfx(b.bump, 'pop', { p: 1.4, v: 0.4 });
+    c.up = function (lt) {
+      const has = function (k) { return b[k] != null && lt >= b[k]; };
+      pen.style.strokeDashoffset = b.pen != null ? String(1 - E.io3(P(lt, b.pen, 0.8))) : '1';
+      T(mk, { sx: b.mark != null ? Math.max(0.001, E.o3(P(lt, b.mark, 0.6))) : 0.001, o: b.mark != null && lt >= b.mark ? 1 : 0 });
+      // القرعة
+      const pkOn = b.pick != null ? io(lt, b.pick, b.pickOut, 0.35, 0.35) : 0; T(dim, { o: pkOn }); T(card, { s: 0.9 + 0.1 * E.spr(P(lt, b.pick || 0, 0.6)), o: pkOn });
+      if (b.pick != null && lt >= b.pick) {
+        const w = lt >= won, n = w ? 17 : 1 + (Math.floor((lt - b.pick) * 6) * 11) % 30, txt = w ? ar(17) : ar(n);
+        if (pkn._t !== txt) { pkn.textContent = txt; pkn._t = txt; }
+        const st = w ? 'w' : 's'; if (pkn._s !== st) { css(pkn, w ? { background: '#1a71fd', color: '#fff' } : { background: '#f4f4f6', color: '#6b6b72' }); pkn._s = st; pki.textContent = w ? 'بقي ٢٩ في القرعة' : ''; }
+        T(pkn, { s: w ? 0.85 + 0.15 * E.spr(P(lt, won, 0.55)) : 1 });
+      }
+      // النقاط
+      T(scb, { o: b.sc != null ? E.o3(P(lt, b.sc, 0.4)) : 0, y: b.sc != null ? (1 - E.o5(P(lt, b.sc, 0.6))) * -20 : 0 });
+      T(teams[2].e, { s: b.sc != null ? 0.4 + 0.6 * E.spr(P(lt, b.sc + 0.7, 0.6)) : 0, o: b.sc != null ? P(lt, b.sc + 0.7, 0.15) : 0 });
+      const bumped = b.bump != null && lt >= b.bump, bt = bumped ? ar(1) : ar(0);
+      if (teams[2].b.textContent !== bt) teams[2].b.textContent = bt;
+      T(teams[2].b, { s: bumped ? 1 + 0.6 * (1 - E.o3(P(lt, b.bump, 0.5))) : 1 });
+      // الأداة الفاعلة
+      let act = ''; ['pen', 'mark', 'pick', 'sc'].forEach(function (k) { if (has(k)) act = k; }); if (act === 'pick' && b.pickOut != null && lt >= b.pickOut && !has('sc')) act = '';
+      tEls.forEach(function (t) { const on = t.k === act; if (t.on !== on) { css(t.e, on ? { background: PAL.or, color: '#fff' } : { background: 'rgba(255,255,255,.07)', color: '#cfcfdb' }); t.on = on; } });
+    };
+    return c;
+  }
+
+  /* ---------- عرض المقدّم: الطلاب يرون الشريحة، ولوحة المقدّم عائمة لا تدخل في المشاركة ---------- */
+  function cPresenter(S, o) {
+    const v = !!o.v, W = v ? 920 : 1240, H = v ? 1180 : 780, c = comp(W, H), e = c.el, C = S.C, b = o.b || {}, sfx = o.sfx || noop;
+    e.style.background = 'linear-gradient(160deg,#eeedf3,#e2e1ea)';
+    // نافذة اللقاء: ما يراه الطلاب
+    const mw = v ? 880 : 880, mh = v ? 560 : 560, mx = v ? 20 : W - 20 - mw, my = v ? 24 : 24;
+    const win = A(e, mx, my, mw, mh, 'mo-card'); css(win, { borderRadius: '20px', overflow: 'hidden', background: '#202124' });
+    const bar = A(win, 0, 0, mw, 52); css(bar, { background: '#2b2c30', display: 'flex', alignItems: 'center', gap: '12px', padding: '0 18px', color: '#e8eaed', fontSize: '19px', boxSizing: 'border-box' });
+    bar.innerHTML = '<i style="width:12px;height:12px;border-radius:50%;background:#ea4335;display:block"></i><span style="flex:1">لقاء الدرس · مشاركة علامة التبويب</span><span style="display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:99px;background:rgba(234,67,53,.18);color:#ff8a80;font-size:16px">' + ico('eye', 18, 'currentColor', 2) + 'يراها الطلاب</span>';
+    const sw = mw - 40, sh = sw * 9 / 16, slide = lessonSlide(win, 20, 52 + (mh - 52 - sh) / 2, sw, sh, C);
+    // اللوحة العائمة
+    const pw = v ? 620 : 500, ph = v ? 560 : 560, px = v ? (W - pw) / 2 : 22, py = v ? my + mh - 40 : H - ph - 22;
+    const pnl = A(e, px, py, pw, ph); css(pnl, { background: '#101118', borderRadius: '22px', boxShadow: '0 40px 90px -20px rgba(10,10,30,.55), 0 0 0 1px rgba(255,255,255,.06)', color: '#ececf3', overflow: 'hidden' });
+    const hd = A(pnl, 20, 16, pw - 40, 40); css(hd, { display: 'flex', alignItems: 'center', gap: '10px', fontSize: '20px', fontWeight: '600' });
+    hd.innerHTML = '<i style="width:9px;height:9px;border-radius:50%;background:#ff5a4f;display:block"></i><span style="flex:1">لوحة المقدّم</span><span style="display:inline-flex;align-items:center;gap:7px;padding:4px 12px;border-radius:99px;background:rgba(71,196,134,.14);color:#7fdcab;font-size:15px;font-weight:500">' + ico('lock', 16, 'currentColor', 2) + 'لا يراها الطلاب</span>';
+    const lab = A(pnl, 20, 64, pw - 40, 24); css(lab, { fontSize: '14px', color: '#8e8fa3', textAlign: 'center' }); lab.textContent = '● ما يراه الطلاب الآن';
+    const nw = pw - 40, nh = nw * 9 / 16, mini = lessonSlide(pnl, 20, 92, nw, nh, C);
+    const zr = A(mini.el, 0, 0, nw / 2, nh / 2); css(zr, { border: '3px solid #ffb54a', borderRadius: '4px', boxShadow: '0 0 0 999px rgba(0,0,0,.45)', boxSizing: 'border-box' });
+    const zl = A(zr, -3, -3, null, null); css(zl, { background: '#ffb54a', color: '#1a1206', fontSize: '13px', fontWeight: '700', padding: '1px 8px', borderRadius: '3px 0 6px 0', whiteSpace: 'nowrap' }); zl.textContent = 'يراها الطلاب ×٢';
+    const ny = 92 + nh + 14, nb = A(pnl, 20, ny, pw - 40, ph - ny - 84); css(nb, { background: '#171821', borderRadius: '16px', padding: '12px 16px', boxSizing: 'border-box', fontSize: '19px', lineHeight: '1.7' });
+    nb.innerHTML = '<div style="font-size:14px;color:#8e8fa3;font-weight:600">ملاحظاتك</div><div class="nt"></div>';
+    const nt = nb.querySelector('.nt'), NOTE = 'اسألهم: أيّ الصفات أصعب؟ ثم القرعة.';
+    const ft = A(pnl, 20, ph - 70, pw - 40, 52); css(ft, { display: 'flex', alignItems: 'center', gap: '8px' });
+    const tm = h('span', null, ft); css(tm, { display: 'inline-flex', alignItems: 'baseline', gap: '8px', padding: '8px 14px', borderRadius: '12px', background: '#171821', fontSize: '14px', color: '#8e8fa3' }); tm.innerHTML = 'بقي <b style="font-family:var(--mo-fd);font-size:22px;color:#ececf3;direction:ltr">٤:١٢</b>';
+    const tmb = tm.querySelector('b');
+    h('span', null, ft).style.flex = '1';
+    const tb = ['pen', 'zoomin', 'dice', 'trophy'].map(function (k) { const d = h('span', null, ft); css(d, { width: '46px', height: '46px', borderRadius: '12px', display: 'grid', placeItems: 'center', background: '#1d1e29', color: '#cfcfdb' }); d.innerHTML = ico(k, 22, 'currentColor', 2); return { e: d, k: k, on: null }; });
+    const nxt = h('span', null, ft); css(nxt, { display: 'inline-flex', alignItems: 'center', gap: '6px', height: '46px', padding: '0 16px', borderRadius: '12px', background: PAL.or, color: '#fff', fontSize: '17px', fontWeight: '600' }); nxt.textContent = 'التالي';
+    // التكبير حول السطر الثالث
+    const fx = 0.68, fy = (slide.rowY(2) + sh * 0.06) / sh, Z = 2;
+    if (b.win != null) sfx(b.win, 'whoosh', { d: 0.5, v: 0.25 });
+    if (b.pnl != null) { sfx(b.pnl, 'whoosh', { d: 0.6, v: 0.3 }); sfx(b.pnl + 0.3, 'pop', { p: 0.9, v: 0.3 }); }
+    if (b.note) for (let k = 0; k < 8; k++) sfx(b.note[0] + k * (b.note[1] - b.note[0]) / 8, 'tick', { p: 1.2 + (k % 3) * 0.08, v: 0.14 });
+    if (b.zoom != null) { sfx(b.zoom, 'pop', { p: 1.1, v: 0.3 }); sfx(b.zoom + 0.3, 'riser', { d: 0.5, v: 0.18 }); }
+    c.up = function (lt) {
+      const wIn = b.win != null ? E.o5(P(lt, b.win, 0.6)) : 1; T(win, { o: wIn, s: 0.96 + 0.04 * wIn });
+      const pIn = b.pnl != null ? E.spr(P(lt, b.pnl, 0.8)) : 0; T(pnl, { o: b.pnl != null ? P(lt, b.pnl, 0.2) : 0, y: (1 - pIn) * 70, s: 0.94 + 0.06 * pIn });
+      if (b.note) { const n = Math.round(NOTE.length * cl(P(lt, b.note[0], b.note[1] - b.note[0]))), s = NOTE.slice(0, n); if (nt._t !== s) { nt.textContent = s; nt._t = s; } }
+      const left = Math.max(0, 252 - Math.floor(Math.max(0, lt - (b.pnl || 0)))), ts = ar(Math.floor(left / 60) + ':' + ('0' + left % 60).slice(-2)); if (tmb._t !== ts) { tmb.textContent = ts; tmb._t = ts; }
+      // التكبير: في اللوحة إطار حول ما يراه الطلاب، وعندهم الشريحة مكبّرة
+      const zp = b.zoom != null ? E.io3(P(lt, b.zoom + 0.35, 0.7)) * (b.zout != null ? 1 - E.io3(P(lt, b.zout, 0.6)) : 1) : 0, z = 1 + (Z - 1) * zp;
+      const cx = Math.max(0.5 / Z, Math.min(1 - 0.5 / Z, fx)), cy = Math.max(0.5 / Z, Math.min(1 - 0.5 / Z, fy));
+      T(slide.inner, { s: z, x: (0.5 - cx) * sw * z * zp, y: (0.5 - cy) * sh * z * zp });
+      css(zr, { left: ((cx - 0.25) * nw) + 'px', top: ((cy - 0.25) * nh) + 'px' }); T(zr, { o: b.zoom != null ? io(lt, b.zoom, b.zout, 0.3, 0.3) : 0, s: 1.3 - 0.3 * E.o5(P(lt, b.zoom || 0, 0.5)) });
+      const zon = b.zoom != null && lt >= b.zoom && (b.zout == null || lt < b.zout);
+      tb.forEach(function (t) { const on = t.k === 'zoomin' && zon; if (t.on !== on) { css(t.e, on ? { background: 'rgba(240,140,58,.18)', color: '#ffb27a' } : { background: '#1d1e29', color: '#cfcfdb' }); t.on = on; } });
+    };
+    return c;
+  }
+
   function stdScene(d, opt, mkComp, beats, compAt) {
     return {
       d: d, tr: opt.tr, td: opt.td, ch: opt.ch,
@@ -1422,6 +1553,8 @@ const MO = (function () {
     stdScene(7.6, { tr: 'wipe', td: 0.8, ch: 'النشر', eb: 'النشر', ic: 'send', h: 'انشر _بضغطة_', sub: 'نصٌّ مصاحب يُكتب لك، ثم إلى قناتك… الآن أو في موعده', box: function (S, L) { return L.box; } }, function (S, o) { return cPublish(S, Object.assign(o, { side: !S.v, when: 'اليوم' })); }, { type: [0.9, 2.7], send: 3.35, msg: 4.25 }),
     stdScene(6.4, { tr: 'push', td: 0.6, ch: 'التقويم والمهام', eb: 'التقويم والمهام', ic: 'cal', h: 'كل موعد _في مكانه_', sub: 'منشوراتك ومهامك في تقويم واحد، بتذكير في وقته' }, cCal, { ev: 0.6, drag: 1.9, tasks: 3.3, rem: 4.7 }),
     stdScene(6.8, { tr: 'iris', td: 0.75, ch: 'الشرائح والعروض', eb: 'الشرائح والعروض', ic: 'slides', h: 'من درسٍ إلى _عرضٍ حيّ_', sub: 'انتقالات وحركة، وأسئلة ومؤقّت، وملاحظات للمقدّم' }, cSlides, { doc: 0.4, s1: 2.1, s2: 3.0, s3: 4.6, s4: 5.6 }),
+    stdScene(7.0, { tr: 'push', td: 0.6, ch: 'أدوات الدرس', eb: 'أدوات الدرس', ic: 'pen', h: 'الدرس _بين يديك_', sub: 'قلمٌ على الشريحة، وقرعةٌ بلا تكرار، ونقاطٌ للفرق' }, cLesson, { pen: 0.5, mark: 1.3, pick: 2.1, pickOut: 4.5, sc: 4.6, bump: 5.6 }),
+    stdScene(7.4, { tr: 'wipe', td: 0.8, ch: 'عرض المقدّم', eb: 'عرض المقدّم', ic: 'slides', h: 'يرون الشريحة… _ولوحتك لك_', sub: 'ملاحظاتك والمؤقّت والتكبير في لوحة عائمة لا تدخل في المشاركة' }, cPresenter, { win: 0.1, pnl: 0.9, note: [1.7, 3.2], zoom: 3.7 }),
     stdScene(6.4, { tr: 'wipe', td: 0.8, ch: 'المراجعة والفريق', eb: 'المراجعة والفريق', ic: 'users', h: 'رأيٌ _قبل النشر_', sub: 'تقييم فوري من المصمّم الذكي، وملاحظات مشرفك على التصميم نفسه' }, cReview, { rv: 0.6, cm: 3.0, req: 4.0 }),
     stdScene(6.6, { tr: 'push', td: 0.6, ch: 'التطبيق', eb: 'التطبيق', ic: 'phone', h: 'وفي _جيبك_ أيضًا', sub: 'ثبّته على هاتفك، وصمّم وانشر من أي مكان' }, cPhone, { plus: 1.0, sheet: 2.6, pub: 4.6 }),
     { d: 6.2, tr: 'iris', td: 0.7, ch: 'بالأرقام', build: function (S, root) {
@@ -1562,6 +1695,12 @@ const MO = (function () {
     slides: { title: 'الشرائح والعروض', ic: 'slides', col: '#2a2a3a', desc: 'من نص الدرس إلى شرائح بهويتك، بانتقالات وحركة وأدوات للعرض', where: 'صفحة البرنامج ← الشرائح',
       moves: [['من الدرس *إلى المخطط*', 'ألصق النص أو ارفع ملف الدرس'], ['شرائح *بهويتك*', 'يتحوّل المخطط إلى شرائح جاهزة'], ['انتقالات *وحركة*', '١٢ انتقالًا، وظهور تدريجي للعناصر'], ['اعرض *بثقة*', 'مؤقّت، وأسئلة، وملاحظات للمقدّم']],
       comp: cSlides, beats: function (m) { return { doc: m[0] + 0.6, s1: m[1] + 0.6, s2: m[2] + 0.5, s3: m[3] + 0.6, s4: m[3] + 3.0 }; } },
+    lesson: { title: 'أدوات الدرس', ic: 'pen', col: '#7a3e9d', desc: 'قلمٌ على الشريحة، وقرعة بلا تكرار، ونقاط للفرق تظهر لطلابك أثناء العرض', where: 'اعرض ← شريط الأدوات',
+      moves: [['اكتب *على الشريحة*', 'قلم، وتحديد، ومؤشّر أحمر تشير به'], ['قرعة *بلا تكرار*', 'بالأرقام أو بأسماء طلابك'], ['نقاط *الفرق*', 'أضف فريقاً، وسمّه، وزِد نقاطه بنقرة']],
+      comp: cLesson, beats: function (m) { return { pen: m[0] + 0.8, mark: m[0] + 2.2, pick: m[1] + 0.6, pickOut: m[2] + 0.2, sc: m[2] + 0.6, bump: m[2] + 2.2 }; } },
+    presenter: { title: 'عرض المقدّم', ic: 'slides', col: '#1f2a44', desc: 'درسك عن بُعد: يرى الطلاب الشريحة، وتبقى لك لوحة عائمة بملاحظاتك والمؤقّت والأدوات', where: 'المحرر ← عرض المقدّم',
+      moves: [['شارك *علامة التبويب*', 'يرى الطلاب الشريحة وحدها'], ['لوحتك *عائمة*', 'ملاحظاتك والمؤقّت والتالي، ولا يراها الطلاب'], ['كبّر *ما تشرحه*', 'انقر جزءاً من الشريحة فيكبر عندهم']],
+      comp: cPresenter, beats: function (m) { return { win: m[0] + 0.3, pnl: m[1] + 0.5, note: [m[1] + 1.4, m[1] + 3.2], zoom: m[2] + 0.8 }; } },
     mine: { title: 'تصاميمي والفريق', ic: 'users', col: '#b4451c', desc: 'كل ما صمّمته محفوظ، تشاركه للتعديل المشترك، وتطلب عليه مراجعة', where: 'القائمة ← تصاميمي',
       moves: [['تصاميمك *محفوظة*', 'كل تنزيل وحفظ في مكان واحد'], ['شارك *للتعديل*', 'رابط واحد، ويعدّل معك فريقك'], ['اطلب *مراجعة*', 'تقييم من المصمّم الذكي وملاحظات الإدارة'], ['تابع *الإشعارات*', 'تعليق، مهمة، نشر… كله في الجرس']],
       comp: cMine, beats: function (m) { return { share: m[1] + 0.9, rev: m[2] + 0.8, bell: m[3] + 0.9 }; } },

@@ -5,7 +5,7 @@ sys.path.insert(0, _R + '/v6')
 from t6 import setup, URL, OUT, THM
 from playwright.async_api import async_playwright
 APP = URL.replace('index.html', 'app.html')
-IDS = ['launch', 'home', 'gallery', 'editor', 'make', 'publish', 'cal', 'slides', 'mine', 'app', 'admin']
+IDS = ['launch', 'home', 'gallery', 'editor', 'make', 'publish', 'cal', 'slides', 'lesson', 'presenter', 'mine', 'app', 'admin']
 def ok(c, m): print(('✓ ' if c else '✗ ') + m); return c
 def clean(errs): return [e for e in errs if 'favicon' not in e and '404' not in e]
 async def start(pg, js):
@@ -91,7 +91,7 @@ async def main():
         await m.evaluate("DEMO.reset()"); await m.evaluate("DEMO.seed(%s)" % THM); await m.wait_for_timeout(300)
         await m.fill('#lg_id', 'admin'); await m.fill('#lg_pw', 'Admin#2026'); await m.click('.lgform button[type=submit]')
         await m.wait_for_selector('.mtab:not([hidden])', timeout=60000); await m.wait_for_timeout(1500)
-        ok(await m.evaluate("typeof playMotion==='function' && MOTION_CLIPS.length===11"), 'API available in the app')
+        ok(await m.evaluate("typeof playMotion==='function' && MOTION_CLIPS.length===13"), 'API available in the app')
         await start(m, "playMotion('launch',{intro:true})"); await m.wait_for_timeout(900)
         g = await m.evaluate("(function(){const f=document.querySelector('.mo-frame').getBoundingClientRect(), b=document.querySelector('.mo-bot').getBoundingClientRect(), s=document.querySelector('.mo-skip').getBoundingClientRect(), row=document.querySelector('.mo-row'); return [f.width,f.height,f.top,b.bottom,s.left,s.bottom, MO.current.tl.v, row.scrollWidth<=row.clientWidth+1, document.documentElement.scrollWidth];})()")
         ok(g[6] is True and g[0] <= 390 and g[1] <= 844 and g[3] <= 844 and g[4] >= 0 and g[7] and g[8] <= 390, 'app 390: portrait stage fits, controls in view, no overflow: %s' % g)

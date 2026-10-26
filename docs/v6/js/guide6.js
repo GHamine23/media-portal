@@ -5,10 +5,10 @@
 IC.guide = '<rect x="3" y="5" width="18" height="14" rx="3.5"/><path d="M10.2 9.4v5.2l4.4-2.6z"/>';
 IC.help = '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.4a2.6 2.6 0 0 1 5 .9c0 1.8-2.5 2.3-2.5 4"/><path d="M12 17.2v.3"/>';
 const GUIDE = { visit: 0, shown: false, prompt: null, promptId: '', playing: false, chat: [], panel: null, quietUntil: 0 };
-const G_ICON = { launch: 'sparkles', home: 'home', gallery: 'grid', editor: 'pencil', make: 'ai', publish: 'send', cal: 'cal', slides: 'slides', mine: 'heart', app: 'phone', admin: 'gear' };
+const G_ICON = { launch: 'sparkles', home: 'home', gallery: 'grid', editor: 'pencil', make: 'ai', publish: 'send', cal: 'cal', slides: 'slides', lesson: 'pen', presenter: 'slides', mine: 'heart', app: 'phone', admin: 'gear' };
 // ما يُعرض إن لم تصل وحدة الحركة بعد: الأقسام نفسها بالترتيب، بلا تشغيل
 const G_FALLBACK = [['launch', 'أثر في دقيقة', 'المنصة'], ['home', 'الرئيسية', 'الرئيسية'], ['gallery', 'القوالب والهويات', 'القوالب'], ['editor', 'المحرر', 'المحرر'], ['make', 'اصنع إعلانك', 'المصمّم الذكي'], ['publish', 'النشر إلى القناة', 'النشر'],
-  ['cal', 'التقويم والمهام', 'التقويم'], ['slides', 'الشرائح', 'الشرائح'], ['mine', 'تصاميمي', 'تصاميمي'], ['app', 'تطبيق الجوال', 'التطبيق'], ['admin', 'لوحة الإدارة', 'الإدارة', 1]];
+  ['cal', 'التقويم والمهام', 'التقويم'], ['slides', 'الشرائح', 'الشرائح'], ['lesson', 'أدوات الدرس', 'الشرائح'], ['presenter', 'عرض المقدّم', 'الشرائح'], ['mine', 'تصاميمي', 'تصاميمي'], ['app', 'تطبيق الجوال', 'التطبيق'], ['admin', 'لوحة الإدارة', 'الإدارة', 1]];
 const G_ROUTE = { home: '#/', gallery: '#/tpl', make: '#/make', cal: '#/cal', mine: '#/mine', admin: '#/admin' };
 // وجهة «اذهب إلى …» لكل مقدمة: route في بيانات المقاطع نمطٌ لمطابقة الصفحات (مثل ^/(s|p)/) وليس رابطاً، فلا يُستعمل رابطاً أبداً
 function gDest(c) {
