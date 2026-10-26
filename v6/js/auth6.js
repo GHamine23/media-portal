@@ -107,7 +107,7 @@ async function restore() {
   await loadBundle();
   splash('نصفّ القوالب صفّاً منتظماً…');
   setMotion((V6.me.prefs && V6.me.prefs.motion) || 'calm'); applyAccent();
-  buildTop(); loadNews();
+  buildTop(); if (!/^#\/stage/.test(location.hash)) loadNews();
   return true;
 }
 function isAdmin() { return V6.me && (V6.me.role === 'super' || V6.me.role === 'sup'); }

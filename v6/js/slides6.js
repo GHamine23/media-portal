@@ -108,7 +108,8 @@ function renderSlide(c, p, T, scale, collect) { const tpl = TEMPLATES.find(funct
 function reducedMotion() { return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }
 function isMedia(L) { return L && (L.t === 'video' || L.t === 'yt' || L.t === 'audio'); }
 
-function present6(fromView, startAt) {
+function present6(fromView, startAt, opts) {
+  opts = opts || {};
   if (!fromView) commitPage();
   const doc = ED.doc, pages = doc.pages, T = S.track, touch = matchMedia('(pointer: coarse)').matches;
   let i = startAt != null ? startAt : (fromView ? 0 : ED.cur), step = 0, timer = null, timerLeft = 0, notesOn = false, numBuf = '', wakeLock = null;
@@ -117,9 +118,11 @@ function present6(fromView, startAt) {
   const prog = el('div', { class: 'pprog' }, [el('i')]), blank = el('div', { class: 'pblank', hidden: true }), grid = el('div', { class: 'pgrid', hidden: true });
   stage.appendChild(media);
   const hint = touch ? 'اسحب للتنقل · المس الوسط للأزرار' : 'الأسهم أو النقر للتنقل · G الشرائح · N الملاحظات · T المؤقّت · P القلم · R القرعة · S النقاط · Esc للخروج';
-  const ov = el('div', { class: 'present6' + (touch ? ' touch' : ''), tabindex: '0' }, [stage, prog, blank, timerEl, notesEl, grid, bar, el('div', { class: 'phint', text: hint })]);
+  const FOL = opts.follower || '';   // نافذة العرض في «عرض المقدّم»: الشرائح وحدها، والأوامر من نافذة المقدّم
+  const ov = el('div', { class: 'present6' + (touch ? ' touch' : '') + (FOL ? ' follower' : ''), tabindex: '0' }, [stage, prog, blank, timerEl, notesEl, grid, bar, el('div', { class: 'phint', text: hint })]);
   let cur = null, chan = null, mediaSlide = -1, animTimers = [];
   try { chan = new BroadcastChannel('athar-present'); } catch (e) {}
+  let fch = null; try { if (FOL) fch = new BroadcastChannel('athar-stage-' + FOL); } catch (e) {}
   const later = function (fn, ms) { animTimers.push(setTimeout(fn, ms)); };
   function fitStage() {
     const sz = SIZES[pages[i].size || 'slide'], W = ov.clientWidth || innerWidth, H = ov.clientHeight || innerHeight, aw = W - (notesOn ? 320 : 0), r = Math.min(aw / sz.w, H / sz.h);
@@ -207,6 +210,7 @@ function present6(fromView, startAt) {
     prog.firstChild.style.width = ((i + 1) / pages.length * 100) + '%';
     notesEl.textContent = p.notes || 'لا ملاحظات لهذه الشريحة.';
     if (ov._lesson) ov._lesson.slide(i, p, step, q);
+    if (fch) { try { fch.postMessage({ t: 'state', i: i, step: step }); } catch (e) {} }
     if (chan) { try { const nx = pages[i + 1]; const c2 = document.createElement('canvas'); if (nx) renderSlide(c2, nx, T, 0.2); chan.postMessage({ i: i, n: pages.length, step: step, notes: p.notes || '', cur: c.toDataURL('image/jpeg', 0.6), next: nx ? c2.toDataURL('image/jpeg', 0.6) : '' }); } catch (e) {} }
   }
   /* ---------- الوسائط فوق مكانها: تبقى ما دامت الشريحة نفسها، وتُضاف عند ظهورها بنقرة ---------- */
@@ -288,7 +292,7 @@ function present6(fromView, startAt) {
     if (document.querySelector('.modal')) return;
     if (ov._lesson && ov._lesson.key(e)) { e.preventDefault(); return; }
     const k = e.key;
-    if (k === 'Escape') { if (!grid.hidden) { grid.hidden = true; return; } if (!blank.hidden) { hideBlank(); return; } close(); return; }
+    if (k === 'Escape') { if (!grid.hidden) { grid.hidden = true; return; } if (!blank.hidden) { hideBlank(); return; } if (FOL) { if (document.fullscreenElement) document.exitFullscreen().catch(function () {}); return; } close(); return; }
     if (/^[0-9٠-٩]$/.test(k)) { numBuf += String('٠١٢٣٤٥٦٧٨٩'.indexOf(k) >= 0 ? '٠١٢٣٤٥٦٧٨٩'.indexOf(k) : k); clearTimeout(key.t); key.t = setTimeout(function () { numBuf = ''; }, 1500); return; }
     if (k === 'Enter' && numBuf) { e.preventDefault(); goTo(+numBuf - 1); numBuf = ''; return; }
     if (k === 'ArrowLeft' || k === ' ' || k === 'PageDown' || k === 'Enter' || k === 'ArrowDown') { e.preventDefault(); next(); }
@@ -323,7 +327,7 @@ function present6(fromView, startAt) {
     el('button', { type: 'button', class: 'pb', title: 'كل الشرائح (G)', 'aria-label': 'كل الشرائح', onclick: toggleGrid }, [ico('grid')]),
     el('button', { type: 'button', class: 'pb', title: 'مؤقّت (T)', 'aria-label': 'مؤقّت', onclick: toggleTimer }, [ico('clock')]),
     el('button', { type: 'button', class: 'pb', title: 'الملاحظات (N)', 'aria-label': 'الملاحظات', onclick: toggleNotes }, [ico('content')]),
-    touch ? null : el('button', { type: 'button', class: 'pb', title: 'شاشة المقدّم في نافذة أخرى', 'aria-label': 'شاشة المقدّم', onclick: speakerWindow }, [ico('slides')]),
+    touch || FOL || typeof presenterMode !== 'function' ? null : el('button', { type: 'button', class: 'pb', title: 'عرض المقدّم: شارك الشرائح وحدها في لقاء عن بُعد، وأمامك الملاحظات والمؤقّت', 'aria-label': 'عرض المقدّم', onclick: function () { const at = i; close(); presenterMode(at, !!fromView); } }, [ico('slides')]),
     el('button', { type: 'button', class: 'pb', title: 'شاشة سوداء (B)', 'aria-label': 'شاشة سوداء', onclick: function () { toggleBlank('#000'); } }, [ico('eyeoff')]),
     el('span', { class: 'psep' }),
     el('button', { type: 'button', class: 'pb', title: 'خروج (Esc)', 'aria-label': 'خروج', onclick: function () { close(); } }, [ico('close')])
@@ -339,12 +343,12 @@ function present6(fromView, startAt) {
     if (tx == null) return; const t = e.changedTouches[0], dx = t.clientX - tx, dy = t.clientY - ty; tx = null;
     if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.3) { swiped = true; if (dx > 0) next(); else prev(); }
   }, { passive: true });
-  stage.addEventListener('click', function (e) { if (swiped) { swiped = false; return; } if (touch && Math.abs(e.clientX - innerWidth / 2) < innerWidth * 0.16) { wake(); return; } if (e.clientX < innerWidth / 2) next(); else prev(); });
+  stage.addEventListener('click', function (e) { if (FOL) return; if (swiped) { swiped = false; return; } if (touch && Math.abs(e.clientX - innerWidth / 2) < innerWidth * 0.16) { wake(); return; } if (e.clientX < innerWidth / 2) next(); else prev(); });
   blank.addEventListener('click', hideBlank);
   grid.addEventListener('click', function (e) { if (e.target === grid) { grid.hidden = true; ov.focus(); } });
   function close() {
     settle(); $$('.pmbox', media).forEach(function (x) { if (x._stop) x._stop(); }); if (ov._lesson) ov._lesson.close(); document.removeEventListener('keydown', key); window.removeEventListener('resize', onResize);
-    if (timer) clearInterval(timer); if (chan) chan.close(); ov.remove();
+    if (timer) clearInterval(timer); if (chan) chan.close(); if (fch) { try { fch.postMessage({ t: 'closed' }); fch.close(); } catch (e) {} } ov.remove();
     try { if (wakeLock) wakeLock.release(); } catch (e) {}
     try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
     if (document.fullscreenElement) document.exitFullscreen().catch(function () {});
@@ -352,7 +356,26 @@ function present6(fromView, startAt) {
   let rzT = 0; function onResize() { clearTimeout(rzT); rzT = setTimeout(function () { draw('still'); }, 120); }
   document.addEventListener('keydown', key); window.addEventListener('resize', onResize);
   document.body.appendChild(ov); draw('next'); ov.focus(); wake();
-  if (ov.requestFullscreen) ov.requestFullscreen().then(function () { if (touch && screen.orientation && screen.orientation.lock) return screen.orientation.lock('landscape'); }).catch(function () {});
+  if (fch) {
+    fch.onmessage = function (e) {
+      const m = e.data || {};
+      if (m.t === 'ping') { fch.postMessage({ t: 'pong' }); return; }
+      if (m.t === 'go') {
+        const ni = Math.max(0, Math.min(pages.length - 1, m.i | 0)), ns = Math.max(0, m.step | 0);
+        if (ni === i && ns === step) return;
+        const mode = ni === i ? (ns === step + 1 ? 'stepf' : ns < step ? 'stepb' : 'still') : (ni === i + 1 && !ns ? 'next' : ni < i ? 'prev' : 'next');
+        i = ni; step = ns; hideBlank(); if (!grid.hidden) grid.hidden = true; draw(mode); return;
+      }
+      if (m.t === 'blank') { if (!m.c) hideBlank(); else { blank.dataset.c = m.c; blank.hidden = false; } return; }
+      if (m.t === 'media') { const b = media.querySelector('.pmbox'); if (!b) return; const v = b.querySelector('video,audio'); const btn = b.querySelector('.pmyt,.pmaudio,.pmtap,.tlplay,button'); if (v && !btn) { if (v.paused) v.play().catch(function () {}); else v.pause(); } else if (btn) btn.click(); return; }
+      if (m.t === 'end') { close(); setTimeout(function () { try { window.close(); } catch (er) {} }, 150); return; }
+      if (ov._lesson && ov._lesson.cmd) ov._lesson.cmd(m);
+    };
+    fch.postMessage({ t: 'ready' });
+    // أول ثوانٍ: تنبيه صغير يختفي، يذكّر بأن هذه هي النافذة التي تُشارَك
+    const tip = el('div', { class: 'pstage-tip', text: 'هذه نافذة العرض: شاركها في لقائك. للتنقل استعمل نافذة المقدّم.' }); ov.appendChild(tip); setTimeout(function () { tip.remove(); }, 5000);
+  }
+  if (!FOL && ov.requestFullscreen) ov.requestFullscreen().then(function () { if (touch && screen.orientation && screen.orientation.lock) return screen.orientation.lock('landscape'); }).catch(function () {});
   try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wakeLock = w; }).catch(function () {}); } catch (e) {}
   // الجوال عمودياً: تلميح بإدارة الهاتف لعرض أكبر
   if (touch && innerHeight > innerWidth) { const rot = el('div', { class: 'prot', text: 'أدِر الهاتف أفقياً لعرض أكبر' }); ov.appendChild(rot); setTimeout(function () { rot.remove(); }, 3800); }

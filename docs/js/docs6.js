@@ -97,6 +97,7 @@ async function showPresent(id) {
   view(el('div', { class: 'wrap page pview' }, [
     el('div', { class: 'phead row wrapr' }, [el('div', {}, [el('span', { class: 'eyebrow', text: (doc.kind === 'deck' ? 'عرض' : 'تصميم') + ' من ' + item.owner }), H('h1', doc.name)]), el('span', { class: 'sp' }),
       doc.kind === 'deck' ? el('button', { type: 'button', class: 'btn dark', onclick: function () { ED.doc = doc; ED.cur = 0; S.tpl = TEMPLATES.find(function (t) { return t.id === doc.pages[0].tpl; }); present6(true); } }, [ico('play'), 'اعرض بملء الشاشة']) : null,
+      doc.kind === 'deck' && typeof presenterMode === 'function' && !matchMedia('(pointer: coarse)').matches ? el('button', { type: 'button', class: 'btn line', onclick: function () { ED.doc = doc; ED.cur = 0; S.tpl = TEMPLATES.find(function (t) { return t.id === doc.pages[0].tpl; }); presenterMode(0, true); } }, [ico('slides'), 'عرض المقدّم']) : null,
       canEdit ? el('a', { class: 'btn line', href: '#/d/' + item.id }, [ico('pencil'), item.mine ? 'افتحه في المحرر' : 'عدّل مع الفريق']) : el('a', { class: 'btn line', href: '#/d/' + item.id }, [ico('copy'), 'افتح نسخة لي'])]),
     el('div', { class: multiPage(doc) ? 'pvdeck' : 'pvone' }, cvs)
   ]));
@@ -168,6 +169,7 @@ function showEditor6(doc, fromDraft) {
     el('button', { type: 'button', class: 'ib', title: 'ملاحظة للفريق', 'aria-label': 'ملاحظة', onclick: function () { showFeedback6(); } }, [ico('chat')]),
     el('button', { type: 'button', class: 'btn line', id: 'e_save', onclick: function () { saveDialog(); } }, [ico('heart'), el('span', { class: 'hide-s', text: doc.id ? 'محفوظ' : 'حفظ' })]),
     doc.kind === 'deck' ? el('button', { type: 'button', class: 'btn e-present', id: 'e_present', title: 'اعرض بملء الشاشة (من الشريحة الحالية)', onclick: function () { present6(false, ED.cur); } }, [ico('play'), el('span', { text: 'اعرض' })]) : null,
+    doc.kind === 'deck' && typeof presenterMode === 'function' && !matchMedia('(pointer: coarse)').matches ? el('button', { type: 'button', class: 'btn line e-presenter', id: 'e_presenter', title: 'عرض المقدّم: شارك الشرائح وحدها في لقاء عن بُعد، وأمامك الملاحظات والمؤقّت والأدوات', onclick: function () { presenterMode(ED.cur, false); } }, [ico('slides'), el('span', { text: 'عرض المقدّم' })]) : null,
     el('button', { type: 'button', class: 'btn dark', id: 'e_dl', onclick: function (e) { dlMenu(e.currentTarget); } }, [ico('download'), el('span', { class: 'hide-s', text: 'تنزيل' })])
   ]);
   const rail = el('nav', { class: 'e-rail', 'aria-label': 'الأدوات', id: 'e_rail' });

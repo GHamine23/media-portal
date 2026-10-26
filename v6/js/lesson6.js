@@ -464,6 +464,16 @@ function lessonPresent(o) {
     return false;
   };
   api.close = function () { clearTimeout(resT); resOn = false; };
+  // أوامر نافذة المقدّم (عرض المقدّم): الكتابة والليزر والقرعة والنقاط وإجابات الطلاب
+  api.cmd = function (m) {
+    if (m.t === 'ink') { pen.strokes[m.i] = m.strokes || []; if (m.i === idx) render(); return; }
+    if (m.t === 'laser') { const now = performance.now(); pen.laser = (m.pts || []).map(function (q) { return [q[0], q[1], now - (q[2] || 0)]; }); render(); return; }
+    if (m.t === 'tool') { if (m.k === 'res') toggleRes(); else if (m.k === 'score') toggleScore(); return; }
+    if (m.t === 'pickopen') { if (!ov.querySelector('.ppick')) picker(); return; }
+    if (m.t === 'pickgo') { if (!ov.querySelector('.ppick')) picker(); const b = ov.querySelector('.ppick .pkgo'); if (b) b.click(); return; }
+    if (m.t === 'pickclose') { const x = ov.querySelector('.ppick'); if (x) x.remove(); return; }
+    if (m.t === 'teams') { lessonOf(doc).teams = m.teams || []; score.hidden = !m.show; if (m.show) fillScore(); btnScore.classList.toggle('on', !!m.show); return; }
+  };
   api.pen = pen;
   return api;
 }

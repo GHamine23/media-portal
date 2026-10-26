@@ -1979,6 +1979,98 @@ body.mapp .e-cropbar .crt { display: none; }
 .fqs{list-style:arabic-indic}
 .lkeys kbd{display:inline-block;unicode-bidi:isolate;font:600 11px/1 ui-monospace,monospace;padding:3px 6px;border-radius:6px;border:1px solid var(--line);background:var(--card);margin:0 2px}
 
+/* ===== presenter.css ===== */
+/* عرض المقدّم: نافذة المقدّم (داكنة، هادئة) ونافذة العرض */
+.pcon{position:fixed;inset:0;z-index:130;display:grid;grid-template-rows:auto minmax(0,1fr) auto;background:#101118;color:#e9e9f1;font-family:var(--fb);outline:none}
+.pcon button{font:inherit}
+.pc-top{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid #23242f}
+.pc-title{display:flex;align-items:center;gap:10px;min-width:0}
+.pc-title b{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:32vw}
+.pc-dot{width:9px;height:9px;border-radius:50%;background:#ff5a4f;box-shadow:0 0 0 4px rgba(255,90,79,.18);animation:pcdot 1.6s ease-in-out infinite}
+@keyframes pcdot{50%{opacity:.45}}
+.pc-status{font-size:12.5px;padding:4px 10px;border-radius:99px;background:#22232e;color:#b9b9c8;white-space:nowrap}
+.pc-status.ok{background:rgba(52,178,110,.16);color:#6fdc9f}
+.pc-status.off{background:rgba(255,90,79,.16);color:#ff8f87}
+.pc-reopen{background:#1e1f2a;color:#fff;border-color:#3a3b4a}
+.pc-tm{display:grid;line-height:1.15;text-align:center;padding:4px 12px;border-radius:12px;background:#191a23}
+.pc-tm small{font-size:11px;color:#8d8d9e}
+.pc-tm b{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.pc-tm.cd{display:none}.pc-tm.cd.on{display:grid}
+.pc-tm.cd.warn{background:rgba(240,140,0,.18)}.pc-tm.cd.warn b{color:#ffb54a}
+.pc-tm.cd.over{background:rgba(255,90,79,.2)}.pc-tm.cd.over b{color:#ff7d74}
+.pc-end{background:#2a1c20;color:#ff9d95;border:1px solid #4a2a30}
+.pc-end:hover{background:#3a2026}
+.pc-body{display:grid;grid-template-columns:168px minmax(0,1fr) minmax(300px,30%);gap:16px;padding:16px 18px;min-height:0}
+.pc-thumbs{display:grid;align-content:start;gap:10px;overflow-y:auto;padding:2px 4px 2px 2px;scrollbar-width:thin;scrollbar-color:#33343f transparent}
+.pc-t{position:relative;border:0;padding:0;border-radius:10px;background:#1b1c26;cursor:pointer;box-shadow:inset 0 0 0 1.5px #2a2b37;transition:box-shadow .2s}
+.pc-t canvas{display:block;width:100%!important;height:auto!important;border-radius:9px}
+.pc-t small{position:absolute;top:5px;inset-inline-start:6px;font-size:11px;background:rgba(16,17,24,.75);color:#ddd;border-radius:6px;padding:0 6px}
+.pc-t:hover{box-shadow:inset 0 0 0 1.5px #5a5b6b}
+.pc-t.on{box-shadow:0 0 0 2.5px #f08c3a}
+.pc-main{position:relative;display:grid;min-height:0}
+.pc-cur{position:relative;display:grid;place-items:center;min-height:0;background:#0b0c11;border-radius:16px;overflow:hidden}
+.pc-cur>.pc-cv,.pc-cur>.pc-ink{grid-area:1/1;border-radius:6px}
+.pc-cur>.pc-cv{box-shadow:0 20px 50px -20px rgba(0,0,0,.8)}
+.pc-ink{pointer-events:none;touch-action:none}
+.pc-ink.on{pointer-events:auto;cursor:crosshair}
+.pc-ink.on[data-tool=laser]{cursor:none}
+.pc-ink.on[data-tool=eraser]{cursor:cell}
+.pc-blank{position:absolute;top:12px;inset-inline-start:12px;background:rgba(0,0,0,.75);color:#fff;font-size:13px;padding:5px 12px;border-radius:99px;box-shadow:0 0 0 1px #444}
+.pc-penbar{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:99px;background:rgba(24,25,34,.92);box-shadow:0 10px 30px -8px rgba(0,0,0,.6)}
+.pc-penbar .pp{width:34px;height:34px;border:0;border-radius:50%;background:transparent;color:#ddd;display:grid;place-items:center;cursor:pointer}
+.pc-penbar .pp svg{width:18px;height:18px}
+.pc-penbar .pp.on{background:#f08c3a;color:#fff}
+.pcc{width:20px;height:20px;border-radius:50%;border:2px solid #2a2b36;cursor:pointer;padding:0}
+.pcc.on{border-color:#fff;transform:scale(1.15)}
+.pc-aside{display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:14px;min-height:0}
+.pc-next{display:grid;gap:6px;padding:12px;border-radius:16px;background:#191a23}
+.pc-next canvas{width:100%!important;height:auto!important;border-radius:8px;opacity:.92}
+.pc-nl{font-size:12.5px;color:#a3a3b4}
+.pc-h{font-size:12px;color:#8d8d9e;letter-spacing:.02em}
+.pc-notes{display:grid;grid-template-rows:auto minmax(0,1fr);gap:8px;padding:12px 14px;border-radius:16px;background:#191a23;min-height:0}
+.pc-nh{display:flex;align-items:center;gap:6px}
+.pcz{border:0;background:#24252f;color:#ddd;border-radius:8px;padding:2px 8px;cursor:pointer;font-size:13px}
+.pc-notes-t{overflow-y:auto;line-height:1.8;white-space:pre-wrap;color:#f2f2f7;scrollbar-width:thin;scrollbar-color:#33343f transparent}
+.pc-notes-t.empty{color:#6e6e80;font-size:15px!important}
+.pc-panel{display:grid;gap:10px;padding:12px 14px;border-radius:16px;background:#1d1e29;box-shadow:inset 0 0 0 1px #2c2d3a}
+.pc-panel .tiny{color:#9a9aab;margin:0}
+.pc-panel .ib{color:#ddd}
+.pc-go{justify-self:start}
+.pc-team{display:grid;grid-template-columns:10px minmax(0,1fr) auto 32px 32px;align-items:center;gap:8px}
+.pc-team i{width:10px;height:10px;border-radius:50%;background:var(--tc)}
+.pc-team b{font-size:18px;font-variant-numeric:tabular-nums;min-width:2ch;text-align:center}
+.pcs{width:32px;height:32px;border-radius:10px;border:0;background:#2a2b37;color:#fff;font-size:18px;cursor:pointer}
+.pcs.add{background:var(--tc)}
+.pcon .tog{color:#ccc}
+.pc-bar{display:flex;align-items:center;gap:6px;padding:10px 18px;border-top:1px solid #23242f;flex-wrap:wrap}
+.pcb{display:inline-flex;align-items:center;gap:7px;border:0;border-radius:12px;padding:9px 12px;background:#1b1c26;color:#e6e6ef;cursor:pointer;font-size:14px;transition:background .2s}
+.pcb svg{width:18px;height:18px}
+.pcb:hover{background:#262734}
+.pcb.on{background:#f08c3a;color:#fff}
+.pcb:disabled{opacity:.35;cursor:default}
+.pcb.nav{background:#262734;padding:10px 16px}
+.pcb.nextb{background:#f08c3a;color:#fff}
+.pcb.nextb svg{transform:scaleX(-1)}
+[dir=ltr] .pcb.prevb svg{transform:scaleX(-1)}[dir=ltr] .pcb.nextb svg{transform:none}
+.pc-count{font-size:15px;font-variant-numeric:tabular-nums;min-width:86px;text-align:center}
+.pc-sep{width:1px;height:26px;background:#2a2b37;margin-inline:4px}
+.pc-tip{font-size:12px;color:#8d8d9e;max-width:440px;line-height:1.5}
+.pcon :focus-visible{outline:2px solid #f08c3a;outline-offset:2px}
+@media (max-width:1180px){.pcb span{display:none}.pcb.nav span{display:inline}.pc-body{grid-template-columns:130px minmax(0,1fr) minmax(260px,32%)}.pc-tip{display:none}}
+body.pcon-open{overflow:hidden}
+/* زر «عرض المقدّم» في رأس المحرر: أيقونة وحدها في الشاشات الأضيق */
+@media (max-width:1500px){.e-presenter span{display:none}}
+/* نافذة العرض: الشرائح وحدها، بلا أزرار ولا مؤشر */
+body.stage6 #top,body.stage6 .gx-fab,body.stage6 #banner,body.stage6 .gx-intro{display:none!important}
+body.stage6{background:#000}
+.stage-bg{position:fixed;inset:0;background:#000}
+.stage-empty{color:#ccc;background:#000;min-height:100vh}
+.present6.follower .pbar,.present6.follower .phint,.present6.follower .ppen{display:none!important}
+.present6.follower{cursor:none}
+.pstage-tip{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);z-index:5;background:rgba(18,18,26,.82);color:#fff;font-size:14px;padding:8px 16px;border-radius:99px;pointer-events:none;animation:pstip 5s ease forwards}
+@keyframes pstip{0%,80%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.pc-dot{animation:none}.pstage-tip{animation:none}}
+
 /* ===== progmark.css ===== */
 /* شعار البرنامج المفتوح في الرئيسية: سطر واحد مكان التحية، الشعار يُكتب من اليمين ثم يظهر خط ذهبي والدفعة */
 .pmark { display: flex; align-items: center; gap: 14px; margin: 0; max-width: 100%; }
@@ -2302,29 +2394,30 @@ body.mapp .e-cropbar .crt { display: none; }
 <script src="js/core6.js?v=93c35b93f2"></script>
 <script src="js/freetpl6.js?v=f9b7e44ff1"></script>
 <script src="js/assets6.js?v=c17949e94a"></script>
-<script src="js/auth6.js?v=74a67932e5"></script>
+<script src="js/auth6.js?v=9c26490fdc"></script>
 <script src="js/home6.js?v=849f5f73ee"></script>
 <script src="js/sections6.js?v=798f2452b2"></script>
 <script src="js/updates6.js?v=1210eaa02d"></script>
 <script src="js/motion6.js?v=c3c5dbc6be"></script>
-<script src="js/kb6.js?v=1f7cd63469"></script>
+<script src="js/kb6.js?v=16c47e289a"></script>
 <script src="js/guide6.js?v=e56f204b50"></script>
 <script src="js/about6.js?v=79d95a379c"></script>
 <script src="js/editor6.js?v=002d51fc20"></script>
 <script src="js/panels6.js?v=40bf4adab7"></script>
-<script src="js/docs6.js?v=c69e1d4828"></script>
+<script src="js/docs6.js?v=baea6fea5b"></script>
 <script src="js/make6.js?v=a6b2855dcb"></script>
 <script src="js/caption6.js?v=ee66ba7087"></script>
 <script src="js/cal6.js?v=5d32d6c604"></script>
-<script src="js/slides6.js?v=cf22454e8d"></script>
+<script src="js/slides6.js?v=0992afe987"></script>
+<script src="js/presenter6.js?v=71ed1b4add"></script>
 <script src="js/tilawa6.js?v=908a88e136"></script>
-<script src="js/lesson6.js?v=f247e03cc9"></script>
+<script src="js/lesson6.js?v=ead838e32c"></script>
 <script src="js/extras6.js?v=1fd6891d43"></script>
 <script src="js/tips6.js?v=86b4f361a7"></script>
 <script src="js/social6.js?v=05c796e7ed"></script>
 <script src="js/mine6.js?v=bca6971598"></script>
 <script src="js/admin6.js?v=0b4e4c6d16"></script>
 <script src="js/pstats6.js?v=6e18786688"></script>
-<script src="js/app6.js?v=7513b74f80"></script>
+<script src="js/app6.js?v=49ca97ea05"></script>
 </body>
 </html>
