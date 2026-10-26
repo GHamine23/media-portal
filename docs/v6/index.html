@@ -1261,6 +1261,70 @@ a.chip,.chip{text-decoration:none}
 .linkbtn{color:var(--ac-ink)}
 .emowrap>textarea{width:100%!important;display:block}
 
+/* ===== about.css ===== */
+/* التعريف بأثر: نصف صفحة الدخول، وصفحة «تعرّف على أثر» */
+/* الفيلم صامتاً داخل الصفحة */
+.abfilm{position:relative;aspect-ratio:16/9;width:100%;border-radius:20px;overflow:hidden;background:#fff;box-shadow:0 1px 2px rgba(20,18,40,.06),0 24px 60px -26px rgba(20,18,40,.38);isolation:isolate}
+.abfilm-st{position:absolute;inset:0;overflow:hidden}
+.abfilm.fb{background:radial-gradient(120% 120% at 85% 0%,var(--ac3) 0%,var(--ac) 45%,var(--ac2) 100%)}
+.abfilm-play{position:absolute;inset-inline-start:14px;bottom:14px;z-index:2;display:flex;align-items:center;gap:10px;border:0;border-radius:99px;padding:7px 16px 7px 8px;background:rgba(18,16,34,.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#fff;cursor:pointer;font:inherit;text-align:start;transition:transform .35s var(--spring),background .25s}
+.abfilm-play:hover{background:rgba(18,16,34,.86);transform:translateY(-2px)}
+.abfilm-play:active{transform:scale(.97)}
+.abfilm-play:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.abfp-i{width:34px;height:34px;border-radius:50%;background:#fff;color:var(--ac);display:grid;place-items:center;flex:none}
+.abfp-i svg{width:44%;height:44%;fill:currentColor;transform:translateX(8%)}
+.abfp-t{display:grid;line-height:1.35}
+.abfp-t b{font-size:14px;font-weight:600}
+.abfp-t small{font-size:12px;opacity:.78}
+
+/* صفحة الدخول: النصف الآخر تعريف وفيلم بدل البطاقات الزخرفية */
+.login.withintro .lgside{display:grid;place-items:center;padding:48px max(28px,4vw);background:var(--ac-bg)}
+.lgintro{width:min(600px,100%);display:grid;gap:18px}
+.lgi-h{font-size:clamp(24px,2.6vw,32px);line-height:1.35;text-wrap:balance}
+.lgi-pts{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.lgi-pts li{display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;align-items:center;font-size:16px;line-height:1.7;color:var(--ink2)}
+.lgi-ic{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:#fff;color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-t)}
+.lgi-ic svg{width:18px;height:18px}
+.lgi-more{justify-self:start;display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--ac-ink);text-decoration:none;border-bottom:1.5px solid var(--ac-t2);padding-bottom:2px}
+.lgi-more:hover{border-color:var(--ac)}
+.lgi-more svg{width:16px;height:16px}
+@media (max-width:860px){
+  .login.withintro .lgside{display:grid;order:2;padding:36px 20px 48px}
+  .login.withintro .lgmain{order:1}
+}
+
+/* صفحة «تعرّف على أثر» */
+.abtop{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:18px}
+.abbrand-i{height:34px;display:block}
+.abpage .page{display:grid;gap:44px}
+.abpage.pub .page{padding-top:8px}
+.abhero{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.25fr);gap:clamp(24px,4vw,56px);align-items:center}
+.abh-tx{display:grid;gap:16px;min-width:0}
+.abh-tx h1{font-size:clamp(34px,4.4vw,52px)}
+.abh-tx .lead{font-size:18px;line-height:1.8;color:var(--ink2)}
+.abcta{gap:12px;align-items:center;margin-top:6px}
+.abh-film{min-width:0}
+.abgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+@media (max-width:980px){.abgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.abgrid{grid-template-columns:1fr}}
+.abcard{display:grid;gap:0;border:0;padding:0;background:#fff;border-radius:18px;overflow:hidden;cursor:pointer;text-align:start;font:inherit;color:inherit;box-shadow:0 1px 2px rgba(20,18,40,.05),inset 0 0 0 1px var(--line)}
+.abcard:focus-visible{outline:2px solid var(--ac);outline-offset:3px}
+.abc-th{position:relative;display:block;aspect-ratio:16/9;background:var(--ac-bg);overflow:hidden}
+.abc-th>.mo-pv{position:absolute;inset:0}
+.abcard:hover .gplay{transform:scale(1.08)}
+.abc-tx{display:grid;gap:2px;padding:14px 16px 16px}
+.abc-tx b{font-family:var(--fd);font-weight:600;font-size:17px;line-height:1.5}
+.abc-tx small{font-size:13px}
+.abguide{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:16px;align-items:center}
+.abguide h3{margin:0 0 2px}
+@media (max-width:860px){
+  .abhero{grid-template-columns:1fr}
+  .abh-film{order:-1}
+  .abguide{grid-template-columns:auto minmax(0,1fr)}
+  .abguide .btn{grid-column:1/-1;justify-self:start}
+}
+@media (prefers-reduced-motion:reduce){.abfilm-play,.abcard{transition:none}}
+
 /* ===== ai.css ===== */
 /* المصمّم الذكي: مراحل الانتظار، «فهم المساعد»، بطاقة الاقتراح بزر «عدّل»، وشارة «الأنسب» */
 .mkwait2{max-width:560px;margin:10px auto;padding:26px 28px;display:flex;flex-direction:column;gap:14px}
@@ -2006,6 +2070,40 @@ body.mapp .e-cropbar .crt { display: none; }
 .sectr:hover{border-color:var(--sc)}
 @media (max-width:640px){.secbar{display:flex;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px}.secb{flex:0 0 auto;padding:10px 12px}.secb .icon-tile{width:36px;height:36px}.secb-t small{display:none}}
 
+/* صفحة الأقسام: صف الأقسام ثم شبكة المسارات */
+.secpick{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:6px}
+.secp{position:relative;display:flex;align-items:center;gap:12px;padding:14px 16px;border:1.5px solid var(--line);border-radius:18px;background:var(--card);color:var(--ink1);cursor:pointer;font:inherit;text-align:start;transition:border-color .2s,background .2s,box-shadow .25s}
+.secp:hover{border-color:var(--sc)}
+.secp.on{border-color:var(--sc);background:var(--sct);box-shadow:0 10px 26px -18px var(--sc)}
+.secp .icon-tile{width:44px;height:44px}
+.secp-t b{display:block;font-size:16px;font-weight:700}
+.secp-t small{display:block;font-size:12.5px;color:var(--ink2);margin-top:1px}
+.secp.on .secp-t b{color:var(--sc)}
+.secgrid2{display:grid;gap:12px;margin-top:6px}
+.secdesc{margin:0}
+.secgh{font-size:15px;margin:8px 0 0;color:var(--ink2);font-weight:600}
+.secgrid2 .sectracks{grid-template-columns:repeat(var(--cols,4),minmax(0,1fr))}
+@media (max-width:980px){.secgrid2 .sectracks{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.secgrid2 .sectr{padding:12px 14px;font-size:15px}
+.secgrid2 .sectr img{height:38px;max-width:80px}
+@media (max-width:640px){.secpick{grid-template-columns:1fr;gap:8px}.secp{padding:11px 14px}.secgrid2 .sectracks{grid-template-columns:1fr;gap:8px}.secgrid2 .sectr img{height:32px}}
+
+.secpick3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:8px}
+.seccard3{display:grid;gap:10px;align-content:start;padding:24px;border-radius:24px;border:1.5px solid var(--line);background:linear-gradient(160deg,var(--sct),var(--card) 62%);color:var(--ink1);text-decoration:none}
+.seccard3:hover{border-color:var(--sc)}
+.seccard3 .icon-tile{width:56px;height:56px;border-radius:17px}
+.seccard3 b{font-size:21px;font-weight:700}
+.secback{display:inline-flex;align-items:center;gap:6px;color:var(--ink2);text-decoration:none;font-weight:600;font-size:14px;margin-bottom:6px}
+.secback svg{width:16px;height:16px;transform:scaleX(-1)}
+[dir=ltr] .secback svg{transform:none}
+.secback:hover{color:var(--sc)}
+.sechead2{display:flex;align-items:center;gap:16px;margin:4px 0 6px}
+.sechead2 .icon-tile{width:58px;height:58px;border-radius:18px}
+.sechead2 h1{margin:0;color:var(--sc)}
+.sechead2 p{margin:4px 0 0}
+.secstep{font-weight:700;margin:14px 0 0;color:var(--ink1)}
+@media (max-width:860px){.secpick3{grid-template-columns:1fr}}
+
 /* ===== slides.css ===== */
 /* ===== الشرائح: حركة العناصر، والانتقال بين الشرائح، والعرض الحي، ولوحة الحركة، وإعدادات الوسائط ===== */
 
@@ -2204,13 +2302,14 @@ body.mapp .e-cropbar .crt { display: none; }
 <script src="js/core6.js?v=93c35b93f2"></script>
 <script src="js/freetpl6.js?v=f9b7e44ff1"></script>
 <script src="js/assets6.js?v=c17949e94a"></script>
-<script src="js/auth6.js?v=86fffb5da1"></script>
+<script src="js/auth6.js?v=74a67932e5"></script>
 <script src="js/home6.js?v=849f5f73ee"></script>
-<script src="js/sections6.js?v=aef782e066"></script>
+<script src="js/sections6.js?v=798f2452b2"></script>
 <script src="js/updates6.js?v=1210eaa02d"></script>
 <script src="js/motion6.js?v=c3c5dbc6be"></script>
 <script src="js/kb6.js?v=1f7cd63469"></script>
-<script src="js/guide6.js?v=551abac012"></script>
+<script src="js/guide6.js?v=e56f204b50"></script>
+<script src="js/about6.js?v=79d95a379c"></script>
 <script src="js/editor6.js?v=002d51fc20"></script>
 <script src="js/panels6.js?v=40bf4adab7"></script>
 <script src="js/docs6.js?v=c69e1d4828"></script>
@@ -2226,6 +2325,6 @@ body.mapp .e-cropbar .crt { display: none; }
 <script src="js/mine6.js?v=bca6971598"></script>
 <script src="js/admin6.js?v=0b4e4c6d16"></script>
 <script src="js/pstats6.js?v=6e18786688"></script>
-<script src="js/app6.js?v=db2d15d0bd"></script>
+<script src="js/app6.js?v=7513b74f80"></script>
 </body>
 </html>

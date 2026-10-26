@@ -454,7 +454,8 @@ function guideMoreCard() {
   const pr = gProgress();
   return mCard('المساعدة', 'help', [
     mLine('دليل أثر', pr.seen ? 'شاهدت ' + gNum(pr.seen) + ' من ' + gNum(pr.total) + ' مقدمات' : 'مقدمات قصيرة لكل قسم', 'guide', null, { href: '#/guide' }),
-    mLine('اسأل أثر', 'سؤال عن أي شيء في التطبيق', 'help', function () { askAthar(); })
+    mLine('اسأل أثر', 'سؤال عن أي شيء في التطبيق', 'help', function () { askAthar(); }),
+    typeof showAbout6 === 'function' ? mLine('تعرّف على أثر', 'الفيلم ولمحات من كل قسم', 'film', null, { href: '#/about' }) : null
   ]);
 }
 // في نافذة «ما الجديد»: بطاقة الدليل في أعلاها

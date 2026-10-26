@@ -31,6 +31,7 @@ function plain(fn) { return function () { M.wrap = null; return fn.apply(null, a
 maybeTour = function () {};
 ROUTES.length = 0;
 route6(/^\/login$/, plain(function () { if (V6.token && V6.me && !V6.me.mustChange) return go('#/'); showLogin(); }), { public: true, page: 'login', noVT: true });
+route6(/^\/about$/, function () { if (V6.token && V6.me) { M.wrap = { title: 'تعرّف على أثر', back: '#/more', noTitle: true }; } else M.wrap = null; showAbout6(); }, { public: true, page: 'more', noVT: true });
 route6(/^\/password$/, mwrap('كلمة المرور', function () { showChangePw(false); }, { back: '#/more' }), { page: 'more', noVT: true });
 route6(/^\/$/, plain(mHome), { page: 'home', noVT: true });
 route6(/^\/tpl$/, plain(function () { mTemplates(); }), { page: 'tpl', noVT: true });

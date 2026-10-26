@@ -34,28 +34,48 @@ function secGo(s) {
   if (tr.length === 1) { go(s.href(tr[0].id)); return; }
   go('#/sections?s=' + s.id);
 }
-// صفحة الأقسام: لكل قسم بطاقته، وتحته مسارات البرنامج؛ اختر القسم ثم المسار
+// صفحة الأقسام بخطوتين: (١) الأقسام الثلاثة وحدها، (٢) صفحة القسم وفيها مساراته، فتختار المسار وتدخل
 function showSections6() {
-  const want = (location.hash.split('?s=')[1] || '').replace(/[^a-z]/g, '');
   const tracks = tracksOf(), list = secList();
-  document.title = 'الأقسام';
   if (!tracks.length) { go('#/'); return; }
-  const last = TRACKS[ls('lastTrack')] ? ls('lastTrack') : tracks[0].id;
-  view(el('div', { class: 'wrap page secpage' }, [
-    el('div', { class: 'phead' }, [el('span', { class: 'eyebrow', text: V6.prog ? V6.prog.name : '' }), H('h1', 'الأقسام'), el('p', { class: 'muted rv', text: 'اختر القسم، ثم المسار الذي تصمّم له.' })]),
-    el('div', { class: 'secgrid' }, list.map(function (s, i) {
-      const on = s.id === want;
-      return el('section', { class: 'seccard card rv sc-' + s.tone.slice(2) + (on ? ' on' : ''), id: 'sec-' + s.id, style: '--d:' + i }, [
-        el('div', { class: 'sechead' }, [el('span', { class: 'icon-tile ' + s.tone }, [ico(s.ic)]), el('div', {}, [el('h2', { text: s.name }), el('p', { class: 'muted small', text: s.desc })]), s.star ? el('span', { class: 'pill pu', text: 'مهم' }) : null]),
-        el('div', { class: 'sectracks' }, tracks.map(function (t) {
-          return el('a', { class: 'sectr hover-lift' + (t.id === last ? ' last' : ''), href: s.href(t.id), style: '--tc:' + t.c.p }, [
-            IMG[t.logo] ? el('img', { src: ASSETS[t.logo], alt: '' }) : el('i', { style: 'background:' + t.c.p }),
-            el('span', { text: t.full.replace('ـ', '') }), ico('chev')]);
-        }))
-      ]);
-    }))
+  const want = (location.hash.split('?s=')[1] || '').replace(/[^a-z]/g, '');
+  const cur = list.find(function (s) { return s.id === want; });
+  const P = V6.prog ? V6.prog.name : '';
+  if (!cur) {
+    document.title = 'الأقسام';
+    view(el('div', { class: 'wrap page secpage' }, [
+      el('div', { class: 'phead' }, [el('span', { class: 'eyebrow', text: P }), H('h1', 'الأقسام'), el('p', { class: 'muted rv', text: 'اختر القسم، ثم المسار.' })]),
+      el('div', { class: 'secpick3' }, list.map(function (s, i) {
+        return el('a', { class: 'seccard3 hover-lift rv sc-' + s.tone.slice(2), style: '--d:' + i, href: tracks.length === 1 ? s.href(tracks[0].id) : '#/sections?s=' + s.id, 'data-sec': s.id }, [
+          el('span', { class: 'icon-tile ' + s.tone }, [ico(s.ic)]),
+          el('b', { text: s.name }), el('span', { class: 'muted small', text: s.desc }),
+          el('span', { class: 'hsecmeta' }, [el('small', { text: secSub(s) }), s.star ? el('span', { class: 'pill pu', text: 'مهم' }) : null, ico('chev')])
+        ]);
+      }))
+    ]));
+    return;
+  }
+  document.title = cur.name;
+  const last = TRACKS[ls('lastTrack')] ? ls('lastTrack') : '';
+  const groups = [['track', 'المسارات'], ['act', 'الأنشطة والهويات']];
+  const known = tracks.every(function (t) { return groups.some(function (g) { return g[0] === t.group; }); });
+  const sets = known ? groups.map(function (g) { return [g[1], tracks.filter(function (t) { return t.group === g[0]; })]; }).filter(function (x) { return x[1].length; }) : [['', tracks]];
+  const body = [];
+  sets.forEach(function (g) {
+    if (g[0] && sets.length > 1) body.push(el('h3', { class: 'secgh', text: g[0] }));
+    const n = g[1].length, cols = n <= 5 ? Math.max(2, n) : [5, 4, 3].sort(function (a, b) { return ((a - n % a) % a) - ((b - n % b) % b) || b - a; })[0];   // أعمدة تمتلئ فلا تبقى بطاقة وحدها
+    body.push(el('div', { class: 'sectracks', style: '--cols:' + cols }, g[1].map(function (t, i) {
+      return el('a', { class: 'sectr hover-lift rv' + (t.id === last ? ' last' : ''), style: '--tc:' + t.c.p + ';--d:' + Math.min(i, 8), href: cur.href(t.id) }, [
+        IMG[t.logo] ? el('img', { src: ASSETS[t.logo], alt: '' }) : el('i', { style: 'background:' + t.c.p }),
+        el('span', { text: t.full.replace('ـ', '') }), ico('chev')]);
+    })));
+  });
+  view(el('div', { class: 'wrap page secpage sc-' + cur.tone.slice(2) }, [
+    el('a', { class: 'secback', href: '#/sections' }, [ico('chev'), el('span', { text: 'الأقسام' })]),
+    el('div', { class: 'sechead2' }, [el('span', { class: 'icon-tile ' + cur.tone }, [ico(cur.ic)]), el('div', {}, [H('h1', cur.name), el('p', { class: 'muted', text: cur.desc })])]),
+    el('p', { class: 'secstep', text: 'اختر المسار' }),
+    el('div', { class: 'secgrid2' }, body)
   ]));
-  if (want) setTimeout(function () { const x = $('#sec-' + want); if (x) x.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 250);
 }
 // الرئيسية: الأقسام في مكان بارز تحت الترحيب
 function homeSections() {

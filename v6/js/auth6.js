@@ -38,14 +38,14 @@ function showLogin() {
       modal({ title: 'نسيت كلمة المرور', body: [el('p', { class: 'muted', text: 'كلمات المرور محفوظة مشفّرة، فلا يمكن لأحد استرجاعها. اطلب من مشرف برنامجك كلمة مرور مؤقتة جديدة، ثم اختر كلمتك عند أول دخول.' })], acts: [{ t: 'فهمت', cls: 'dark' }] });
     } })
   ]);
-  view(el('section', { class: 'login' }, [
-    el('div', { class: 'lgside' }, [floatCards()]),
+  view(el('section', { class: 'login' + (typeof loginIntro === 'function' ? ' withintro' : '') }, [
+    el('div', { class: 'lgside' }, [typeof loginIntro === 'function' ? loginIntro() : floatCards()]),
     el('div', { class: 'lgmain' }, [
       el('div', { class: 'lglogo rv' }, [brandImg('b')]),
       H('h1', 'ادخل إلى منصتك', 'lgh'),
       el('p', { class: 'muted rv', style: '--d:2', text: 'قوالب بهوية برنامجك، ومحرر سهل، ومساعد يصمّم معك.' }),
       el('div', { class: 'card lgcard rv', style: '--d:3' }, [form]),
-      el('p', { class: 'tiny rv', style: '--d:4', text: 'لا يوجد تسجيل ذاتي. حسابك ينشئه مدير المنصة أو مشرف برنامجك.' })
+      el('p', { class: 'tiny rv', style: '--d:4', text: typeof ABOUT_TXT !== 'undefined' ? ABOUT_TXT.account : 'لا يوجد تسجيل ذاتي. حسابك ينشئه مدير المنصة أو مشرف برنامجك.' })
     ])
   ]));
   setTimeout(function () { idI.focus(); }, 300);
@@ -177,6 +177,7 @@ function buildTop() {
         { t: 'حسابي', ic: 'user', href: '#/account' },
         { t: 'أسبوعي في أثر', ic: 'chart', href: '#/week' },
         { t: 'مراجعاتي', ic: 'review', href: '#/reviews' },
+        typeof showAbout6 === 'function' ? { t: 'تعرّف على أثر', ic: 'film', href: '#/about' } : null,
         fbHidden ? { t: 'ملاحظة للفريق', ic: 'chat', fn: function () { showFeedback6(); } } : null,
         '-', { t: 'خروج', ic: 'logout', fn: logout }]).filter(Boolean));
   } });
