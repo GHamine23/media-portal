@@ -673,7 +673,7 @@ function endDrag(e, cancel) {
    مرة ثانية حتى ينتهي، ولو أُعيد رسم الصفحة في أثنائه. */
 const BUSY = new Map();
 const BUSY_LABEL = {
-  'share-on': 'يُنشئ…', 'share-off': 'يُوقف…', 'f-save': 'يحفظ…', 'f-save-next': 'يحفظ…', 'f-meet': 'يُنشئ الرابط…', 'f-meet-del': 'يُزيل…', 'tk-save': 'يحفظ…', 'tk-del': 'يحذف…', 'mb-save': 'يحفظ الفريق…',
+  'ann-save': 'يحفظ…',   'share-on': 'يُنشئ…', 'share-off': 'يُوقف…', 'f-save': 'يحفظ…', 'f-save-next': 'يحفظ…', 'f-meet': 'يُنشئ الرابط…', 'f-meet-del': 'يُزيل…', 'tk-save': 'يحفظ…', 'tk-del': 'يحذف…', 'mb-save': 'يحفظ الفريق…',
   'de-save': 'يحفظ…', 'ae-send': 'يُرسل…', 'bs-save': 'يحفظ…', 'bot-menu': 'يحدّث…', 'bot-test': 'يُرسل…', 'bot-now': 'يُرسل…', 'bot-token': 'يربط…',
   'mt-admins': 'يحفظ…', 'ac-save': 'يحفظ…', 'ac-del': 'يحذف…', 'acc-reset': 'يعيد التعيين…', 'pw-save': 'يغيّر…', 'si-check': 'يفحص…', 'si-save': 'يستورد…',
   'sn-save': 'يُنشئ…', semdel: 'يحذف…', grant: 'يفتح…', toggleedit: 'يحفظ…', 'bs-pause': 'يحفظ…', 'bs-atasks': 'يحفظ…', 'bot-unlink': 'يُلغي…'

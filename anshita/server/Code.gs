@@ -423,11 +423,11 @@ function boot(token) {
 }
 // أرقام الإصدارات فقط: تستعملها الواجهة لتعرف هل تغيّر شيء
 function revs(token) {
-  var a = auth_(token), p = props_(), o = {};
-  tracks_().forEach(function (t) { if (a.role === 'admin' || t.id === a.track) o[t.id] = +(p.getProperty('rev_' + t.id) || 0); });
-  o._log = +(p.getProperty('rev_log') || 0);
-  o._meta = +(p.getProperty('rev_meta') || 0);
-  if (a.role === 'admin') o._alerts = +(p.getProperty('rev_alerts') || 0);
+  var a = auth_(token), all = props_().getProperties(), o = {};   // قراءة واحدة لكل الخصائص بدل قراءة لكل مسار
+  tracks_().forEach(function (t) { if (a.role === 'admin' || t.id === a.track) o[t.id] = +(all['rev_' + t.id] || 0); });
+  o._log = +(all.rev_log || 0);
+  o._meta = +(all.rev_meta || 0);
+  if (a.role === 'admin') o._alerts = +(all.rev_alerts || 0);
   return JSON.stringify(o);
 }
 function plan(token, tid) { var a = auth_(token); canView_(a, tid); return JSON.stringify(plan_(tid)); }
@@ -1320,6 +1320,25 @@ function tgSend_(chatId, text, tid, html) {
     throw e;
   }
 }
+// صورة التصميم المرفوع في النشاط: رابط صورة مباشر، أو ملف درايف يصل إليه حساب الأنشطة
+function photoOf_(x) {
+  var L = String(x.link || '').trim(); if (!/^https?:\/\//i.test(L)) return null;
+  if (/\.(png|jpe?g|webp)(\?.*)?$/i.test(L)) return { url: L };
+  var m = /drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:.*&)?id=)([\w-]{20,})/.exec(L) || /docs\.google\.com\/uc\?(?:.*&)?id=([\w-]{20,})/.exec(L);
+  if (m) { try { var b = DriveApp.getFileById(m[1]).getBlob(); if (/^image\//.test(b.getContentType())) return { blob: b }; } catch (e) {} }
+  return null;
+}
+// يرسل صورة مع نص التذكير: النص تعليقًا إن قصر (حدّ تليجرام ١٠٢٤ حرفًا)، وإلا فالصورة ثم النص
+function tgPhoto_(chatId, ph, html, tid) {
+  var s0 = cfg_();
+  if (s0.groupsPaused && !(s0.adminChat && String(s0.adminChat.id) === String(chatId))) return { skipped: true };
+  var plain = String(html).replace(/<[^>]+>/g, ''), fits = plain.length <= 1000;
+  var cap = fits ? html : String(html).split('\n')[0];
+  var o = { chat_id: String(chatId), caption: cap, parse_mode: 'HTML' }; o.photo = ph.blob || ph.url;
+  try { tgCall_('sendPhoto', o); } catch (e) { return tgSend_(chatId, html, tid, true); }
+  if (!fits) return tgSend_(chatId, html, tid, true);
+  return { ok: true };
+}
 function migrateChat_(from, to) {
   withLock_(function () {
     var ts = tracks_(), ch = false;
@@ -1504,7 +1523,8 @@ function runReminders_(force) {
     queue.forEach(function (q) {
       var x = p.acts.filter(function (y) { return y.id === q[0]; })[0];
       var ct = q[1] === 'd3' || (q[1] === 'd1' && remCfg_(x).des) ? customTpl_(s, q[1]) : '';
-      try { if (ct) tgSend_(t.chat.id, remindText_(ct, x, t, q[2]), t.id); else tgSend_(t.chat.id, remindHtml_(q[1], x, t, q[2], p), t.id, true); done.push(q); sent++; }
+      var ph = q[1] !== 'd3' ? photoOf_(x) : null;
+      try { if (ct) tgSend_(t.chat.id, remindText_(ct, x, t, q[2]), t.id); else if (ph) tgPhoto_(t.chat.id, ph, remindHtml_(q[1], x, t, q[2], p), t.id); else tgSend_(t.chat.id, remindHtml_(q[1], x, t, q[2], p), t.id, true); done.push(q); sent++; }
       catch (e) { errs.push(t.name + ': ' + e.message); }
     });
     if (done.length) withLock_(function () {

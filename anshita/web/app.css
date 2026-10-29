@@ -946,3 +946,5 @@ html.net-busy body::before{content:'';position:fixed;top:0;inset-inline:0;height
 .rlw:not([open]) summary::before{transform:rotate(135deg)}
 .rlw .flist{padding:0 0 8px}
 .kpis{margin-bottom:18px}.kpis+.secgrid{margin-top:0}.secgrid+.card,.rnarr+.card{margin-top:18px}
+.anntxt{white-space:pre-wrap;font-family:var(--ft);font-size:15px;line-height:1.8;background:var(--sunken);border-radius:12px;padding:12px 14px;margin:4px 0 8px;color:var(--ink1)}
+.callout.ok{background:var(--ok-t)}.callout.ok svg{color:var(--ok)}

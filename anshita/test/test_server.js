@@ -31,6 +31,7 @@ GAS._fetch.handler = function (url, opt) {
     const m = url.split('/').pop(), p = opt.payload || {};
     if (url.indexOf('/botBAD') >= 0) return { code: 401, body: JSON.stringify({ ok: false, description: 'Unauthorized' }) };
     if (m === 'getMe') return { code: 200, body: JSON.stringify({ ok: true, result: { id: 9, username: 'anshita_bot', first_name: 'بوت الأنشطة' } }) };
+    if (m === 'sendPhoto') { TG.photos = (TG.photos || []).concat({ chat: String(p.chat_id), photo: typeof p.photo === 'string' ? p.photo : 'blob', caption: p.caption }); return { code: 200, body: '{"ok":true,"result":{"message_id":1}}' }; }
     if (m === 'editMessageText') { TG.edits = (TG.edits || []).concat({ chat: String(p.chat_id), id: p.message_id, text: p.text }); return { code: 200, body: '{"ok":true,"result":true}' }; }
     if (m === 'answerCallbackQuery') { TG.answers = (TG.answers || []).concat(p.text); return { code: 200, body: '{"ok":true,"result":true}' }; }
     if (m === 'deleteWebhook' || m === 'setMyCommands') return { code: 200, body: '{"ok":true,"result":true}' };
@@ -374,6 +375,12 @@ ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.te
   n = at(16, 20, 30); ok(of('لقاء الختام', n).length === 1 && /21:30/.test(of('لقاء الختام', n)[0].text) && !of('مسابقة سريعة', n).length, 'يوم الموعد قبله بساعة: ' + ((of('لقاء الختام', n)[0] || {}).text || '').split('\n')[0]);
   n = at(16, 21, 30); ok(!of('لقاء الختام', n).length, 'لا تكرار ليوم الموعد');
   ok(!ctx.weekTasks_(ctx.trackOf_('judhoor'), ctx.plan_('judhoor'), '2026-12-12', ctx.cfg_()).some(x => x.ref === B1.id && x.k === 'design'), 'لا مهمة تصميم لنشاط لا يحتاجه');
+  // التصميم المرفوع يُرفق صورةً مع التذكير
+  const C1 = call('act_save', AT, 'judhoor', JSON.stringify({ title: 'لقاء بتصميم', type: 'لقاء', d: '2026-12-19', time: '20:00', link: 'https://example.org/ad.png', rp: { des: true } })).act;
+  const p0 = (TG.photos || []).length; at(18, 19);
+  const ph = (TG.photos || []).slice(p0).find(x => /لقاء بتصميم/.test(x.caption || ''));
+  ok(ph && ph.photo === 'https://example.org/ad.png' && /نشر الإعلان/.test(ph.caption), 'تذكير النشر يُرسل صورة التصميم مع النص');
+  call('act_del', AT, 'judhoor', C1.id);
   call('act_del', AT, 'judhoor', A1.id); call('act_del', AT, 'judhoor', B1.id);
 }
 

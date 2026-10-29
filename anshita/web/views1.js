@@ -107,7 +107,7 @@ function wtRow(id, x) {
   const ic = svg(WT_IC[x.k] || 'check');
   const when = x.d ? `<span class="xs ${x.late ? 'late' : 'faint'}">${x.d === TODAY ? 'اليوم' : gDay(x.d)}</span>` : '';
   if (x.k === 'task') return `<div class="wt-row task"><button class="ck round" type="button" role="checkbox" aria-checked="false" data-act="tk-done" data-id="${x.ref}" data-track="${id}" aria-label="تم">${svg('check', 2.4)}</button><button class="tx lk-plain" type="button" data-act="tk-edit" data-id="${x.ref}" data-track="${id}"><span>${esc(x.text)}</span>${when}</button></div>`;
-  const act = x.ref ? `data-act="openact" data-id="${x.ref}" data-track="${id}"` : x.k === 'kahoot' && x.sug ? `data-act="newact" data-track="${id}" data-date="${x.sug.d}" data-type="كاهوت" data-title="${esc(x.sug.title)}"` : x.k === 'next' ? `data-act="newact" data-track="${id}" data-date="${add(x.d, 1)}"` : `data-act="go" data-v="t/${id}"`;
+  const act = x.ref && (x.k === 'design' || x.k === 'publish') ? `data-act="designact" data-id="${x.ref}" data-track="${id}" data-k="${x.k}"` : x.ref ? `data-act="openact" data-id="${x.ref}" data-track="${id}"` : x.k === 'kahoot' && x.sug ? `data-act="newact" data-track="${id}" data-date="${x.sug.d}" data-type="كاهوت" data-title="${esc(x.sug.title)}"` : x.k === 'next' ? `data-act="newact" data-track="${id}" data-date="${add(x.d, 1)}"` : `data-act="go" data-v="t/${id}"`;
   return `<button class="wt-row k-${x.k}" type="button" ${act}><span class="ic">${ic}</span><span class="tx"><span>${esc(x.text)}</span>${when}</span></button>`;
 }
 function weekTasksCard(id, ws, o = {}) {
@@ -593,7 +593,8 @@ function readiness(id, a) {
 function fRow(id, a, mode) {
   const marks = mode === 'week' ? readiness(id, a).map(([k, l]) => `<span class="rd ${k}">${svg(k === 'ok' ? 'check' : 'alert')}${esc(l)}</span>`).join('') : '';
   const note = mode === 'done' ? (a.note ? `<p class="fnote">${esc(a.note)}</p>` : `<p class="fnote faint">لا ملاحظة عن التنفيذ بعد.</p>`) : '';
-  const act = mode === 'late' || mode === 'week' ? `<button class="btn sm ${mode === 'late' ? 'pri' : ''}" type="button" data-act="done" data-id="${a.id}" data-track="${id}">${svg('check')}تم</button>` : (a.link ? `<a class="btn icon sm" href="${esc(a.link)}" target="_blank" rel="noopener" aria-label="الرابط" data-tip="الرابط">${svg('ext')}</a>` : '');
+  const needDes = mode === 'week' && remindable(a) && remCfg(a).des && !a.link;
+  const act = mode === 'late' || mode === 'week' ? `${needDes ? `<button class="btn sm" type="button" data-act="designact" data-id="${a.id}" data-track="${id}" data-k="design">${svg('edit')}التصميم</button>` : ''}<button class="btn sm ${mode === 'late' ? 'pri' : ''}" type="button" data-act="done" data-id="${a.id}" data-track="${id}">${svg('check')}تم</button>` : (a.link ? `<a class="btn icon sm" href="${esc(a.link)}" target="_blank" rel="noopener" aria-label="الرابط" data-tip="الرابط">${svg('ext')}</a>` : '');
   return `<div class="frow ${mode}">${tile(a.type)}<button class="tx lk-plain" type="button" data-act="openact" data-id="${a.id}" data-track="${id}"><b>${esc(a.title)}</b><span class="xs faint">${gDay(a.d)}${a.time ? ' · ' + timeText(a.time) : ''}${(a.who || []).length && mode !== 'week' ? ' · ' + esc(a.who.join('، ')) : ''}${mode === 'late' ? ' · ' + rel(a.d) : ''}</span>${marks ? `<span class="rds">${marks}</span>` : ''}${note}</button><div class="fact-a">${act}</div></div>`;
 }
 function followSec(id, n) {

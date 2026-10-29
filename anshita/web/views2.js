@@ -79,7 +79,7 @@ function actParts() {
   const follow = !F.isNew ? `<div class="sep" style="margin:4px 0"></div><b style="font-family:var(--fd);font-weight:500;font-size:17px;color:var(--ink)">المتابعة</b>
     <div class="opt" style="border-top:0;padding-top:0"><button class="ck round ok" type="button" role="checkbox" aria-checked="${!!F.done}" data-act="f-done" aria-label="تم التنفيذ">${svg('check', 2.4)}</button><div class="tx"><b>تم التنفيذ</b><span>يُعلَّم بعد إقامة النشاط</span></div></div>
     <div class="field"><label for="f-note">ملاحظة بعد التنفيذ</label><textarea class="inp" id="f-note" rows="2" placeholder="كم حضر؟ ما الذي نجح وما الذي يُحسَّن؟">${esc(F.note || '')}</textarea></div>
-    <div class="field"><label for="f-link">رابط (الإعلان، التصميم، ورقة الفعالية)</label><div class="row" style="gap:6px"><input class="inp ltr" style="text-align:left;display:block;flex:1" id="f-link" type="url" inputmode="url" value="${esc(F.link || '')}" placeholder="https://">${/^https?:\/\//i.test(F.link || '') ? `<a class="btn icon" href="${esc(F.link)}" target="_blank" rel="noopener" aria-label="افتح الرابط" data-tip="افتح الرابط">${svg('ext')}</a>` : ''}</div></div>` : '';
+    <div class="field"><label for="f-link">رابط (الإعلان، التصميم، ورقة الفعالية)${remCfg(F).des ? ` <button class="lk xs" type="button" data-act="designact" data-id="${F.id}" data-track="${F.tid}" data-k="design">صمّمه في أثر</button>` : ''}</label><div class="row" style="gap:6px"><input class="inp ltr" style="text-align:left;display:block;flex:1" id="f-link" type="url" inputmode="url" value="${esc(F.link || '')}" placeholder="https://">${/^https?:\/\//i.test(F.link || '') ? `<a class="btn icon" href="${esc(F.link)}" target="_blank" rel="noopener" aria-label="افتح الرابط" data-tip="افتح الرابط">${svg('ext')}</a>` : ''}</div></div>` : '';
   let body;
   if (ro) {
     body = `${ctx}${clash}<div class="row" style="gap:8px">${tile(F.type)}<b>${esc(F.type)}</b>${F.time ? `<span class="pill">${svg('clock')}${timeText(F.time)}</span>` : ''}</div>
@@ -209,6 +209,27 @@ async function saveF(scope) {
     toast((f.isNew ? `أُضيف ${qt(patch.title)}` : scope === 'next' ? `حُفظ لهذا الموعد وما بعده` : 'حُفظ') + (cl.length ? ` — تنبيه: ${clashText(cl.concat(qt(patch.title)))}` : '') + (!isAdmin() && !f.isNew && mode !== 'ro' ? '. وصل الإدارةَ تنبيه بالتغيير' : ''));
     if (newNames.length && canEdit(tid)) trackSave(tid, { members: members(tid).concat(newNames) }).catch(() => {});
   } catch (e) {}
+}
+
+/* ---------- تصميم الإعلان ونشره: من مهمة «تصميم إعلان» أو «نشر إعلان» ----------
+   يفتح نافذة الإعلان (لا نافذة التحرير): بياناته جاهزة للنسخ، وزر إلى المصمّم الذكي في أثر بهوية المسار، وخانة رابط التصميم */
+const ATAR_URL = 'https://ghamine23.github.io/media-portal/';
+const atarTid = id => /^ithmar/.test(id) ? 'ithmar' : id;
+function annText(tid, a) {
+  const who = (a.who || []).map(w => 'أ. ' + w.replace(/^أ\.\s*/, ''));
+  return [`${a.type === 'لقاء' ? 'لقاء' : a.type} بعنوان ${qt(a.title)}`, who.length ? 'يقدّمه: ' + who.join(' و') : '', `يوم ${DAYS[wd(a.d)]} ${dnum(a.d)} ${mon(a.d)} ${a.d.slice(0, 4)}م، الموافق ${hijri(a.d)}`, a.time ? 'الساعة ' + timeText(a.time) : '', a.idea ? a.idea : ''].filter(Boolean).join('\n');
+}
+function designDialog(tid, id, kind) {
+  const a = planOf(tid).acts.find(x => x.id === id); if (!a) return toast('النشاط غير موجود', 'err');
+  const txt = annText(tid, a), at = atarTid(tid), make = ATAR_URL + '#/make?tid=' + at + '&new=1', gal = ATAR_URL + '#/g/' + at, pub = kind === 'publish';
+  openDialog(`<h3>${pub ? 'نشر إعلان' : 'تصميم إعلان'} ${esc(qt(a.title))}</h3>
+    <p class="muted sm" style="margin-top:-6px">${gDay(a.d)}${a.time ? ' · ' + timeText(a.time) : ''}${(a.who || []).length ? ' · ' + esc(a.who.join('، ')) : ''}</p>
+    <div class="field"><span class="flabel">بيانات الإعلان</span><pre class="anntxt">${esc(txt)}</pre><div class="row" style="gap:6px"><button class="btn sm" type="button" data-act="copy" data-v="${esc(txt)}">${svg('copy')}انسخها</button></div></div>
+    ${pub ? (a.link ? `<div class="callout ok" role="status">${svg('check')}<div><b>التصميم جاهز</b><span>افتحه وانشره مع البيانات أعلاه في القناة ومجموعات الطلاب. وسيُرفق مع تذكير النشر في مجموعة الفريق.</span></div></div><div class="row"><a class="btn pri" href="${esc(a.link)}" target="_blank" rel="noopener">${svg('ext')}افتح التصميم</a></div>` : `<div class="callout warn" role="status">${svg('alert')}<div><b>لم يُرفع رابط التصميم بعد</b><span>صمّموه أولًا ثم ضعوا رابطه هنا.</span></div></div>`) : ''}
+    ${!pub || !a.link ? `<div class="row" style="flex-wrap:wrap;gap:8px"><a class="btn pri" href="${make}" target="_blank" rel="noopener" data-act="ann-go" data-v="${esc(txt)}">${svg('ext')}صمّمه في أثر</a><a class="btn" href="${gal}" target="_blank" rel="noopener">قوالب ${esc(T(tid).name)}</a></div>
+    <p class="hint">«صمّمه في أثر» يفتح المصمّم الذكي بهوية المسار، وننسخ لك بيانات الإعلان فتلصقها في خانة الفكرة.</p>` : ''}
+    <div class="field"><label for="ann-link">رابط التصميم</label><input class="inp ltr" id="ann-link" style="text-align:left" type="url" inputmode="url" value="${esc(a.link || '')}" placeholder="https://"><span class="hint">صورة مباشرة أو ملف في درايف، فيُرفق صورةً مع تذكير النشر.</span></div>
+    <div class="row"><button class="btn pri" type="button" data-act="ann-save" data-id="${id}" data-track="${tid}">احفظ الرابط</button><button class="btn" type="button" data-act="close">إغلاق</button><span class="sp"></span><button class="lk" type="button" data-act="openact" data-id="${id}" data-track="${tid}">النشاط كاملًا</button></div>`);
 }
 
 /* ---------- المهام ---------- */
@@ -647,6 +668,9 @@ const H = {
   'tk-save': () => { readTK(); if (!TK.title.trim()) { toast('اكتب المهمة', 'err'); return; } const k = TK, patch = { title: k.title.trim(), d: k.d || '', who: k.who || [] }; if (!k.isNew) Object.assign(patch, { id: k.id, done: !!k.done }); return saveTask(k.tid, patch).then(r => { if (TK === k) closeLayer(); toast(k.isNew ? 'أُضيفت المهمة' : 'حُفظت المهمة'); }).catch(() => {}); },
   'tk-del': async el => { if (!armed(el, 'تأكيد الحذف')) return; const k = TK; closeLayer(); const p = planOf(k.tid), i = p.tasks.findIndex(x => x.id === k.id), prev = p.tasks[i]; p.tasks.splice(i, 1); render(); try { const r = await API.me('task_del', k.tid, k.id); p.rev = r.rev; D.revs[k.tid] = r.rev; toast('حُذفت المهمة'); } catch (e) { p.tasks.splice(i, 0, prev); render(); toast(e.message, 'err'); } },
   pdf: el => printPlan(planDocOf(el.dataset.id, el.dataset.n)),
+  designact: el => designDialog(el.dataset.track, el.dataset.id, el.dataset.k),
+  'ann-go': el => { try { navigator.clipboard.writeText(el.dataset.v).then(() => toast('نُسخت بيانات الإعلان: الصقها في خانة الفكرة في أثر')); } catch (e) {} },
+  'ann-save': async el => { const tid = el.dataset.track, id = el.dataset.id, v = ($('#ann-link').value || '').trim(); if (v && !/^https?:\/\//i.test(v)) { toast('الرابط يبدأ بـ https://', 'err'); return; } try { await saveAct(tid, { id, link: v }); closeLayer(); toast(v ? 'حُفظ رابط التصميم' : 'أُزيل الرابط'); } catch (e) {} },
   'pub-print': () => printPlan(pubDocData()),
   share: el => shareDialog(el.dataset.id),
   'share-on': async el => { const id = el.dataset.id; try { const r = await API.me('share_set', id, true); T(id).share = r.share; shareDialog(id); toast('أُنشئ رابط الخطة'); } catch (e) { toast(e.message, 'err'); } },
