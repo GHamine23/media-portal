@@ -36,6 +36,7 @@ var DEFAULTS = {
   digest: { on: true, dow: 0, hour: 9 },  // الملخص الأسبوعي للمجموعات: dow بترتيب المنصة (٠ = السبت)
   adminDigest: true,                   // ملخص الإدارة الأسبوعي (إن رُبطت محادثة للإدارة)
   notifyChanges: true,                 // تنبيه المجموعة إذا نُقل لقاء قريب أو أُلغي
+  groupsPaused: false,                 // إيقاف مؤقت لكل ما يرسله البوت في المجموعات (يبقى الخاص مع الإدارة)
   durMin: 60,                          // مدة الحدث في التقويم إن لم تُحدَّد
   calId: '',                           // فارغ = التقويم الأساسي لصاحب السكربت
   tpl: {
@@ -58,7 +59,8 @@ function apiFns_() {
     tg_check: tg_check, edit_request: edit_request,
     ui_fonts: ui_fonts, ui_font_get: ui_font_get, font_put: font_put,
     report_key: report_key, report_data: report_data, report_send: report_send, report_list: report_list,
-    alerts: alerts, alerts_seen: alerts_seen, meet_create: meet_create, meet_unlink: meet_unlink
+    alerts: alerts, alerts_seen: alerts_seen, meet_create: meet_create, meet_unlink: meet_unlink,
+    login_atar: login_atar, atar_links: atar_links, atar_link: atar_link, atar_unlink: atar_unlink
   };
 }
 function doPost(e) {
@@ -209,8 +211,8 @@ function tempPass_() {
 }
 function norm_(s) { return String(s || '').trim().toLowerCase(); }
 function accs_() { return readJson_('accounts.json', {}); }
-function pubAcc_(a) { return { uid: a.uid, user: a.user, name: a.name, role: a.role, track: a.track || '', created: a.created || 0, last: a.last || 0, disabled: !!a.disabled }; }
-function meOf_(a) { return { uid: a.uid, user: a.user, name: a.name, role: a.role, track: a.track || '' }; }
+function pubAcc_(a) { return { uid: a.uid, user: a.user, name: a.name, role: a.role, track: a.track || '', created: a.created || 0, last: a.last || 0, disabled: !!a.disabled, atar: a.atar || '' }; }
+function meOf_(a) { return { uid: a.uid, user: a.user, name: a.name, role: a.role, track: a.track || '', atar: !!a.atar }; }
 function auth_(token) {
   var p = String(token || '').split('|');
   if (p.length !== 4 || sign_(p.slice(0, 3).join('|')) !== p[3]) throw err_('ادخل أولاً', 'auth');
@@ -237,7 +239,7 @@ function login(user, pw) {
   return withLock_(function () {
     var all = accs_(), a = null;
     Object.keys(all).forEach(function (k) { if (norm_(all[k].user) === user) a = all[k]; });
-    if (!a) throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة');
+    if (!a || a.atar) throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة');
     if (a.disabled) throw new Error('هذا الحساب موقوف');
     if (a.lockUntil && a.lockUntil > now_()) throw new Error('محاولات كثيرة، حاول بعد دقائق');
     if (pwHash_(a.salt, pw, a.it) !== a.hash) {
@@ -251,6 +253,70 @@ function login(user, pw) {
     writeJson_('accounts.json', all);
     return JSON.stringify({ token: mkToken_(a), me: meOf_(a) });
   });
+}
+/* ================= الدخول بحساب أثر =================
+   الواجهة تدخل إلى أثر مباشرة (auth_login) ثم ترسل رمز أثر هنا، فنتحقق منه عند خادم أثر (auth_me) ونفتح حساب ظلٍّ:
+   المدير العام في أثر = الإدارة، والحساب المربوط بمسار (atar_links.json: {atarUid: {track, name, username, at}}) = فريق ذلك المسار.
+   سنابل خارج الربط بأثر، وحسابات المنصة القديمة تبقى تعمل حتى توقفها الإدارة. */
+var ATAR_API = 'https://script.google.com/macros/s/AKfycbzBUiyrhbixemmecyGrcGfhWQhmUq-i7ZGKi9fgpg8OlMBJKLDkQLVbndTk5kZsakl4/exec';
+var ATAR_TRACK = { judhoor: 'judhoor', budhoor: 'budhoor', ishraq: 'ishraq', ithmar2: 'ithmar', ithmar3: 'ithmar' };
+function atarCall_(fn, args) {
+  var r = UrlFetchApp.fetch(ATAR_API, { method: 'post', contentType: 'text/plain', payload: JSON.stringify({ fn: fn, args: args || [] }), followRedirects: true, muteHttpExceptions: true }), j = null;
+  try { j = JSON.parse(r.getContentText()); } catch (e) { throw new Error('تعذّر الاتصال بأثر، حاول بعد قليل'); }
+  if (j.error) throw new Error(j.error);
+  var v = j.result; if (typeof v !== 'string') return v;
+  try { return JSON.parse(v); } catch (e) { return v; }
+}
+function atarTrackOf_(me, links) {
+  var l = links[me.uid];
+  if (l && ATAR_TRACK[l.track]) return l.track;
+  // ربط تلقائي لحساب في برنامج الأكاديمية على هوية مسار واحد لا التباس فيها (إثمار له دفعتان فيحتاج ربطًا)
+  if ((me.programs || []).indexOf('academy') < 0) return '';
+  var c = Object.keys(ATAR_TRACK).filter(function (k) { return (me.tracks || []).indexOf(ATAR_TRACK[k]) >= 0; });
+  return c.length === 1 ? c[0] : '';
+}
+function login_atar(atarToken) {
+  var me = atarCall_('auth_me', [String(atarToken || '')]);
+  if (!me || !me.uid) throw new Error('تعذّر التحقق من حساب أثر');
+  if (me.disabled) throw new Error('حسابك في أثر موقوف');
+  var role = '', track = '';
+  if (me.role === 'super') role = 'admin';
+  else { track = atarTrackOf_(me, readJson_('atar_links.json', {})); if (track) role = 'team'; }
+  if (!role) throw new Error('حسابك في أثر غير مربوط بمسار في منصة الأنشطة. اطلب من الإدارة ربطه.');
+  return withLock_(function () {
+    var all = accs_(), uid = 'atar_' + me.uid, a = all[uid];
+    if (a && a.disabled) throw new Error('هذا الحساب موقوف في منصة الأنشطة');
+    if (!a) { a = all[uid] = { uid: uid, created: now_(), tv: 0 }; }
+    a.atar = me.uid; a.user = 'أثر: ' + (me.username || me.email || ''); a.name = clip_(me.name || me.username, 80);
+    a.role = role; a.track = role === 'team' ? track : ''; a.last = now_();
+    writeJson_('accounts.json', all);
+    return JSON.stringify({ token: mkToken_(a), me: meOf_(a), atar: { mustChange: !!me.mustChange, username: me.username || '' } });
+  });
+}
+function atar_links(token) { var a = auth_(token); needAdmin_(a); return JSON.stringify(readJson_('atar_links.json', {})); }
+// o = {uid: معرّف حساب أثر, track, name, username}
+function atar_link(token, json) {
+  var a = auth_(token); needAdmin_(a);
+  var o = JSON.parse(json), uid = String(o.uid || '');
+  if (!/^[a-z0-9]{6,40}$/.test(uid)) throw new Error('معرّف حساب أثر غير صحيح');
+  if (!ATAR_TRACK[o.track]) throw new Error('هذا المسار خارج الربط بأثر');
+  return JSON.stringify(withLock_(function () {
+    var L = readJson_('atar_links.json', {});
+    L[uid] = { track: o.track, name: clip_(o.name, 80), username: clip_(o.username, 80), at: now_(), by: a.name };
+    writeJson_('atar_links.json', L);
+    var all = accs_(), sh = all['atar_' + uid]; if (sh) { sh.role = 'team'; sh.track = o.track; sh.tv = (sh.tv || 0) + 1; writeJson_('accounts.json', all); }
+    log_(a, o.track, 'ربط حساب أثر بالمسار', o.name || o.username);
+    return L;
+  }));
+}
+function atar_unlink(token, uid) {
+  var a = auth_(token); needAdmin_(a);
+  return JSON.stringify(withLock_(function () {
+    var L = readJson_('atar_links.json', {}), x = L[uid]; delete L[uid]; writeJson_('atar_links.json', L);
+    var all = accs_(), sh = all['atar_' + uid]; if (sh && sh.role !== 'admin') { sh.disabled = true; sh.tv = (sh.tv || 0) + 1; writeJson_('accounts.json', all); }
+    if (x) log_(a, x.track, 'ألغى ربط حساب أثر', x.name || x.username);
+    return L;
+  }));
 }
 function pass(token, oldPw, newPw) {
   var a = auth_(token);
@@ -614,6 +680,7 @@ function settings_save(token, json) {
     if ('adminDigest' in o) s.adminDigest = !!o.adminDigest;
     if ('notifyChanges' in o) s.notifyChanges = !!o.notifyChanges;
     if ('durMin' in o) s.durMin = Math.max(15, Math.min(600, Math.round(+o.durMin || 60)));
+    if ('groupsPaused' in o) s.groupsPaused = !!o.groupsPaused;
     if ('meetAdmins' in o) s.meetAdmins = (o.meetAdmins || []).map(function (e) { return String(e || '').trim().toLowerCase(); }).filter(isEmail_).slice(0, 5);
     if ('tpl' in o) { s.tpl = s.tpl || {}; ['d3', 'd1'].forEach(function (k) { if (o.tpl[k] != null) s.tpl[k] = txt_(o.tpl[k], 1200) || DEFAULTS.tpl[k]; }); }
     writeJson_('settings.json', s);
@@ -859,6 +926,8 @@ function tgCall_(method, payload, tok) {
 }
 // يرسل نصاً، ويتابع انتقال المجموعة إلى «مجموعة خارقة» (يتغير معرّفها) فيحدّث الربط
 function tgSend_(chatId, text, tid) {
+  var s0 = cfg_();
+  if (s0.groupsPaused && !(s0.adminChat && String(s0.adminChat.id) === String(chatId))) return { skipped: true };   // الإرسال في المجموعات موقوف مؤقتًا
   try { return tgCall_('sendMessage', { chat_id: String(chatId), text: text, disable_web_page_preview: 'true' }); }
   catch (e) {
     var mig = e.tg && e.tg.parameters && e.tg.parameters.migrate_to_chat_id;
@@ -977,7 +1046,7 @@ function tg_status(token) {
   var chats = Object.keys(known).map(function (k) { var c = known[k]; return { id: c.id, title: c.title, type: c.type, at: c.at, left: !!c.left, to: map[String(c.id)] || '' }; })
     .sort(function (x, y) { return (y.at || 0) - (x.at || 0); });
   if (g.bot && g.bot.username) { ts.forEach(function (t) { t.link = tgLink_(g.bot.username, t.id); }); }
-  return JSON.stringify({ bot: g.bot || null, hasToken: !!props_().getProperty('TG_TOKEN'), chats: chats, tracks: ts, adminChat: s.adminChat || null, adminLink: g.bot && g.bot.username ? tgLink_(g.bot.username, 'admin') : '', lastTick: g.lastTick || null, upcoming: upcoming_(s), settings: { remindHour: s.remindHour, remindTypes: s.remindTypes, digest: s.digest, adminDigest: s.adminDigest, notifyChanges: s.notifyChanges, tpl: s.tpl } });
+  return JSON.stringify({ bot: g.bot || null, hasToken: !!props_().getProperty('TG_TOKEN'), chats: chats, tracks: ts, adminChat: s.adminChat || null, adminLink: g.bot && g.bot.username ? tgLink_(g.bot.username, 'admin') : '', lastTick: g.lastTick || null, upcoming: upcoming_(s), settings: { remindHour: s.remindHour, remindTypes: s.remindTypes, digest: s.digest, adminDigest: s.adminDigest, notifyChanges: s.notifyChanges, tpl: s.tpl, groupsPaused: !!s.groupsPaused } });
 }
 function tg_poll(token) {
   var a = auth_(token); needAdmin_(a);
@@ -1025,6 +1094,7 @@ function runReminders_(force) {
   var sent = 0, errs = [];
   if (!props_().getProperty('TG_TOKEN')) return { sent: 0, errs: ['لا بوت'] };
   if (!force && hour < s.remindHour) return { sent: 0, errs: [], wait: true };
+  if (s.groupsPaused) return { sent: 0, errs: [], paused: true };   // لا تُعلَّم التذكيرات مُرسلة، فتصل بعد إعادة الإرسال
   tracks_().forEach(function (t) {
     if (!t.chat || !t.chat.id || t.remind === false) return;
     var p = plan_(t.id), queue = [];
@@ -1149,7 +1219,7 @@ function report_list(token) { var a = auth_(token); needAdmin_(a); return JSON.s
 // قبل الاختبار بأسبوع تقريباً: اقتراح كاهوت مراجعة في مجموعة الفريق، مرة واحدة لكل اختبار، إن لم يكن في الخطة كاهوت قبله
 function runSuggest_() {
   var s = cfg_(), tz = tz_(), now = new Date(), today = Utilities.formatDate(now, tz, 'yyyy-MM-dd'), hour = +Utilities.formatDate(now, tz, 'H');
-  if (!props_().getProperty('TG_TOKEN') || hour < s.remindHour) return 0;
+  if (!props_().getProperty('TG_TOKEN') || hour < s.remindHour || s.groupsPaused) return 0;
   var g = readJson_('tg.json', {}), done = g.kahoot || {}, n = 0, sentKeys = [];
   tracks_().forEach(function (t) {
     if (!t.chat || !t.chat.id || t.remind === false) return;

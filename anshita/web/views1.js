@@ -106,6 +106,7 @@ function mobWeek(id, sem) {
 function attention(ws) {
   const L = [];
   D.tracks.filter(t => t.editReq).forEach(t => L.push({ ic: 'unlock', k: 'brand', html: `<b>${esc(t.name)}</b> طلب فتح تعديل الخطة${t.editReq.note ? `: «${esc(t.editReq.note)}»` : ''} <span class="faint">${ago(t.editReq.at)}</span>`, act: `<button class="btn sm pri" type="button" data-act="grant" data-id="${t.id}">افتح التعديل</button>` }));
+  if (D.settings && D.settings.groupsPaused) L.push({ ic: 'bot', k: 'warn', html: 'إرسال البوت في المجموعات موقوف مؤقتًا. أعده حين تستقر المنصة.', act: `<a class="btn sm" href="#bot">صفحة البوت</a>` });
   if (D.unseen) L.push({ ic: 'bell', k: 'brand', html: `${D.unseen === 1 ? 'تغيير جديد' : D.unseen === 2 ? 'تغييران جديدان' : D.unseen + ' تغييرات جديدة'} من الفرق على خططها`, act: `<a class="btn sm pri" href="#alerts">اعرضها</a>` });
   const acts = allActs(), seenC = {};
   acts.filter(a => a.d >= TODAY && diffD(a.d, TODAY) <= 14 && clashOf(a.t, a)).forEach(a => { const k = a.t + a.d; if (seenC[k]) return; seenC[k] = 1; L.push({ ic: 'alert', k: 'warn', html: `<b>${esc(T(a.t).name)}</b> ${gDay(a.d)}: ${esc(clashOf(a.t, a))}`, act: `<button class="btn sm" type="button" data-act="openact" data-id="${a.id}" data-track="${a.t}">راجعه</button>` }); });

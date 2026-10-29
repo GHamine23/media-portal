@@ -265,6 +265,16 @@ throws(() => call('report_data', rk), /مفتاح/, 'المفتاح القديم
   call('meet_unlink', JM, 'judhoor', mm.id); ok(!call('plan', AM, 'judhoor').acts.find(a => a.id === mm.id).meet, 'إزالة الرابط');
 }
 
+// ١٢) إيقاف الإرسال في المجموعات مؤقتًا: لا شيء يصل المجموعات، ويبقى الخاص مع الإدارة
+{
+  const AP = call('login', 'admin', cred.admin).token;
+  call('settings_save', AP, JSON.stringify({ groupsPaused: true }));
+  const s0 = TG.sent.length;
+  call('tg_test', AP, 'judhoor'); ctx.tick();
+  ok(!TG.sent.slice(s0).some(m => m.chat !== '5555'), 'لا رسائل في المجموعات أثناء الإيقاف');
+  call('settings_save', AP, JSON.stringify({ groupsPaused: false }));
+}
+
 // ١٠) اقتراح الكاهوت قبل الاختبار النصفي (٨ ديسمبر) بنحو أسبوع، مرة واحدة
 NOW = Date.UTC(2026, 11, 2, 16, 0); TG.sent.length = 0; ctx.tick();
 ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.text) && /الاختبار النصفي/.test(m.text) && /بعد 6 أيام/.test(m.text)), 'اقتراح كاهوت قبل الاختبار: ' + (TG.sent.find(m => /كاهوت/.test(m.text)) || {}).text);
