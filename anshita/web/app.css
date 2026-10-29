@@ -142,7 +142,7 @@ kbd{font-family:var(--fn);font-size:11px;line-height:1;padding:3px 6px;border-ra
 .pill.dash{background:transparent;border:1px dashed var(--line2);color:var(--ink3)}
 .badge{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--wine);color:#fff;font-size:11.5px;font-family:var(--fn);display:inline-flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
 .badge.soft{background:var(--sunken);color:var(--ink2)}
-.av{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-family:var(--fd);flex:none;width:28px;height:28px;font-size:13px}
+.av{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-family:var(--fn);font-weight:500;flex:none;width:28px;height:28px;font-size:12.5px;letter-spacing:-.02em}
 .tile{width:30px;height:30px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;flex:none;background:color-mix(in srgb,var(--tc) 12%,transparent);color:var(--tc)}
 .tile svg{width:17px;height:17px}
 .tile.sm{width:24px;height:24px;border-radius:7px}.tile.sm svg{width:14px;height:14px}

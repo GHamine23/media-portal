@@ -228,7 +228,11 @@ addEventListener('hashchange', () => { closeLayer(); render(); window.scrollTo(0
 
 /* ---------- الإطار ---------- */
 const logoImg = (id, cls = '') => LOGOS[id] ? `<img class="${cls}" src="${LOGOS[id]}" alt="" loading="lazy">` : `<span class="av" style="background:${tcol(id)}">${esc((T(id) || {}).name ? T(id).name[0] : '؟')}</span>`;
-const avatar = (name, color, cls = '') => `<span class="av ${cls}" style="background:${color || 'var(--ink2)'}">${esc(String(name || '؟').replace(/^(فريق|أبو|أ\.)\s+/, '').replace(/^ال(?=\S{2})/, '').charAt(0))}</span>`;
+function initials(name) {   // الحرف الأول، وحرفان إن بدأ الاسم بألف (تشتبه الألف المفردة بعلامة تعجب)
+  const w = String(name || '؟').replace(/^(فريق|أبو|أ\.)\s+/, '').replace(/^ال(?=\S{2})/, '').trim();
+  return /^[اأإآ]/.test(w) ? w.slice(0, 2) : w.charAt(0);
+}
+const avatar = (name, color, cls = '') => `<span class="av ${cls}" style="background:${color || 'var(--ink2)'}">${esc(initials(name))}</span>`;
 const adminAv = () => `<span class="adm" aria-hidden="true"><i style="background:#e1642b"></i><i style="background:#b6293e"></i><i style="background:#4c2e5f"></i><i style="background:#3c7e79"></i></span>`;
 function weekStat(id, from, to) { return actsOf(id).filter(a => a.d >= from && a.d <= to); }
 function navItems() {

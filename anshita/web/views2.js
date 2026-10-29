@@ -322,7 +322,8 @@ VIEWS.accounts = {
   admin: true,
   render() {
     if (!AC) { API.me('acc_list').then(l => { AC = l; render(); }).catch(e => toast(e.message, 'err')); return pageHead('', 'الحسابات', '') + `<div class="card empty"><span class="spin"></span></div>`; }
-    const rows = AC.slice().sort((a, b) => (a.role === 'admin' ? -1 : 1) - (b.role === 'admin' ? -1 : 1) || (a.track || '').localeCompare(b.track || '')).map(a => `<div class="li">${a.role === 'admin' ? adminAv() : avatar(a.name, tcol(a.track))}
+    const ord = t => t ? D.tracks.findIndex(x => x.id === t) : -1;
+    const rows = AC.slice().sort((a, b) => ord(a.track) - ord(b.track) || (a.created || 0) - (b.created || 0)).map(a => `<div class="li">${a.role === 'admin' ? adminAv() : T(a.track) && LOGOS[a.track] ? logoImg(a.track) : avatar(a.name, tcol(a.track))}
       <div class="tx"><div class="tt">${esc(a.name)} ${a.disabled ? '<span class="pill warn">موقوف</span>' : ''}</div><div class="mt"><bdi>${esc(a.user)}</bdi> · ${a.role === 'admin' ? 'الإدارة: كل المسارات' : 'فريق ' + esc((T(a.track) || {}).name || a.track)} · ${a.last ? 'آخر دخول ' + ago(a.last) : 'لم يدخل بعد'}</div></div>
       <button class="btn sm ghost" type="button" data-act="acc-edit" data-id="${a.uid}">تعديل</button><button class="btn sm" type="button" data-act="acc-reset" data-id="${a.uid}">كلمة مرور جديدة</button></div>`).join('');
     return pageHead('', 'الحسابات', 'نوعان فقط: الإدارة ترى كل المسارات، والفريق يرى مساره. لكل مسار حساب، ويمكن إضافة حسابات أخرى للفريق نفسه.', `<button class="btn pri" type="button" data-act="acc-edit" data-id="">${svg('plus')}حساب</button>`) + `<div class="card"><div class="list">${rows}</div></div>`;
@@ -449,7 +450,7 @@ function updTgPrev() { const p = $('#bs-prev'); if (p && BS) p.innerHTML = tgPre
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el) return;
   const k = el.dataset.act, f = H[k]; if (!f) return;
-  if (el.tagName === 'A' && (k === 'tgwatch' || k === 'tglink')) { f(el); return; }   // يفتح الرابط ويبدأ المتابعة
+  if (el.tagName === 'A' && (k === 'tgwatch' || k === 'tglink')) { f(el, e); return; }   // يفتح الرابط ويبدأ المتابعة
   if (el.tagName === 'A' && k === 'tlweek') e.preventDefault();
   if (el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && k !== 'tblq')) return;
   if (k === 'tblq') return;
