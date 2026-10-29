@@ -217,7 +217,7 @@ const ATAR_URL = 'https://ghamine23.github.io/media-portal/';
 const atarTid = id => /^ithmar/.test(id) ? 'ithmar' : id;
 function annText(tid, a) {
   const who = (a.who || []).map(w => 'أ. ' + w.replace(/^أ\.\s*/, ''));
-  return [`${a.type === 'لقاء' ? 'لقاء' : a.type} بعنوان ${qt(a.title)}`, who.length ? 'يقدّمه: ' + who.join(' و') : '', `يوم ${DAYS[wd(a.d)]} ${dnum(a.d)} ${mon(a.d)} ${a.d.slice(0, 4)}م، الموافق ${hijri(a.d)}`, a.time ? 'الساعة ' + timeText(a.time) : '', a.idea ? a.idea : ''].filter(Boolean).join('\n');
+  return [`${a.type === 'لقاء' ? 'لقاء' : a.type} بعنوان ${qt(a.title)}`, who.length ? 'يقدّمه: ' + who.join(' و') : '', `يوم ${DAYS[wd(a.d)]} ${dnum(a.d)} ${mon(a.d)} ${a.d.slice(0, 4)}م، الموافق ${hijri(a.d)}`, a.time ? 'الساعة ' + time12(a.time) : '', a.idea ? a.idea : ''].filter(Boolean).join('\n');
 }
 function designDialog(tid, id, kind) {
   const a = planOf(tid).acts.find(x => x.id === id); if (!a) return toast('النشاط غير موجود', 'err');
@@ -670,7 +670,7 @@ const H = {
   pdf: el => printPlan(planDocOf(el.dataset.id, el.dataset.n)),
   designact: el => designDialog(el.dataset.track, el.dataset.id, el.dataset.k),
   // يكتب بيانات الإعلان لأثر (النطاق نفسه، المفتاح mp6.prefill) ثم يفتح الرابط معرض قوالب المسار
-  'ann-pre': el => { const tid = el.dataset.track, a = planOf(tid).acts.find(x => x.id === el.dataset.id); if (!a) return; const who = (a.who || []).map(w => 'أ. ' + w.replace(/^أ\.\s*/, '')).join(' و'); try { localStorage.setItem('mp6.prefill', JSON.stringify({ tid: atarTid(tid), at: Date.now(), from: 'anshita', act: a.id, info: { title: a.title, who, time: a.time ? timeText(a.time) : '', date: a.d } })); } catch (e) {} },
+  'ann-pre': el => { const tid = el.dataset.track, a = planOf(tid).acts.find(x => x.id === el.dataset.id); if (!a) return; const who = (a.who || []).map(w => 'أ. ' + w.replace(/^أ\.\s*/, '')).join(' و'); try { localStorage.setItem('mp6.prefill', JSON.stringify({ tid: atarTid(tid), at: Date.now(), from: 'anshita', act: a.id, info: { title: a.title, who, time: a.time ? time12(a.time) : '', date: a.d } })); } catch (e) {} },
   'ann-go': el => { try { navigator.clipboard.writeText(el.dataset.v).then(() => toast('نُسخت بيانات الإعلان: الصقها في خانة الفكرة في أثر')); } catch (e) {} },
   'ann-save': async el => { const tid = el.dataset.track, id = el.dataset.id, v = ($('#ann-link').value || '').trim(); if (v && !/^https?:\/\//i.test(v)) { toast('الرابط يبدأ بـ https://', 'err'); return; } try { await saveAct(tid, { id, link: v }); closeLayer(); toast(v ? 'حُفظ رابط التصميم' : 'أُزيل الرابط'); } catch (e) {} },
   'pub-print': () => printPlan(pubDocData()),

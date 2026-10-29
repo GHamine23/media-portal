@@ -86,6 +86,8 @@ function ago(ms) {
   const d = Math.round(h / 24); return d === 1 ? 'أمس' : d === 2 ? 'قبل يومين' : d <= 10 ? `قبل ${d} أيام` : `قبل ${d} يومًا`;
 }
 const timeText = t => t ? t.slice(0, 5) : '';   // نظام ٢٤ ساعة (21:00)
+// صيغة قوالب أثر المعتادة في التصاميم والإعلانات (21:00 ← 9:00 م)
+const time12 = t => { if (!t) return ''; const [h, m] = t.slice(0, 5).split(':').map(Number); return `${h % 12 || 12}:${String(m || 0).padStart(2, '0')} ${h < 12 ? 'ص' : 'م'}`; };
 const TIMES = (() => { const a = ['']; for (let h = 6; h <= 23; h++) { a.push(pad(h) + ':00'); a.push(pad(h) + ':30'); } return a; })();
 function countAr(n, f) { // f = [مفرد، مثنى، جمع، تمييز]
   if (n === 0) return 'لا ' + f[2]; if (n === 1) return f[0] + ' واحد'; if (n === 2) return f[1];
