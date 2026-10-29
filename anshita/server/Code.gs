@@ -56,7 +56,8 @@ function apiFns_() {
     cal_list: cal_list, cal_set: cal_set, cal_push: cal_push,
     tg_token: tg_token, tg_status: tg_status, tg_poll: tg_poll, tg_assign: tg_assign, tg_test: tg_test, remind_now: remind_now,
     tg_check: tg_check, edit_request: edit_request,
-    ui_fonts: ui_fonts, ui_font_get: ui_font_get, font_put: font_put
+    ui_fonts: ui_fonts, ui_font_get: ui_font_get, font_put: font_put,
+    report_key: report_key, report_data: report_data, report_send: report_send, report_list: report_list
   };
 }
 function doPost(e) {
@@ -925,6 +926,68 @@ function runDigests_() {
   withLock_(function () { var g2 = readJson_('tg.json', {}); g2.digestWeek = wk; writeJson_('tg.json', g2); });
   return n;
 }
+/* ================= التقرير الأسبوعي =================
+   مهمة مجدولة (Claude) تقرأ بيانات المنصة بمفتاح خاص للقراءة فقط، وتكتب تقريرًا شاملًا،
+   ثم تحفظه هنا (صفحة «التقارير») وترسل خلاصته إلى محادثة الإدارة مع البوت. */
+function reportKey_() { return props_().getProperty('REPORT_KEY') || ''; }
+function needKey_(key) { var k = reportKey_(); if (!k || String(key || '') !== k) throw err_('مفتاح التقرير غير صحيح', 'auth'); }
+function report_key(token, renew) {
+  var a = auth_(token); needAdmin_(a);
+  var k = reportKey_();
+  if (!k || renew) { k = uid_() + uid_() + uid_(); props_().setProperty('REPORT_KEY', k); }
+  return JSON.stringify({ key: k });
+}
+// كل ما يحتاجه التقرير: المسارات وجداول الفصل الحالي وأنشطته، وسجل التحديثات، وحال البوت والتقويم
+function report_data(key, days) {
+  needKey_(key);
+  var s = cfg_(), g = readJson_('tg.json', {}), today = today_(), since = now_() - Math.max(1, Math.min(60, +days || 14)) * 864e5;
+  var tracks = tracks_().map(function (t) {
+    var p = plan_(t.id), S = p.sems[String(t.cur)] || null;
+    return {
+      id: t.id, name: t.name, full: t.full, cohort: t.cohort, age: t.age, cur: t.cur, canEdit: !!t.canEdit, members: t.members || [],
+      bot: { linked: !!(t.chat && t.chat.id), group: t.chat ? t.chat.title : '', remind: t.remind !== false }, editReq: t.editReq || null,
+      sem: S ? { title: S.title, start: S.start, end: S.end, days: S.days } : null,
+      acts: p.acts.map(function (x) { return { title: x.title, type: x.type, d: x.d, time: x.time || '', who: x.who || [], idea: x.idea || '', done: !!x.done, note: x.note || '', link: x.link || '', sem: x.sem, by: x.by || '', calendar: !!(x.cal && x.cal.id), calErr: x.cal && x.cal.err || '', reminders: remindable_(x, s), sent: x.sent || {} }; })
+    };
+  });
+  return JSON.stringify({
+    today: today, weekStart: weekOf_(today), tz: tz_(), site: SITE_URL, days: DAYS,
+    settings: { remindHour: s.remindHour, remindTypes: s.remindTypes, digest: s.digest, notifyChanges: s.notifyChanges, calendar: s.calName || 'التقويم الأساسي' },
+    bot: { username: g.bot ? g.bot.username : '', adminLinked: !!(s.adminChat && s.adminChat.id), lastTick: g.lastTick || null },
+    tracks: tracks,
+    log: readJson_('log.json', []).filter(function (x) { return x.at >= since; }),
+    lastReports: readJson_('reports.json', []).slice(0, 2).map(function (r) { return { at: r.at, title: r.title }; })
+  });
+}
+// يحفظ التقرير ويرسل خلاصته (tg) أو نصّه كاملًا إلى محادثة الإدارة، مقسومًا على رسائل
+function report_send(key, title, text, tg) {
+  needKey_(key);
+  title = txt_(title, 120) || 'التقرير الأسبوعي'; text = clip_(text, 60000);
+  var rep = withLock_(function () {
+    var L = readJson_('reports.json', []), r = { id: uid_(), at: now_(), title: title, text: text };
+    L.unshift(r); if (L.length > 60) L.length = 60;
+    writeJson_('reports.json', L); props_().setProperty('rev_meta', String(now_()));
+    log_(null, '', 'أضاف التقرير الأسبوعي', title);
+    return r;
+  });
+  var s = cfg_(), sent = 0, err = '';
+  if (s.adminChat && s.adminChat.id && props_().getProperty('TG_TOKEN')) {
+    var body = String(tg || text) + '\n\nالتقرير كاملًا في المنصة: ' + SITE_URL + '#reports';
+    try { chunks_(title + '\n\n' + body, 3800).forEach(function (c) { tgSend_(s.adminChat.id, c); sent++; }); } catch (e) { err = e.message; }
+  } else err = 'لم تُربط محادثة الإدارة بالبوت بعد';
+  return JSON.stringify({ id: rep.id, saved: true, sent: sent, err: err });
+}
+function chunks_(t, n) {
+  var out = [], cur = '';
+  String(t).split('\n').forEach(function (line) {
+    while (line.length > n) { if (cur) { out.push(cur); cur = ''; } out.push(line.slice(0, n)); line = line.slice(n); }
+    if ((cur + '\n' + line).length > n) { out.push(cur); cur = line; } else cur = cur ? cur + '\n' + line : line;
+  });
+  if (cur) out.push(cur);
+  return out;
+}
+function report_list(token) { var a = auth_(token); needAdmin_(a); return JSON.stringify(readJson_('reports.json', [])); }
+
 // المؤقّت: كل ساعة
 function tick() {
   var r = { at: now_(), ok: true, msg: '', sent: 0 };

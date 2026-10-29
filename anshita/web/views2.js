@@ -345,6 +345,36 @@ function showPass(name, user, pw) {
     <div class="row"><button class="btn pri" type="button" data-act="copy" data-v="${esc(`منصة الأنشطة التربوية\n${location.origin + location.pathname}\nاسم المستخدم: ${user}\nكلمة المرور: ${pw}`)}">${svg('copy')}انسخ بيانات الدخول</button><button class="btn" type="button" data-act="close">تم</button></div>`);
 }
 
+/* ---------- التقارير الأسبوعية (الإدارة) ---------- */
+let RP = null, RP_OPEN = '', RP_AT = 0, RP_LOAD = false;
+function md(t) {   // تنسيق بسيط وآمن: عناوين، نقاط، ترقيم، عريض
+  const inl = x => esc(x).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  let h = '', list = '';
+  const close = () => { if (list) { h += `</${list}>`; list = ''; } };
+  String(t || '').split('\n').forEach(l => {
+    const m = /^(#{1,3})\s+(.*)$/.exec(l), b = /^\s*[-•*]\s+(.*)$/.exec(l), n = /^\s*\d+[.)]\s+(.*)$/.exec(l);
+    if (m) { close(); h += `<h${m[1].length + 2}>${inl(m[2])}</h${m[1].length + 2}>`; }
+    else if (b) { if (list !== 'ul') { close(); h += '<ul>'; list = 'ul'; } h += `<li>${inl(b[1])}</li>`; }
+    else if (n) { if (list !== 'ol') { close(); h += '<ol>'; list = 'ol'; } h += `<li>${inl(n[1])}</li>`; }
+    else if (!l.trim()) close();
+    else { close(); h += `<p>${inl(l)}</p>`; }
+  });
+  close(); return h;
+}
+VIEWS.reports = {
+  admin: true,
+  render() {
+    if (RP && Date.now() - RP_AT > 60000 && !RP_LOAD) { RP_LOAD = true; API.me('report_list').then(l => { RP = l; RP_AT = Date.now(); RP_LOAD = false; render(); }).catch(() => { RP_LOAD = false; }); }
+    if (!RP) { if (!RP_LOAD) { RP_LOAD = true; API.me('report_list').then(l => { RP = l; RP_AT = Date.now(); RP_LOAD = false; render(); }).catch(e => { RP = []; RP_LOAD = false; toast(e.message, 'err'); render(); }); } return pageHead('', 'التقارير الأسبوعية', '') + `<div class="card empty"><span class="spin"></span></div>`; }
+    const lead = 'تقرير شامل عن أنشطة المسارات يُكتب كل أسبوع تلقائيًا، ويصلك في تليجرام إن رُبطت محادثتك بالبوت.';
+    if (!RP.length) return pageHead('', 'التقارير الأسبوعية', lead) + `<div class="card empty">${svg('sheet')}<h3>لا تقارير بعد</h3><p>يصل أول تقرير في موعده الأسبوعي.</p></div>`;
+    const open = RP_OPEN || RP[0].id;
+    return pageHead('', 'التقارير الأسبوعية', lead) + `<div class="stack">${RP.map(r => `<article class="card report">
+      <button class="row" type="button" style="width:100%;text-align:start" data-act="rp-toggle" data-id="${r.id}" aria-expanded="${r.id === open}"><span class="tile" style="--tc:var(--brand)">${svg('sheet')}</span><span class="col" style="flex:1;min-width:0"><b style="font-family:var(--fd);font-weight:500;font-size:19px;color:var(--ink)">${esc(r.title)}</b><span class="xs faint">${gLong(isoOf(new Date(r.at)))} · ${ago(r.at)}</span></span>${svg(r.id === open ? 'down' : 'back')}</button>
+      ${r.id === open ? `<div class="md">${md(r.text)}</div>` : ''}</article>`).join('')}</div>`;
+  }
+};
+
 /* ---------- لوحة الأوامر ---------- */
 let CMD = null;
 function openCmd() {
@@ -441,7 +471,8 @@ const H = {
   'acc-reset': async el => { const a = AC.find(x => x.uid === el.dataset.id); try { const r = await API.me('acc_reset', a.uid); if (r.token) { TOKEN = r.token; LS.set(NS + 'tok', TOKEN); } showPass(a.name, a.user, r.pass); } catch (e) { toast(e.message, 'err'); } },
   'pw-save': async () => { try { const r = await API.me('pass', $('#pw-o').value, $('#pw-n').value); TOKEN = r.token; LS.set(NS + 'tok', TOKEN); closeLayer(); toast('غُيّرت كلمة المرور'); } catch (e) { toast(e.message, 'err'); } },
   copy: async el => { try { await navigator.clipboard.writeText(el.dataset.v); toast('نُسخ'); } catch (e) { toast('انسخها يدويًا', 'err'); } },
-  'cmd-run': el => cmdRun(+el.dataset.i)
+  'cmd-run': el => cmdRun(+el.dataset.i),
+  'rp-toggle': el => { RP_OPEN = RP_OPEN === el.dataset.id || (!RP_OPEN && RP[0].id === el.dataset.id) ? '-' : el.dataset.id; render(); }
 };
 let SI = null, LAST_TA = null;
 function tgOpen(el, e) { if (CFG.demo && window.DEMO) { e.preventDefault(); window.DEMO.simJoin(el.getAttribute('href')); toast('تجربة: كأنك اخترت المجموعة في تليجرام…'); } watchLink(); }

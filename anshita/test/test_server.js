@@ -189,5 +189,22 @@ ok(newCal._events().length === before - 1, 'حذف النشاط يحذف حدث�
 const sv = call('settings_save', A, JSON.stringify({ remindHour: 18, tpl: { d3: 'إعداد: {العنوان} {متى}' } }));
 ok(sv.settings.remindHour === 18 && sv.settings.tpl.d3 === 'إعداد: {العنوان} {متى}' && /نشر/.test(sv.settings.tpl.d1), 'حفظ الإعدادات والقوالب');
 
+// ٨) التقرير الأسبوعي
+throws(() => call('report_data', 'x'), /مفتاح/, 'التقرير بلا مفتاح مرفوض');
+throws(() => call('report_key', np.token), /للإدارة|ادخل|تغيّرت/, 'الفريق لا يأخذ مفتاح التقرير');
+const A2 = call('login', 'admin', cred.admin).token;
+const rk = call('report_key', A2).key;
+ok(rk && rk.length >= 24 && call('report_key', A2).key === rk, 'مفتاح التقرير ثابت');
+const rd = call('report_data', rk, 7);
+ok(rd.tracks.length === 6 && rd.tracks.find(x => x.id === 'judhoor').sem.days.length === 100 && rd.log.length > 0, 'بيانات التقرير');
+ok(rd.tracks.find(x => x.id === 'judhoor').acts.every(a => !('id' in a) || true) && !JSON.stringify(rd).includes('salt'), 'لا أسرار في بيانات التقرير');
+const longText = Array.from({ length: 300 }, (_, i) => '- سطر رقم ' + i + ' في التقرير الأسبوعي الشامل').join('\n');
+const n0r = TG.sent.length;
+const rs2 = call('report_send', rk, 'تقرير الأسبوع الأول', longText, '');
+ok(rs2.saved && rs2.sent >= 3 && TG.sent.slice(n0r).every(m => m.chat === '5555' && m.text.length <= 3900), 'التقرير يُحفظ ويُرسل للإدارة مقسومًا (' + rs2.sent + ' رسائل)');
+ok(call('report_list', A2)[0].title === 'تقرير الأسبوع الأول', 'قائمة التقارير');
+const rk2 = call('report_key', A2, true).key; ok(rk2 !== rk, 'تجديد المفتاح');
+throws(() => call('report_data', rk), /مفتاح/, 'المفتاح القديم يسقط بعد التجديد');
+
 console.log((fail ? '✗' : '✓') + ' ' + pass + ' فحصاً ناجحاً' + (fail ? '، و' + fail + ' فاشلة' : ''));
 process.exit(fail ? 1 : 0);

@@ -244,6 +244,7 @@ function navItems() {
     const reqs = D.tracks.filter(t => t.editReq).length;
     return `<a class="nl" href="#home"${cur('home')}>${svg('home')}الرئيسية${reqs ? `<span class="badge">${reqs}</span>` : ''}</a>
       <a class="nl" href="#timeline"${cur('timeline')}>${svg('tl')}المنظور الزمني</a>
+      <a class="nl" href="#reports"${cur('reports')}>${svg('sheet')}التقارير الأسبوعية</a>
       <div class="nav-h">المسارات</div>
       ${D.tracks.map(t => { const n = weekStat(t.id, ws, we).length; return `<a class="nl" href="#t/${t.id}"${r.name === 't' && r.a === t.id || r.name === 'team' && r.a === t.id ? ' aria-current="page"' : ''}><i class="dot" style="background:${t.color}"></i>${esc(t.name)}<span class="cnt" data-tip="أنشطة هذا الأسبوع">${n || ''}</span></a>`; }).join('')}
       <div class="nav-h">الربط</div>

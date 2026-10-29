@@ -559,3 +559,7 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 .stbl tr.drop-on td{background:var(--brand-t)!important}
 .stbl tr.drop-on td:first-child{box-shadow:inset -3px 0 0 var(--brand)}
 @media (max-width:640px){.fact{padding:12px;gap:10px}.fact .kv b{font-size:15px}.fact .tile{display:none}.thead .meta .pill{font-size:12.5px}}
+.report .md{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--ft);font-size:16px;line-height:1.85;color:var(--ink1);max-width:78ch}
+.report .md h3,.report .md h4,.report .md h5{font-family:var(--fd);font-weight:500;margin:18px 0 6px;color:var(--ink)}
+.report .md h3{font-size:21px}.report .md h4{font-size:18px}.report .md h5{font-size:16px}
+.report .md p{margin:6px 0}.report .md ul,.report .md ol{margin:6px 0;padding-inline-start:22px}.report .md li{margin:3px 0}
