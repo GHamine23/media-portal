@@ -76,6 +76,45 @@ function weekBoard(ws, tids) {
   return `<div class="board">${cols}</div>`;
 }
 
+/* ---------- مهام الأسبوع: من الخطة (الإعلان، المسؤول، اللقاءان، الكاهوت، التعليم، الأسبوع القادم) ومن المهام نفسها ---------- */
+const tasksOf = id => (planOf(id).tasks || []);
+const nTasks = n => n === 1 ? 'مهمة واحدة' : n === 2 ? 'مهمتان' : n <= 10 ? n + ' مهام' : n + ' مهمة';
+function weekTasks(id, ws) {
+  const we = add(ws, 6), out = [], acts = actsOf(id).slice().sort(sortA), S = semOf(id, curN(id)) || { days: [] };
+  acts.forEach(a => {
+    if (a.done || !remindable(a)) return;
+    const d3 = add(a.d, -3), d1 = add(a.d, -1), sent = a.sent || {};
+    if (d3 >= ws && d3 <= we && sent.d3 !== a.d) out.push({ k: 'design', d: d3, ref: a.id, text: `تصميم إعلان ${qt(a.title)} وإعداده` });
+    if (d1 >= ws && d1 <= we && sent.d1 !== a.d) out.push({ k: 'publish', d: d1, ref: a.id, text: `نشر إعلان ${qt(a.title)}` });
+  });
+  acts.forEach(a => { if (a.d >= ws && a.d <= we && !a.done && !(a.who && a.who.length)) out.push({ k: 'who', d: a.d, ref: a.id, text: `تحديد المسؤول عن ${qt(a.title)}` }); });
+  const seen = {};
+  acts.forEach(a => { if (a.d < ws || a.d > we || seen[a.d]) return; const c = clashOf(id, a); if (c) { seen[a.d] = 1; out.push({ k: 'clash', d: a.d, ref: a.id, text: `مراجعة يوم ${gDay(a.d)}: ${c}` }); } });
+  S.days.forEach(x => {
+    if (!x.ev || !/اختبار/.test(x.ev)) return; const left = diffD(x.d, ws); if (left < 0 || left > 14) return;
+    if (!acts.some(a => a.type === 'كاهوت' && a.d >= add(x.d, -12) && a.d <= x.d)) { const s = kahootSugs(id).find(k => k.ed === x.d); out.push({ k: 'kahoot', d: add(x.d, -7) < ws ? ws : add(x.d, -7), sug: s, text: `إضافة كاهوت مراجعة قبل ${x.ev} (${gDay(x.d)})` }); }
+  });
+  const prev = acts.filter(a => a.d >= add(ws, -7) && a.d < ws && !a.done);
+  if (prev.length) out.push({ k: 'mark', d: ws, text: `تعليم ما نُفّذ من أنشطة الأسبوع الماضي (${nActs(prev.length)})` });
+  const nws = add(ws, 7), nwe = add(ws, 13);
+  if (S.days.some(x => x.d >= nws && x.d <= nwe && x.c) && !acts.some(a => a.d >= nws && a.d <= nwe)) out.push({ k: 'next', d: we, text: 'وضع أنشطة الأسبوع القادم' });
+  tasksOf(id).forEach(x => { if (!x.done && (!x.d || x.d <= we)) out.push({ k: 'task', d: x.d || '', ref: x.id, text: x.title + (x.who && x.who.length ? ' (' + x.who.join('، ') + ')' : ''), late: x.d && x.d < TODAY }); });
+  return out.sort((a, b) => (a.d || '9') < (b.d || '9') ? -1 : (a.d || '9') > (b.d || '9') ? 1 : 0);
+}
+const WT_IC = { design: 'edit', publish: 'send', who: 'users', clash: 'alert', kahoot: 'target', mark: 'check', next: 'cal', task: 'check' };
+function wtRow(id, x) {
+  const ic = svg(WT_IC[x.k] || 'check');
+  const when = x.d ? `<span class="xs ${x.late ? 'late' : 'faint'}">${x.d === TODAY ? 'اليوم' : gDay(x.d)}</span>` : '';
+  if (x.k === 'task') return `<div class="wt-row task"><button class="ck round" type="button" role="checkbox" aria-checked="false" data-act="tk-done" data-id="${x.ref}" data-track="${id}" aria-label="تم">${svg('check', 2.4)}</button><button class="tx lk-plain" type="button" data-act="tk-edit" data-id="${x.ref}" data-track="${id}"><span>${esc(x.text)}</span>${when}</button></div>`;
+  const act = x.ref ? `data-act="openact" data-id="${x.ref}" data-track="${id}"` : x.k === 'kahoot' && x.sug ? `data-act="newact" data-track="${id}" data-date="${x.sug.d}" data-type="كاهوت" data-title="${esc(x.sug.title)}"` : x.k === 'next' ? `data-act="newact" data-track="${id}" data-date="${add(x.d, 1)}"` : `data-act="go" data-v="t/${id}"`;
+  return `<button class="wt-row k-${x.k}" type="button" ${act}><span class="ic">${ic}</span><span class="tx"><span>${esc(x.text)}</span>${when}</span></button>`;
+}
+function weekTasksCard(id, ws, o = {}) {
+  const L = weekTasks(id, ws || wkStart(TODAY));
+  return `<div class="card wtc"><div class="card-h"><h3>${o.title || 'مهام هذا الأسبوع'}</h3><span class="xs faint">${L.length ? nTasks(L.length) : ''}</span><span class="sp"></span><button class="btn sm ghost" type="button" data-act="tk-new" data-track="${id}">${svg('plus')}مهمة</button></div>
+    ${L.length ? `<div class="wt-list">${L.map(x => wtRow(id, x)).join('')}</div>` : `<p class="muted sm">لا مهام هذا الأسبوع. ${o.empty || 'أضيفوا مهمة إن احتجتم.'}</p>`}</div>`;
+}
+
 /* ---------- الجوال: قائمة حالة المسارات، وأجندة الأسبوع ---------- */
 function trackStrip(ws) {
   return `<div class="card strip">${D.tracks.map(t => { const h = health(t.id, ws); return `<a class="srow" href="#t/${t.id}" style="--tc:${t.color}"><span class="slogo">${logoImg(t.id)}</span><span class="col" style="min-width:0;flex:1"><b>${esc(t.name)}</b>${hlDot(h)}</span>${svg('fwd')}</a>`; }).join('')}</div>`;
@@ -150,12 +189,17 @@ function adminHome() {
   <div class="grid2 sect">
     <div class="card"><div class="card-h"><h3>يحتاج انتباهك</h3>${att.length ? `<span class="badge soft">${att.length}</span>` : ''}</div>
       ${att.length ? `<div class="list">${att.map(x => `<div class="li"><span class="tile sm" style="--tc:${x.k === 'warn' ? 'var(--warn)' : x.k === 'brand' ? 'var(--brand)' : 'var(--ink3)'}">${svg(x.ic)}</span><div class="tx sm">${x.html}</div>${x.act}</div>`).join('')}</div>` : `<p class="muted sm">لا شيء يحتاجك الآن.</p>`}</div>
-    <div class="card"><div class="card-h"><h3>آخر التحديثات</h3><span class="xs faint">تعديلات الفرق والإدارة</span></div>${feed(D.log, mob ? 3 : 6)}</div>
+    ${adminWeekTasks(ws)}
   </div>
   <div class="sect"><div class="sh"><h2>${HB.ws === wkStart(TODAY) ? 'هذا الأسبوع' : HB.ws === ws && pre ? 'الأسبوع الأول' : 'أسبوع ' + gShort(HB.ws)}</h2>
       <span class="xs faint">${gShort(HB.ws)} – ${gShort(we)}</span>
       <div class="row" style="gap:2px"><button class="btn icon" type="button" data-act="hbw" data-n="-7" aria-label="الأسبوع السابق">${svg('back')}</button><button class="btn sm ghost" type="button" data-act="hbw" data-n="0">${pre ? 'الأول' : 'الآن'}</button><button class="btn icon" type="button" data-act="hbw" data-n="7" aria-label="الأسبوع التالي">${svg('fwd')}</button></div></div>
-    ${mob ? agenda(HB.ws, D.tracks.map(t => t.id)) : weekBoard(HB.ws, D.tracks.map(t => t.id))}</div>`;
+    ${mob ? agenda(HB.ws, D.tracks.map(t => t.id)) : weekBoard(HB.ws, D.tracks.map(t => t.id))}</div>
+  <div class="card sect"><div class="card-h"><h3>آخر التحديثات</h3><span class="xs faint">تعديلات الفرق والإدارة</span></div>${feed(D.log, mob ? 3 : 6)}</div>`;
+}
+function adminWeekTasks(ws) {
+  const rows = D.tracks.map(t => { const L = weekTasks(t.id, ws); return `<details class="awt"><summary><span class="dot" style="background:${t.color}"></span><b>${esc(t.name)}</b><span class="xs faint">${L.length ? nTasks(L.length) : 'لا مهام'}</span>${svg('down')}</summary>${L.length ? `<div class="wt-list">${L.map(x => wtRow(t.id, x)).join('')}</div>` : ''}</details>`; }).join('');
+  return `<div class="card"><div class="card-h"><h3>مهام الأسبوع</h3><span class="xs faint">على الفرق</span></div><div class="awts">${rows}</div></div>`;
 }
 function tracksIndex() {
   const ws = focusWeek();
@@ -205,6 +249,7 @@ function teamHome(id, preview) {
     pageHead(todayLine(), 'أهلًا بفريق ' + t.name, esc(lead), `<div class="row" style="flex-wrap:wrap">${permPill}${botPill}</div>`) + hero + `
   <div class="cols sect">
     <section class="stack">
+      ${weekTasksCard(id, focusWeek())}
       ${teamNotes(id)}
       <div class="card"><div class="card-h"><h3>القادم خلال أسبوعين</h3><a class="lk sm" href="#t/${id}">خطة الفصل كاملة</a></div>${upList}</div>
       ${late.length ? `<div class="card"><div class="card-h"><h3>مضى موعدها</h3><span class="xs faint">علّموا ما نُفّذ</span></div><div class="list">${late.slice(-8).reverse().map(a => actRow(a, id)).join('')}</div></div>` : ''}
@@ -429,7 +474,8 @@ function dockIdle(id) {
   const notes = cls.map(a => `<button class="dk-note warn" type="button" data-act="openact" data-id="${a.id}" data-track="${id}">${svg('alert')}<span><b>${gDay(a.d)}:</b> ${esc(clashOf(id, a))}</span></button>`).join('') +
     kahootSugs(id).filter(s => s.left <= 30).map(s => `<div class="dk-note sug">${tile('كاهوت', 'sm')}<span>${esc(s.exam)} ${rel(s.ed)}. <b>اقتراح:</b> كاهوت مراجعة ${gDay(s.d)}.</span>${ed ? `<button class="btn sm" type="button" data-act="newact" data-track="${id}" data-date="${s.d}" data-type="كاهوت" data-title="${esc(s.title)}">أضفه</button>` : ''}</div>`).join('');
   return `<div class="dk-h"><div class="col"><span class="xs faint">لوحة النشاط</span><b>أنشطة ${esc(t.name)}</b></div>${ed ? `<button class="btn pri sm" type="button" data-act="newact" data-track="${id}">${svg('plus')}نشاط</button>` : ''}</div>
-  <div class="dk-b">${notes ? `<div class="dk-sec"><h4>تنبيهات واقتراحات</h4>${notes}</div>` : ''}
+  <div class="dk-b">${(() => { const L = weekTasks(id, focusWeek()); return `<div class="dk-sec"><div class="row" style="gap:6px"><h4 style="margin:0;flex:1">مهام الأسبوع${L.length ? ' · ' + L.length : ''}</h4><button class="btn sm ghost" type="button" data-act="tk-new" data-track="${id}">${svg('plus')}مهمة</button></div>${L.length ? `<div class="wt-list" style="margin-top:8px">${L.map(x => wtRow(id, x)).join('')}</div>` : '<p class="muted sm" style="margin-top:6px">لا مهام هذا الأسبوع.</p>'}</div>`; })()}
+    ${notes ? `<div class="dk-sec"><h4>تنبيهات واقتراحات</h4>${notes}</div>` : ''}
     <div class="dk-sec"><h4>القادمة</h4>${up.length ? `<div class="col" style="gap:6px">${up.slice(0, 10).map(a => evChip(a, id, { date: true })).join('')}</div>${up.length > 10 ? `<p class="xs faint" style="margin-top:6px">و${nActs(up.length - 10)} بعدها في الجدول</p>` : ''}` : `<p class="muted sm">لا أنشطة قادمة في الخطة.</p>`}</div>
     <p class="hint">${svg('edit', 1.6)} اضغط أي نشاط في الجدول ليُفتح هنا، أو اسحبه إلى يوم آخر.</p></div>`;
 }

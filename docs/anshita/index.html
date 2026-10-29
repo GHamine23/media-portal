@@ -749,6 +749,34 @@ details.mfold[open]>summary svg{transform:rotate(180deg)}
 .mbl{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow:auto}
 .mbr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) auto;gap:8px;align-items:center}
 @media (max-width:520px){.mbr{grid-template-columns:minmax(0,1fr) auto}.mbr [data-mb="e"]{grid-column:1;grid-row:2}}
+/* مهام الأسبوع وأوامر البوت */
+.wt-list{display:flex;flex-direction:column;gap:2px}
+.wt-row{display:flex;align-items:center;gap:10px;width:100%;text-align:start;padding:8px 6px;border-radius:12px;color:var(--ink1);font-size:14.5px;line-height:1.5}
+button.wt-row:hover,.wt-row.task:hover{background:var(--hover)}
+.wt-row .ic{width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:var(--sunken);color:var(--ink2);flex:none}
+.wt-row .ic svg{width:15px;height:15px}
+.wt-row .tx{display:flex;flex-direction:column;min-width:0;flex:1;text-align:start;align-items:flex-start}
+.wt-row .late{color:var(--bad)}
+.wt-row.k-clash .ic,.wt-row.k-who .ic{background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--warn)}
+.wt-row.k-kahoot .ic{background:color-mix(in srgb,var(--ty-kahoot) 14%,transparent);color:var(--ty-kahoot)}
+.wt-row.k-design .ic,.wt-row.k-publish .ic{background:var(--brand-t);color:var(--brand)}
+.wt-row.task .ck{flex:none}
+.lk-plain{background:none;border:0;padding:0;cursor:pointer;color:inherit;font:inherit}
+.awts{display:flex;flex-direction:column}
+details.awt{border-top:1px solid var(--line)}
+details.awt:first-child{border-top:0}
+details.awt>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:10px 2px;cursor:pointer}
+details.awt>summary::-webkit-details-marker{display:none}
+details.awt>summary .dot{width:9px;height:9px;border-radius:3px}
+details.awt>summary svg{width:16px;height:16px;color:var(--ink4);margin-inline-start:auto;transition:transform .2s}
+details.awt[open]>summary svg{transform:rotate(180deg)}
+details.awt .wt-list{padding:0 0 8px}
+.cmds{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.cmd-i{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:14px}
+.cmd-i code{font-size:13px;background:var(--sunken);border-radius:7px;padding:2px 7px;color:var(--ink1);flex:none}
+.cmd-i .tx{display:flex;flex-direction:column;gap:2px;min-width:0}
+.cmd-i .tx b{font-weight:500;font-size:14.5px}
+.cmd-i .tx span{font-size:13px;color:var(--ink3)}
 
 </style>
 </head>
@@ -1418,6 +1446,45 @@ function weekBoard(ws, tids) {
   return `<div class="board">${cols}</div>`;
 }
 
+/* ---------- مهام الأسبوع: من الخطة (الإعلان، المسؤول، اللقاءان، الكاهوت، التعليم، الأسبوع القادم) ومن المهام نفسها ---------- */
+const tasksOf = id => (planOf(id).tasks || []);
+const nTasks = n => n === 1 ? 'مهمة واحدة' : n === 2 ? 'مهمتان' : n <= 10 ? n + ' مهام' : n + ' مهمة';
+function weekTasks(id, ws) {
+  const we = add(ws, 6), out = [], acts = actsOf(id).slice().sort(sortA), S = semOf(id, curN(id)) || { days: [] };
+  acts.forEach(a => {
+    if (a.done || !remindable(a)) return;
+    const d3 = add(a.d, -3), d1 = add(a.d, -1), sent = a.sent || {};
+    if (d3 >= ws && d3 <= we && sent.d3 !== a.d) out.push({ k: 'design', d: d3, ref: a.id, text: `تصميم إعلان ${qt(a.title)} وإعداده` });
+    if (d1 >= ws && d1 <= we && sent.d1 !== a.d) out.push({ k: 'publish', d: d1, ref: a.id, text: `نشر إعلان ${qt(a.title)}` });
+  });
+  acts.forEach(a => { if (a.d >= ws && a.d <= we && !a.done && !(a.who && a.who.length)) out.push({ k: 'who', d: a.d, ref: a.id, text: `تحديد المسؤول عن ${qt(a.title)}` }); });
+  const seen = {};
+  acts.forEach(a => { if (a.d < ws || a.d > we || seen[a.d]) return; const c = clashOf(id, a); if (c) { seen[a.d] = 1; out.push({ k: 'clash', d: a.d, ref: a.id, text: `مراجعة يوم ${gDay(a.d)}: ${c}` }); } });
+  S.days.forEach(x => {
+    if (!x.ev || !/اختبار/.test(x.ev)) return; const left = diffD(x.d, ws); if (left < 0 || left > 14) return;
+    if (!acts.some(a => a.type === 'كاهوت' && a.d >= add(x.d, -12) && a.d <= x.d)) { const s = kahootSugs(id).find(k => k.ed === x.d); out.push({ k: 'kahoot', d: add(x.d, -7) < ws ? ws : add(x.d, -7), sug: s, text: `إضافة كاهوت مراجعة قبل ${x.ev} (${gDay(x.d)})` }); }
+  });
+  const prev = acts.filter(a => a.d >= add(ws, -7) && a.d < ws && !a.done);
+  if (prev.length) out.push({ k: 'mark', d: ws, text: `تعليم ما نُفّذ من أنشطة الأسبوع الماضي (${nActs(prev.length)})` });
+  const nws = add(ws, 7), nwe = add(ws, 13);
+  if (S.days.some(x => x.d >= nws && x.d <= nwe && x.c) && !acts.some(a => a.d >= nws && a.d <= nwe)) out.push({ k: 'next', d: we, text: 'وضع أنشطة الأسبوع القادم' });
+  tasksOf(id).forEach(x => { if (!x.done && (!x.d || x.d <= we)) out.push({ k: 'task', d: x.d || '', ref: x.id, text: x.title + (x.who && x.who.length ? ' (' + x.who.join('، ') + ')' : ''), late: x.d && x.d < TODAY }); });
+  return out.sort((a, b) => (a.d || '9') < (b.d || '9') ? -1 : (a.d || '9') > (b.d || '9') ? 1 : 0);
+}
+const WT_IC = { design: 'edit', publish: 'send', who: 'users', clash: 'alert', kahoot: 'target', mark: 'check', next: 'cal', task: 'check' };
+function wtRow(id, x) {
+  const ic = svg(WT_IC[x.k] || 'check');
+  const when = x.d ? `<span class="xs ${x.late ? 'late' : 'faint'}">${x.d === TODAY ? 'اليوم' : gDay(x.d)}</span>` : '';
+  if (x.k === 'task') return `<div class="wt-row task"><button class="ck round" type="button" role="checkbox" aria-checked="false" data-act="tk-done" data-id="${x.ref}" data-track="${id}" aria-label="تم">${svg('check', 2.4)}</button><button class="tx lk-plain" type="button" data-act="tk-edit" data-id="${x.ref}" data-track="${id}"><span>${esc(x.text)}</span>${when}</button></div>`;
+  const act = x.ref ? `data-act="openact" data-id="${x.ref}" data-track="${id}"` : x.k === 'kahoot' && x.sug ? `data-act="newact" data-track="${id}" data-date="${x.sug.d}" data-type="كاهوت" data-title="${esc(x.sug.title)}"` : x.k === 'next' ? `data-act="newact" data-track="${id}" data-date="${add(x.d, 1)}"` : `data-act="go" data-v="t/${id}"`;
+  return `<button class="wt-row k-${x.k}" type="button" ${act}><span class="ic">${ic}</span><span class="tx"><span>${esc(x.text)}</span>${when}</span></button>`;
+}
+function weekTasksCard(id, ws, o = {}) {
+  const L = weekTasks(id, ws || wkStart(TODAY));
+  return `<div class="card wtc"><div class="card-h"><h3>${o.title || 'مهام هذا الأسبوع'}</h3><span class="xs faint">${L.length ? nTasks(L.length) : ''}</span><span class="sp"></span><button class="btn sm ghost" type="button" data-act="tk-new" data-track="${id}">${svg('plus')}مهمة</button></div>
+    ${L.length ? `<div class="wt-list">${L.map(x => wtRow(id, x)).join('')}</div>` : `<p class="muted sm">لا مهام هذا الأسبوع. ${o.empty || 'أضيفوا مهمة إن احتجتم.'}</p>`}</div>`;
+}
+
 /* ---------- الجوال: قائمة حالة المسارات، وأجندة الأسبوع ---------- */
 function trackStrip(ws) {
   return `<div class="card strip">${D.tracks.map(t => { const h = health(t.id, ws); return `<a class="srow" href="#t/${t.id}" style="--tc:${t.color}"><span class="slogo">${logoImg(t.id)}</span><span class="col" style="min-width:0;flex:1"><b>${esc(t.name)}</b>${hlDot(h)}</span>${svg('fwd')}</a>`; }).join('')}</div>`;
@@ -1492,12 +1559,17 @@ function adminHome() {
   <div class="grid2 sect">
     <div class="card"><div class="card-h"><h3>يحتاج انتباهك</h3>${att.length ? `<span class="badge soft">${att.length}</span>` : ''}</div>
       ${att.length ? `<div class="list">${att.map(x => `<div class="li"><span class="tile sm" style="--tc:${x.k === 'warn' ? 'var(--warn)' : x.k === 'brand' ? 'var(--brand)' : 'var(--ink3)'}">${svg(x.ic)}</span><div class="tx sm">${x.html}</div>${x.act}</div>`).join('')}</div>` : `<p class="muted sm">لا شيء يحتاجك الآن.</p>`}</div>
-    <div class="card"><div class="card-h"><h3>آخر التحديثات</h3><span class="xs faint">تعديلات الفرق والإدارة</span></div>${feed(D.log, mob ? 3 : 6)}</div>
+    ${adminWeekTasks(ws)}
   </div>
   <div class="sect"><div class="sh"><h2>${HB.ws === wkStart(TODAY) ? 'هذا الأسبوع' : HB.ws === ws && pre ? 'الأسبوع الأول' : 'أسبوع ' + gShort(HB.ws)}</h2>
       <span class="xs faint">${gShort(HB.ws)} – ${gShort(we)}</span>
       <div class="row" style="gap:2px"><button class="btn icon" type="button" data-act="hbw" data-n="-7" aria-label="الأسبوع السابق">${svg('back')}</button><button class="btn sm ghost" type="button" data-act="hbw" data-n="0">${pre ? 'الأول' : 'الآن'}</button><button class="btn icon" type="button" data-act="hbw" data-n="7" aria-label="الأسبوع التالي">${svg('fwd')}</button></div></div>
-    ${mob ? agenda(HB.ws, D.tracks.map(t => t.id)) : weekBoard(HB.ws, D.tracks.map(t => t.id))}</div>`;
+    ${mob ? agenda(HB.ws, D.tracks.map(t => t.id)) : weekBoard(HB.ws, D.tracks.map(t => t.id))}</div>
+  <div class="card sect"><div class="card-h"><h3>آخر التحديثات</h3><span class="xs faint">تعديلات الفرق والإدارة</span></div>${feed(D.log, mob ? 3 : 6)}</div>`;
+}
+function adminWeekTasks(ws) {
+  const rows = D.tracks.map(t => { const L = weekTasks(t.id, ws); return `<details class="awt"><summary><span class="dot" style="background:${t.color}"></span><b>${esc(t.name)}</b><span class="xs faint">${L.length ? nTasks(L.length) : 'لا مهام'}</span>${svg('down')}</summary>${L.length ? `<div class="wt-list">${L.map(x => wtRow(t.id, x)).join('')}</div>` : ''}</details>`; }).join('');
+  return `<div class="card"><div class="card-h"><h3>مهام الأسبوع</h3><span class="xs faint">على الفرق</span></div><div class="awts">${rows}</div></div>`;
 }
 function tracksIndex() {
   const ws = focusWeek();
@@ -1547,6 +1619,7 @@ function teamHome(id, preview) {
     pageHead(todayLine(), 'أهلًا بفريق ' + t.name, esc(lead), `<div class="row" style="flex-wrap:wrap">${permPill}${botPill}</div>`) + hero + `
   <div class="cols sect">
     <section class="stack">
+      ${weekTasksCard(id, focusWeek())}
       ${teamNotes(id)}
       <div class="card"><div class="card-h"><h3>القادم خلال أسبوعين</h3><a class="lk sm" href="#t/${id}">خطة الفصل كاملة</a></div>${upList}</div>
       ${late.length ? `<div class="card"><div class="card-h"><h3>مضى موعدها</h3><span class="xs faint">علّموا ما نُفّذ</span></div><div class="list">${late.slice(-8).reverse().map(a => actRow(a, id)).join('')}</div></div>` : ''}
@@ -1771,7 +1844,8 @@ function dockIdle(id) {
   const notes = cls.map(a => `<button class="dk-note warn" type="button" data-act="openact" data-id="${a.id}" data-track="${id}">${svg('alert')}<span><b>${gDay(a.d)}:</b> ${esc(clashOf(id, a))}</span></button>`).join('') +
     kahootSugs(id).filter(s => s.left <= 30).map(s => `<div class="dk-note sug">${tile('كاهوت', 'sm')}<span>${esc(s.exam)} ${rel(s.ed)}. <b>اقتراح:</b> كاهوت مراجعة ${gDay(s.d)}.</span>${ed ? `<button class="btn sm" type="button" data-act="newact" data-track="${id}" data-date="${s.d}" data-type="كاهوت" data-title="${esc(s.title)}">أضفه</button>` : ''}</div>`).join('');
   return `<div class="dk-h"><div class="col"><span class="xs faint">لوحة النشاط</span><b>أنشطة ${esc(t.name)}</b></div>${ed ? `<button class="btn pri sm" type="button" data-act="newact" data-track="${id}">${svg('plus')}نشاط</button>` : ''}</div>
-  <div class="dk-b">${notes ? `<div class="dk-sec"><h4>تنبيهات واقتراحات</h4>${notes}</div>` : ''}
+  <div class="dk-b">${(() => { const L = weekTasks(id, focusWeek()); return `<div class="dk-sec"><div class="row" style="gap:6px"><h4 style="margin:0;flex:1">مهام الأسبوع${L.length ? ' · ' + L.length : ''}</h4><button class="btn sm ghost" type="button" data-act="tk-new" data-track="${id}">${svg('plus')}مهمة</button></div>${L.length ? `<div class="wt-list" style="margin-top:8px">${L.map(x => wtRow(id, x)).join('')}</div>` : '<p class="muted sm" style="margin-top:6px">لا مهام هذا الأسبوع.</p>'}</div>`; })()}
+    ${notes ? `<div class="dk-sec"><h4>تنبيهات واقتراحات</h4>${notes}</div>` : ''}
     <div class="dk-sec"><h4>القادمة</h4>${up.length ? `<div class="col" style="gap:6px">${up.slice(0, 10).map(a => evChip(a, id, { date: true })).join('')}</div>${up.length > 10 ? `<p class="xs faint" style="margin-top:6px">و${nActs(up.length - 10)} بعدها في الجدول</p>` : ''}` : `<p class="muted sm">لا أنشطة قادمة في الخطة.</p>`}</div>
     <p class="hint">${svg('edit', 1.6)} اضغط أي نشاط في الجدول ليُفتح هنا، أو اسحبه إلى يوم آخر.</p></div>`;
 }
@@ -2013,6 +2087,31 @@ async function saveF() {
   } catch (e) {}
 }
 
+/* ---------- المهام ---------- */
+let TK = null;
+function taskDialog(tid, id) {
+  const x = id ? tasksOf(tid).find(y => y.id === id) : null;
+  TK = x ? JSON.parse(JSON.stringify(x)) : { title: '', d: '', who: [], done: false };
+  TK.tid = tid; TK.isNew = !x; drawTask();
+}
+function drawTask() {
+  const t = T(TK.tid);
+  openDialog(`<h3>${TK.isNew ? 'مهمة جديدة' : 'المهمة'} <span class="xs faint">· ${esc(t.name)}</span></h3>
+    <div class="field"><label for="tk-t">المهمة</label><input class="inp" id="tk-t" value="${esc(TK.title)}" placeholder="مثل: تجهيز أسئلة الكاهوت" autofocus></div>
+    <div class="field"><label for="tk-d">قبل يوم</label><input class="inp" id="tk-d" type="date" value="${TK.d || ''}"></div>
+    <div class="field"><span class="flabel">من يقوم بها</span><div class="whos">${members(TK.tid).map(w => `<button class="chip" type="button" aria-pressed="${(TK.who || []).includes(w)}" data-act="tk-who" data-v="${esc(w)}">${esc(w)}</button>`).join('') || '<span class="muted sm">أضيفوا أسماء الفريق من «الفريق».</span>'}</div></div>
+    ${TK.isNew ? '' : `<div class="opt" style="border-top:0"><button class="ck round ok" type="button" role="checkbox" aria-checked="${!!TK.done}" data-act="tk-tgl" aria-label="تمت">${svg('check', 2.4)}</button><div class="tx"><b>تمت</b></div></div>`}
+    <div class="row"><button class="btn pri" type="button" data-act="tk-save">${TK.isNew ? 'أضف المهمة' : 'احفظ'}</button><button class="btn" type="button" data-act="close">إلغاء</button><span class="sp"></span>${TK.isNew ? '' : `<button class="btn danger" type="button" data-act="tk-del">حذف</button>`}</div>`);
+}
+function readTK() { if (!TK) return; const a = $('#tk-t'), b = $('#tk-d'); if (a) TK.title = a.value; if (b) TK.d = b.value; }
+async function saveTask(tid, patch, quiet) {
+  const p = planOf(tid); p.tasks = p.tasks || [];
+  const i = patch.id ? p.tasks.findIndex(x => x.id === patch.id) : -1, prev = i >= 0 ? p.tasks[i] : null;
+  if (prev) p.tasks[i] = Object.assign({}, prev, patch); render(); setSync('busy');
+  try { const r = await API.me('task_save', tid, JSON.stringify(patch)); const j = p.tasks.findIndex(x => x.id === r.task.id); if (j >= 0) p.tasks[j] = r.task; else p.tasks.push(r.task); p.rev = r.rev; D.revs[tid] = r.rev; setSync('ok'); render(); return r.task; }
+  catch (e) { if (prev) p.tasks[i] = prev; setSync('ok'); render(); toast(e.message, 'err'); throw e; }
+}
+
 /* ---------- تعديل يوم في الجدول، والتحرير داخل الخلية ---------- */
 function dayEdit(id, n, d) {
   const x = dayOf(id, n, d); if (!x) return;
@@ -2173,6 +2272,17 @@ async function calSet(id) {
 }
 
 /* ---------- بوت التذكيرات (الإدارة) ---------- */
+// أوامر البوت (تطابق BOT_COMMANDS في الخادم): [الأمر، المهمة، ما يسأل عنه البوت]
+const BOT_CMDS = [
+  ['help', 'ما يستطيع البوت فعله', 'يعرض هذه القائمة.'],
+  ['week', 'خطة هذا الأسبوع ومهامه', 'يعرض أنشطة الأسبوع ومهامه لمسار المجموعة.'],
+  ['add', 'إضافة نشاط', 'يسأل عن: الاسم، والنوع، واليوم، والوقت، والمسؤول، والفكرة باختصار.'],
+  ['task', 'إضافة مهمة', 'يسأل عن: المهمة، ومن يقوم بها، وقبل أي يوم.'],
+  ['edit', 'تعديل نشاط', 'يسأل: أي نشاط، وما الذي يتغيّر (الموعد، المسؤول، الاسم، الفكرة)، والقيمة الجديدة.'],
+  ['done', 'تعليم «تم»', 'يسأل: أي نشاط أو مهمة، وملاحظة قصيرة بعد التنفيذ (اختيارية).'],
+  ['meet', 'رابط ميت للقاء', 'يسأل: أي لقاء، ثم يرسل الرابط ويجعل المسؤولين مشرفين فيه.'],
+  ['remove', 'حذف نشاط أو مهمة', 'يسأل: أيها، ويطلب التأكيد قبل الحذف.']
+];
 let BS = null, BS_LOAD = false, WATCH = null;
 VIEWS.bot = {
   admin: true,
@@ -2199,6 +2309,10 @@ VIEWS.bot = {
     return pageHead('', 'بوت التذكيرات', '', `<div class="card flat" style="padding:12px 16px;min-width:270px"><div class="row"><span class="tile" style="--tc:var(--brand)">${svg('bot')}</span><div class="col" style="flex:1;min-width:0"><b>${esc(bot.name || '')}</b><a class="xs lk" href="https://t.me/${esc(bot.username)}" target="_blank" rel="noopener"><bdi>@${esc(bot.username || '')}</bdi></a></div><button class="btn icon" type="button" data-act="bot-refresh" aria-label="تحديث" data-tip="تحديث">${svg('refresh')}</button></div>
       <div class="xs faint" style="margin-top:8px">${lt ? `آخر تشغيل ${ago(lt.at)}${lt.sent ? ' · أُرسلت ' + lt.sent : ''}${lt.ok ? '' : ' · ' + esc(lt.msg)}` : 'يعمل كل ساعة'}</div></div>`) + `
     <div class="card ${BS.settings.groupsPaused ? 'paused' : ''}" style="margin-bottom:16px"><div class="opt" style="border:0;padding:0"><span class="tile sm" style="--tc:var(--warn)">${svg('alert')}</span><div class="tx"><b>${BS.settings.groupsPaused ? 'الإرسال في المجموعات موقوف' : 'الإرسال في المجموعات يعمل'}</b><span>${BS.settings.groupsPaused ? 'لا يرسل البوت شيئًا في المجموعات: لا تذكيرات ولا ملخصات ولا تنبيهات ولا رسائل ربط. ويبقى ما يصلك على الخاص. التذكيرات المستحقة تُرسل بعد إعادة التشغيل.' : 'التذكيرات والملخصات والتنبيهات تصل مجموعات الفرق.'}</span></div><button class="sw" type="button" role="switch" aria-checked="${!BS.settings.groupsPaused}" data-act="bs-pause" aria-label="الإرسال في المجموعات"></button></div></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-h"><h3>مهام البوت</h3><span class="xs faint">تظهر للفرق حين يكتبون / في المجموعة</span><span class="sp"></span><button class="btn sm ghost" type="button" data-act="bot-menu">${svg('refresh')}حدّث القائمة في تليجرام</button></div>
+      <div class="cmds">${BOT_CMDS.map(c => `<div class="cmd-i"><code dir="ltr">/${c[0]}</code><div class="tx"><b>${c[1]}</b><span>${c[2]}</span></div></div>`).join('')}</div>
+      <p class="hint" style="margin-top:10px">${svg('bot')} يسأل البوت عن كل تفصيل ينقصه قبل التنفيذ، ثم يقول «تم». وما يحتاج صلاحية أوسع من صلاحية الفريق يرجع فيه إليك على الخاص.</p>
+      <div class="opt"><div class="tx"><b>مهام الأسبوع لك على الخاص</b><span>كل سبت مع الملخص: مهام كل مسار، وما يحتاج قرارك</span></div><button class="sw" type="button" role="switch" aria-checked="${BS.settings.adminTasks !== false}" data-act="bs-atasks" aria-label="مهام الأسبوع على الخاص"></button></div></div>
     <div class="cols">
       <section class="stack">
         <div class="card"><div class="card-h"><h3>مجموعات الفرق</h3><span class="xs faint">${BS.tracks.filter(t => t.chat).length} من ${BS.tracks.length} مربوطة</span></div>
@@ -2398,6 +2512,16 @@ const H = {
     try { const r = await API.me('meet_unlink', f.tid, f.id); const p = planOf(f.tid), i = p.acts.findIndex(a => a.id === f.id); if (i >= 0) p.acts[i] = r.act; p.rev = r.rev; D.revs[f.tid] = r.rev; if (F === f) { readF(); delete F.meet; drawAct(true); } render(); toast('أُزيل الرابط من النشاط'); } catch (e) { toast(e.message, 'err'); }
   },
   'f-copy': el => { const v = el.dataset.v; const ok = () => toast('نُسخ الرابط'); try { navigator.clipboard.writeText(v).then(ok, () => toast(v)); } catch (e) { toast(v); } },
+  go: el => { location.hash = '#' + el.dataset.v; },
+  'tk-new': el => taskDialog(el.dataset.track || (isAdmin() ? D.tracks[0].id : myTrack())),
+  'tk-edit': el => taskDialog(el.dataset.track, el.dataset.id),
+  'tk-who': el => { readTK(); const w = el.dataset.v; TK.who = (TK.who || []).includes(w) ? TK.who.filter(x => x !== w) : (TK.who || []).concat(w); drawTask(); },
+  'tk-tgl': () => { readTK(); TK.done = !TK.done; drawTask(); },
+  'tk-save': () => { readTK(); if (!TK.title.trim()) { toast('اكتب المهمة', 'err'); return; } const k = TK, patch = { title: k.title.trim(), d: k.d || '', who: k.who || [] }; if (!k.isNew) Object.assign(patch, { id: k.id, done: !!k.done }); closeLayer(); saveTask(k.tid, patch).then(r => toast(k.isNew ? 'أُضيفت المهمة' : 'حُفظت المهمة')).catch(() => {}); },
+  'tk-del': async el => { if (!armed(el, 'تأكيد الحذف')) return; const k = TK; closeLayer(); const p = planOf(k.tid), i = p.tasks.findIndex(x => x.id === k.id), prev = p.tasks[i]; p.tasks.splice(i, 1); render(); try { const r = await API.me('task_del', k.tid, k.id); p.rev = r.rev; D.revs[k.tid] = r.rev; toast('حُذفت المهمة'); } catch (e) { p.tasks.splice(i, 0, prev); render(); toast(e.message, 'err'); } },
+  'tk-done': el => { saveTask(el.dataset.track, { id: el.dataset.id, done: true }).then(() => toast('أُنجزت المهمة', '', () => saveTask(el.dataset.track, { id: el.dataset.id, done: false }))).catch(() => {}); },
+  'bot-menu': async () => { try { const r = await API.me('tg_menu'); toast('حُدّثت قائمة أوامر البوت في تليجرام (' + r.n + ')'); } catch (e) { toast(e.message, 'err'); } },
+  'bs-atasks': async () => { const v = !(BS.settings.adminTasks !== false); try { await API.me('settings_save', JSON.stringify({ adminTasks: v })); BS.settings.adminTasks = v; render(); } catch (e) { toast(e.message, 'err'); } },
   'f-cancel': closeAct, 'f-day': el => { readF(); F.d = el.dataset.v; drawAct(true); },
   'al-seen': () => alertsSeen(true),
   done: el => { const tid = el.dataset.track, a = planOf(tid).acts.find(x => x.id === el.dataset.id); if (!a) return; const v = !a.done; saveAct(tid, { id: a.id, done: v }).then(() => toast(v ? `تم تنفيذ ${qt(a.title)}` : 'أُعيد إلى الخطة', '', () => saveAct(tid, { id: a.id, done: !v }))).catch(() => {}); },

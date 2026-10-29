@@ -735,3 +735,31 @@ details.mfold[open]>summary svg{transform:rotate(180deg)}
 .mbl{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow:auto}
 .mbr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) auto;gap:8px;align-items:center}
 @media (max-width:520px){.mbr{grid-template-columns:minmax(0,1fr) auto}.mbr [data-mb="e"]{grid-column:1;grid-row:2}}
+/* مهام الأسبوع وأوامر البوت */
+.wt-list{display:flex;flex-direction:column;gap:2px}
+.wt-row{display:flex;align-items:center;gap:10px;width:100%;text-align:start;padding:8px 6px;border-radius:12px;color:var(--ink1);font-size:14.5px;line-height:1.5}
+button.wt-row:hover,.wt-row.task:hover{background:var(--hover)}
+.wt-row .ic{width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:var(--sunken);color:var(--ink2);flex:none}
+.wt-row .ic svg{width:15px;height:15px}
+.wt-row .tx{display:flex;flex-direction:column;min-width:0;flex:1;text-align:start;align-items:flex-start}
+.wt-row .late{color:var(--bad)}
+.wt-row.k-clash .ic,.wt-row.k-who .ic{background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--warn)}
+.wt-row.k-kahoot .ic{background:color-mix(in srgb,var(--ty-kahoot) 14%,transparent);color:var(--ty-kahoot)}
+.wt-row.k-design .ic,.wt-row.k-publish .ic{background:var(--brand-t);color:var(--brand)}
+.wt-row.task .ck{flex:none}
+.lk-plain{background:none;border:0;padding:0;cursor:pointer;color:inherit;font:inherit}
+.awts{display:flex;flex-direction:column}
+details.awt{border-top:1px solid var(--line)}
+details.awt:first-child{border-top:0}
+details.awt>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:10px 2px;cursor:pointer}
+details.awt>summary::-webkit-details-marker{display:none}
+details.awt>summary .dot{width:9px;height:9px;border-radius:3px}
+details.awt>summary svg{width:16px;height:16px;color:var(--ink4);margin-inline-start:auto;transition:transform .2s}
+details.awt[open]>summary svg{transform:rotate(180deg)}
+details.awt .wt-list{padding:0 0 8px}
+.cmds{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.cmd-i{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:14px}
+.cmd-i code{font-size:13px;background:var(--sunken);border-radius:7px;padding:2px 7px;color:var(--ink1);flex:none}
+.cmd-i .tx{display:flex;flex-direction:column;gap:2px;min-width:0}
+.cmd-i .tx b{font-weight:500;font-size:14.5px}
+.cmd-i .tx span{font-size:13px;color:var(--ink3)}

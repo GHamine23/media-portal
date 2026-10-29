@@ -153,6 +153,31 @@ async function saveF() {
   } catch (e) {}
 }
 
+/* ---------- المهام ---------- */
+let TK = null;
+function taskDialog(tid, id) {
+  const x = id ? tasksOf(tid).find(y => y.id === id) : null;
+  TK = x ? JSON.parse(JSON.stringify(x)) : { title: '', d: '', who: [], done: false };
+  TK.tid = tid; TK.isNew = !x; drawTask();
+}
+function drawTask() {
+  const t = T(TK.tid);
+  openDialog(`<h3>${TK.isNew ? 'مهمة جديدة' : 'المهمة'} <span class="xs faint">· ${esc(t.name)}</span></h3>
+    <div class="field"><label for="tk-t">المهمة</label><input class="inp" id="tk-t" value="${esc(TK.title)}" placeholder="مثل: تجهيز أسئلة الكاهوت" autofocus></div>
+    <div class="field"><label for="tk-d">قبل يوم</label><input class="inp" id="tk-d" type="date" value="${TK.d || ''}"></div>
+    <div class="field"><span class="flabel">من يقوم بها</span><div class="whos">${members(TK.tid).map(w => `<button class="chip" type="button" aria-pressed="${(TK.who || []).includes(w)}" data-act="tk-who" data-v="${esc(w)}">${esc(w)}</button>`).join('') || '<span class="muted sm">أضيفوا أسماء الفريق من «الفريق».</span>'}</div></div>
+    ${TK.isNew ? '' : `<div class="opt" style="border-top:0"><button class="ck round ok" type="button" role="checkbox" aria-checked="${!!TK.done}" data-act="tk-tgl" aria-label="تمت">${svg('check', 2.4)}</button><div class="tx"><b>تمت</b></div></div>`}
+    <div class="row"><button class="btn pri" type="button" data-act="tk-save">${TK.isNew ? 'أضف المهمة' : 'احفظ'}</button><button class="btn" type="button" data-act="close">إلغاء</button><span class="sp"></span>${TK.isNew ? '' : `<button class="btn danger" type="button" data-act="tk-del">حذف</button>`}</div>`);
+}
+function readTK() { if (!TK) return; const a = $('#tk-t'), b = $('#tk-d'); if (a) TK.title = a.value; if (b) TK.d = b.value; }
+async function saveTask(tid, patch, quiet) {
+  const p = planOf(tid); p.tasks = p.tasks || [];
+  const i = patch.id ? p.tasks.findIndex(x => x.id === patch.id) : -1, prev = i >= 0 ? p.tasks[i] : null;
+  if (prev) p.tasks[i] = Object.assign({}, prev, patch); render(); setSync('busy');
+  try { const r = await API.me('task_save', tid, JSON.stringify(patch)); const j = p.tasks.findIndex(x => x.id === r.task.id); if (j >= 0) p.tasks[j] = r.task; else p.tasks.push(r.task); p.rev = r.rev; D.revs[tid] = r.rev; setSync('ok'); render(); return r.task; }
+  catch (e) { if (prev) p.tasks[i] = prev; setSync('ok'); render(); toast(e.message, 'err'); throw e; }
+}
+
 /* ---------- تعديل يوم في الجدول، والتحرير داخل الخلية ---------- */
 function dayEdit(id, n, d) {
   const x = dayOf(id, n, d); if (!x) return;
@@ -313,6 +338,17 @@ async function calSet(id) {
 }
 
 /* ---------- بوت التذكيرات (الإدارة) ---------- */
+// أوامر البوت (تطابق BOT_COMMANDS في الخادم): [الأمر، المهمة، ما يسأل عنه البوت]
+const BOT_CMDS = [
+  ['help', 'ما يستطيع البوت فعله', 'يعرض هذه القائمة.'],
+  ['week', 'خطة هذا الأسبوع ومهامه', 'يعرض أنشطة الأسبوع ومهامه لمسار المجموعة.'],
+  ['add', 'إضافة نشاط', 'يسأل عن: الاسم، والنوع، واليوم، والوقت، والمسؤول، والفكرة باختصار.'],
+  ['task', 'إضافة مهمة', 'يسأل عن: المهمة، ومن يقوم بها، وقبل أي يوم.'],
+  ['edit', 'تعديل نشاط', 'يسأل: أي نشاط، وما الذي يتغيّر (الموعد، المسؤول، الاسم، الفكرة)، والقيمة الجديدة.'],
+  ['done', 'تعليم «تم»', 'يسأل: أي نشاط أو مهمة، وملاحظة قصيرة بعد التنفيذ (اختيارية).'],
+  ['meet', 'رابط ميت للقاء', 'يسأل: أي لقاء، ثم يرسل الرابط ويجعل المسؤولين مشرفين فيه.'],
+  ['remove', 'حذف نشاط أو مهمة', 'يسأل: أيها، ويطلب التأكيد قبل الحذف.']
+];
 let BS = null, BS_LOAD = false, WATCH = null;
 VIEWS.bot = {
   admin: true,
@@ -339,6 +375,10 @@ VIEWS.bot = {
     return pageHead('', 'بوت التذكيرات', '', `<div class="card flat" style="padding:12px 16px;min-width:270px"><div class="row"><span class="tile" style="--tc:var(--brand)">${svg('bot')}</span><div class="col" style="flex:1;min-width:0"><b>${esc(bot.name || '')}</b><a class="xs lk" href="https://t.me/${esc(bot.username)}" target="_blank" rel="noopener"><bdi>@${esc(bot.username || '')}</bdi></a></div><button class="btn icon" type="button" data-act="bot-refresh" aria-label="تحديث" data-tip="تحديث">${svg('refresh')}</button></div>
       <div class="xs faint" style="margin-top:8px">${lt ? `آخر تشغيل ${ago(lt.at)}${lt.sent ? ' · أُرسلت ' + lt.sent : ''}${lt.ok ? '' : ' · ' + esc(lt.msg)}` : 'يعمل كل ساعة'}</div></div>`) + `
     <div class="card ${BS.settings.groupsPaused ? 'paused' : ''}" style="margin-bottom:16px"><div class="opt" style="border:0;padding:0"><span class="tile sm" style="--tc:var(--warn)">${svg('alert')}</span><div class="tx"><b>${BS.settings.groupsPaused ? 'الإرسال في المجموعات موقوف' : 'الإرسال في المجموعات يعمل'}</b><span>${BS.settings.groupsPaused ? 'لا يرسل البوت شيئًا في المجموعات: لا تذكيرات ولا ملخصات ولا تنبيهات ولا رسائل ربط. ويبقى ما يصلك على الخاص. التذكيرات المستحقة تُرسل بعد إعادة التشغيل.' : 'التذكيرات والملخصات والتنبيهات تصل مجموعات الفرق.'}</span></div><button class="sw" type="button" role="switch" aria-checked="${!BS.settings.groupsPaused}" data-act="bs-pause" aria-label="الإرسال في المجموعات"></button></div></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-h"><h3>مهام البوت</h3><span class="xs faint">تظهر للفرق حين يكتبون / في المجموعة</span><span class="sp"></span><button class="btn sm ghost" type="button" data-act="bot-menu">${svg('refresh')}حدّث القائمة في تليجرام</button></div>
+      <div class="cmds">${BOT_CMDS.map(c => `<div class="cmd-i"><code dir="ltr">/${c[0]}</code><div class="tx"><b>${c[1]}</b><span>${c[2]}</span></div></div>`).join('')}</div>
+      <p class="hint" style="margin-top:10px">${svg('bot')} يسأل البوت عن كل تفصيل ينقصه قبل التنفيذ، ثم يقول «تم». وما يحتاج صلاحية أوسع من صلاحية الفريق يرجع فيه إليك على الخاص.</p>
+      <div class="opt"><div class="tx"><b>مهام الأسبوع لك على الخاص</b><span>كل سبت مع الملخص: مهام كل مسار، وما يحتاج قرارك</span></div><button class="sw" type="button" role="switch" aria-checked="${BS.settings.adminTasks !== false}" data-act="bs-atasks" aria-label="مهام الأسبوع على الخاص"></button></div></div>
     <div class="cols">
       <section class="stack">
         <div class="card"><div class="card-h"><h3>مجموعات الفرق</h3><span class="xs faint">${BS.tracks.filter(t => t.chat).length} من ${BS.tracks.length} مربوطة</span></div>
@@ -538,6 +578,16 @@ const H = {
     try { const r = await API.me('meet_unlink', f.tid, f.id); const p = planOf(f.tid), i = p.acts.findIndex(a => a.id === f.id); if (i >= 0) p.acts[i] = r.act; p.rev = r.rev; D.revs[f.tid] = r.rev; if (F === f) { readF(); delete F.meet; drawAct(true); } render(); toast('أُزيل الرابط من النشاط'); } catch (e) { toast(e.message, 'err'); }
   },
   'f-copy': el => { const v = el.dataset.v; const ok = () => toast('نُسخ الرابط'); try { navigator.clipboard.writeText(v).then(ok, () => toast(v)); } catch (e) { toast(v); } },
+  go: el => { location.hash = '#' + el.dataset.v; },
+  'tk-new': el => taskDialog(el.dataset.track || (isAdmin() ? D.tracks[0].id : myTrack())),
+  'tk-edit': el => taskDialog(el.dataset.track, el.dataset.id),
+  'tk-who': el => { readTK(); const w = el.dataset.v; TK.who = (TK.who || []).includes(w) ? TK.who.filter(x => x !== w) : (TK.who || []).concat(w); drawTask(); },
+  'tk-tgl': () => { readTK(); TK.done = !TK.done; drawTask(); },
+  'tk-save': () => { readTK(); if (!TK.title.trim()) { toast('اكتب المهمة', 'err'); return; } const k = TK, patch = { title: k.title.trim(), d: k.d || '', who: k.who || [] }; if (!k.isNew) Object.assign(patch, { id: k.id, done: !!k.done }); closeLayer(); saveTask(k.tid, patch).then(r => toast(k.isNew ? 'أُضيفت المهمة' : 'حُفظت المهمة')).catch(() => {}); },
+  'tk-del': async el => { if (!armed(el, 'تأكيد الحذف')) return; const k = TK; closeLayer(); const p = planOf(k.tid), i = p.tasks.findIndex(x => x.id === k.id), prev = p.tasks[i]; p.tasks.splice(i, 1); render(); try { const r = await API.me('task_del', k.tid, k.id); p.rev = r.rev; D.revs[k.tid] = r.rev; toast('حُذفت المهمة'); } catch (e) { p.tasks.splice(i, 0, prev); render(); toast(e.message, 'err'); } },
+  'tk-done': el => { saveTask(el.dataset.track, { id: el.dataset.id, done: true }).then(() => toast('أُنجزت المهمة', '', () => saveTask(el.dataset.track, { id: el.dataset.id, done: false }))).catch(() => {}); },
+  'bot-menu': async () => { try { const r = await API.me('tg_menu'); toast('حُدّثت قائمة أوامر البوت في تليجرام (' + r.n + ')'); } catch (e) { toast(e.message, 'err'); } },
+  'bs-atasks': async () => { const v = !(BS.settings.adminTasks !== false); try { await API.me('settings_save', JSON.stringify({ adminTasks: v })); BS.settings.adminTasks = v; render(); } catch (e) { toast(e.message, 'err'); } },
   'f-cancel': closeAct, 'f-day': el => { readF(); F.d = el.dataset.v; drawAct(true); },
   'al-seen': () => alertsSeen(true),
   done: el => { const tid = el.dataset.track, a = planOf(tid).acts.find(x => x.id === el.dataset.id); if (!a) return; const v = !a.done; saveAct(tid, { id: a.id, done: v }).then(() => toast(v ? `تم تنفيذ ${qt(a.title)}` : 'أُعيد إلى الخطة', '', () => saveAct(tid, { id: a.id, done: !v }))).catch(() => {}); },

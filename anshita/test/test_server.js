@@ -12,7 +12,7 @@ vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'anshita/server/Code.gs'), 'utf8'), ctx, { filename: 'Code.gs' });
 
 // تليجرام وهمي: طابور تحديثات + سجل الرسائل
-const TG = { sent: [], updates: [], uid: 1 };
+const TG = { sent: [], updates: [], uid: 1 }, ALLSENT = [];
 const SHEET = fs.readFileSync(path.join(__dirname, 'fixtures/judhoor.csv'), 'utf8');
 const MEET = { calls: [], off: false, n: 0 };
 GAS._fetch.handler = function (url, opt) {
@@ -31,11 +31,11 @@ GAS._fetch.handler = function (url, opt) {
     const m = url.split('/').pop(), p = opt.payload || {};
     if (url.indexOf('/botBAD') >= 0) return { code: 401, body: JSON.stringify({ ok: false, description: 'Unauthorized' }) };
     if (m === 'getMe') return { code: 200, body: JSON.stringify({ ok: true, result: { id: 9, username: 'anshita_bot', first_name: 'بوت الأنشطة' } }) };
-    if (m === 'deleteWebhook') return { code: 200, body: '{"ok":true,"result":true}' };
+    if (m === 'deleteWebhook' || m === 'setMyCommands') return { code: 200, body: '{"ok":true,"result":true}' };
     if (m === 'getUpdates') { if (p.offset) TG.offsetUsed = true; const off = +p.offset || 0; return { code: 200, body: JSON.stringify({ ok: true, result: TG.updates.filter(u => u.update_id >= off) }) }; }
     if (m === 'sendMessage') {
       if (TG.migrate && String(p.chat_id) === TG.migrate[0]) return { code: 400, body: JSON.stringify({ ok: false, description: 'Bad Request: group chat was upgraded to a supergroup chat', parameters: { migrate_to_chat_id: +TG.migrate[1] } }) };
-      TG.sent.push({ chat: String(p.chat_id), text: p.text }); return { code: 200, body: JSON.stringify({ ok: true, result: { message_id: TG.sent.length } }) };
+      TG.sent.push({ chat: String(p.chat_id), text: p.text, html: p.parse_mode === 'HTML' }); ALLSENT.push(TG.sent[TG.sent.length - 1]); return { code: 200, body: JSON.stringify({ ok: true, result: { message_id: TG.sent.length } }) };
     }
   }
   return { code: 404, body: '' };
@@ -153,17 +153,17 @@ NOW = Date.UTC(2026, 9, 30, 5, 0);   // ٣٠ أكتوبر ٨:٠٠ — قبل س�
 ctx.tick(); ok(TG.sent.length === 0, 'لا إرسال قبل الساعة العاشرة');
 NOW = Date.UTC(2026, 9, 30, 8, 0);   // ١١:٠٠ — قبل اللقاء بثلاثة أيام
 ctx.tick();
-ok(TG.sent.length === 1 && /حان وقت تصميم إعلان اللقاء/.test(TG.sent[0].text) && /بعد 3 أيام/.test(TG.sent[0].text) && /موعده الإثنين 2 نوفمبر الساعة 9:30 م \(بعد 3 أيام\)/.test(TG.sent[0].text), 'تذكير الإعداد قبل ثلاثة أيام: ' + (TG.sent[0] || {}).text);
+ok(TG.sent.length === 1 && TG.sent[0].html && /إعلان «لقاء الافتتاح»/.test(TG.sent[0].text) && /الموعد: الإثنين 2 نوفمبر الساعة 9:30 م \(بعد 3 أيام\)/.test(TG.sent[0].text) && /المطلوب اليوم: تصميم الإعلان/.test(TG.sent[0].text) && /مقرر الطلاب يومها/.test(TG.sent[0].text), 'تذكير الإعداد قبل ثلاثة أيام غني بالتفاصيل: ' + (TG.sent[0] || {}).text);
 ctx.tick(); ok(TG.sent.length === 1, 'لا تكرار في الساعة التالية');
-NOW = Date.UTC(2026, 9, 31, 8, 0); ctx.tick(); ok(TG.sent.filter(m => /^تذكير/.test(m.text)).length === 1, 'لا تذكير إعداد ثانٍ قبل يومين');
-ok(TG.sent.some(m => m.chat === '-100111' && /أنشطة هذا الأسبوع في مسار جذور/.test(m.text)), 'ملخص الأسبوع للمجموعة يوم السبت');
+NOW = Date.UTC(2026, 9, 31, 8, 0); ctx.tick(); ok(TG.sent.filter(m => /المطلوب اليوم: تصميم الإعلان/.test(m.text)).length === 1, 'لا تذكير إعداد ثانٍ قبل يومين');
+ok(TG.sent.some(m => m.chat === '-100111' && /خطة الأسبوع/.test(m.text) && /مسار جذور/.test(m.text) && /<b>الأنشطة<\/b>/.test(m.text)), 'ملخص الأسبوع ومهامه للمجموعة يوم السبت');
 // تعديل موعد اللقاء قبله بيومين: تنبيه المجموعة
 call('act_save', A, 'judhoor', JSON.stringify({ id: m1.id, d: '2026-11-03' }));
 ok(/تعديل في الخطة/.test(TG.sent[TG.sent.length - 1].text), 'تنبيه نقل لقاء قريب');
 const n0 = TG.sent.length;
 NOW = Date.UTC(2026, 10, 2, 8, 0); ctx.tick();
-const d1 = TG.sent.slice(n0).filter(m => /موعد نشر إعلان اللقاء/.test(m.text));
-ok(d1.length === 1 && /غدًا/.test(d1[0].text), 'تذكير النشر قبل يوم');
+const d1 = TG.sent.slice(n0).filter(m => /المطلوب اليوم: نشر الإعلان/.test(m.text));
+ok(d1.length === 1 && /غدًا/.test(d1[0].text) && /التصميم:/.test(d1[0].text), 'تذكير النشر قبل يوم');
 const n1 = TG.sent.length; ctx.tick(); ok(TG.sent.length === n1, 'لا تكرار لتذكير النشر');
 // لقاء أُضيف متأخراً (بعد يومين): يصله تذكير الإعداد بصيغة «بعد يومين»
 call('act_save', A, 'judhoor', JSON.stringify({ title: 'استضافة: سيرة عثمان', d: '2026-11-04', time: '20:00', type: 'استضافة' }));
@@ -208,13 +208,13 @@ const before = newCal._events().length;
 call('act_del', A, 'judhoor', m1.id);
 ok(newCal._events().length === before - 1, 'حذف النشاط يحذف حدثه');
 const sv = call('settings_save', A, JSON.stringify({ remindHour: 18, tpl: { d3: 'إعداد: {العنوان} {متى}' } }));
-ok(sv.settings.remindHour === 18 && sv.settings.tpl.d3 === 'إعداد: {العنوان} {متى}' && /نشر/.test(sv.settings.tpl.d1), 'حفظ الإعدادات والقوالب');
+ok(sv.settings.remindHour === 18 && sv.settings.tpl.d3 === 'إعداد: {العنوان} {متى}' && !ctx.customTpl_(sv.settings, 'd1'), 'حفظ الإعدادات والقوالب (والفارغ يعني الرسائل الغنية)');
 
 function np2tok() { return call('login', 'judhoor', rs.pass).token; }
 // ٧ب) التنبيهات: الإرسال إلى محادثة الإدارة، والتعليم كمقروء
 const nA = TG.sent.length;
 call('act_save', np2tok(), 'judhoor', JSON.stringify({ id: t1.id, d: '2026-11-07' }));
-ok(TG.sent.slice(nA).some(m => m.chat === '5555' && /غيّر|عدّل/.test(m.text) && /الموعد: من/.test(m.text)), 'تنبيه تليجرام للإدارة بتغيير الموعد');
+ok(TG.sent.slice(nA).some(m => m.chat === '5555' && m.html && /تغيير موعد/.test(m.text) && /الموعد: <s>/.test(m.text)), 'تنبيه تليجرام للإدارة بتغيير الموعد');
 const AA = call('login', 'admin', cred.admin).token;
 ok(call('alerts_seen', AA, 'all').unseen === 0 && call('boot', AA).unseen === 0, 'تعليم التنبيهات مقروءة');
 throws(() => call('alerts', np2tok()), /للإدارة/, 'الفريق لا يقرأ التنبيهات');
@@ -275,10 +275,31 @@ throws(() => call('report_data', rk), /مفتاح/, 'المفتاح القديم
   call('settings_save', AP, JSON.stringify({ groupsPaused: false }));
 }
 
+// ١٣) المهام ومهام الأسبوع، وقائمة أوامر البوت
+{
+  const AT = call('login', 'admin', cred.admin).token, JT = call('login', 'judhoor', rs.pass).token;
+  const tk = call('task_save', JT, 'judhoor', JSON.stringify({ title: 'تجهيز أسئلة الكاهوت', d: '2026-12-03', who: ['معاذ'] })).task;
+  ok(tk.id && tk.by && !tk.done, 'الفريق يضيف مهمة ولو أُغلقت إضافة الأنشطة');
+  throws(() => call('task_save', call('login', 'ishraq', cred.ishraq).token, 'judhoor', JSON.stringify({ title: 'x' })), /صلاحيتك/, 'لا مهام لمسار غيرك');
+  const wt = ctx.weekTasks_(ctx.trackOf_('judhoor'), ctx.plan_('judhoor'), '2026-11-28', ctx.cfg_());
+  ok(wt.some(x => x.k === 'task' && /الكاهوت/.test(x.text)), 'المهمة في مهام أسبوعها');
+  ok(wt.some(x => x.k === 'kahoot' && /الاختبار النصفي/.test(x.text)), 'اقتراح الكاهوت في مهام الأسبوع قبل الاختبار');
+  const done = call('task_save', JT, 'judhoor', JSON.stringify({ id: tk.id, done: true })).task; ok(done.done, 'تعليم المهمة تم');
+  ok(!ctx.weekTasks_(ctx.trackOf_('judhoor'), ctx.plan_('judhoor'), '2026-11-28', ctx.cfg_()).some(x => x.ref === tk.id), 'المهمة المنجزة تخرج من القائمة');
+  call('task_del', JT, 'judhoor', tk.id);
+  const rd2 = call('report_data', call('report_key', AT).key, 7); ok(Array.isArray(rd2.tracks[0].weekTasks) && Array.isArray(rd2.tracks[0].tasks), 'التقرير فيه مهام الأسبوع');
+  const m = call('tg_menu', AT); ok(m.ok && m.n === 8, 'قائمة أوامر البوت');
+}
+
 // ١٠) اقتراح الكاهوت قبل الاختبار النصفي (٨ ديسمبر) بنحو أسبوع، مرة واحدة
 NOW = Date.UTC(2026, 11, 2, 16, 0); TG.sent.length = 0; ctx.tick();
 ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.text) && /الاختبار النصفي/.test(m.text) && /بعد 6 أيام/.test(m.text)), 'اقتراح كاهوت قبل الاختبار: ' + (TG.sent.find(m => /كاهوت/.test(m.text)) || {}).text);
 { const k0 = TG.sent.filter(m => /كاهوت مراجعة/.test(m.text)).length; NOW += 3600e3; ctx.tick(); ok(TG.sent.filter(m => /كاهوت مراجعة/.test(m.text)).length === k0, 'الاقتراح لا يتكرر'); }
 
+if (process.env.PREVIEW) {
+  const seen = new Set(); ALLSENT.forEach(m => { const k = m.text.split('\n')[0].replace(/«.*»/, ''); if (m.html && !seen.has(k)) { seen.add(k); console.log('\n=== ' + m.chat + '\n' + m.text); } });
+  console.log('\n=== ADMIN TASKS\n' + ctx.adminTasksHtml_('2026-11-28', ctx.cfg_()));
+  console.log('\n=== REPORT PARTS\n' + ctx.mdToTgParts_('التقرير الأسبوعي — السبت 31 أكتوبر', '## الخلاصة\nيبدأ الفصل اليوم. **خمسة مسارات** وضعت أنشطة.\n\n## ما يحتاج قرارك\n- إثمار ٣ بلا أنشطة\n- لقاء جذور بلا مسؤول\n\n## جذور\n' + Array.from({length: 20}, (_, i) => '- نشاط رقم ' + i + ' في الأسبوع').join('\n')).join('\n---- next message ----\n'));
+}
 console.log((fail ? '✗' : '✓') + ' ' + pass + ' فحصاً ناجحاً' + (fail ? '، و' + fail + ' فاشلة' : ''));
 process.exit(fail ? 1 : 0);
