@@ -20,7 +20,7 @@ def datauri(path):
     return 'data:%s;base64,%s' % (mime, base64.b64encode(open(path, 'rb').read()).decode())
 
 def page(config, logos, icon, demo=''):
-    js = '\n'.join(rd(os.path.join(A, 'web', f)) for f in ['core.js', 'views1.js', 'views2.js'])
+    js = '\n'.join(rd(os.path.join(A, 'web', f)) for f in ['core.js', 'views1.js', 'cards.js', 'views2.js'])
     h = rd(os.path.join(A, 'web', 'shell.html'))
     h = h.replace('/*CSS*/', rd(os.path.join(A, 'web', 'app.css')))
     h = h.replace('/*CONFIG*/', json.dumps(config, ensure_ascii=False)).replace('/*LOGOS*/', json.dumps(logos, ensure_ascii=False))

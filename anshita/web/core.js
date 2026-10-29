@@ -107,7 +107,7 @@ const savePrefs = () => LS.set(NS + 'prefs', P);
 /* ---------- الاتصال بالخادم ---------- */
 let TOKEN = LS.get(NS + 'tok', '');
 // ما يقرأ فقط لا يُظهر شريط التنفيذ (التحديث الدوري وأمثاله)
-const READ_FNS = new Set(['revs', 'plan', 'boot', 'log_list', 'alerts', 'tg_status', 'report_list', 'acc_list', 'cal_list', 'me']);
+const READ_FNS = new Set(['revs', 'plan', 'boot', 'log_list', 'alerts', 'tg_status', 'report_list', 'acc_list', 'cal_list', 'me', 'cards_todo', 'card_put']);   // card_put في الخلفية بلا شريط
 const NET = { n: 0 };
 function netBar() { document.documentElement.classList.toggle('net-busy', NET.n > 0); }
 const API = {
@@ -383,6 +383,7 @@ function render() {
   applyTheme();
   const app = $('#app');
   if (route().name === 'pub') { app.innerHTML = pubView(route().a); return; }
+  if (route().name === 'render') { app.innerHTML = renderView(route().a); return; }
   if (!D) { app.innerHTML = TOKEN ? `<div class="login"><div class="col" style="align-items:center;gap:14px">${LOGOS.anshita ? `<img class="brand-img" src="${LOGOS.anshita}" alt="" style="height:56px">` : ''}<span class="spin"></span></div></div>` : vLogin(); afterLogin(); return; }
   const r = route();
   let v = VIEWS[r.name];
@@ -440,7 +441,7 @@ function setBoot(b) {
 }
 async function boot(silent) {
   try {
-    const b = await API.me('boot'); setBoot(b); setSync('ok'); render(); startPoll();
+    const b = await API.me('boot'); setBoot(b); setSync('ok'); render(); startPoll(); cardSoon(5000);
   } catch (e) {
     if (e.code === 'auth') { logout(); LG.err = e.message; render(); return; }
     setSync('off');
@@ -499,7 +500,7 @@ async function saveAct(tid, patch, opt = {}) {
     if (i >= 0) p.acts[i] = r.act; else p.acts.push(r.act);
     (r.others || []).forEach(o => { const k = p.acts.findIndex(a => a.id === o.id); if (k >= 0) p.acts[k] = o; });
     p.rev = r.rev; D.revs[tid] = r.rev;
-    pendOff(tid, key); setSync('ok');
+    pendOff(tid, key); setSync('ok'); cardSoon();
     if (r.calErr) toast('حُفظ النشاط، وتعذّر تحديث تقويم جوجل: ' + r.calErr, 'err');
     if (!opt.noRender) render();
     setTimeout(() => poll(true), 600);

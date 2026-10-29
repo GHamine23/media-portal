@@ -51,7 +51,7 @@ function apiFns_() {
   return {
     info: info, login: login,
     boot: boot, revs: revs, plan: plan, pass: pass,
-    act_save: act_save, act_del: act_del, act_series: act_series, share_set: share_set, pub_plan: pub_plan, tg_relay: tg_relay,
+    act_save: act_save, act_del: act_del, act_series: act_series, share_set: share_set, pub_plan: pub_plan, tg_relay: tg_relay, cards_todo: cards_todo, card_put: card_put,
     day_save: day_save, sem_put: sem_put, sem_import: sem_import, sem_del: sem_del,
     track_save: track_save, settings_save: settings_save, log_list: log_list,
     acc_list: acc_list, acc_save: acc_save, acc_reset: acc_reset, acc_del: acc_del,
@@ -1524,6 +1524,7 @@ function runReminders_(force) {
       var x = p.acts.filter(function (y) { return y.id === q[0]; })[0];
       var ct = q[1] === 'd3' || (q[1] === 'd1' && remCfg_(x).des) ? customTpl_(s, q[1]) : '';
       var ph = q[1] !== 'd3' ? photoOf_(x) : null;
+      if (!ph && (q[1] === 'd0' || (q[1] === 'd1' && remCfg_(x).des))) { var cb = cardBlob_('r:' + x.id + ':' + q[1], cardSig_(remCardData_(t, x, q[1]))); if (cb) ph = { blob: cb }; }
       try { if (ct) tgSend_(t.chat.id, remindText_(ct, x, t, q[2]), t.id); else if (ph) tgPhoto_(t.chat.id, ph, remindHtml_(q[1], x, t, q[2], p), t.id); else tgSend_(t.chat.id, remindHtml_(q[1], x, t, q[2], p), t.id, true); done.push(q); sent++; }
       catch (e) { errs.push(t.name + ': ' + e.message); }
     });
@@ -1568,7 +1569,7 @@ function runDigests_() {
     lines.push((acts.length ? '• ' : '⚠ ') + t.name + ': ' + (acts.length ? countText_(acts.length) + (meet.length ? '، أقرب لقاء ' + dayText_(meet[0].d) : '') : 'لا أنشطة في الخطة هذا الأسبوع'));
     var wt = weekTasks_(t, p, wk, s);
     if (!t.chat || !t.chat.id || t.remind === false || (!acts.length && !wt.length)) return;
-    try { tgSend_(t.chat.id, digestHtml_(t, p, wk, s), t.id, true); n++; } catch (e) {}
+    try { var wc = cardBlob_('w:' + t.id, cardSig_(weekCardData_(t, p, wk, s))); if (wc) tgPhoto_(t.chat.id, { blob: wc }, digestHtml_(t, p, wk, s), t.id); else tgSend_(t.chat.id, digestHtml_(t, p, wk, s), t.id, true); n++; } catch (e) {}
   });
   if (s.adminTasks !== false && s.adminChat && s.adminChat.id && g.adminTasksWeek !== wk) {
     try { tgSend_(s.adminChat.id, adminTasksHtml_(wk, s), '', true); n++; } catch (e) {}
@@ -1580,6 +1581,72 @@ function runDigests_() {
   withLock_(function () { var g2 = readJson_('tg.json', {}); g2.digestWeek = wk; writeJson_('tg.json', g2); });
   return n;
 }
+/* ================= البطاقات المصوّرة =================
+   تُرسم في المتصفح (خط ثمانية وهوية المسار) ثم تُرفع هنا وتُرسل صورًا: بطاقة «خطة الأسبوع» مع رسالة الأسبوع،
+   وبطاقة النشاط مع تذكير النشر وتذكير يوم الموعد إن لم يُرفع للنشاط تصميم. يرسمها أي متصفح مفتوح على المنصة،
+   وصفحة الرسم (‎#render/<مفتاح التقرير>‎) التي تفتحها مهمة التقرير الأسبوعي صباح السبت قبل رسالة الأسبوع. */
+function cardSig_(o) { return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify(o), Utilities.Charset.UTF_8)).slice(0, 16); }
+function trackCard_(t) { return { id: t.id, name: t.name, full: t.full || t.name, color: t.color || '' }; }
+function weekCardData_(t, p, wk, s) {
+  var end = addDays_(wk, 6), acts = p.acts.filter(function (x) { return x.d >= wk && x.d <= end; }).sort(function (a, b) { return (a.d + (a.time || '99')) < (b.d + (b.time || '99')) ? -1 : 1; });
+  var wt = weekTasks_(t, p, wk, s).filter(function (x) { return x.k !== 'mark'; });
+  return { kind: 'week', track: trackCard_(t), wk: wk, wn: weekNo_(t, p, wk) || weekNo_(t, p, addDays_(wk, 1)) || '', acts: acts.map(function (x) { return { d: x.d, time: x.time || '', type: x.type, title: x.title, who: x.who || [] }; }), tasks: wt.map(function (x) { return { d: x.d || '', text: x.text }; }) };
+}
+function remCardData_(t, x, kind) { return { kind: kind, track: trackCard_(t), act: { d: x.d, time: x.time || '', type: x.type, title: x.title, who: x.who || [] } }; }
+function cardAuth_(auth) {
+  if (auth && String(auth) === reportKey_() && reportKey_()) return { all: true };
+  var a = auth_(auth); return a.role === 'admin' ? { all: true } : { track: a.track };
+}
+// ما يحتاج رسمًا الآن (ناقص أو تغيّر نشاطه منذ رُسم)
+function cards_todo(auth) {
+  var A = cardAuth_(auth), s = cfg_(), today = today_(), idx = readJson_('cards.json', {}), out = [];
+  // أسبوع رسالة «خطة الأسبوع» القادمة: هذا الأسبوع إن لم يأتِ يومها وساعتها بعد، وإلا الأسبوع التالي
+  var h = +Utilities.formatDate(new Date(), tz_(), 'HH'), dw = wd_(today), dd = s.digest.dow || 0;
+  var wk = (dw < dd || (dw === dd && h < s.digest.hour)) ? weekOf_(today) : addDays_(weekOf_(today), 7);
+  tracks_().forEach(function (t) {
+    if (!A.all && t.id !== A.track) return;
+    if (!t.chat || !t.chat.id || t.remind === false) return;
+    var p = plan_(t.id), w = weekCardData_(t, p, wk, s), ws = cardSig_(w);
+    if (s.digest.on && (w.acts.length || w.tasks.length) && (!idx['w:' + t.id] || idx['w:' + t.id].sig !== ws)) out.push({ id: 'w:' + t.id, sig: ws, data: w });
+    p.acts.forEach(function (x) {
+      var left = dayDiff_(x.d, today); if (left < 0 || left > 8 || x.done || !remindable_(x, s) || x.link) return;
+      var R = remCfg_(x);
+      [['d1', R.d1 && R.des], ['d0', R.d0]].forEach(function (k) {
+        if (!k[1]) return; var id = 'r:' + x.id + ':' + k[0], d = remCardData_(t, x, k[0]), sg = cardSig_(d);
+        if (!idx[id] || idx[id].sig !== sg) out.push({ id: id, sig: sg, data: d });
+      });
+    });
+  });
+  return JSON.stringify({ items: out.slice(0, 40), total: out.length });
+}
+function cardsDir_() {
+  var id = props_().getProperty('CARDS_DIR'), f = null;
+  if (id) { try { f = DriveApp.getFolderById(id); } catch (e) { f = null; } }
+  if (!f) { f = dataFolder_().createFolder('cards'); props_().setProperty('CARDS_DIR', f.getId()); }
+  return f;
+}
+function card_put(auth, id, sig, b64) {
+  var A = cardAuth_(auth);
+  id = String(id || ''); var m = /^(w|r):([\w-]+)(?::(d0|d1))?$/.exec(id); if (!m) throw new Error('بطاقة غير معروفة');
+  if (!A.all) { var tid = m[1] === 'w' ? m[2] : ''; if (m[1] === 'w' && tid !== A.track) throw new Error('ليست من صلاحيتك'); if (m[1] === 'r' && !plan_(A.track).acts.some(function (x) { return x.id === m[2]; })) throw new Error('ليست من صلاحيتك'); }
+  b64 = String(b64 || '').replace(/^data:image\/png;base64,/, ''); if (b64.length < 1000 || b64.length > 4000000) throw new Error('صورة غير صالحة');
+  return JSON.stringify(withLock_(function () {
+    var idx = readJson_('cards.json', {}), e = idx[id], f = null;
+    if (e && e.f) { try { f = DriveApp.getFileById(e.f); f.setContent(b64); } catch (x) { f = null; } }
+    if (!f) f = cardsDir_().createFile(id.replace(/:/g, '_') + '.b64', b64, 'text/plain');
+    idx[id] = { sig: String(sig || ''), f: f.getId(), at: now_() };
+    // تنظيف: بطاقات أنشطة مضت تُنقل إلى سلة درايف (تُفرغ تلقائيًا بعد ٣٠ يومًا)
+    var keep = {}; tracks_().forEach(function (t) { plan_(t.id).acts.forEach(function (x) { if (dayDiff_(x.d, today_()) >= -2) keep[x.id] = 1; }); });
+    Object.keys(idx).forEach(function (k) { var mm = /^r:([\w-]+):/.exec(k); if (mm && !keep[mm[1]]) { try { DriveApp.getFileById(idx[k].f).setTrashed(true); } catch (x) {} delete idx[k]; } });
+    writeJson_('cards.json', idx);
+    return { ok: true };
+  }));
+}
+function cardBlob_(id, sig) {
+  var e = readJson_('cards.json', {})[id]; if (!e || !e.f || (sig && e.sig !== sig)) return null;
+  try { return Utilities.newBlob(Utilities.base64Decode(DriveApp.getFileById(e.f).getBlob().getDataAsString()), 'image/png', id.replace(/:/g, '_') + '.png'); } catch (x) { return null; }
+}
+
 /* ================= سؤال المتابعة بعد النشاط =================
    بعد النشاط بساعتين (وما لا وقت له: الساعة التاسعة مساءً) يسأل البوت مجموعة الفريق: هل أُقيم؟ بأزرار.
    «تم» يعلّم النشاط في المنصة ويذكّر بالخطوة التالية؛ «لم يُقم» يرشد إلى نقله أو كتابة السبب. */

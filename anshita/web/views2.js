@@ -816,7 +816,7 @@ let MQ = isMob(), WQ = innerWidth >= WIDE_Q; addEventListener('resize', () => { 
 /* ---------- التشغيل ---------- */
 (async function start() {
   applyTheme();
-  loadFonts();
+  window.FONTS_READY = loadFonts();
   if (CFG.demo && window.DEMO) await window.DEMO.ready();
   if (!TOKEN) { render(); return; }
   const c = LS.get(NS + 'boot', null);

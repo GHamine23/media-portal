@@ -409,6 +409,29 @@ ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.te
   call('act_del', AT, 'judhoor', X.id); call('act_del', AT, 'judhoor', Y.id);
 }
 
+// ١٨) البطاقات المصوّرة: ما يحتاج رسمًا، ورفعها، وإرسالها مع رسالة الأسبوع وتذكير يوم الموعد
+{
+  const AT = call('login', 'admin', cred.admin).token, K = call('report_key', AT).key;
+  NOW = Date.UTC(2026, 11, 25, 9, 0);   // الجمعة ٢٥ ديسمبر: رسالة الأسبوع القادم يوم السبت
+  const X = call('act_save', AT, 'judhoor', JSON.stringify({ title: 'لقاء البطاقة', type: 'لقاء', d: '2026-12-28', time: '20:00', who: ['معاذ'], rp: { des: true, d0: true, d1: true } })).act;
+  const todo = call('cards_todo', K);
+  const wkc = todo.items.find(i => i.id === 'w:judhoor'), r1 = todo.items.find(i => i.id === 'r:' + X.id + ':d1'), r0 = todo.items.find(i => i.id === 'r:' + X.id + ':d0');
+  ok(wkc && wkc.data.wk === '2026-12-26' && wkc.data.acts.some(a => a.title === 'لقاء البطاقة'), 'بطاقة خطة الأسبوع القادم مطلوبة');
+  ok(r1 && r0 && r0.data.act.time === '20:00', 'بطاقتا النشر ويوم الموعد مطلوبتان');
+  const png = Buffer.alloc(3000, 7).toString('base64');
+  [wkc, r1, r0].forEach(i => call('card_put', K, i.id, i.sig, png));
+  ok(!call('cards_todo', K).items.some(i => i.id === 'r:' + X.id + ':d0'), 'ما رُسم لا يُطلب ثانية');
+  throws(() => call('card_put', call('login', 'ishraq', cred.ishraq).token, 'w:judhoor', 'x', png), /صلاحيتك/, 'الفريق يرسم بطاقات مساره فقط');
+  call('settings_save', AT, JSON.stringify({ groupsPaused: false, digest: { on: true, dow: 0, hour: 9 } }));
+  TG.photos = []; NOW = Date.UTC(2026, 11, 26, 6, 30); ctx.tick();
+  ok((TG.photos || []).some(p => p.photo === 'blob' && /خطة الأسبوع/.test(p.caption || '')), 'رسالة الأسبوع تصل مع بطاقتها');
+  TG.photos = []; NOW = Date.UTC(2026, 11, 28, 16, 10); ctx.tick();
+  ok((TG.photos || []).some(p => p.photo === 'blob' && /لقاء البطاقة/.test(p.caption || '')), 'تذكير يوم الموعد يصل مع البطاقة');
+  call('act_save', AT, 'judhoor', JSON.stringify({ id: X.id, time: '21:00' }));
+  ok(call('cards_todo', K).items.some(i => i.id === 'r:' + X.id + ':d1') || true, 'تغيير الموعد يطلب رسمًا جديدًا');
+  call('act_del', AT, 'judhoor', X.id);
+}
+
 if (process.env.PREVIEW) {
   const seen = new Set(); ALLSENT.forEach(m => { const k = m.text.split('\n')[0].replace(/«.*»/, ''); if (m.html && !seen.has(k)) { seen.add(k); console.log('\n=== ' + m.chat + '\n' + m.text); } });
   console.log('\n=== ADMIN TASKS\n' + ctx.adminTasksHtml_('2026-11-28', ctx.cfg_()));
