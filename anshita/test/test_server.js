@@ -21,7 +21,7 @@ GAS._fetch.handler = function (url, opt) {
     if (url.indexOf('/botBAD') >= 0) return { code: 401, body: JSON.stringify({ ok: false, description: 'Unauthorized' }) };
     if (m === 'getMe') return { code: 200, body: JSON.stringify({ ok: true, result: { id: 9, username: 'anshita_bot', first_name: 'بوت الأنشطة' } }) };
     if (m === 'deleteWebhook') return { code: 200, body: '{"ok":true,"result":true}' };
-    if (m === 'getUpdates') { const off = +p.offset || 0; return { code: 200, body: JSON.stringify({ ok: true, result: TG.updates.filter(u => u.update_id >= off) }) }; }
+    if (m === 'getUpdates') { if (p.offset) TG.offsetUsed = true; const off = +p.offset || 0; return { code: 200, body: JSON.stringify({ ok: true, result: TG.updates.filter(u => u.update_id >= off) }) }; }
     if (m === 'sendMessage') {
       if (TG.migrate && String(p.chat_id) === TG.migrate[0]) return { code: 400, body: JSON.stringify({ ok: false, description: 'Bad Request: group chat was upgraded to a supergroup chat', parameters: { migrate_to_chat_id: +TG.migrate[1] } }) };
       TG.sent.push({ chat: String(p.chat_id), text: p.text }); return { code: 200, body: JSON.stringify({ ok: true, result: { message_id: TG.sent.length } }) };
@@ -54,6 +54,8 @@ throws(() => call('login', 'admin', 'xx'), /غير صحيحة/, 'كلمة مرو
 const A = call('login', 'ADMIN ', cred.admin).token;
 ok(A && A.split('|').length === 4, 'رمز جلسة الإدارة');
 const J = call('login', 'judhoor', cred.judhoor).token;
+ok(call('boot', A).tracks.every(t => t.canEdit), 'تعديل الخطة مفتوح للمسارات افتراضياً');
+call('track_save', A, 'judhoor', JSON.stringify({ canEdit: false }));
 throws(() => call('boot', A.slice(0, -2) + 'xx'), /ادخل أولاً/, 'رمز معبوث به مرفوض');
 let b = call('boot', A);
 ok(b.me.role === 'admin' && b.tracks.length === 6, 'الإدارة ترى ستة مسارات');
@@ -127,6 +129,8 @@ ok(st.chats.find(c => c.id === '-100222').to === '', 'رمز مزوّر لا ي�
 upd({ message: { chat: { id: 5555, first_name: 'أمين', type: 'private' }, text: '/start ' + st.adminLink.split('start=')[1] } });
 st = call('tg_poll', A);
 ok(st.adminChat && st.adminChat.id === '5555', 'ربط محادثة الإدارة');
+ok(!TG.offsetUsed, 'المنصة تقرأ التحديثات دون حذفها من طابور تليجرام');
+{ const s0 = TG.sent.length; call('tg_poll', A); ok(TG.sent.length === s0, 'لا معالجة مكررة لتحديثات قُرئت'); }
 st = call('tg_assign', A, '-100222', 'ishraq');
 ok(st.tracks.find(t => t.id === 'ishraq').chat.id === '-100222', 'ربط يدوي لمجموعة مكتشفة');
 
@@ -146,7 +150,7 @@ ok(/تعديل في الخطة/.test(TG.sent[TG.sent.length - 1].text), 'تنب�
 const n0 = TG.sent.length;
 NOW = Date.UTC(2026, 10, 2, 8, 0); ctx.tick();
 const d1 = TG.sent.slice(n0).filter(m => /موعد نشر إعلان اللقاء/.test(m.text));
-ok(d1.length === 1 && /غداً/.test(d1[0].text), 'تذكير النشر قبل يوم');
+ok(d1.length === 1 && /غدًا/.test(d1[0].text), 'تذكير النشر قبل يوم');
 const n1 = TG.sent.length; ctx.tick(); ok(TG.sent.length === n1, 'لا تكرار لتذكير النشر');
 // لقاء أُضيف متأخراً (بعد يومين): يصله تذكير الإعداد بصيغة «بعد يومين»
 call('act_save', A, 'judhoor', JSON.stringify({ title: 'استضافة: سيرة عثمان', d: '2026-11-04', time: '20:00', type: 'استضافة' }));
@@ -218,6 +222,11 @@ ok(rs2.saved && rs2.sent >= 3 && TG.sent.slice(n0r).every(m => m.chat === '5555'
 ok(call('report_list', A2)[0].title === 'تقرير الأسبوع الأول', 'قائمة التقارير');
 const rk2 = call('report_key', A2, true).key; ok(rk2 !== rk, 'تجديد المفتاح');
 throws(() => call('report_data', rk), /مفتاح/, 'المفتاح القديم يسقط بعد التجديد');
+
+// ١٠) اقتراح الكاهوت قبل الاختبار النصفي (٨ ديسمبر) بنحو أسبوع، مرة واحدة
+NOW = Date.UTC(2026, 11, 2, 16, 0); TG.sent.length = 0; ctx.tick();
+ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.text) && /الاختبار النصفي/.test(m.text) && /بعد 6 أيام/.test(m.text)), 'اقتراح كاهوت قبل الاختبار: ' + (TG.sent.find(m => /كاهوت/.test(m.text)) || {}).text);
+{ const k0 = TG.sent.filter(m => /كاهوت مراجعة/.test(m.text)).length; NOW += 3600e3; ctx.tick(); ok(TG.sent.filter(m => /كاهوت مراجعة/.test(m.text)).length === k0, 'الاقتراح لا يتكرر'); }
 
 console.log((fail ? '✗' : '✓') + ' ' + pass + ' فحصاً ناجحاً' + (fail ? '، و' + fail + ' فاشلة' : ''));
 process.exit(fail ? 1 : 0);

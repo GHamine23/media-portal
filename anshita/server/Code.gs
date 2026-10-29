@@ -376,15 +376,15 @@ var ADJUST_FIELDS = ['id', 'title', 'type', 'd', 'time', 'dur', 'who', 'idea', '
 function alertOf_(a, tid, old, x) {
   if (a.role === 'admin') return null;
   var ch = [], kind = '';
-  if (!old) return { kind: 'add', title: x.title, from: '', to: whenText_(x) };
-  if (!x) return { kind: 'del', title: old.title, from: whenText_(old), to: '' };
+  if (!old) return { kind: 'add', aid: x.id, title: x.title, from: '', to: whenText_(x) };
+  if (!x) return { kind: 'del', aid: old.id, title: old.title, from: whenText_(old), to: '' };
   if (old.d !== x.d || (old.time || '') !== (x.time || '')) { kind = 'move'; ch.push(['الموعد', whenText_(old), whenText_(x)]); }
   if ((old.who || []).join('،') !== (x.who || []).join('،')) { kind = kind || 'who'; ch.push(['القائم', (old.who || []).join('، ') || 'لم يُحدَّد', (x.who || []).join('، ') || 'لم يُحدَّد']); }
   if (old.title !== x.title) { kind = kind || 'edit'; ch.push(['العنوان', old.title, x.title]); }
   if (old.type !== x.type) { kind = kind || 'edit'; ch.push(['النوع', old.type, x.type]); }
   if ((old.idea || '') !== (x.idea || '') || (old.dur || 0) !== (x.dur || 0)) { kind = kind || 'edit'; ch.push(['التفاصيل', '', '']); }
   if (!kind) return null;
-  return { kind: kind, title: x.title, changes: ch };
+  return { kind: kind, aid: x.id, title: x.title, changes: ch };
 }
 function alertText_(al, t, by) {
   var head = by + ' (' + (t.full || t.name) + ')';
@@ -393,7 +393,7 @@ function alertText_(al, t, by) {
   return head + ' عدّل «' + al.title + '»:\n' + al.changes.map(function (c) { return c[1] || c[2] ? '- ' + c[0] + ': من ' + (c[1] || '—') + ' إلى ' + (c[2] || '—') : '- ' + c[0]; }).join('\n');
 }
 function pushAlert_(a, t, al) {
-  var L = readJson_('alerts.json', []), x = { id: uid_(), at: now_(), t: t.id, by: a.name, kind: al.kind, title: al.title, changes: al.changes || [], from: al.from || '', to: al.to || '', seen: false };
+  var L = readJson_('alerts.json', []), x = { id: uid_(), at: now_(), t: t.id, aid: al.aid || '', by: a.name, kind: al.kind, title: al.title, changes: al.changes || [], from: al.from || '', to: al.to || '', seen: false };
   L.unshift(x); if (L.length > 300) L.length = 300;
   writeJson_('alerts.json', L); props_().setProperty('rev_alerts', String(now_()));
   return x;
@@ -438,8 +438,8 @@ function act_save(token, tid, json) {
     savePlan_(tid, p);
     var what = !old ? 'أضاف نشاطاً' : old.d !== x.d || (old.time || '') !== (x.time || '') ? 'غيّر موعد نشاط' : (old.who || []).join() !== (x.who || []).join() ? 'غيّر القائم على نشاط' : old.done !== x.done ? (x.done ? 'أتمّ نشاطاً' : 'أعاد نشاطاً إلى الخطة') : al ? 'عدّل نشاطاً' : 'تابع نشاطاً';
     log_(a, tid, what, x.title);
-    var alr = al && al.kind !== 'add' ? pushAlert_(a, t, al) : null;
-    return { act: x, rev: p.rev, calErr: calErr, notice: notice, alert: alr ? alertText_(al, t, a.name) : '' };
+    if (al) pushAlert_(a, t, al);
+    return { act: x, rev: p.rev, calErr: calErr, notice: notice, alert: al && al.kind !== 'add' ? alertText_(al, t, a.name) : '' };
   });
   if (res.notice && t.chat && t.chat.id) { try { tgSend_(t.chat.id, res.notice, tid); } catch (e) {} }
   if (res.alert) adminTg_(res.alert);
@@ -641,7 +641,7 @@ function timeText_(t) {
   return h12 + ':' + m + (pm ? ' م' : ' ص');
 }
 function whenText_(x) { return dayText_(x.d) + (x.time ? ' الساعة ' + timeText_(x.time) : ''); }
-function leftText_(n) { return n === 0 ? 'اليوم' : n === 1 ? 'غداً' : n === 2 ? 'بعد يومين' : 'بعد ' + n + ' أيام'; }
+function leftText_(n) { return n === 0 ? 'اليوم' : n === 1 ? 'غدًا' : n === 2 ? 'بعد يومين' : 'بعد ' + n + ' أيام'; }
 function countText_(n) { return n === 1 ? 'نشاط واحد' : n === 2 ? 'نشاطان' : n <= 10 ? n + ' أنشطة' : n + ' نشاطاً'; }
 function remindable_(x, s) { if (x.rem === true) return true; if (x.rem === false) return false; return (s.remindTypes || []).indexOf(x.type) >= 0; }
 function fill_(tpl, x, t, left) {
@@ -785,8 +785,11 @@ function tg_token(token, botToken) {
 }
 function tgPoll_() {
   if (!props_().getProperty('TG_TOKEN')) return { n: 0 };
-  var g0 = readJson_('tg.json', {});
-  var ups = tgCall_('getUpdates', { offset: String(g0.offset || 0), timeout: '0', allowed_updates: JSON.stringify(['message', 'my_chat_member']) });
+  // نقرأ بلا offset فلا تُحذف التحديثات من طابور تليجرام (تبقى 24 ساعة) ويراها كل من يقرأ البوت نفسه (أثر، والربط الشخصي)،
+  // ونتجاوز ما عالجناه برقمه
+  var g0 = readJson_('tg.json', {}), last0 = g0.last != null ? g0.last : (g0.offset || 1) - 1;
+  var ups = tgCall_('getUpdates', { timeout: '0', limit: '100', allowed_updates: JSON.stringify(['message', 'my_chat_member']) })
+    .filter(function (u) { return u.update_id > last0; });
   if (!ups.length) return { n: 0 };
   var welcome = [], migs = [], linked = [];
   withLock_(function () {
@@ -794,11 +797,12 @@ function tgPoll_() {
     var assigned = {}; tracks_().forEach(function (t) { if (t.chat && t.chat.id) assigned[String(t.chat.id)] = t.name; });
     var s = readJson_('settings.json', {}); if (s.adminChat && s.adminChat.id) assigned[String(s.adminChat.id)] = 'الإدارة';
     ups.forEach(function (u) {
-      g.offset = Math.max(g.offset || 0, u.update_id + 1);
+      if (u.update_id <= (g.last != null ? g.last : (g.offset || 1) - 1)) return;
+      g.last = u.update_id; delete g.offset;
       var m = u.message || u.my_chat_member; if (!m || !m.chat) return;
       var c = m.chat, id = String(c.id);
       if (u.message && u.message.migrate_to_chat_id) { migs.push([id, String(u.message.migrate_to_chat_id)]); return; }
-      var title = c.title || [c.first_name, c.last_name].filter(String).join(' ') || c.username || id;
+      var title = c.title || [c.first_name, c.last_name].filter(function (x) { return x; }).join(' ').trim() || c.username || id;
       var k = g.known[id] || { id: id, first: now_() };
       var wasLeft = !!k.left;
       k.title = title; k.type = c.type; k.at = now_();
@@ -822,7 +826,7 @@ function tgPoll_() {
     writeJson_('tg.json', g);
   });
   migs.forEach(function (p) { migrateChat_(p[0], p[1]); });
-  if (linked.length) withLock_(function () { linked.forEach(function (l) { log_(null, l[2] === 'admin' ? '' : l[2], 'ربط مجموعة تليجرام', l[3]); }); });
+  if (linked.length) withLock_(function () { linked.forEach(function (l) { log_(null, l[2] === 'admin' ? '' : l[2], l[2] === 'admin' ? 'ربط محادثة الإدارة في تليجرام' : 'ربط مجموعة تليجرام', l[3]); }); });
   welcome = welcome.filter(function (w) { return !linked.some(function (l) { return l[0] === w[0]; }); });
   welcome.concat(linked).forEach(function (w) { try { tgSend_(w[0], w[1]); } catch (e) {} });
   return { n: ups.length };
@@ -1036,11 +1040,34 @@ function chunks_(t, n) {
 function report_list(token) { var a = auth_(token); needAdmin_(a); return JSON.stringify(readJson_('reports.json', [])); }
 
 // المؤقّت: كل ساعة
+// قبل الاختبار بأسبوع تقريباً: اقتراح كاهوت مراجعة في مجموعة الفريق، مرة واحدة لكل اختبار، إن لم يكن في الخطة كاهوت قبله
+function runSuggest_() {
+  var s = cfg_(), tz = tz_(), now = new Date(), today = Utilities.formatDate(now, tz, 'yyyy-MM-dd'), hour = +Utilities.formatDate(now, tz, 'H');
+  if (!props_().getProperty('TG_TOKEN') || hour < s.remindHour) return 0;
+  var g = readJson_('tg.json', {}), done = g.kahoot || {}, n = 0, sentKeys = [];
+  tracks_().forEach(function (t) {
+    if (!t.chat || !t.chat.id || t.remind === false) return;
+    var p = plan_(t.id), S = p.sems[String(t.cur)]; if (!S) return;
+    (S.days || []).forEach(function (x) {
+      if (!x.ev || !/اختبار/.test(x.ev)) return;
+      var left = dayDiff_(x.d, today), key = t.id + '|' + x.d;
+      if (left < 4 || left > 8 || done[key]) return;
+      var has = p.acts.some(function (y) { return y.type === 'كاهوت' && y.d >= addDays_(x.d, -12) && y.d <= x.d; });
+      if (has) { sentKeys.push(key); return; }
+      var msg = 'بعد ' + countDays_(left) + ' ' + x.ev + ' (' + dayText_(x.d) + ').\nاقتراح: كاهوت مراجعة قبله، يثبّت ما درسه الطلاب ويخفّف رهبة الاختبار.\nأضيفوه في خطة المسار: ' + SITE_URL + '#t/' + t.id;
+      try { tgSend_(t.chat.id, msg, t.id); n++; sentKeys.push(key); } catch (e) {}
+    });
+  });
+  if (sentKeys.length) withLock_(function () { var g2 = readJson_('tg.json', {}); g2.kahoot = g2.kahoot || {}; sentKeys.forEach(function (k) { g2.kahoot[k] = today; }); writeJson_('tg.json', g2); });
+  return n;
+}
+function countDays_(n) { return n === 1 ? 'يوم' : n === 2 ? 'يومين' : n <= 10 ? n + ' أيام' : n + ' يوماً'; }
 function tick() {
   var r = { at: now_(), ok: true, msg: '', sent: 0 };
   try { tgPoll_(); } catch (e) { r.msg += 'استقبال: ' + e.message + ' '; }
   try { var x = runReminders_(false); r.sent += x.sent; if (x.errs.length) { r.ok = false; r.msg += x.errs.join('؛ '); } } catch (e) { r.ok = false; r.msg += e.message; }
   try { r.sent += runDigests_(); } catch (e) { r.ok = false; r.msg += ' ملخص: ' + e.message; }
+  try { r.sent += runSuggest_(); } catch (e) { r.msg += ' اقتراح: ' + e.message; }
   try { withLock_(function () { var g = readJson_('tg.json', {}); g.lastTick = r; writeJson_('tg.json', g); }); } catch (e) {}
   return r;
 }
@@ -1063,7 +1090,7 @@ function setup() {
   secret_();
   var creds = [];
   withLock_(function () {
-    if (!jfile_('tracks.json')) { writeJson_('tracks.json', TRACKS_SEED.map(function (t) { var o = JSON.parse(JSON.stringify(t)); o.members = []; o.canEdit = false; o.remind = true; o.chat = null; return o; })); log.push('أُنشئت المسارات الستة.'); }
+    if (!jfile_('tracks.json')) { writeJson_('tracks.json', TRACKS_SEED.map(function (t) { var o = JSON.parse(JSON.stringify(t)); o.members = []; o.canEdit = true; o.remind = true; o.chat = null; return o; })); log.push('أُنشئت المسارات الستة.'); }
     if (!jfile_('settings.json')) writeJson_('settings.json', {});
     if (!jfile_('log.json')) writeJson_('log.json', []);
     if (!jfile_('tg.json')) writeJson_('tg.json', { offset: 0, known: {} });
