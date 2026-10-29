@@ -192,11 +192,13 @@ function secret_() {
 }
 function sign_(body) { return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(body, secret_())).replace(/=+$/, ''); }
 function mkToken_(a) { var body = a.uid + '|' + (now_() + SESSION_DAYS * 864e5) + '|' + (a.tv || 0); return body + '|' + sign_(body); }
-function pwHash_(salt, pw) {
+var PW_IT = 150;   // عدد جولات التجزئة لكلمات المرور (الحسابات القديمة 1200 وتُرقّى عند الدخول)
+function pwHash_(salt, pw, it) {
   var key = Utilities.newBlob(String(pw)).getBytes(), v = Utilities.newBlob(String(salt)).getBytes();
-  for (var i = 0; i < 1200; i++) v = Utilities.computeHmacSha256Signature(v, key);
+  for (var i = 0; i < (it || 1200); i++) v = Utilities.computeHmacSha256Signature(v, key);
   return Utilities.base64Encode(v);
 }
+function setPass_(x, pw) { x.salt = uid_(); x.it = PW_IT; x.hash = pwHash_(x.salt, pw, PW_IT); }
 function tempPass_() {
   var abc = 'abcdefghjkmnpqrstuvwxyz23456789', s = '';
   var b = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, Utilities.getUuid() + now_());
@@ -236,13 +238,14 @@ function login(user, pw) {
     if (!a) throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة');
     if (a.disabled) throw new Error('هذا الحساب موقوف');
     if (a.lockUntil && a.lockUntil > now_()) throw new Error('محاولات كثيرة، حاول بعد دقائق');
-    if (pwHash_(a.salt, pw) !== a.hash) {
+    if (pwHash_(a.salt, pw, a.it) !== a.hash) {
       a.fails = (a.fails || 0) + 1;
       if (a.fails >= 8) { a.lockUntil = now_() + 10 * 60e3; a.fails = 0; }
       writeJson_('accounts.json', all);
       throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة');
     }
     a.fails = 0; a.lockUntil = 0; a.last = now_();
+    if ((a.it || 1200) !== PW_IT) setPass_(a, pw);   // ترقية التجزئة دون تغيير كلمة المرور
     writeJson_('accounts.json', all);
     return JSON.stringify({ token: mkToken_(a), me: meOf_(a) });
   });
@@ -253,8 +256,8 @@ function pass(token, oldPw, newPw) {
   if (newPw.length < 6) throw new Error('كلمة المرور ستة أحرف على الأقل');
   return withLock_(function () {
     var all = accs_(), x = all[a.uid];
-    if (pwHash_(x.salt, oldPw) !== x.hash) throw new Error('كلمة المرور الحالية غير صحيحة');
-    x.salt = uid_(); x.hash = pwHash_(x.salt, newPw); x.tv = (x.tv || 0) + 1;
+    if (pwHash_(x.salt, oldPw, x.it) !== x.hash) throw new Error('كلمة المرور الحالية غير صحيحة');
+    setPass_(x, newPw); x.tv = (x.tv || 0) + 1;
     writeJson_('accounts.json', all);
     return JSON.stringify({ token: mkToken_(x) });
   });
@@ -272,7 +275,7 @@ function acc_save(token, json) {
     var role = o.role === 'admin' ? 'admin' : 'team';
     var track = role === 'team' ? String(o.track || '') : '';
     if (role === 'team') trackOf_(track);
-    if (fresh) { x = { uid: uid_(), created: now_(), tv: 0, salt: uid_() }; pw = tempPass_(); x.hash = pwHash_(x.salt, pw); all[x.uid] = x; }
+    if (fresh) { x = { uid: uid_(), created: now_(), tv: 0 }; pw = tempPass_(); setPass_(x, pw); all[x.uid] = x; }
     if (x.uid === a.uid && (role !== 'admin' || o.disabled)) throw new Error('لا يمكنك تقييد حسابك');
     x.user = user; x.name = txt_(o.name, 60) || user; x.role = role; x.track = track; x.disabled = !!o.disabled;
     writeJson_('accounts.json', all);
@@ -284,7 +287,7 @@ function acc_reset(token, uid) {
   var a = auth_(token); needAdmin_(a);
   return withLock_(function () {
     var all = accs_(), x = all[uid]; if (!x) throw new Error('الحساب غير موجود');
-    var pw = tempPass_(); x.salt = uid_(); x.hash = pwHash_(x.salt, pw); x.tv = (x.tv || 0) + 1; x.fails = 0; x.lockUntil = 0;
+    var pw = tempPass_(); setPass_(x, pw); x.tv = (x.tv || 0) + 1; x.fails = 0; x.lockUntil = 0;
     writeJson_('accounts.json', all);
     return JSON.stringify({ pass: pw, token: x.uid === a.uid ? mkToken_(x) : '' });
   });
@@ -957,7 +960,7 @@ function setup() {
     var all = readJson_('accounts.json', null);
     if (!all || !Object.keys(all).length) {
       all = {};
-      var mk = function (user, name, role, track) { var x = { uid: uid_(), user: user, name: name, role: role, track: track || '', created: now_(), tv: 0, salt: uid_() }, pw = tempPass_(); x.hash = pwHash_(x.salt, pw); all[x.uid] = x; creds.push([name, user, pw]); };
+      var mk = function (user, name, role, track) { var x = { uid: uid_(), user: user, name: name, role: role, track: track || '', created: now_(), tv: 0 }, pw = tempPass_(); setPass_(x, pw); all[x.uid] = x; creds.push([name, user, pw]); };
       mk('admin', 'المدير العام', 'admin', '');
       TRACKS_SEED.forEach(function (t) { mk(t.id, 'فريق ' + t.name, 'team', t.id); });
       writeJson_('accounts.json', all);

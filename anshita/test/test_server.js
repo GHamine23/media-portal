@@ -178,6 +178,10 @@ const lgj = call('log_list', np.token.split('|')[0] ? call('login', 'judhoor', r
 // قفل بعد محاولات كثيرة
 for (let i = 0; i < 8; i++) { try { call('login', 'budhoor', 'bad'); } catch (e) {} }
 throws(() => call('login', 'budhoor', cred.budhoor), /محاولات كثيرة/, 'قفل مؤقت بعد ثماني محاولات');
+// ترقية تجزئة كلمة مرور قديمة (1200 جولة) عند الدخول دون تغييرها
+ctx.withLock_(function () { const all = ctx.readJson_('accounts.json', {}); const x = Object.values(all).find(y => y.user === 'ithmar3'); x.salt = 'oldsalt'; delete x.it; x.hash = ctx.pwHash_('oldsalt', 'legacy-pass'); ctx.writeJson_('accounts.json', all); });
+ok(call('login', 'ithmar3', 'legacy-pass').token, 'دخول حساب بتجزئة قديمة');
+ok(Object.values(ctx.readJson_('accounts.json', {})).find(y => y.user === 'ithmar3').it === 150 && call('login', 'ithmar3', 'legacy-pass').token, 'رُقّيت التجزئة وبقيت كلمة المرور');
 // حذف النشاط يحذف الحدث
 const before = newCal._events().length;
 call('act_del', A, 'judhoor', m1.id);
