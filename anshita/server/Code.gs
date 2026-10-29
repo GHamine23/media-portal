@@ -820,7 +820,7 @@ function tgPoll_() {
           linked.push([id, linkedMsg_(label), target, title]);
           return;
         }
-        if (c.type === 'private' && !assigned[id]) welcome.push([id, 'أهلاً بك، هذا بوت منصة الأنشطة التربوية. للربط استعمل الرابط الذي في المنصة.']);
+        // الخاص: لا يرد البوت على أحد غير محادثة الإدارة (إلا ربطها برابطها الموقّع)
       }
     });
     writeJson_('tg.json', g);

@@ -130,6 +130,8 @@ upd({ message: { chat: { id: 5555, first_name: 'أمين', type: 'private' }, te
 st = call('tg_poll', A);
 ok(st.adminChat && st.adminChat.id === '5555', 'ربط محادثة الإدارة');
 ok(!TG.offsetUsed, 'المنصة تقرأ التحديثات دون حذفها من طابور تليجرام');
+upd({ message: { chat: { id: 7777, first_name: 'غريب', type: 'private' }, text: '/start' } }); upd({ message: { chat: { id: 7777, first_name: 'غريب', type: 'private' }, text: 'مرحبا' } });
+call('tg_poll', A); ok(!TG.sent.some(m => m.chat === '7777'), 'البوت لا يرد في الخاص على غير الإدارة');
 { const s0 = TG.sent.length; call('tg_poll', A); ok(TG.sent.length === s0, 'لا معالجة مكررة لتحديثات قُرئت'); }
 st = call('tg_assign', A, '-100222', 'ishraq');
 ok(st.tracks.find(t => t.id === 'ishraq').chat.id === '-100222', 'ربط يدوي لمجموعة مكتشفة');
