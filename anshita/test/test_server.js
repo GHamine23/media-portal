@@ -81,8 +81,12 @@ ok(ev().getTitle() === 'جذور · لقاء الافتتاح' && !ev().isAllDay
 ok(GAS.Utilities.formatDate(ev().getStartTime(), 'x', 'yyyy-MM-dd HH:mm') === '2026-11-01 20:00', 'بداية الحدث ٨ مساء بتوقيت الرياض');
 const w1 = call('act_save', A, 'judhoor', JSON.stringify({ title: 'تحدي أذكاري', d: '2026-11-03', type: 'تحدٍّ' })).act;
 ok(!w1.cal, 'نشاط بلا تقويم لا يُرسل تلقائياً');
-const m1b = call('act_save', J, 'judhoor', JSON.stringify({ id: m1.id, done: false, title: 'محاولة تغيير', d: '2027-01-01' })).act;
-ok(m1b.title === 'لقاء الافتتاح' && m1b.d === '2026-11-01', 'الفريق بلا صلاحية: تُتجاهل حقول الخطة');
+const m1b = call('act_save', J, 'judhoor', JSON.stringify({ id: m1.id, time: '20:30', who: ['أنس', 'معاذ'], calOn: false })).act;
+ok(m1b.time === '20:30' && m1b.who.length === 2 && m1b.cal && m1b.cal.id, 'الفريق بلا صلاحية يعدّل موعد نشاط قائم والقائم عليه (ولا يملك التقويم)');
+const al1 = call('alerts', call('login', 'admin', cred.admin).token);
+ok(al1[0].kind === 'move' && al1[0].t === 'judhoor' && al1[0].changes.some(c => c[0] === 'الموعد' && /8:00 م/.test(c[1]) && /8:30 م/.test(c[2])) && al1[0].changes.some(c => c[0] === 'القائم'), 'تنبيه للإدارة بتغيير الموعد والقائم');
+const m1c = call('act_save', J, 'judhoor', JSON.stringify({ id: m1.id, time: '20:00', who: ['أنس'] })).act; void m1c;
+ok(call('boot', call('login', 'admin', cred.admin).token).unseen === 2, 'عدد التنبيهات غير المقروءة في boot');
 throws(() => call('act_save', J, 'judhoor', JSON.stringify({ title: 'جديد', d: '2026-11-05' })), /مغلقة/, 'الفريق بلا صلاحية لا يضيف');
 throws(() => call('act_del', J, 'judhoor', m1.id), /مغلق/, 'الفريق بلا صلاحية لا يحذف');
 const r = call('edit_request', J, 'نحتاج إضافة مسابقة');
@@ -188,6 +192,15 @@ call('act_del', A, 'judhoor', m1.id);
 ok(newCal._events().length === before - 1, 'حذف النشاط يحذف حدثه');
 const sv = call('settings_save', A, JSON.stringify({ remindHour: 18, tpl: { d3: 'إعداد: {العنوان} {متى}' } }));
 ok(sv.settings.remindHour === 18 && sv.settings.tpl.d3 === 'إعداد: {العنوان} {متى}' && /نشر/.test(sv.settings.tpl.d1), 'حفظ الإعدادات والقوالب');
+
+function np2tok() { return call('login', 'judhoor', rs.pass).token; }
+// ٧ب) التنبيهات: الإرسال إلى محادثة الإدارة، والتعليم كمقروء
+const nA = TG.sent.length;
+call('act_save', np2tok(), 'judhoor', JSON.stringify({ id: t1.id, d: '2026-11-07' }));
+ok(TG.sent.slice(nA).some(m => m.chat === '5555' && /غيّر|عدّل/.test(m.text) && /الموعد: من/.test(m.text)), 'تنبيه تليجرام للإدارة بتغيير الموعد');
+const AA = call('login', 'admin', cred.admin).token;
+ok(call('alerts_seen', AA, 'all').unseen === 0 && call('boot', AA).unseen === 0, 'تعليم التنبيهات مقروءة');
+throws(() => call('alerts', np2tok()), /للإدارة/, 'الفريق لا يقرأ التنبيهات');
 
 // ٨) التقرير الأسبوعي
 throws(() => call('report_data', 'x'), /مفتاح/, 'التقرير بلا مفتاح مرفوض');

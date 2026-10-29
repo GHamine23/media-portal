@@ -6,8 +6,8 @@
 function evChip(a, tid, o = {}) {
   const t = T(tid), drag = canEdit(tid) && !o.noDrag && !String(a.id).startsWith('tmp');
   const flags = (a.cal && a.cal.id ? `<span data-tip="في تقويم جوجل">${svg('gcal')}</span>` : '') + (a.done ? `<span data-tip="تم التنفيذ">${svg('check')}</span>` : '');
-  const meta = [o.track ? `<span class="hl"><i style="background:${t.color};border-radius:2px"></i>${esc(t.name)}</span>` : '', a.time ? `<span>${timeText(a.time)}</span>` : '', a.who && a.who.length ? `<span>${esc(a.who.join('، '))}</span>` : '', o.date ? `<span>${gDay(a.d)}</span>` : '', flags ? `<span class="flag">${flags}</span>` : ''].filter(Boolean).join('');
-  return `<div class="ev ${a.done ? 'done' : ''} ${isLate(a) ? 'late' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${tid}" ${drag ? 'data-drag="1"' : ''} style="--tcol:${t.color}">
+  const meta = [o.track ? `<span class="tbadge">${esc(t.name)}</span>` : '', a.time ? `<span>${timeText(a.time)}</span>` : '', a.who && a.who.length ? `<span>${esc(a.who.join('، '))}</span>` : '', o.date ? `<span>${gDay(a.d)}</span>` : '', flags ? `<span class="flag">${flags}</span>` : ''].filter(Boolean).join('');
+  return `<div class="ev ${o.track || o.tint ? 'tinted' : ''} ${a.done ? 'done' : ''} ${isLate(a) ? 'late' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${tid}" ${drag ? 'data-drag="1"' : ''} style="--tcol:${t.color}">
     ${tile(a.type, 'sm')}<span class="tx"><span class="tt clamp2">${esc(a.title)}</span>${meta ? `<span class="mt">${meta}</span>` : ''}</span></div>`;
 }
 const pageHead = (eyebrow, title, lead, side = '', reveal = false) => `<div class="ph"><div class="t">${eyebrow ? `<div class="eyebrow">${eyebrow}</div>` : ''}<h1 class="${reveal ? 'reveal' : ''}">${reveal ? title.split(' ').map((w, i) => `<span class="w" style="animation-delay:${i * 70}ms">${esc(w)}</span>`).join(' ') : esc(title)}</h1>${lead ? `<p class="lead">${lead}</p>` : ''}</div>${side}</div>`;
@@ -128,7 +128,13 @@ function adminHome() {
 }
 function tracksIndex() {
   const ws = focusWeek();
-  return pageHead(todayLine(), 'المسارات', '') + `<div class="grid3">${D.tracks.map(t => { const h = health(t.id, ws), r = semRange(t.id, curN(t.id)); return `<a class="card" href="#t/${t.id}" style="text-decoration:none;display:flex;flex-direction:column;gap:12px"><div class="row">${logoImg(t.id)}<b style="font-family:var(--fd);font-weight:500;font-size:19px;color:var(--ink)">${esc(t.name)}</b></div><div class="sm">${hlDot(h)}</div><div class="xs faint">${semLabel(curN(t.id))}${r ? ' · ' + gShort(r.from) + ' – ' + gShort(r.to) : ''}</div></a>`; }).join('')}</div>`;
+  return pageHead(todayLine(), 'المسارات', '') + `<div class="grid3 tix">${D.tracks.map(t => {
+    const h = health(t.id, ws), r = semRange(t.id, curN(t.id)), n = actsOf(t.id, curN(t.id)).length;
+    return `<a class="card tcard" href="#t/${t.id}" style="--tc:${t.color}"><span class="tlogo">${logoImg(t.id)}</span>
+      <span class="col" style="gap:4px;min-width:0"><b class="tname">${esc(t.full || t.name)}</b><span class="xs faint">${esc([t.cohort, t.age].filter(Boolean).join(' · '))}</span></span>
+      <span class="sm">${hlDot(h)}</span>
+      <span class="xs faint">${semLabel(curN(t.id))}${r ? ' · ' + gShort(r.from) + ' – ' + gShort(r.to) : ''} · ${nActs(n)}</span></a>`;
+  }).join('')}</div>`;
 }
 
 /* ---------- رئيسية الفريق ---------- */
@@ -389,7 +395,7 @@ function weekLanes(ws, ids) {
   for (const id of ids) {
     const t = T(id);
     h += `<div class="ln"><a href="#t/${id}" class="row" style="gap:8px;text-decoration:none">${logoImg(id)}<b>${esc(t.name)}</b></a></div>`;
-    h += days.map(d => { const x = dayOf(id, curN(id), d), da = actsOf(id).filter(a => a.d === d).sort(sortA); return `<div class="c ${d === TODAY ? 'today' : ''} ${x && !x.c ? 'off' : ''}" data-drop="1" data-date="${d}" data-track="${id}">${da.map(a => evChip(a, id)).join('')}${canEdit(id) ? `<button class="add" type="button" data-act="newact" data-date="${d}" data-track="${id}">+</button>` : ''}</div>`; }).join('');
+    h += days.map(d => { const x = dayOf(id, curN(id), d), da = actsOf(id).filter(a => a.d === d).sort(sortA); return `<div class="c ${d === TODAY ? 'today' : ''} ${x && !x.c ? 'off' : ''}" data-drop="1" data-date="${d}" data-track="${id}">${da.map(a => evChip(a, id, { tint: true })).join('')}${canEdit(id) ? `<button class="add" type="button" data-act="newact" data-date="${d}" data-track="${id}">+</button>` : ''}</div>`; }).join('');
   }
   return `<div class="lanesw"><div class="lw">${h}</div></div>`;
 }

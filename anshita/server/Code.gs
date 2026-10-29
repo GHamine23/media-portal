@@ -57,7 +57,8 @@ function apiFns_() {
     tg_token: tg_token, tg_status: tg_status, tg_poll: tg_poll, tg_assign: tg_assign, tg_test: tg_test, remind_now: remind_now,
     tg_check: tg_check, edit_request: edit_request,
     ui_fonts: ui_fonts, ui_font_get: ui_font_get, font_put: font_put,
-    report_key: report_key, report_data: report_data, report_send: report_send, report_list: report_list
+    report_key: report_key, report_data: report_data, report_send: report_send, report_list: report_list,
+    alerts: alerts, alerts_seen: alerts_seen
   };
 }
 function doPost(e) {
@@ -312,6 +313,7 @@ function boot(token) {
   var plans = {}, revsO = {};
   ts.forEach(function (t) { plans[t.id] = plan_(t.id); revsO[t.id] = plans[t.id].rev; });
   revsO._log = +(props_().getProperty('rev_log') || 0); revsO._meta = +(props_().getProperty('rev_meta') || 0);
+  if (admin) revsO._alerts = +(props_().getProperty('rev_alerts') || 0);
   var out = {
     v: VERSION, me: meOf_(a), today: Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd'), tz: tz_(),
     types: TYPES, remindTypes: s.remindTypes, remindHour: s.remindHour,
@@ -324,7 +326,8 @@ function boot(token) {
     out.tg = { bot: tg0.bot.username, linked: !!(mt.chat && mt.chat.id), title: mt.chat ? mt.chat.title : '', link: tgLink_(tg0.bot.username, a.track) };
   }
   if (admin) {
-    var tgs = tg0;
+    var tgs = tg0, AL = readJson_('alerts.json', []);
+    out.alerts = AL.slice(0, 40); out.unseen = AL.filter(function (x) { return !x.seen; }).length;
     out.settings = s;
     out.bot = tgs.bot || null;
     out.cal = { id: s.calId || '', name: s.calName || '' };
@@ -337,6 +340,7 @@ function revs(token) {
   tracks_().forEach(function (t) { if (a.role === 'admin' || t.id === a.track) o[t.id] = +(p.getProperty('rev_' + t.id) || 0); });
   o._log = +(p.getProperty('rev_log') || 0);
   o._meta = +(p.getProperty('rev_meta') || 0);
+  if (a.role === 'admin') o._alerts = +(p.getProperty('rev_alerts') || 0);
   return JSON.stringify(o);
 }
 function plan(token, tid) { var a = auth_(token); canView_(a, tid); return JSON.stringify(plan_(tid)); }
@@ -366,6 +370,44 @@ function cleanAct_(o, old) {
   return x;
 }
 var FOLLOW_FIELDS = ['id', 'done', 'note', 'link'];
+// ما يعدّله الفريق في نشاط قائم ولو كان تعديل الخطة مغلقًا (ويصل الإدارةَ تنبيه به)
+var ADJUST_FIELDS = ['id', 'title', 'type', 'd', 'time', 'dur', 'who', 'idea', 'rem', 'sem', 'done', 'note', 'link'];
+/* تنبيهات الإدارة: alerts.json [{id, at, t, by, kind: move|who|edit|del|add, title, from, to, seen}] */
+function alertOf_(a, tid, old, x) {
+  if (a.role === 'admin') return null;
+  var ch = [], kind = '';
+  if (!old) return { kind: 'add', title: x.title, from: '', to: whenText_(x) };
+  if (!x) return { kind: 'del', title: old.title, from: whenText_(old), to: '' };
+  if (old.d !== x.d || (old.time || '') !== (x.time || '')) { kind = 'move'; ch.push(['الموعد', whenText_(old), whenText_(x)]); }
+  if ((old.who || []).join('،') !== (x.who || []).join('،')) { kind = kind || 'who'; ch.push(['القائم', (old.who || []).join('، ') || 'لم يُحدَّد', (x.who || []).join('، ') || 'لم يُحدَّد']); }
+  if (old.title !== x.title) { kind = kind || 'edit'; ch.push(['العنوان', old.title, x.title]); }
+  if (old.type !== x.type) { kind = kind || 'edit'; ch.push(['النوع', old.type, x.type]); }
+  if ((old.idea || '') !== (x.idea || '') || (old.dur || 0) !== (x.dur || 0)) { kind = kind || 'edit'; ch.push(['التفاصيل', '', '']); }
+  if (!kind) return null;
+  return { kind: kind, title: x.title, changes: ch };
+}
+function alertText_(al, t, by) {
+  var head = by + ' (' + (t.full || t.name) + ')';
+  if (al.kind === 'add') return head + ' أضاف «' + al.title + '» ' + al.to + '.';
+  if (al.kind === 'del') return head + ' حذف «' + al.title + '» الذي كان ' + al.from + '.';
+  return head + ' عدّل «' + al.title + '»:\n' + al.changes.map(function (c) { return c[1] || c[2] ? '- ' + c[0] + ': من ' + (c[1] || '—') + ' إلى ' + (c[2] || '—') : '- ' + c[0]; }).join('\n');
+}
+function pushAlert_(a, t, al) {
+  var L = readJson_('alerts.json', []), x = { id: uid_(), at: now_(), t: t.id, by: a.name, kind: al.kind, title: al.title, changes: al.changes || [], from: al.from || '', to: al.to || '', seen: false };
+  L.unshift(x); if (L.length > 300) L.length = 300;
+  writeJson_('alerts.json', L); props_().setProperty('rev_alerts', String(now_()));
+  return x;
+}
+function alerts(token) { var a = auth_(token); needAdmin_(a); return JSON.stringify(readJson_('alerts.json', []).slice(0, 100)); }
+function alerts_seen(token, ids) {
+  var a = auth_(token); needAdmin_(a);
+  return JSON.stringify(withLock_(function () {
+    var L = readJson_('alerts.json', []), all = ids === 'all', set = all ? null : (ids || []);
+    L.forEach(function (x) { if (all || set.indexOf(x.id) >= 0) x.seen = true; });
+    writeJson_('alerts.json', L); props_().setProperty('rev_alerts', String(now_()));
+    return { unseen: L.filter(function (x) { return !x.seen; }).length };
+  }));
+}
 // json: النشاط (بلا id = جديد). calOn: true يرسله للتقويم، false يزيله (للإدارة)
 function act_save(token, tid, json) {
   var a = auth_(token), o = JSON.parse(json), t = trackOf_(tid), s = cfg_();
@@ -379,9 +421,9 @@ function act_save(token, tid, json) {
     var calOn = o.calOn; delete o.calOn;
     if (!full) {
       if (!old) throw new Error('إضافة الأنشطة مغلقة، ويفتحها المدير العام');
-      var f = {}; FOLLOW_FIELDS.forEach(function (k) { if (k in o) f[k] = o[k]; }); o = f;
+      var f = {}; ADJUST_FIELDS.forEach(function (k) { if (k in o) f[k] = o[k]; }); o = f;
     }
-    var x = cleanAct_(o, old), calErr = '', notice = '';
+    var x = cleanAct_(o, old), calErr = '', notice = '', al = alertOf_(a, tid, old, x);
     if (!old) { x.by = a.name; if (!x.sem) x.sem = String(t.cur || ''); }
     // تقويم جوجل: الاختيار للإدارة، وما أُرسل يبقى محدَّثاً
     if (a.role === 'admin' && calOn === false && x.cal) { try { calRemove_(x); } catch (e) { calErr = e.message; } delete x.cal; }
@@ -394,13 +436,14 @@ function act_save(token, tid, json) {
     }
     if (old) p.acts[i] = x; else p.acts.push(x);
     savePlan_(tid, p);
-    var what = !old ? 'أضاف نشاطاً' : (!full ? (old.done !== x.done ? (x.done ? 'أتمّ نشاطاً' : 'أعاد نشاطاً إلى الخطة') : 'تابع نشاطاً') : (old.d !== x.d ? 'نقل نشاطاً' : 'عدّل نشاطاً'));
-    if (full && old && old.done !== x.done && old.d === x.d) what = x.done ? 'أتمّ نشاطاً' : 'أعاد نشاطاً إلى الخطة';
+    var what = !old ? 'أضاف نشاطاً' : old.d !== x.d || (old.time || '') !== (x.time || '') ? 'غيّر موعد نشاط' : (old.who || []).join() !== (x.who || []).join() ? 'غيّر القائم على نشاط' : old.done !== x.done ? (x.done ? 'أتمّ نشاطاً' : 'أعاد نشاطاً إلى الخطة') : al ? 'عدّل نشاطاً' : 'تابع نشاطاً';
     log_(a, tid, what, x.title);
-    return { act: x, rev: p.rev, calErr: calErr, notice: notice };
+    var alr = al && al.kind !== 'add' ? pushAlert_(a, t, al) : null;
+    return { act: x, rev: p.rev, calErr: calErr, notice: notice, alert: alr ? alertText_(al, t, a.name) : '' };
   });
   if (res.notice && t.chat && t.chat.id) { try { tgSend_(t.chat.id, res.notice, tid); } catch (e) {} }
-  delete res.notice;
+  if (res.alert) adminTg_(res.alert);
+  delete res.notice; delete res.alert;
   return JSON.stringify(res);
 }
 function act_del(token, tid, id) {
@@ -413,12 +456,15 @@ function act_del(token, tid, id) {
     if (x.cal && x.cal.id) { try { calRemove_(x); } catch (e) {} }
     savePlan_(tid, p);
     log_(a, tid, 'حذف نشاطاً', x.title);
+    var al = alertOf_(a, tid, x, null); if (al) pushAlert_(a, t, al);
+    var alertTxt = al ? alertText_(al, t, a.name) : '';
     var notice = '', left = dayDiff_(x.d, today_());
     if (remindable_(x, s) && s.notifyChanges && left >= 0 && left <= 14 && !x.done) notice = 'تعديل في الخطة: أُلغي لقاء «' + x.title + '» الذي كان ' + whenText_(x) + '.';
-    return { rev: p.rev, act: x, notice: notice };
+    return { rev: p.rev, act: x, notice: notice, alert: alertTxt };
   });
   if (res.notice && t.chat && t.chat.id) { try { tgSend_(t.chat.id, res.notice, tid); } catch (e) {} }
-  delete res.notice;
+  if (res.alert) adminTg_(res.alert);
+  delete res.notice; delete res.alert;
   return JSON.stringify(res);
 }
 
@@ -565,6 +611,7 @@ function settings_save(token, json) {
   }));
 }
 
+function adminTg_(text) { var s = cfg_(); if (s.adminChat && s.adminChat.id && props_().getProperty('TG_TOKEN')) { try { tgSend_(s.adminChat.id, text + '\n' + SITE_URL); } catch (e) {} } }
 // طلب الفريق فتح تعديل الخطة: يظهر للإدارة في المنصة، ويصلها في تليجرام إن رُبطت محادثتها
 function edit_request(token, note) {
   var a = auth_(token);
