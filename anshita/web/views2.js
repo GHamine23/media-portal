@@ -388,7 +388,7 @@ VIEWS.bot = {
           ${unassigned.length ? `<div class="sep"></div><p class="sm muted" style="margin-bottom:6px">مجموعات أضيف إليها البوت ولم تُربط:</p><div class="list">${unassigned.map(c => `<div class="li"><span class="tile sm">${svg('users')}</span><div class="tx"><div class="tt">${esc(c.title)}</div><div class="mt">${ago(c.at)}</div></div><select class="inp" style="width:auto" data-act="bot-assign" data-chat="${esc(c.id)}" aria-label="اربطها بمسار"><option value="">اربطها بـ…</option>${D.tracks.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></div>`).join('')}</div>` : ''}
         </div>
         <div class="card"><div class="card-h"><h3>ما سيُرسل قريبًا</h3><button class="btn sm ghost" type="button" data-act="bot-now">أرسل المستحق الآن</button></div>${up ? `<div class="list">${up}</div>` : `<p class="muted sm">لا لقاءات خلال الأيام العشرة القادمة.</p>`}</div>
-        ${CFG.demo && window.DEMO ? `<div class="card"><div class="card-h"><h3>رسائل البوت في التجربة</h3><span class="xs faint">ما كان سيصل المجموعات</span></div><div class="tgwall">${window.DEMO.outbox().slice(-8).reverse().map(m => { const tr = BS.tracks.find(t => t.chat && String(t.chat.id) === m.chat); return `<div class="xs faint">${tr ? esc(T(tr.id).name) : String(m.chat) === String((BS.adminChat || {}).id) ? 'الإدارة' : 'مجموعة'} · ${ago(m.at)}</div><div class="tgmsg">${esc(m.text)}</div>`; }).join('') || '<p class="muted sm">لا رسائل بعد.</p>'}</div></div>` : ''}
+        ${CFG.demo && window.DEMO ? `<div class="card"><div class="card-h"><h3>رسائل البوت في التجربة</h3><span class="xs faint">ما كان سيصل المجموعات</span></div><div class="tgwall">${window.DEMO.outbox().slice(-8).reverse().map(m => { const tr = BS.tracks.find(t => t.chat && String(t.chat.id) === m.chat); return `<div class="xs faint">${tr ? esc(T(tr.id).name) : String(m.chat) === String((BS.adminChat || {}).id) ? 'الإدارة' : 'مجموعة'} · ${ago(m.at)}</div><div class="tgmsg">${m.html ? tgHtml(m.text) : esc(m.text)}</div>`; }).join('') || '<p class="muted sm">لا رسائل بعد.</p>'}</div></div>` : ''}
       </section>
       <aside class="stack">
         <div class="card"><div class="card-h"><h3>الإعدادات</h3></div>
@@ -400,8 +400,8 @@ VIEWS.bot = {
         </div>
         <div class="card"><div class="card-h"><h3>نص التذكيرين</h3></div>
           <div class="ph-chips" style="margin-bottom:8px">${['العنوان', 'الموعد', 'متى', 'المسؤول', 'المسار', 'النوع'].map(k => `<button type="button" data-act="bs-ph" data-v="{${k}}">{${k}}</button>`).join('')}</div>
-          <div class="field"><label for="bs-d3">قبل اللقاء بثلاثة أيام</label><textarea class="inp" id="bs-d3" rows="4" data-act="bs-tpl">${esc((s.tpl || {}).d3 || '')}</textarea></div>
-          <div class="field" style="margin-top:10px"><label for="bs-d1">قبله بيوم</label><textarea class="inp" id="bs-d1" rows="4" data-act="bs-tpl">${esc((s.tpl || {}).d1 || '')}</textarea></div>
+          <div class="field"><label for="bs-d3">قبل اللقاء بثلاثة أيام</label><textarea class="inp" id="bs-d3" rows="4" data-act="bs-tpl" placeholder="اتركه فارغًا ليكتب البوت تذكيرًا متنوعًا">${esc((s.tpl || {}).d3 || '')}</textarea></div>
+          <div class="field" style="margin-top:10px"><label for="bs-d1">قبله بيوم</label><textarea class="inp" id="bs-d1" rows="4" data-act="bs-tpl" placeholder="اتركه فارغًا ليكتب البوت تذكيرًا متنوعًا">${esc((s.tpl || {}).d1 || '')}</textarea></div>
           <div class="tgwall" style="margin-top:12px" id="bs-prev">${tgPreview(s, 'd3')}${tgPreview(s, 'd1')}</div>
           <div class="row" style="margin-top:12px"><button class="btn pri" type="button" data-act="bs-save">احفظ الإعدادات</button></div></div>
       </aside>
@@ -413,7 +413,9 @@ function tgFill(tpl, k) {
   const map = { 'العنوان': x.title, 'الموعد': gDay(d) + ' الساعة ' + timeText(x.time), 'متى': k === 'd3' ? 'بعد 3 أيام' : 'غدًا', 'المتبقي': k === 'd3' ? '3 أيام' : 'يوم واحد', 'المسؤول': x.who.join('، '), 'المسار': 'جذور', 'النوع': 'لقاء', 'الفكرة': '' };
   return String(tpl || '').replace(/\{([^}]+)\}/g, (a, n) => map.hasOwnProperty(n) ? map[n] : a);
 }
-const tgPreview = (s, k) => `<div class="tgmsg">${esc(tgFill(($('#bs-' + k) && $('#bs-' + k).value) || (s.tpl || {})[k] || '', k))}</div>`;
+const tgPreview = (s, k) => { const v = ($('#bs-' + k) && $('#bs-' + k).value) || (s.tpl || {})[k] || ''; return v ? `<div class="tgmsg">${esc(tgFill(v, k))}</div>` : `<div class="tgmsg auto">${k === 'd3' ? 'بلا نص مخصص: يكتب البوت تذكيرًا متنوعًا تلقائيًا بحسب حال النشاط: هل له مسؤول، وهل صُمّم إعلانه ونُشر، ورابط ميت إن وُجد.' : 'وكذلك تذكير اليوم السابق. اكتب نصًا هنا إن أردت نصًا ثابتًا بدلًا منه.'}</div>`; };
+// رسائل البوت بتنسيق تليجرام: يُعرض المسموح به فقط (عريض، مائل، رابط، اقتباس)، وكل ما سواه نص
+const tgHtml = t => esc(t).replace(/&lt;(\/?)(b|i|u|s|code|pre|blockquote)(?: expandable)?&gt;/g, '<$1$2>').replace(/&lt;a href=&quot;(https?:\/\/[^"&<>]+)&quot;&gt;/g, '<a href="$1" target="_blank" rel="noopener">').replace(/&lt;\/a&gt;/g, '</a>');
 async function botSaveSettings() {
   const s = Object.assign({}, BS.settings || {});
   const body = { remindHour: +$('#bs-h').value, remindTypes: s.remindTypes, digest: s.digest, notifyChanges: s.notifyChanges, adminDigest: s.adminDigest, tpl: { d3: $('#bs-d3').value, d1: $('#bs-d1').value } };

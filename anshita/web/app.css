@@ -292,7 +292,7 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 .stack{display:flex;flex-direction:column;gap:18px}
 .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
 .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
-@media (max-width:1000px){.cols{grid-template-columns:1fr}}
+@media (max-width:1000px){.cols{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:700px){.grid2,.grid3{grid-template-columns:1fr}}
 .sect{margin-top:28px}
 .sect>.sh{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
@@ -533,6 +533,10 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 /* تليجرام */
 .tgmsg{background:#e7f4e1;color:#14231a;border-radius:16px 16px 4px 16px;padding:10px 13px;font-size:14.5px;line-height:1.6;white-space:pre-wrap;max-width:360px;box-shadow:0 1px 1px rgba(0,0,0,.08);font-family:-apple-system,'Segoe UI',Tahoma,sans-serif}
 :root[data-theme="dark"] .tgmsg{background:#2b5240;color:#eaf4ee}
+.tgmsg{overflow-wrap:anywhere;max-width:100%}
+.tgmsg.auto{background:transparent;color:inherit;box-shadow:none;border:1px dashed var(--line);font-size:13.5px;opacity:.85}
+.tgmsg blockquote{margin:6px 0;padding:4px 10px;border-inline-start:3px solid currentColor;background:rgba(0,0,0,.05);border-radius:6px;white-space:pre-wrap}
+.tgmsg a{color:inherit;text-decoration:underline}
 .tgwall{background:linear-gradient(135deg,#cfe0c3,#e6edd2);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
 :root[data-theme="dark"] .tgwall{background:linear-gradient(135deg,#17221b,#1c2a1f)}
 .steps3{counter-reset:s;display:flex;flex-direction:column;gap:12px}

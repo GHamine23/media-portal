@@ -34,7 +34,7 @@ window.DEMO = (function () {
         if (m === 'getMe') return { code: 200, body: JSON.stringify({ ok: true, result: { id: 7, username: 'anshita_demo_bot', first_name: 'تذكيرات الأنشطة' } }) };
         if (m === 'deleteWebhook') return { code: 200, body: '{"ok":true,"result":true}' };
         if (m === 'getUpdates') { const off = +p.offset || 0; return { code: 200, body: JSON.stringify({ ok: true, result: UPD.filter(u => u.update_id >= off) }) }; }
-        if (m === 'sendMessage') { OUT.push({ chat: String(p.chat_id), text: p.text, at: Date.now() }); if (OUT.length > 60) OUT.shift(); return { code: 200, body: JSON.stringify({ ok: true, result: { message_id: OUT.length } }) }; }
+        if (m === 'sendMessage') { OUT.push({ chat: String(p.chat_id), text: p.text, html: p.parse_mode === 'HTML', at: Date.now() }); if (OUT.length > 60) OUT.shift(); return { code: 200, body: JSON.stringify({ ok: true, result: { message_id: OUT.length } }) }; }
       }
       return { code: 404, body: '' };
     };
