@@ -29,7 +29,7 @@ const IC = {
   bell: 'M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20.5a2.2 2.2 0 0 0 4 0', eye: 'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
   edit: 'M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19zM14 7l3 3', send: 'M21 3 10 14M21 3l-7 18-4-7-7-4z', refresh: 'M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7',
   alert: 'M12 4 2.5 20h19zM12 10v4.5M12 17.5h.01', copy: 'M8 8h12v12H8zM16 8V4H4v12h4', ext: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
-  flag: 'M5 21V4M5 4h11l-2 4 2 4H5', down: 'm6 9 6 6 6-6', sheet: 'M5 3.5h10l4 4v13H5zM15 3.5v4h4M8.5 12h7M8.5 15.5h7',
+  flag: 'M5 21V4M5 4h11l-2 4 2 4H5', live: 'M12 13.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM8.6 15.4a4.8 4.8 0 0 1 0-6.8M15.4 8.6a4.8 4.8 0 0 1 0 6.8M5.8 18.2a8.8 8.8 0 0 1 0-12.4M18.2 5.8a8.8 8.8 0 0 1 0 12.4', down: 'm6 9 6 6 6-6', sheet: 'M5 3.5h10l4 4v13H5zM15 3.5v4h4M8.5 12h7M8.5 15.5h7',
   menu: 'M4 7h16M4 12h16M4 17h16', target: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01'
 };
 const svg = (k, sw = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${IC[k] || k}"/></svg>`;
@@ -130,7 +130,7 @@ const isAdmin = () => D && D.me.role === 'admin';
 const myTrack = () => D && D.me.role === 'team' ? D.me.track : null;
 const T = id => D.tracks.find(t => t.id === id);
 const planOf = id => D.plans[id] || (D.plans[id] = { sems: {}, acts: [], rev: 0 });
-const semN = id => String(P.sem[id] || (T(id) && T(id).cur) || 1);
+const semN = id => { const r = route(); return String((r.name === 't' && r.a === id && r.b) || (T(id) && T(id).cur) || 1); };
 const curN = id => String((T(id) && T(id).cur) || 1);
 const semOf = (id, n) => planOf(id).sems[String(n)];
 const daysOf = (id, n) => (semOf(id, n || curN(id)) || {}).days || [];
@@ -138,6 +138,43 @@ const dayOf = (id, n, d) => daysOf(id, n).find(x => x.d === d);
 const actsOf = (id, n) => planOf(id).acts.filter(a => n == null || a.sem === String(n));
 const allActs = () => D.tracks.flatMap(t => planOf(t.id).acts.map(a => Object.assign(a, { t: t.id })));
 const canEdit = id => isAdmin() || !!(T(id) && T(id).canEdit);
+const canAdjust = id => isAdmin() || myTrack() === id;   // تعديل نشاط قائم (الموعد، القائم، التفاصيل) — يصل الإدارةَ تنبيه به
+
+/* ---------- لقاءات اليوم: البث المباشر في الجدول + أنشطة اللقاء ---------- */
+const MEET_T = ['لقاء', 'استضافة'];
+const isLive = d => !!d && /بث/.test((d.r || '') + ' ' + (d.ev || ''));
+function dayMeets(tid, d, skipId) {
+  const x = dayOf(tid, semFor(tid, d) || curN(tid), d), L = [];
+  if (isLive(x)) L.push('البث المباشر');
+  actsOf(tid).filter(a => a.d === d && MEET_T.includes(a.type) && a.id !== skipId).forEach(a => L.push(qt(a.title)));
+  return L;
+}
+const clashText = L => (L.length === 2 ? 'لقاءان في يوم واحد: ' : L.length + ' لقاءات في يوم واحد: ') + L.join(' و');
+function clashOf(tid, a) { if (!MEET_T.includes(a.type)) return ''; const L = dayMeets(tid, a.d); return L.length >= 2 ? clashText(L) : ''; }
+// أقرب أيام دراسة بلا بث ولا لقاء
+function freeDays(tid, d, skipId, n = 3) {
+  const out = [];
+  for (const k of [1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6]) {
+    const x = add(d, k); if (x < TODAY) continue;
+    const day = dayOf(tid, semFor(tid, x) || curN(tid), x); if (!day || !day.c || dayMeets(tid, x, skipId).length) continue;
+    out.push(x); if (out.length >= n) break;
+  }
+  return out.sort();
+}
+/* ---------- اقتراح كاهوت مراجعة قبل الاختبار بأسبوع ---------- */
+function kahootSugs(tid) {
+  const S = semOf(tid, curN(tid)); if (!S) return [];
+  return S.days.filter(x => x.ev && /اختبار/.test(x.ev) && x.d > TODAY).map(x => {
+    if (actsOf(tid).some(a => a.type === 'كاهوت' && a.d >= add(x.d, -12) && a.d <= x.d)) return null;
+    let best = null;
+    for (const k of [7, 6, 8, 5, 9, 4, 10, 3, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]) { const c = add(x.d, -k); if (c < TODAY) continue; const day = dayOf(tid, curN(tid), c); if (day && day.c && !dayMeets(tid, c).length) { best = c; break; } }
+    if (!best && add(x.d, -7) >= TODAY) best = add(x.d, -7);
+    return best ? { exam: x.ev, ed: x.d, d: best, left: diffD(x.d, TODAY), title: 'كاهوت مراجعة قبل ' + x.ev } : null;
+  }).filter(Boolean);
+}
+/* ---------- لوحة النشاط الثابتة في صفحة المسار (الشاشات العريضة) ---------- */
+const WIDE_Q = 1240;
+const dockOn = tid => !!tid && route().name === 't' && route().a === tid && innerWidth >= WIDE_Q;
 const tcol = id => (T(id) && T(id).color) || '#888';
 const sortA = (x, y) => x.d < y.d ? -1 : x.d > y.d ? 1 : (x.time || '99').localeCompare(y.time || '99');
 const members = id => (T(id) && T(id).members) || [];
@@ -224,7 +261,7 @@ function route() {
   return { name: p[0] || 'home', a: p[1] || '', b: p[2] || '' };
 }
 function go(h) { if (location.hash === '#' + h) render(); else location.hash = h; }
-addEventListener('hashchange', () => { closeLayer(); render(); window.scrollTo(0, 0); });
+addEventListener('hashchange', () => { closeLayer(); if (F && F.dock) F = null; if (route().name !== 'bot') { BS = null; BS_LOAD = false; } if (P.tl && P.tl.tmp && route().name !== 'timeline') { P.tl.tracks = []; P.tl.tmp = false; savePrefs(); } render(); window.scrollTo(0, 0); });
 
 /* ---------- الإطار ---------- */
 const logoImg = (id, cls = '') => LOGOS[id] ? `<img class="${cls}" src="${LOGOS[id]}" alt="" loading="lazy">` : `<span class="av" style="background:${tcol(id)}">${esc((T(id) || {}).name ? T(id).name[0] : '؟')}</span>`;
@@ -243,6 +280,7 @@ function navItems() {
     const unl = D.bot ? D.tracks.filter(t => !t.linked).length : 0;
     const reqs = D.tracks.filter(t => t.editReq).length;
     return `<a class="nl" href="#home"${cur('home')}>${svg('home')}الرئيسية${reqs ? `<span class="badge">${reqs}</span>` : ''}</a>
+      <a class="nl" href="#alerts"${cur('alerts')}>${svg('bell')}تغييرات الفرق${D.unseen ? `<span class="badge">${D.unseen}</span>` : ''}</a>
       <a class="nl" href="#timeline"${cur('timeline')}>${svg('tl')}المنظور الزمني</a>
       <a class="nl" href="#reports"${cur('reports')}>${svg('sheet')}التقارير الأسبوعية</a>
       <div class="nav-h">المسارات</div>
@@ -257,11 +295,23 @@ function navItems() {
     <a class="nl" href="#t/${id}"${cur('t')}>${svg('table')}خطة الفصل</a>
     <a class="nl" href="#timeline"${cur('timeline')}>${svg('tl')}المنظور الزمني</a>`;
 }
+// العدد مع المعدود
+const nWeeks = n => n === 1 ? 'أسبوع واحد' : n === 2 ? 'أسبوعان' : n >= 3 && n <= 10 ? n + ' أسابيع' : n + ' أسبوعًا';
+const nStudy = n => !n ? 'لا أيام دراسة' : n === 1 ? 'يوم دراسة واحد' : n === 2 ? 'يوما دراسة' : n <= 10 ? n + ' أيام دراسة' : n + ' يوم دراسة';
+const qt = t => /[«»]/.test(t) ? t : '«' + t + '»';
+// زر الإضافة العائم في الجوال
+function fabHtml(r) {
+  if (!['home', 't', 'timeline'].includes(r.name)) return '';
+  const tid = r.name === 't' ? r.a : isAdmin() ? '' : myTrack();
+  if (tid ? !canEdit(tid) : !isAdmin()) return '';
+  return `<button class="fab" type="button" data-act="newact" ${tid ? `data-track="${tid}"` : ''} aria-label="نشاط جديد">${svg('plus', 2.2)}</button>`;
+}
+const MORE_R = ['calendar', 'bot', 'accounts', 'reports', 'alerts'];
 function shell(body) {
   const me = D.me, r = route();
   const tab = (h, ic, label, on) => `<a href="#${h}"${on ? ' aria-current="page"' : ''}>${svg(ic)}<span>${label}</span></a>`;
   const tabs = isAdmin()
-    ? tab('home', 'home', 'الرئيسية', r.name === 'home') + tab('tracks', 'table', 'المسارات', r.name === 't' || r.name === 'tracks' || r.name === 'team') + tab('timeline', 'tl', 'الزمني', r.name === 'timeline') + `<button type="button" data-act="more">${svg('menu')}<span>المزيد</span></button>`
+    ? tab('home', 'home', 'الرئيسية', r.name === 'home') + tab('tracks', 'table', 'المسارات', r.name === 't' || r.name === 'tracks' || r.name === 'team') + tab('timeline', 'tl', 'الزمني', r.name === 'timeline') + `<button type="button" data-act="more"${MORE_R.includes(r.name) ? ' aria-current="page"' : ''}>${svg('menu')}<span>المزيد</span></button>`
     : tab('home', 'home', 'الرئيسية', r.name === 'home') + tab('t/' + myTrack(), 'table', 'الخطة', r.name === 't') + tab('timeline', 'tl', 'الزمني', r.name === 'timeline') + `<button type="button" data-act="more">${svg('menu')}<span>المزيد</span></button>`;
   return `<div class="app">
   <aside class="side" aria-label="التنقل">
@@ -279,12 +329,13 @@ function shell(body) {
   <header class="topbar">
     <a href="#home" aria-label="الرئيسية">${LOGOS.anshita ? `<img class="brand-img" src="${LOGOS.anshita}" alt="الأنشطة التربوية">` : ''}</a>
     <span class="sp"></span>
+    ${isAdmin() ? `<a class="btn icon bellb" href="#alerts" aria-label="تغييرات الفرق">${svg('bell')}${D.unseen ? `<span class="badge">${D.unseen}</span>` : ''}</a>` : ''}
     <button class="btn icon" type="button" data-act="cmd" aria-label="بحث">${svg('search')}</button>
     <button class="btn icon" type="button" data-act="theme" aria-label="تبديل الوضع">${svg(P.theme === 'dark' ? 'sun' : 'moon')}</button>
     <button class="btn icon" type="button" data-act="usermenu" aria-label="الحساب">${isAdmin() ? adminAv() : avatar(T(me.track).name, tcol(me.track))}</button>
   </header>
   <main class="main" id="main"><div class="wrap">${CFG.demo ? `<div class="demo-bar">${svg('eye')}<span>نسخة تجربة: البيانات في متصفحك فقط، والبوت والتقويم محاكاة.</span><span class="sp"></span><button type="button" data-act="demo-reset">ابدأ من جديد</button></div>` : ''}${body}</div></main>
-  <nav class="tabbar" aria-label="التنقل">${tabs}</nav>
+  ${fabHtml(r)}<nav class="tabbar" aria-label="التنقل">${tabs}</nav>
 </div>`;
 }
 
@@ -299,8 +350,13 @@ function render() {
   let v = VIEWS[r.name];
   if (!v || (v.admin && !isAdmin())) { if (r.name !== 'home') { location.replace('#home'); return; } v = VIEWS.home; }
   const y = scrollY;
+  PENDING_RENDER = false;
+  let foc = null;
+  if (F && F.dock) { readF(); const ae = document.activeElement; if (ae && ae.id && ae.closest && ae.closest('#dock')) foc = { id: ae.id, s: ae.selectionStart, e: ae.selectionEnd }; }
+  if (F && F.dock && !dockOn(F.tid)) F = null;
   app.innerHTML = shell(v.render(r));
   if (v.after) v.after(r);
+  if (F && F.dock) { markSel(); if (foc) { const el = document.getElementById(foc.id); if (el) { el.focus({ preventScroll: true }); try { if (foc.s != null) el.setSelectionRange(foc.s, foc.e); } catch (e) {} } } }
   if (!FIRST) window.scrollTo(0, y);
   FIRST = false;
 }
@@ -324,7 +380,7 @@ function vLogin() {
     <p class="alt"><button type="button" class="lk" data-act="lgother">${LG.other ? 'اختر من القائمة' : 'حساب آخر؟ ادخل باسم المستخدم'}</button></p>
   </div></div>`;
 }
-function afterLogin() { const p = $('#lg-p'); if (p && (LG.who || LG.other)) setTimeout(() => (LG.other ? $('#lg-u') : p).focus(), 30); }
+function afterLogin() { if (LG.who || LG.other) setTimeout(() => { const el = LG.other ? $('#lg-u') : $('#lg-p'); if (el) el.focus(); }, 30); }
 async function doLogin(user, pass) {
   LG.busy = true; LG.err = ''; render();
   try {
@@ -334,7 +390,7 @@ async function doLogin(user, pass) {
     LG.busy = false; location.hash = '#home'; await boot();
   } catch (e) { LG.busy = false; LG.err = e.message; render(); }
 }
-function logout() { TOKEN = ''; D = null; LS.del(NS + 'tok'); LS.del(NS + 'boot'); stopPoll(); closeLayer(); location.hash = ''; render(); }
+function logout() { TOKEN = ''; D = null; LG.other = false; LS.del(NS + 'tok'); LS.del(NS + 'boot'); stopPoll(); closeLayer(); location.hash = ''; render(); }
 
 /* ---------- التحميل والتحديث الدوري ---------- */
 function setBoot(b) {
@@ -369,12 +425,17 @@ async function poll(force) {
       D.plans[id] = await API.me('plan', id); D.revs[id] = r[id]; changed.push(id);
     }
     if (r._log !== D.revs._log) { D.log = (await API.me('log_list')).slice(0, 60); D.revs._log = r._log; }
+    if (r._alerts !== undefined && r._alerts !== D.revs._alerts) {
+      const prevTop = (D.alerts || [])[0] && D.alerts[0].id;
+      D.alerts = (await API.me('alerts')).slice(0, 40); D.unseen = D.alerts.filter(x => !x.seen).length; D.revs._alerts = r._alerts;
+      const top = D.alerts[0]; if (top && top.id !== prevTop && !top.seen) { toast('تغيير من ' + top.by + ': ' + qt(top.title)); changed.push('_alerts'); }
+    }
     setSync('ok');
     if (changed.length) {
       indexHijri();
-      if (!$('#layer').innerHTML) render(); else PENDING_RENDER = true;
+      if (!$('#layer').innerHTML && !(F && F.dock)) render(); else PENDING_RENDER = true;
       const by = (D.log || []).find(x => changed.includes(x.t));
-      if (by && by.by !== D.me.name) toast(`${by.by}: ${by.what} «${by.d}»`);
+      if (by && by.by !== D.me.name) toast(`${by.by}: ${by.what} ${qt(by.d)}`);
     } else if (!$('#layer').innerHTML) { $$('.sync span').forEach(s => s.textContent = syncText()); }
   } catch (e) { if (e.code === 'auth') logout(); else setSync('off'); }
   polling = false;
@@ -399,6 +460,7 @@ async function saveAct(tid, patch, opt = {}) {
     setSync('ok');
     if (r.calErr) toast('حُفظ النشاط، وتعذّر تحديث تقويم جوجل: ' + r.calErr, 'err');
     if (!opt.noRender) render();
+    setTimeout(() => poll(true), 600);
     return r.act;
   } catch (e) {
     if (prev) p.acts[idx] = prev; else if (tmp) p.acts.splice(p.acts.indexOf(tmp), 1);
@@ -408,20 +470,20 @@ async function saveAct(tid, patch, opt = {}) {
 async function delAct(tid, id) {
   const p = planOf(tid), i = p.acts.findIndex(a => a.id === id), prev = p.acts[i];
   p.acts.splice(i, 1); render(); setSync('busy');
-  try { const r = await API.me('act_del', tid, id); p.rev = r.rev; D.revs[tid] = r.rev; setSync('ok'); toast(`حُذف «${prev.title}»`); }
+  try { const r = await API.me('act_del', tid, id); p.rev = r.rev; D.revs[tid] = r.rev; setSync('ok'); toast(`حُذف ${qt(prev.title)}`); }
   catch (e) { p.acts.splice(i, 0, prev); setSync('ok'); render(); toast(e.message, 'err'); }
 }
 function moveAct(tid, id, d) {
   const a = planOf(tid).acts.find(x => x.id === id); if (!a || a.d === d) return;
   const old = a.d;
   saveAct(tid, { id, d }).then(() => {
-    toast(`نُقل «${a.title}» إلى ${gDay(d)}`, '', () => saveAct(tid, { id, d: old }));
+    toast(`نُقل ${qt(a.title)} إلى ${gDay(d)}`, '', () => saveAct(tid, { id, d: old }));
     announce(`نُقل النشاط إلى ${gDay(d)}`);
   }).catch(() => {});
 }
 async function trackSave(tid, patch) {
   setSync('busy');
-  try { const r = await API.me('track_save', tid, JSON.stringify(patch)); const i = D.tracks.findIndex(t => t.id === tid); D.tracks[i] = Object.assign({}, D.tracks[i], r.track); setSync('ok'); render(); return r.track; }
+  try { const r = await API.me('track_save', tid, JSON.stringify(patch)); const i = D.tracks.findIndex(t => t.id === tid), nt = Object.assign({}, D.tracks[i], r.track); if (!r.track.editReq) delete nt.editReq; D.tracks[i] = nt; setSync('ok'); render(); return r.track; }
   catch (e) { setSync('ok'); toast(e.message, 'err'); throw e; }
 }
 
@@ -441,7 +503,7 @@ function openDialog(html, opts = {}) {
 }
 function closeLayer() {
   if (!$('#layer') || !$('#layer').innerHTML) return;
-  const l = LAYER; $('#layer').innerHTML = ''; LAYER = null; F = null; CMD = null;
+  const l = LAYER; $('#layer').innerHTML = ''; LAYER = null; if (!(F && F.dock)) F = null; CMD = null;
   if (l && l.onClose) l.onClose();
   if (PENDING_RENDER) { PENDING_RENDER = false; render(); }
   if (l && l.prevFocus && document.contains(l.prevFocus)) l.prevFocus.focus();
@@ -460,7 +522,7 @@ function trapFocus(e) {
 let DG = null, SUPPRESS = false;
 document.addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
-  const el = e.target.closest('[data-drag]'); if (!el || !canEdit(el.dataset.track)) return;
+  const el = e.target.closest('[data-drag]'); if (!el || !canAdjust(el.dataset.track)) return;
   DG = { el, x: e.clientX, y: e.clientY, id: el.dataset.id, track: el.dataset.track, on: false, touch: e.pointerType === 'touch', pid: e.pointerId };
   if (DG.touch) DG.timer = setTimeout(() => { if (DG && !DG.on) { startDrag(DG.x, DG.y); if (navigator.vibrate) navigator.vibrate(12); } }, 320);
 });
@@ -501,7 +563,7 @@ function moveGhost(x, y) {
   if (DG.over && DG.over !== (ok && t.el)) DG.over.classList.remove('drop-on');
   if (ok && !t.el.matches('.ltrack')) { t.el.classList.add('drop-on'); DG.over = t.el; } else DG.over = null;
   DG.target = ok ? t : null;
-  if (ok && DG.g) DG.g.dataset.when = gDay(t.date);
+  if (DG.g) { if (ok) DG.g.dataset.when = 'إلى ' + gDay(t.date); else delete DG.g.dataset.when; }
   const m = 60; if (y < m) scrollBy(0, -12); else if (y > innerHeight - m) scrollBy(0, 12);
 }
 function endDrag(e, cancel) {

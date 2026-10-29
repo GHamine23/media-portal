@@ -4,10 +4,10 @@
 
 /* ---------- بطاقة النشاط ---------- */
 function evChip(a, tid, o = {}) {
-  const t = T(tid), drag = canEdit(tid) && !o.noDrag && !String(a.id).startsWith('tmp');
-  const flags = (a.cal && a.cal.id ? `<span data-tip="في تقويم جوجل">${svg('gcal')}</span>` : '') + (a.done ? `<span data-tip="تم التنفيذ">${svg('check')}</span>` : '');
-  const meta = [o.track ? `<span class="tbadge">${esc(t.name)}</span>` : '', a.time ? `<span>${timeText(a.time)}</span>` : '', a.who && a.who.length ? `<span>${esc(a.who.join('، '))}</span>` : '', o.date ? `<span>${gDay(a.d)}</span>` : '', flags ? `<span class="flag">${flags}</span>` : ''].filter(Boolean).join('');
-  return `<div class="ev ${o.track || o.tint ? 'tinted' : ''} ${a.done ? 'done' : ''} ${isLate(a) ? 'late' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${tid}" ${drag ? 'data-drag="1"' : ''} style="--tcol:${t.color}">
+  const t = T(tid), drag = canAdjust(tid) && !o.noDrag && !String(a.id).startsWith('tmp'), cl = clashOf(tid, a);
+  const flags = (cl ? `<span class="cl" data-tip="${esc(cl)}">${svg('alert')}</span>` : '') + (a.cal && a.cal.id ? `<span data-tip="في تقويم جوجل">${svg('gcal')}</span>` : '') + (a.done ? `<span data-tip="تم التنفيذ">${svg('check')}</span>` : '');
+  const meta = [o.track ? `<span class="tbadge">${esc(t.name)}</span>` : '', o.big ? `<span class="ty">${esc(a.type)}</span>` : '', a.time ? `<span>${timeText(a.time)}</span>` : '', a.who && a.who.length ? `<span>${esc(a.who.join('، '))}</span>` : '', o.date ? `<span>${gDay(a.d)}</span>` : '', flags ? `<span class="flag">${flags}</span>` : ''].filter(Boolean).join('');
+  return `<div class="ev ${o.track || o.tint ? 'tinted' : ''} ${o.big ? 'big' : ''} ${cl ? 'clash' : ''} ${a.done ? 'done' : ''} ${isLate(a) ? 'late' : ''} ${typeof F !== 'undefined' && F && F.dock && F.id === a.id ? 'sel' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${tid}" ${drag ? 'data-drag="1"' : ''} style="--tcol:${t.color};--tyc:${typeOf(a.type)[1]}">
     ${tile(a.type, 'sm')}<span class="tx"><span class="tt clamp2">${esc(a.title)}</span>${meta ? `<span class="mt">${meta}</span>` : ''}</span></div>`;
 }
 const pageHead = (eyebrow, title, lead, side = '', reveal = false) => `<div class="ph"><div class="t">${eyebrow ? `<div class="eyebrow">${eyebrow}</div>` : ''}<h1 class="${reveal ? 'reveal' : ''}">${reveal ? title.split(' ').map((w, i) => `<span class="w" style="animation-delay:${i * 70}ms">${esc(w)}</span>`).join(' ') : esc(title)}</h1>${lead ? `<p class="lead">${lead}</p>` : ''}</div>${side}</div>`;
@@ -76,11 +76,40 @@ function weekBoard(ws, tids) {
   return `<div class="board">${cols}</div>`;
 }
 
+/* ---------- الجوال: قائمة حالة المسارات، وأجندة الأسبوع ---------- */
+function trackStrip(ws) {
+  return `<div class="card strip">${D.tracks.map(t => { const h = health(t.id, ws); return `<a class="srow" href="#t/${t.id}" style="--tc:${t.color}"><span class="slogo">${logoImg(t.id)}</span><span class="col" style="min-width:0;flex:1"><b>${esc(t.name)}</b>${hlDot(h)}</span>${svg('fwd')}</a>`; }).join('')}</div>`;
+}
+function agenda(ws, tids, o = {}) {
+  const days = Array.from({ length: 7 }, (_, i) => add(ws, i)), empty = [];
+  let h = '';
+  for (const d of days) {
+    const acts = tids.flatMap(id => actsOf(id).filter(a => a.d === d).map(a => [a, id])).sort((x, y) => sortA(x[0], y[0]));
+    if (!acts.length) { empty.push(d); continue; }
+    h += `<div class="ag-d ${d === TODAY ? 'today' : ''}" data-drop="1" data-date="${d}" ${tids.length === 1 ? `data-track="${tids[0]}"` : ''}><div class="ag-h"><b>${d === TODAY ? 'اليوم' : d === add(TODAY, 1) ? 'غدًا' : DAYS[wd(d)]}</b><span class="xs faint">${gShort(d)}</span></div>${acts.map(([a, id]) => evChip(a, id, { track: tids.length > 1 })).join('')}</div>`;
+  }
+  if (!h) h = `<p class="muted sm" style="padding:6px 2px">لا أنشطة في هذا الأسبوع.</p>`;
+  if (empty.length && h.indexOf('ag-d') >= 0) h += `<p class="xs faint ag-empty">بلا أنشطة: ${empty.map(d => DAYS[wd(d)]).join('، ')}</p>`;
+  return `<div class="agenda">${h}</div>`;
+}
+// أسبوع الجوال في صفحة المسار
+const MW = {};
+function mobWeek(id, sem) {
+  const W = weeksOf(sem.days); if (!W.length) return null;
+  let i = MW[id + '|' + sem.n];
+  if (i == null) { i = W.findIndex(x => x.from <= TODAY && TODAY <= x.to); if (i < 0) i = TODAY < W[0].from ? 0 : W.length - 1; }
+  i = Math.max(0, Math.min(W.length - 1, i)); MW[id + '|' + sem.n] = i;
+  return { W, i };
+}
+
 /* ---------- ما يحتاج انتباه الإدارة ---------- */
 function attention(ws) {
   const L = [];
   D.tracks.filter(t => t.editReq).forEach(t => L.push({ ic: 'unlock', k: 'brand', html: `<b>${esc(t.name)}</b> طلب فتح تعديل الخطة${t.editReq.note ? `: «${esc(t.editReq.note)}»` : ''} <span class="faint">${ago(t.editReq.at)}</span>`, act: `<button class="btn sm pri" type="button" data-act="grant" data-id="${t.id}">افتح التعديل</button>` }));
-  const acts = allActs();
+  if (D.unseen) L.push({ ic: 'bell', k: 'brand', html: `${D.unseen === 1 ? 'تغيير جديد' : D.unseen === 2 ? 'تغييران جديدان' : D.unseen + ' تغييرات جديدة'} من الفرق على خططها`, act: `<a class="btn sm pri" href="#alerts">اعرضها</a>` });
+  const acts = allActs(), seenC = {};
+  acts.filter(a => a.d >= TODAY && diffD(a.d, TODAY) <= 14 && clashOf(a.t, a)).forEach(a => { const k = a.t + a.d; if (seenC[k]) return; seenC[k] = 1; L.push({ ic: 'alert', k: 'warn', html: `<b>${esc(T(a.t).name)}</b> ${gDay(a.d)}: ${esc(clashOf(a.t, a))}`, act: `<button class="btn sm" type="button" data-act="openact" data-id="${a.id}" data-track="${a.t}">راجعه</button>` }); });
+  D.tracks.forEach(t => kahootSugs(t.id).filter(s => s.left <= 14).forEach(s => L.push({ ic: 'target', k: 'brand', html: `<b>${esc(t.name)}</b>: ${esc(s.exam)} ${rel(s.ed)}. اقتراح: كاهوت مراجعة ${gDay(s.d)}`, act: `<button class="btn sm" type="button" data-act="newact" data-track="${t.id}" data-date="${s.d}" data-type="كاهوت" data-title="${esc(s.title)}">أضفه</button>` })));
   acts.filter(a => remindable(a) && !a.done && diffD(a.d, TODAY) >= 0 && diffD(a.d, TODAY) <= 3 && !(a.who && a.who.length)).forEach(a => L.push({ ic: 'users', k: 'warn', html: `لقاء «${esc(a.title)}» في ${esc(T(a.t).name)} ${rel(a.d)} بلا مسؤول`, act: `<button class="btn sm" type="button" data-act="openact" data-id="${a.id}" data-track="${a.t}">حدّد المسؤول</button>` }));
   D.tracks.forEach(t => { const h = health(t.id, ws); if (h.k === 'none') L.push({ ic: 'flag', k: 'none', html: `<b>${esc(t.name)}</b>: لا أنشطة في خطة ${ws === wkStart(TODAY) ? 'هذا الأسبوع' : 'الأسبوع الأول'}`, act: `<a class="btn sm" href="#t/${t.id}">افتح الخطة</a>` }); });
   const late = acts.filter(a => isLate(a) && diffD(TODAY, a.d) <= 14);
@@ -111,20 +140,21 @@ function adminHome() {
   const title = pre ? 'هل المسارات جاهزة للأسبوع الأول؟' : 'هل تعمل المسارات هذا الأسبوع؟';
   let lead = pre ? `يبدأ الفصل ${rel(s0)}، ${gDay(s0)}. ` : '';
   lead += ok.length === D.tracks.length ? 'كل المسارات وضعت أنشطة ' + (pre ? 'للأسبوع الأول.' : 'لهذا الأسبوع.') :
-    (ok.length ? `${ok.length === 1 ? 'مسار واحد' : ok.length === 2 ? 'مساران' : ok.length + ' مسارات'} وضع${ok.length > 1 ? 'ت' : ''} أنشطة ${pre ? 'للأسبوع الأول' : 'لهذا الأسبوع'}` : 'لم يضع أي مسار أنشطة بعد') +
-    (none.length ? `، ولم ${none.length > 1 ? 'تضع' : 'يضع'} ${none.map(x => '<b>' + esc(x[0].name) + '</b>').join(' و')} شيئًا بعد.` : '.');
+    (ok.length ? `${ok.length === 1 ? 'مسار واحد' : ok.length === 2 ? 'مساران' : ok.length + ' مسارات'} ${ok.length === 2 ? 'وضعا' : ok.length > 2 ? 'وضعت' : 'وضع'} أنشطة ${pre ? 'للأسبوع الأول' : 'لهذا الأسبوع'}` : 'لم يضع أي مسار أنشطة بعد') +
+    (none.length ? `، ولم يضع ${none.map(x => '<b>' + esc(x[0].name) + '</b>').join(' و')} شيئًا بعد.` : '.');
   const anim = HOME_ANIM; HOME_ANIM = false;
   const att = attention(ws), we = add(HB.ws, 6);
-  return pageHead(todayLine(), title, lead, '', anim) + pulse(ws, anim) + `
+  const mob = isMob();
+  return pageHead(todayLine(), title, lead, '', anim) + (mob ? trackStrip(ws) : pulse(ws, anim)) + `
   <div class="grid2 sect">
     <div class="card"><div class="card-h"><h3>يحتاج انتباهك</h3>${att.length ? `<span class="badge soft">${att.length}</span>` : ''}</div>
       ${att.length ? `<div class="list">${att.map(x => `<div class="li"><span class="tile sm" style="--tc:${x.k === 'warn' ? 'var(--warn)' : x.k === 'brand' ? 'var(--brand)' : 'var(--ink3)'}">${svg(x.ic)}</span><div class="tx sm">${x.html}</div>${x.act}</div>`).join('')}</div>` : `<p class="muted sm">لا شيء يحتاجك الآن.</p>`}</div>
-    <div class="card"><div class="card-h"><h3>آخر التحديثات</h3><span class="xs faint">تعديلات الفرق والإدارة</span></div>${feed(D.log, 6)}</div>
+    <div class="card"><div class="card-h"><h3>آخر التحديثات</h3><span class="xs faint">تعديلات الفرق والإدارة</span></div>${feed(D.log, mob ? 3 : 6)}</div>
   </div>
   <div class="sect"><div class="sh"><h2>${HB.ws === wkStart(TODAY) ? 'هذا الأسبوع' : HB.ws === ws && pre ? 'الأسبوع الأول' : 'أسبوع ' + gShort(HB.ws)}</h2>
       <span class="xs faint">${gShort(HB.ws)} – ${gShort(we)}</span>
       <div class="row" style="gap:2px"><button class="btn icon" type="button" data-act="hbw" data-n="-7" aria-label="الأسبوع السابق">${svg('back')}</button><button class="btn sm ghost" type="button" data-act="hbw" data-n="0">${pre ? 'الأول' : 'الآن'}</button><button class="btn icon" type="button" data-act="hbw" data-n="7" aria-label="الأسبوع التالي">${svg('fwd')}</button></div></div>
-    ${weekBoard(HB.ws, D.tracks.map(t => t.id))}</div>`;
+    ${mob ? agenda(HB.ws, D.tracks.map(t => t.id)) : weekBoard(HB.ws, D.tracks.map(t => t.id))}</div>`;
 }
 function tracksIndex() {
   const ws = focusWeek();
@@ -147,13 +177,13 @@ function teamHome(id, preview) {
   else if (TODAY < r.from) lead = `يبدأ ${semLabel(n)} ${rel(r.from)}، ${gDay(r.from)}.`;
   else if (TODAY > r.to) lead = `انتهى ${semLabel(n)}.`;
   else lead = `الأسبوع ${nw} من ${ws.length} في ${semLabel(n)}.`;
-  const permPill = t.canEdit ? `<span class="pill ok">${svg('unlock')}التعديل مفتوح لكم</span>` : `<span class="pill">${svg('lock')}الخطة للعرض فقط</span>`;
+  const permPill = t.canEdit ? `<span class="pill ok">${svg('unlock')}التعديل مفتوح لكم</span>` : `<span class="pill">${svg('lock')}إضافة الأنشطة مغلقة</span>`;
   const botPill = t.linked ? `<span class="pill brand">${svg('bot')}البوت يذكّر مجموعتكم</span>` : '';
   const m = nextMeeting(id);
   let hero;
   if (m) {
     const dd = diffD(m.d, TODAY), d3 = add(m.d, -3), d1 = add(m.d, -1), sent = m.sent || {};
-    const st = (d, k) => (sent[k] === m.d || d < TODAY) ? 'done' : d === TODAY ? 'now' : '';
+    const st = (d, k) => sent[k] === m.d ? 'done' : d <= TODAY ? (m.d >= TODAY ? 'now' : 'done') : '';
     hero = `<div class="hero"><div style="min-width:0">
       <div class="faint sm">${remindable(m) ? 'اللقاء القادم' : 'القادم'}</div>
       <div class="count">${dd === 0 ? 'اليوم' : dd === 1 ? 'غدًا' : dd === 2 ? 'بعد يومين' : `بعد ${dd} ${dd <= 10 ? 'أيام' : 'يومًا'}`}</div>
@@ -174,17 +204,28 @@ function teamHome(id, preview) {
     pageHead(todayLine(), 'أهلًا بفريق ' + t.name, esc(lead), `<div class="row" style="flex-wrap:wrap">${permPill}${botPill}</div>`) + hero + `
   <div class="cols sect">
     <section class="stack">
+      ${teamNotes(id)}
       <div class="card"><div class="card-h"><h3>القادم خلال أسبوعين</h3><a class="lk sm" href="#t/${id}">خطة الفصل كاملة</a></div>${upList}</div>
       ${late.length ? `<div class="card"><div class="card-h"><h3>مضى موعدها</h3><span class="xs faint">علّموا ما نُفّذ</span></div><div class="list">${late.slice(-8).reverse().map(a => actRow(a, id)).join('')}</div></div>` : ''}
     </section>
     <aside class="stack">
       <div class="card"><div class="card-h"><h3>مقرر الطلاب اليوم</h3></div>${today && today.c ? `<div class="ctx" style="background:none;padding:0"><b>${esc(today.c)}</b>${today.q ? `<span>${esc(today.q)}</span>` : ''}${today.r ? `<span class="faint">${esc(today.r)}</span>` : ''}</div>` : `<p class="muted sm">${today && today.p ? esc(today.p) : today && today.ev ? esc(today.ev) : 'لا مقرر اليوم.'}</p>`}</div>
       ${botCardTeam(id, preview)}
-      ${!t.canEdit && !preview && !isAdmin() ? `<div class="card"><div class="card-h"><h3>تحتاجون تعديل الخطة؟</h3></div><p class="muted sm" style="margin-bottom:12px">الخطة للعرض، وتستطيعون تعليم ما نُفّذ. لإضافة أنشطة أو نقلها اطلبوا فتح التعديل.</p>${t.editReq ? `<span class="pill brand">${svg('check')}أُرسل الطلب ${ago(t.editReq.at)}</span>` : `<button class="btn" type="button" data-act="askedit">اطلب فتح التعديل</button>`}</div>` : ''}
+      ${!t.canEdit && !preview && !isAdmin() ? `<div class="card"><div class="card-h"><h3>تحتاجون إضافة أنشطة؟</h3></div><p class="muted sm" style="margin-bottom:12px">تستطيعون تغيير مواعيد الأنشطة والمسؤولين عنها وتفاصيلها، ويصل الإدارةَ تنبيه بذلك. لإضافة أنشطة جديدة أو حذفها اطلبوا فتح الإضافة.</p>${t.editReq ? `<span class="pill brand">${svg('check')}أُرسل الطلب ${ago(t.editReq.at)}</span>` : `<button class="btn" type="button" data-act="askedit">اطلب فتح الإضافة</button>`}</div>` : ''}
       <div class="card"><div class="card-h"><h3>الفريق</h3>${canEdit(id) ? `<button class="btn sm ghost" type="button" data-act="members" data-id="${id}">تعديل</button>` : ''}</div>${members(id).length ? `<div class="whos">${members(id).map(x => `<span class="chip">${esc(x)}</span>`).join('')}</div>` : `<p class="muted sm">لم تُكتب أسماء الفريق بعد.</p>`}</div>
     </aside>
   </div>
-  <div class="sect"><div class="sh"><h2>خلاصة الفصل</h2><span class="xs faint">${semLabel(n)}</span></div>${semStats(id, n)}</div>`;
+  ${isMob() ? `<details class="sect mfold"><summary><h2>خلاصة الفصل</h2><span class="xs faint">${semLabel(n)}</span>${svg('down')}</summary>${semStats(id, n)}</details>` : `<div class="sect"><div class="sh"><h2>خلاصة الفصل</h2><span class="xs faint">${semLabel(n)}</span></div>${semStats(id, n)}</div>`}`;
+}
+function teamNotes(id) {
+  const ed = canEdit(id), seen = {};
+  const cls = actsOf(id).filter(a => a.d >= TODAY && diffD(a.d, TODAY) <= 21 && clashOf(id, a)).filter(a => !seen[a.d] && (seen[a.d] = 1));
+  const sugs = kahootSugs(id).filter(s => s.left <= 21);
+  if (!cls.length && !sugs.length) return '';
+  return `<div class="card notes"><div class="card-h"><h3>تنبيهات واقتراحات</h3></div><div class="col" style="gap:8px">
+    ${cls.map(a => `<button class="dk-note warn" type="button" data-act="openact" data-id="${a.id}" data-track="${id}">${svg('alert')}<span><b>${gDay(a.d)}:</b> ${esc(clashOf(id, a))}. الأنسب نقل اللقاء إلى يوم آخر.</span></button>`).join('')}
+    ${sugs.map(s => `<div class="dk-note sug">${tile('كاهوت', 'sm')}<span>${esc(s.exam)} ${rel(s.ed)}. <b>اقتراح:</b> كاهوت مراجعة ${gDay(s.d)} يثبّت ما درسه الطلاب قبل الاختبار.</span>${ed ? `<button class="btn sm" type="button" data-act="newact" data-track="${id}" data-date="${s.d}" data-type="كاهوت" data-title="${esc(s.title)}">أضفه</button>` : ''}</div>`).join('')}
+  </div></div>`;
 }
 function actRow(a, id) {
   const t = T(id);
@@ -251,19 +292,20 @@ VIEWS.t = {
   render(r) {
     const id = r.a, t = T(id);
     if (!t) return `<div class="card empty"><h3>المسار غير موجود</h3></div>`;
-    if (r.b) { P.sem[id] = r.b; savePrefs(); }
-    const n = semN(id), sem = semOf(id, n);
-    return trackHead(id) + semTabs(id, n) + (sem && sem.days.length ? semBody(id, n, sem) : semEmpty(id, n));
+    const n = semN(id), sem = semOf(id, n), body = sem && sem.days.length ? semBody(id, n, sem) : semEmpty(id, n);
+    if (!dockOn(id)) return trackHead(id) + semTabs(id, n) + body;
+    return trackHead(id) + semTabs(id, n) + `<div class="tlay"><div class="tmain">${body}</div><aside class="dock" id="dock" aria-label="لوحة النشاط">${F && F.dock && F.tid === id ? '' : dockIdle(id)}</aside></div>`;
   },
-  after(r) { const el = $('#d-' + TODAY); if (el && !VIEWS.t.scrolled) { VIEWS.t.scrolled = true; setTimeout(() => el.scrollIntoView({ block: 'center' }), 60); } }
+  after(r) { const w = $('.wrap'); if (w) w.classList.toggle('wide', dockOn(r.a)); if (F && F.dock) { if (F.tid === r.a && $('#dock')) drawAct(true); else F = null; }
+    const el = $('#d-' + TODAY); if (el && !VIEWS.t.scrolled) { VIEWS.t.scrolled = true; setTimeout(() => el.scrollIntoView({ block: 'center' }), 60); } }
 };
 function trackHead(id) {
   const t = T(id), n = semN(id), acts = actsOf(id, n);
   let ctl;
-  if (isAdmin()) ctl = `<div class="perm"><span class="row" style="gap:7px">${svg(t.canEdit ? 'unlock' : 'lock')}${t.canEdit ? 'الفريق يعدّل الخطة' : 'الفريق يعرض الخطة فقط'}</span><button class="sw" type="button" role="switch" aria-checked="${!!t.canEdit}" data-act="toggleedit" data-id="${id}" aria-label="السماح للفريق بتعديل الخطة"></button></div>
+  if (isAdmin()) ctl = `<div class="perm"><span class="row" style="gap:7px">${svg(t.canEdit ? 'unlock' : 'lock')}${t.canEdit ? 'الفريق يعدّل الخطة' : 'الفريق يعدّل المواعيد والمسؤولين فقط'}</span><button class="sw" type="button" role="switch" aria-checked="${!!t.canEdit}" data-act="toggleedit" data-id="${id}" aria-label="السماح للفريق بتعديل الخطة"></button></div>
     ${t.editReq ? `<span class="pill brand">${svg('unlock')}طلب الفريق فتح التعديل ${ago(t.editReq.at)}</span>` : ''}
     <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-end"><a class="btn sm ghost" href="#team/${id}">${svg('eye')}كما يراها الفريق</a><button class="btn sm ghost" type="button" data-act="members" data-id="${id}">${svg('users')}الفريق</button></div>`;
-  else ctl = t.canEdit ? `<span class="pill ok">${svg('unlock')}التعديل مفتوح لكم</span>` : `<span class="pill">${svg('lock')}للعرض فقط</span>${t.editReq ? `<span class="xs faint">أُرسل طلب التعديل ${ago(t.editReq.at)}</span>` : `<button class="btn sm" type="button" data-act="askedit">اطلب فتح التعديل</button>`}`;
+  else ctl = t.canEdit ? `<span class="pill ok">${svg('unlock')}التعديل مفتوح لكم</span>` : `<span class="pill">${svg('lock')}إضافة الأنشطة مغلقة</span><span class="xs faint">وتعدّلون المواعيد والمسؤولين</span>${t.editReq ? `<span class="xs faint">أُرسل طلب الفتح ${ago(t.editReq.at)}</span>` : `<button class="btn sm" type="button" data-act="askedit">اطلب فتح الإضافة</button>`}`;
   return `<div class="thead" style="--tc:${t.color}"><div class="logo">${logoImg(id)}</div>
     <div class="t"><div class="eyebrow sm faint">${isAdmin() ? '<a class="lk" href="#tracks">المسارات</a> · ' : ''}${esc(t.cohort || '')}</div><h1>${esc(t.full || t.name)}</h1>
       <div class="meta">${t.age ? `<span class="pill">${esc(t.age)}</span>` : ''}<span class="pill">${svg('users')}${members(id).length ? members(id).length + ' في الفريق' : 'الفريق لم يُكتب'}</span><span class="pill">${nActs(acts.length)} في ${semLabel(n)}</span>${t.linked ? `<span class="pill brand">${svg('bot')}مجموعة مربوطة بالبوت</span>` : ''}</div></div>
@@ -285,11 +327,17 @@ function semFacts(id, n, sem) {
   const acts = actsOf(id, n), done = acts.filter(a => a.done).length;
   const fact = (ic, b, s, extra = '') => `<div class="fact"><span class="tile" style="--tc:${t.color}">${svg(ic)}</span><div class="kv" style="min-width:0;flex:1"><b>${b}</b><span>${s}</span>${extra}</div></div>`;
   return `<div class="facts" style="--tc:${t.color}">
-    ${fact('cal', `${gShort(r.from)} – ${gShort(r.to)}`, `${weeks.length} أسبوعًا${TODAY >= r.from && TODAY <= r.to ? ` · نحن في الأسبوع ${nowWeek(id)}` : TODAY < r.from ? ' · ' + rel(r.from) : ''}`, `<div class="prog"><i style="width:${el / weeks.length * 100}%"></i></div>`)}
+    ${fact('cal', `${gShort(r.from)} – ${gShort(r.to)}`, `${nWeeks(weeks.length)}${TODAY >= r.from && TODAY <= r.to ? ` · نحن في الأسبوع ${nowWeek(id)}` : TODAY < r.from ? ' · ' + rel(r.from) : ''}`, `<div class="prog"><i style="width:${el / weeks.length * 100}%"></i></div>`)}
     ${exams.slice(0, 2).map(x => fact('flag', esc(x.ev.replace(/^الاختبار\s*/, 'الاختبار ')), `${gDay(x.d)} · ${rel(x.d)}`)).join('') || fact('flag', 'لا اختبارات', 'في الجدول')}
-    ${exams.length < 2 ? fact('target', `${sem.days.filter(d => d.c).length} يوم دراسة`, [...new Set(sem.days.filter(d => d.p).map(d => d.p))].join('، ') || 'بلا إجازات') : ''}
+    ${exams.length < 2 ? fact('target', nStudy(sem.days.filter(d => d.c).length), [...new Set(sem.days.filter(d => d.p).map(d => d.p))].join('، ') || 'بلا إجازات') : ''}
     ${fact('check', `${done} من ${acts.length}`, 'أنشطة نُفّذت')}
   </div>`;
+}
+function semFactsMini(id, n, sem) {
+  const weeks = weeksOf(sem.days), exam = sem.days.find(d => d.ev && /اختبار/.test(d.ev) && d.d >= TODAY), r0 = sem.days[0].d;
+  const acts = actsOf(id, n), done = acts.filter(a => a.done).length;
+  const parts = [TODAY < r0 ? 'يبدأ ' + rel(r0) : TODAY > sem.days[sem.days.length - 1].d ? 'انتهى الفصل' : `الأسبوع ${nowWeek(id)} من ${weeks.length}`, exam ? `${esc(exam.ev)} ${rel(exam.d)}` : '', `${done} من ${acts.length} نُفّذ`].filter(Boolean);
+  return `<div class="mfacts" style="--tc:${T(id).color}">${parts.map(x => `<span>${x}</span>`).join('')}</div>`;
 }
 let TB = { q: '' };
 function semBody(id, n, sem) {
@@ -302,7 +350,7 @@ function semBody(id, n, sem) {
     ${ed ? `<button class="btn pri sm" type="button" data-act="newact" data-track="${id}">${svg('plus')}نشاط</button>` : ''}
     ${ed ? `<button class="btn icon" type="button" data-act="semmenu" data-id="${id}" data-n="${n}" aria-label="خيارات الجدول" data-tip="خيارات الجدول">${svg('dots')}</button>` : ''}
   </div>`;
-  return semFacts(id, n, sem) + tools + (isMob() ? semCards(id, n, sem) : semTable(id, n, sem));
+  return (isMob() ? semFactsMini(id, n, sem) : semFacts(id, n, sem)) + tools + (isMob() ? semCards(id, n, sem) : semTable(id, n, sem));
 }
 function dayVisible(d, acts) {
   const q = normAr(TB.q.trim());
@@ -312,8 +360,21 @@ function dayVisible(d, acts) {
   return true;
 }
 const edCell = (id, n, d, k, cls = '') => canEdit(id) ? `<button class="ed ${d[k] ? '' : 'empty'} ${cls}" type="button" data-act="ed" data-id="${id}" data-n="${n}" data-d="${d.d}" data-k="${k}">${esc(d[k] || '')}</button>` : esc(d[k] || '');
+const evBadge = d => d.ev ? (/اختبار/.test(d.ev) ? `<span class="exam">${svg('flag')}${esc(d.ev)}</span>` : `<span class="pill brand">${esc(d.ev)}</span>`) : '';
+const liveBadge = d => isLive(d) ? `<span class="live" data-tip="${esc(d.r || 'بث مباشر')}">${svg('live')}بث مباشر</span>` : '';
+// خلية المقرر المختصرة: المحور، ثم المقرر والمقدار والمطلوب
+function curCell(id, n, d, ed) {
+  const ev = evBadge(d);
+  if (d.p && !d.c) return `${ev}<span class="per">${esc(d.p)}</span>`;
+  if (!d.c && !ed) return ev || '<span class="faint sm">لا مقرر</span>';
+  const ax = d.ax ? `<span class="axp" style="--ac:${axCol(d.ax)}"><i></i>${esc(d.ax)}</span>` : '';
+  return `${ev}${ed ? `<button class="ed axb" type="button" data-act="ed" data-id="${id}" data-n="${n}" data-d="${d.d}" data-k="ax">${ax || '<span class="faint xs">+ المحور</span>'}</button>` : ax}
+    <div class="c1">${edCell(id, n, d, 'c')}</div>${d.q || ed ? `<div class="c2">${edCell(id, n, d, 'q')}</div>` : ''}${d.r || ed || isLive(d) ? `<div class="c3">${liveBadge(d)}${edCell(id, n, d, 'r')}</div>` : ''}`;
+}
+const clashNote = (id, d) => { const L = dayMeets(id, d); return L.length >= 2 ? `<div class="clashn" role="note">${svg('alert')}<span>${esc(clashText(L))}</span></div>` : ''; };
+const sugCard = (id, s, ed) => `<div class="sug">${tile('كاهوت', 'sm')}<span><b>اقتراح:</b> كاهوت مراجعة قبل ${esc(s.exam)} (${gDay(s.ed)})</span>${ed ? `<button class="btn sm" type="button" data-act="newact" data-track="${id}" data-date="${s.d}" data-type="كاهوت" data-title="${esc(s.title)}">أضفه</button>` : ''}</div>`;
 function semTable(id, n, sem) {
-  const acts = actsOf(id, n), ed = canEdit(id);
+  const acts = actsOf(id, n), ed = canEdit(id), sugs = String(n) === String(curN(id)) ? kahootSugs(id) : [];
   let rows = '', shown = 0;
   for (const W of weeksOf(sem.days)) {
     let wr = '', wc = 0;
@@ -321,38 +382,55 @@ function semTable(id, n, sem) {
       const da = acts.filter(a => a.d === d.d).sort(sortA);
       if (!dayVisible(d, da)) continue;
       wc += da.length; shown++;
-      const ev = d.ev ? (/اختبار/.test(d.ev) ? `<span class="exam">${svg('flag')}${esc(d.ev)}</span>` : `<span class="pill brand">${esc(d.ev)}</span>`) : '';
-      let cur;
-      if (d.c) cur = `<td class="ax">${ed ? `<button class="ed" type="button" data-act="ed" data-id="${id}" data-n="${n}" data-d="${d.d}" data-k="ax">${d.ax ? `<span class="axp" style="--ac:${axCol(d.ax)}"><i></i>${esc(d.ax)}</span>` : ''}</button>` : d.ax ? `<span class="axp" style="--ac:${axCol(d.ax)}"><i></i>${esc(d.ax)}</span>` : ''}</td><td class="cur">${ev ? ev + '<div style="height:4px"></div>' : ''}${edCell(id, n, d, 'c')}</td><td class="cur">${edCell(id, n, d, 'q')}</td><td class="cur">${edCell(id, n, d, 'r')}</td>`;
-      else cur = `<td colspan="4" class="cur">${ev || (d.p ? `<span class="per">${esc(d.p)}</span>` : '<span class="faint sm">لا مقرر</span>')}</td>`;
-      wr += `<tr class="d ${d.d === TODAY ? 'today' : ''} ${d.d < TODAY ? 'past' : ''} ${d.c ? '' : 'off'}" id="d-${d.d}" data-drop="1" data-date="${d.d}" data-track="${id}">
-        <td class="dy"><b>${DAYS[wd(d.d)]}</b>${d.d === TODAY ? '<span class="today-tag">اليوم</span>' : ''}${ed ? `<button class="btn icon" type="button" style="padding:3px;margin-top:2px" data-act="dayedit" data-id="${id}" data-n="${n}" data-d="${d.d}" aria-label="تعديل اليوم" data-tip="تعديل اليوم">${svg('edit', 1.6)}</button>` : ''}</td>
-        <td class="dt num"><span>${gShort(d.d)}</span><span class="h">${esc(d.h || hijri(d.d))}</span></td>${cur}
-        <td class="acts"><div class="acts-in">${da.map(a => evChip(a, id)).join('')}${ed ? `<button class="plus" type="button" data-act="newact" data-date="${d.d}" data-track="${id}">+ نشاط</button>` : ''}</div></td></tr>`;
+      const sg = sugs.filter(s => s.d === d.d);
+      wr += `<tr class="d ${d.d === TODAY ? 'today' : ''} ${d.d < TODAY ? 'past' : ''} ${d.c ? '' : 'off'} ${da.length ? 'has' : ''}" id="d-${d.d}" data-drop="1" data-date="${d.d}" data-track="${id}">
+        <td class="dy"><div class="dyw"><b>${DAYS[wd(d.d)]}</b>${d.d === TODAY ? '<span class="today-tag">اليوم</span>' : ''}</div><span class="g num">${gShort(d.d)}</span><span class="h">${esc(d.h || hijri(d.d))}</span>${ed ? `<button class="btn icon dye" type="button" data-act="dayedit" data-id="${id}" data-n="${n}" data-d="${d.d}" aria-label="تعديل اليوم" data-tip="تعديل اليوم">${svg('edit', 1.6)}</button>` : ''}</td>
+        <td class="acts"><div class="acts-in">${clashNote(id, d.d)}${da.map(a => evChip(a, id, { big: true })).join('')}${sg.map(s => sugCard(id, s, ed)).join('')}${ed ? `<button class="plus" type="button" data-act="newact" data-date="${d.d}" data-track="${id}">+ نشاط</button>` : ''}</div></td>
+        <td class="cur">${curCell(id, n, d, ed)}</td></tr>`;
     }
     if (!wr) continue;
-    rows += `<tr class="wkh"><td colspan="7"><div class="wt"><b>الأسبوع ${W.w}</b><span class="xs faint">${gShort(W.from)} – ${gShort(W.to)}</span>${!W.study && W.per ? `<span class="per">${esc(W.per.p)}</span>` : ''}${W.from <= TODAY && TODAY <= W.to ? '<span class="pill brand">هذا الأسبوع</span>' : ''}<span class="sp"></span><span class="xs faint">${wc ? nActs(wc) : ''}</span></div></td></tr>` + wr;
+    rows += `<tr class="wkh"><td colspan="3"><div class="wt"><b>الأسبوع ${W.w}</b><span class="xs faint">${gShort(W.from)} – ${gShort(W.to)}</span>${!W.study && W.per ? `<span class="per">${esc(W.per.p)}</span>` : ''}${W.from <= TODAY && TODAY <= W.to ? '<span class="pill brand">هذا الأسبوع</span>' : ''}<span class="sp"></span><span class="xs faint">${wc ? nActs(wc) : ''}</span></div></td></tr>` + wr;
   }
+  const out = outsideActs(id, n, sem);
+  if (out.length && !TB.q && !P.tbl.ax) rows += `<tr class="wkh"><td colspan="3"><div class="wt"><b>خارج أيام الجدول</b><span class="xs faint">أنشطة تاريخها ليس في أيام هذا الفصل</span></div></td></tr><tr class="d"><td class="dy"><b>—</b></td><td class="acts"><div class="acts-in">${out.map(a => evChip(a, id, { big: true, date: true })).join('')}</div></td><td class="cur"><span class="faint sm">انقلها إلى يوم من أيام الفصل، أو صحّح تاريخها.</span></td></tr>`;
   if (!shown) return `<div class="card empty">${svg('search')}<p>لا أيام تطابق البحث.</p><button class="btn" type="button" data-act="tblclear">امسح البحث</button></div>`;
-  return `<div class="stbl"><table><thead><tr><th>اليوم</th><th>التاريخ</th><th>المحور</th><th>المقرر</th><th>المقدار</th><th>المطلوب</th><th>الأنشطة</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="stbl"><table><thead><tr><th>اليوم</th><th>الأنشطة</th><th>المقرر</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
+const outsideActs = (id, n, sem) => actsOf(id, n).filter(a => !sem.days.some(d => d.d === a.d)).sort(sortA);
 function semCards(id, n, sem) {
-  const acts = actsOf(id, n), ed = canEdit(id);
+  const acts = actsOf(id, n), ed = canEdit(id), sugs = String(n) === String(curN(id)) ? kahootSugs(id) : [];
   let h = '', shown = 0;
-  for (const W of weeksOf(sem.days)) {
+  const paged = !TB.q.trim() && !P.tbl.hideEmpty && !P.tbl.ax, mw = paged ? mobWeek(id, sem) : null;
+  if (mw) { const W = mw.W[mw.i]; h += `<div class="wpager"><button class="btn icon" type="button" data-act="mweek" data-id="${id}" data-n="${sem.n}" data-v="${mw.i - 1}" ${mw.i ? '' : 'disabled'} aria-label="الأسبوع السابق">${svg('back')}</button><div class="col"><b>الأسبوع ${W.w}</b><span class="xs faint">${gShort(W.from)} – ${gShort(W.to)}</span></div>${W.from <= TODAY && TODAY <= W.to ? '<span class="pill brand">هذا الأسبوع</span>' : `<button class="btn sm ghost" type="button" data-act="mweek" data-id="${id}" data-n="${sem.n}" data-v="now">الحالي</button>`}<button class="btn icon" type="button" data-act="mweek" data-id="${id}" data-n="${sem.n}" data-v="${mw.i + 1}" ${mw.i < mw.W.length - 1 ? '' : 'disabled'} aria-label="الأسبوع التالي">${svg('fwd')}</button></div>`; }
+  for (const W of (mw ? [mw.W[mw.i]] : weeksOf(sem.days))) {
     let wr = '';
     for (const d of W.days) {
       const da = acts.filter(a => a.d === d.d).sort(sortA);
       if (!dayVisible(d, da)) continue; shown++;
-      wr += `<div class="mday ${d.d === TODAY ? 'today' : ''}" id="d-${d.d}" data-drop="1" data-date="${d.d}" data-track="${id}">
+      const sg = sugs.filter(s => s.d === d.d);
+      wr += `<div class="mday ${d.d === TODAY ? 'today' : ''} ${da.length ? 'has' : ''}" id="d-${d.d}" data-drop="1" data-date="${d.d}" data-track="${id}">
         <div class="top"><b>${gDay(d.d)}</b><span class="xs faint">${esc(d.h || hijri(d.d))}</span>${d.d === TODAY ? '<span class="today-tag">اليوم</span>' : ''}<span class="sp"></span>${ed ? `<button class="btn icon" type="button" style="padding:4px" data-act="dayedit" data-id="${id}" data-n="${n}" data-d="${d.d}" aria-label="تعديل اليوم">${svg('edit', 1.6)}</button>` : ''}</div>
-        ${d.ev ? `<div>${/اختبار/.test(d.ev) ? `<span class="exam">${svg('flag')}${esc(d.ev)}</span>` : `<span class="pill brand">${esc(d.ev)}</span>`}</div>` : ''}
-        ${d.c ? `<div class="cur">${d.ax ? `<span class="axp" style="--ac:${axCol(d.ax)}"><i></i>${esc(d.ax)}</span> ` : ''}<b style="font-weight:500;color:var(--ink1)">${esc(d.c)}</b>${d.q ? ' — ' + esc(d.q) : ''}${d.r ? `<div class="xs faint">${esc(d.r)}</div>` : ''}</div>` : d.p ? `<span class="per">${esc(d.p)}</span>` : ''}
-        ${da.map(a => evChip(a, id)).join('')}${ed ? `<button class="plus" style="opacity:1" type="button" data-act="newact" data-date="${d.d}" data-track="${id}">+ نشاط</button>` : ''}</div>`;
+        ${clashNote(id, d.d)}${da.map(a => evChip(a, id, { big: true })).join('')}${sg.map(s => sugCard(id, s, ed)).join('')}
+        ${d.ev ? `<div>${evBadge(d)}</div>` : ''}
+        ${d.c ? `<div class="cur">${d.ax ? `<span class="axp" style="--ac:${axCol(d.ax)}"><i></i>${esc(d.ax)}</span> ` : ''}<span>${esc(d.c)}${d.q ? ' — ' + esc(d.q) : ''}</span>${d.r ? `<div class="xs faint">${liveBadge(d)}${esc(d.r)}</div>` : ''}</div>` : d.p ? `<span class="per">${esc(d.p)}</span>` : ''}
+        ${ed ? `<button class="plus" type="button" data-act="newact" data-date="${d.d}" data-track="${id}">+ نشاط</button>` : ''}</div>`;
     }
-    if (wr) h += `<div class="mwk">الأسبوع ${W.w}<span class="xs faint">${gShort(W.from)} – ${gShort(W.to)}</span></div>` + wr;
+    if (wr) h += (mw ? '' : `<div class="mwk">الأسبوع ${W.w}<span class="xs faint">${gShort(W.from)} – ${gShort(W.to)}</span></div>`) + wr;
   }
+  const out = outsideActs(id, n, sem);
+  if (out.length && !TB.q && !P.tbl.ax && (!mw || mw.i === mw.W.length - 1)) h += `<div class="mwk">خارج أيام الجدول</div><div class="mday">${out.map(a => evChip(a, id, { big: true, date: true })).join('')}</div>`;
   return shown ? `<div class="mdays">${h}</div>` : `<div class="card empty"><p>لا أيام تطابق البحث.</p></div>`;
+}
+/* ---------- لوحة النشاط الثابتة (يسار الجدول) ---------- */
+function dockIdle(id) {
+  const t = T(id), ed = canEdit(id), up = actsOf(id).filter(a => a.d >= TODAY).sort(sortA);
+  const seen = {}, cls = up.filter(a => { const c = clashOf(id, a); if (!c || seen[a.d]) return false; seen[a.d] = 1; return true; });
+  const notes = cls.map(a => `<button class="dk-note warn" type="button" data-act="openact" data-id="${a.id}" data-track="${id}">${svg('alert')}<span><b>${gDay(a.d)}:</b> ${esc(clashOf(id, a))}</span></button>`).join('') +
+    kahootSugs(id).filter(s => s.left <= 30).map(s => `<div class="dk-note sug">${tile('كاهوت', 'sm')}<span>${esc(s.exam)} ${rel(s.ed)}. <b>اقتراح:</b> كاهوت مراجعة ${gDay(s.d)}.</span>${ed ? `<button class="btn sm" type="button" data-act="newact" data-track="${id}" data-date="${s.d}" data-type="كاهوت" data-title="${esc(s.title)}">أضفه</button>` : ''}</div>`).join('');
+  return `<div class="dk-h"><div class="col"><span class="xs faint">لوحة النشاط</span><b>أنشطة ${esc(t.name)}</b></div>${ed ? `<button class="btn pri sm" type="button" data-act="newact" data-track="${id}">${svg('plus')}نشاط</button>` : ''}</div>
+  <div class="dk-b">${notes ? `<div class="dk-sec"><h4>تنبيهات واقتراحات</h4>${notes}</div>` : ''}
+    <div class="dk-sec"><h4>القادمة</h4>${up.length ? `<div class="col" style="gap:6px">${up.slice(0, 10).map(a => evChip(a, id, { date: true })).join('')}</div>${up.length > 10 ? `<p class="xs faint" style="margin-top:6px">و${nActs(up.length - 10)} بعدها في الجدول</p>` : ''}` : `<p class="muted sm">لا أنشطة قادمة في الخطة.</p>`}</div>
+    <p class="hint">${svg('edit', 1.6)} اضغط أي نشاط في الجدول ليُفتح هنا، أو اسحبه إلى يوم آخر.</p></div>`;
 }
 
 /* ---------- المنظور الزمني ---------- */
@@ -382,7 +460,7 @@ VIEWS.timeline = {
       ${canEdit(ids[0]) || isAdmin() ? `<span class="hint">اسحب النشاط لتغيير يومه</span>` : ''}</div>`;
     const sel = isAdmin() ? `<div class="tracksel"><button class="chip" type="button" aria-pressed="${!(P.tl.tracks || []).length}" data-act="tltrack" data-v="">كل المسارات</button>${D.tracks.map(t => `<button class="chip" type="button" aria-pressed="${(P.tl.tracks || []).includes(t.id)}" data-act="tltrack" data-v="${t.id}"><i style="background:${t.color}"></i>${esc(t.name)}</button>`).join('')}</div>` : '';
     let body;
-    if (rg === 'week') body = ids.length === 1 && !isMob() ? weekBoard(sp.from, ids) : ids.length === 1 ? weekBoard(sp.from, ids) : (isMob() ? weekBoard(sp.from, ids) : weekLanes(sp.from, ids));
+    if (rg === 'week') body = isMob() ? agenda(sp.from, ids) : ids.length === 1 ? weekBoard(sp.from, ids) : weekLanes(sp.from, ids);
     else if (rg === 'month') body = monthGrid(sp.from, ids);
     else body = lanes(sp.from, sp.to, ids);
     return pageHead('', 'المنظور الزمني', '') + bar + sel + body;
@@ -411,7 +489,7 @@ function monthGrid(m, ids) {
     h += `<div class="md ${out ? 'out' : ''} ${d === TODAY ? 'today' : ''} ${one && !one.c ? 'off' : ''}" data-drop="1" data-date="${d}" ${ids.length === 1 ? `data-track="${ids[0]}"` : ''}>
       <div class="dn"><b>${dnum(d)}</b><span class="hj">${esc(hShort(d))}</span></div>
       ${one && (one.ev || (one.p && !one.c)) ? `<div class="tag ellip">${esc(one.ev || one.p)}</div>` : ''}
-      <div class="acts col" style="gap:3px">${da.slice(0, max).map(([a, id]) => `<div class="mini ${a.done ? 'done' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${id}" ${canEdit(id) ? 'data-drag="1"' : ''} style="--tcol:${tcol(id)}" data-tip="${esc(T(id).name + ': ' + a.title + (a.time ? ' · ' + timeText(a.time) : ''))}"><i></i><span>${esc(a.title)}</span></div>`).join('')}
+      <div class="acts col" style="gap:3px">${da.slice(0, max).map(([a, id]) => `<div class="mini ${a.done ? 'done' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${id}" ${canAdjust(id) ? 'data-drag="1"' : ''} style="--tcol:${tcol(id)}" data-tip="${esc(T(id).name + ': ' + a.title + (a.time ? ' · ' + timeText(a.time) : ''))}"><i></i><span>${esc(a.title)}</span></div>`).join('')}
       ${da.length > max ? `<button class="more" type="button" data-act="dayview" data-date="${d}">+${da.length - max} أخرى</button>` : ''}</div></div>`;
   }
   return `<div class="mgrid">${h}</div>`;
@@ -426,7 +504,7 @@ function lanes(from, to, ids) {
   let rows = '';
   for (const id of ids) {
     const t = T(id), acts = actsOf(id).filter(a => a.d >= from && a.d <= to).sort(sortA), slot = {};
-    const pins = acts.map(a => { const i = diffD(a.d, s), k = slot[i] = (slot[i] || 0) + 1; return `<div class="pin ${a.done ? 'done' : ''} ${remindable(a) ? 'meet' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${id}" ${canEdit(id) ? 'data-drag="1"' : ''} style="--tcol:${t.color};inset-inline-start:${i * dw + 1}px;top:${6 + (k - 1) * 25}px;width:${Math.max(dw - 2, 8)}px" data-tip="${esc(gDay(a.d) + ' — ' + a.type + ': ' + a.title + (a.who && a.who.length ? ' (' + a.who.join('، ') + ')' : ''))}">${dw >= 70 ? esc(a.title) : ''}</div>`; }).join('');
+    const pins = acts.map(a => { const i = diffD(a.d, s), k = slot[i] = (slot[i] || 0) + 1; return `<div class="pin ${a.done ? 'done' : ''} ${remindable(a) ? 'meet' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${id}" ${canAdjust(id) ? 'data-drag="1"' : ''} style="--tcol:${t.color};inset-inline-start:${i * dw + 1}px;top:${6 + (k - 1) * 25}px;width:${Math.max(dw - 2, 8)}px" data-tip="${esc(gDay(a.d) + ' — ' + a.type + ': ' + a.title + (a.who && a.who.length ? ' (' + a.who.join('، ') + ')' : ''))}">${dw >= 70 ? esc(a.title) : ''}</div>`; }).join('');
     const rowsN = Math.max(1, ...Object.values(slot));
     const ds = daysOf(id);
     const dayCls = d => { const x = ds.find(y => y.d === d); return (wd(d) === 0 ? ' ws' : '') + (d === TODAY ? ' today' : '') + (x && !x.c ? ' off' : '') + (!x ? ' out' : ''); };

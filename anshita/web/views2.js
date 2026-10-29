@@ -3,58 +3,105 @@
    لوحة الأوامر، الأحداث، والتشغيل
    ============================================================ */
 
-/* ---------- نافذة النشاط ---------- */
+/* ---------- نافذة النشاط (لوحة جانبية، أو لوحة ثابتة يسار الجدول في الشاشات العريضة) ---------- */
 let F = null;   // نموذج النشاط المفتوح
 function openAct(tid, id, preset = {}) {
   const a = id ? planOf(tid).acts.find(x => x.id === id) : null;
   if (id && !a) return toast('النشاط غير موجود (ربما حُذف)', 'err');
   const ids = isAdmin() ? D.tracks.map(t => t.id) : [myTrack()];
   tid = tid || preset.track || (ids.length === 1 ? ids[0] : '');
+  if (!a && tid && !canEdit(tid)) return toast('إضافة الأنشطة مغلقة لفريقكم. اطلبوا فتحها من الإدارة.', 'err');
   F = a ? Object.assign({ tid, isNew: false }, JSON.parse(JSON.stringify(a)), { calOn: !!(a.cal && a.cal.id) })
-    : { tid, isNew: true, title: '', type: preset.type || 'لقاء', d: preset.date || (tid ? defDate(tid) : TODAY), time: '', dur: 0, who: [], idea: '', rem: null, calOn: false, done: false, note: '', link: '' };
-  F.newNames = [];
+    : { tid, isNew: true, title: preset.title || '', type: preset.type || 'لقاء', d: preset.date || (tid ? defDate(tid) : TODAY), time: '', dur: 0, who: [], idea: '', rem: null, calOn: false, done: false, note: '', link: '' };
+  F.newNames = []; F.lockTrack = !!tid;
+  F.dock = dockOn(F.tid) && !!$('#dock');
   drawAct();
+  if (F.dock) { const b = $('#dock .dk-b'); if (b) b.scrollTop = 0; }
 }
 function defDate(tid) { const r = semRange(tid, curN(tid)); return r && TODAY < r.from ? r.from : TODAY; }
-function drawAct(keepFocus) {
-  const tid = F.tid, t = tid ? T(tid) : null, ro = tid && !canEdit(tid) && !F.isNew;
+// صلاحية النموذج: full تعديل كامل، adj تعديل نشاط قائم بلا حذف (يصل الإدارةَ تنبيه)، ro متابعة فقط
+function fMode() {
+  const tid = F.tid;
+  if (!tid || canEdit(tid)) return 'full';
+  if (!F.isNew && canAdjust(tid)) return 'adj';
+  return 'ro';
+}
+function actParts() {
+  const tid = F.tid, t = tid ? T(tid) : null, mode = fMode(), ro = mode === 'ro';
   const day = tid ? (dayOf(tid, semFor(tid, F.d) || curN(tid), F.d)) : null;
-  const tracksSel = F.isNew && isAdmin() ? `<div class="field"><label>المسار</label><div class="row" style="gap:6px;flex-wrap:wrap">${D.tracks.map(x => `<button class="chip" type="button" aria-pressed="${tid === x.id}" data-act="f-track" data-v="${x.id}"><i style="background:${x.color}"></i>${esc(x.name)}</button>`).join('')}</div></div>` : '';
-  const head = `<div class="row" style="gap:10px">${t ? logoImg(tid) : ''}<div class="col" style="min-width:0"><span class="xs faint">${t ? esc(t.full || t.name) : 'نشاط جديد'}</span><b style="font-family:var(--fd);font-weight:500;font-size:19px;color:var(--ink)">${F.isNew ? 'نشاط جديد' : ro ? esc(F.title) : 'تعديل النشاط'}</b></div></div>`;
-  const ctx = day ? `<div class="ctx"><span>${gLong(F.d)} · ${esc(day.h || hijri(F.d))} · الأسبوع ${day.w}</span>${day.c ? `<span>مقرر اليوم: <b>${esc(day.c)}</b>${day.q ? ' — ' + esc(day.q) : ''}</span>` : ''}${day.ev ? `<span><b>${esc(day.ev)}</b></span>` : ''}${day.p && !day.c ? `<span>${esc(day.p)}</span>` : ''}</div>` : F.d ? `<div class="ctx"><span>${gLong(F.d)} · ${esc(hijri(F.d))}</span><span class="faint">خارج أيام الفصل في الجدول</span></div>` : '';
+  const tracksSel = F.isNew && isAdmin() && !F.dock && !F.lockTrack ? `<div class="field"><label>المسار</label><div class="row" style="gap:6px;flex-wrap:wrap">${D.tracks.map(x => `<button class="chip" type="button" aria-pressed="${tid === x.id}" data-act="f-track" data-v="${x.id}"><i style="background:${x.color}"></i>${esc(x.name)}</button>`).join('')}</div></div>` : '';
+  const head = `<div class="row" style="gap:10px">${t && !F.dock ? logoImg(tid) : ''}<div class="col" style="min-width:0"><span class="xs faint">${t ? esc(t.full || t.name) : 'نشاط جديد'}</span><b style="font-family:var(--fd);font-weight:500;font-size:19px;color:var(--ink)">${F.isNew ? 'نشاط جديد' : ro ? esc(F.title) : 'تعديل النشاط'}</b></div></div>`;
+  const ctx = day ? `<div class="ctx"><span>${gLong(F.d)} · ${esc(day.h || hijri(F.d))} · الأسبوع ${day.w}</span>${day.c ? `<span>مقرر اليوم: <b>${esc(day.c)}</b>${day.q ? ' — ' + esc(day.q) : ''}</span>` : ''}${isLive(day) ? `<span class="live">${svg('live')}${esc(day.r || 'بث مباشر')}</span>` : ''}${day.ev ? `<span><b>${esc(day.ev)}</b></span>` : ''}${day.p && !day.c ? `<span>${esc(day.p)}</span>` : ''}</div>` : F.d ? `<div class="ctx"><span>${gLong(F.d)} · ${esc(hijri(F.d))}</span><span class="faint">خارج أيام الفصل في الجدول</span></div>` : '';
+  // تنبيه اجتماع لقاءين في يوم واحد (بث مباشر أو لقاء آخر)
+  let clash = '';
+  if (tid && MEET_T.includes(F.type) && F.d) {
+    const others = dayMeets(tid, F.d, F.id);
+    if (others.length) {
+      const alt = ro ? [] : freeDays(tid, F.d, F.id);
+      clash = `<div class="callout warn" role="status">${svg('alert')}<div><b>${esc(clashText(others.concat(qt(F.title.trim() || 'هذا النشاط'))))}</b><span>${others[0] === 'البث المباشر' ? 'في هذا اليوم بث مباشر للبرنامج، فيجتمع على الطلاب لقاءان.' : 'في هذا اليوم لقاء آخر في الخطة.'}${alt.length ? ' أيام قريبة بلا لقاء:' : ''}</span>${alt.length ? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${alt.map(x => `<button class="chip" type="button" data-act="f-day" data-v="${x}">${gDay(x)}</button>`).join('')}</div>` : ''}</div></div>`;
+    }
+  }
   const willRem = F.rem === true || (F.rem !== false && (D.remindTypes || []).includes(F.type));
   const remSub = !willRem ? 'لا تذكير لهذا النشاط' : !t || !t.linked ? 'سيُذكَّر به حين تُربط مجموعة المسار بالبوت' : diffD(F.d, TODAY) < 0 ? 'مضى موعده' : `تصميم الإعلان ${gDay(add(F.d, -3) < TODAY ? TODAY : add(F.d, -3))}، ونشره ${gDay(add(F.d, -1) < TODAY ? TODAY : add(F.d, -1))}`;
   const follow = !F.isNew ? `<div class="sep" style="margin:4px 0"></div><b style="font-family:var(--fd);font-weight:500;font-size:17px;color:var(--ink)">المتابعة</b>
     <div class="opt" style="border-top:0;padding-top:0"><button class="ck round ok" type="button" role="checkbox" aria-checked="${!!F.done}" data-act="f-done" aria-label="تم التنفيذ">${svg('check', 2.4)}</button><div class="tx"><b>تم التنفيذ</b><span>يُعلَّم بعد إقامة النشاط</span></div></div>
     <div class="field"><label for="f-note">ملاحظة بعد التنفيذ</label><textarea class="inp" id="f-note" rows="2" placeholder="كم حضر؟ ما الذي نجح وما الذي يُحسَّن؟">${esc(F.note || '')}</textarea></div>
-    <div class="field"><label for="f-link">رابط (الإعلان، التصميم، ورقة الفعالية)</label><input class="inp ltr" style="text-align:left;display:block" id="f-link" type="url" inputmode="url" value="${esc(F.link || '')}" placeholder="https://"></div>` : '';
+    <div class="field"><label for="f-link">رابط (الإعلان، التصميم، ورقة الفعالية)</label><div class="row" style="gap:6px"><input class="inp ltr" style="text-align:left;display:block;flex:1" id="f-link" type="url" inputmode="url" value="${esc(F.link || '')}" placeholder="https://">${/^https?:\/\//i.test(F.link || '') ? `<a class="btn icon" href="${esc(F.link)}" target="_blank" rel="noopener" aria-label="افتح الرابط" data-tip="افتح الرابط">${svg('ext')}</a>` : ''}</div></div>` : '';
   let body;
   if (ro) {
-    body = `${ctx}<div class="row" style="gap:8px">${tile(F.type)}<b>${esc(F.type)}</b>${F.time ? `<span class="pill">${svg('clock')}${timeText(F.time)}</span>` : ''}</div>
+    body = `${ctx}${clash}<div class="row" style="gap:8px">${tile(F.type)}<b>${esc(F.type)}</b>${F.time ? `<span class="pill">${svg('clock')}${timeText(F.time)}</span>` : ''}</div>
       ${F.who && F.who.length ? `<div class="field"><span class="flabel">المسؤول</span><div class="whos">${F.who.map(w => `<span class="chip">${esc(w)}</span>`).join('')}</div></div>` : ''}
       ${F.idea ? `<div class="field"><span class="flabel">الفكرة</span><div class="ro-v">${esc(F.idea)}</div></div>` : ''}
       <div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('bell')}</span><div class="tx"><b>تذكير البوت</b><span>${esc(remSub)}</span></div></div>
-      <p class="hint">${svg('lock')} الخطة للعرض. تستطيعون تسجيل المتابعة.</p>${follow}`;
+      <p class="hint">${svg('lock')} تستطيعون تسجيل المتابعة.</p>${follow}`;
   } else {
-    body = `${tracksSel}
+    body = `${tracksSel}${mode === 'adj' ? `<p class="hint">${svg('bell')} إضافة الأنشطة وحذفها مغلقان، وتستطيعون تعديل هذا النشاط. يصل الإدارةَ تنبيه بكل تغيير.</p>` : ''}
     <input class="inp big" id="f-title" value="${esc(F.title)}" placeholder="اسم النشاط" aria-label="اسم النشاط" ${F.isNew ? 'autofocus' : ''}>
     <div class="types" role="group" aria-label="نوع النشاط">${TYPE_NAMES.map(k => `<button type="button" aria-pressed="${F.type === k}" data-act="f-type" data-v="${esc(k)}" style="--tc:${typeOf(k)[1]}">${svg(typeOf(k)[0])}${esc(k)}</button>`).join('')}</div>
     <div class="grid2" style="gap:10px"><div class="field"><label for="f-d">اليوم</label><input class="inp" id="f-d" type="date" value="${F.d}"></div>
-      <div class="row" style="gap:8px;align-items:flex-end"><div class="field" style="flex:1"><label for="f-time">الوقت</label><select class="inp" id="f-time">${TIMES.map(x => `<option value="${x}" ${x === (F.time || '') ? 'selected' : ''}>${x ? timeText(x) : 'بلا وقت'}</option>`).join('')}</select></div>
+      <div class="row" style="gap:8px;align-items:flex-end"><div class="field" style="flex:1"><label for="f-time">الوقت</label><select class="inp" id="f-time">${(TIMES.includes(F.time || '') ? TIMES : TIMES.concat(F.time).sort()).map(x => `<option value="${x}" ${x === (F.time || '') ? 'selected' : ''}>${x ? timeText(x) : 'بلا وقت'}</option>`).join('')}</select></div>
       <div class="field" style="width:96px"><label for="f-dur">المدة</label><select class="inp" id="f-dur">${[[0, 'تلقائي'], [30, '٣٠ د'], [45, '٤٥ د'], [60, 'ساعة'], [90, 'ساعة ونصف'], [120, 'ساعتان']].map(([v, l]) => `<option value="${v}" ${+F.dur === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div></div>
-    ${ctx}
+    ${ctx}${clash}
     <div class="field"><span class="flabel">المسؤول من الفريق</span><div class="whos">${[...new Set(members(tid).concat(F.who || []))].map(w => `<button class="chip" type="button" aria-pressed="${(F.who || []).includes(w)}" data-act="f-who" data-v="${esc(w)}">${esc(w)}</button>`).join('')}<input id="f-whonew" placeholder="+ اسم جديد" aria-label="إضافة اسم"></div></div>
     <div class="field"><label for="f-idea">الفكرة</label><textarea class="inp" id="f-idea" rows="3" placeholder="الفكرة في سطرين: ماذا سيحدث؟ ولمن؟">${esc(F.idea || '')}</textarea></div>
     <div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('bell')}</span><div class="tx"><b>تذكير البوت في مجموعة الفريق</b><span>${esc(remSub)}</span></div><button class="sw" type="button" role="switch" aria-checked="${willRem}" data-act="f-rem" aria-label="تذكير البوت"></button></div>
     ${isAdmin() ? `<div class="opt"><span class="tile sm" style="--tc:var(--plum)">${svg('gcal')}</span><div class="tx"><b>في تقويم جوجل</b><span>${F.calOn ? (F.cal && F.cal.id ? (F.cal.err ? 'تعذّر آخر تحديث: ' + esc(F.cal.err) : 'في التقويم، ويتحدّث مع كل تعديل') : 'سيُرسل عند الحفظ') : 'لا يظهر في التقويم'}</span></div><button class="sw" type="button" role="switch" aria-checked="${!!F.calOn}" data-act="f-cal" aria-label="في تقويم جوجل"></button></div>` : ''}
     ${follow}`;
   }
-  const foot = ro ? `<button class="btn pri" type="button" data-act="f-save">حفظ المتابعة</button><button class="btn" type="button" data-act="close">إغلاق</button>`
-    : `<button class="btn pri" type="button" data-act="f-save" ${!tid ? 'disabled' : ''}>${F.isNew ? 'أضف النشاط' : 'احفظ'}</button><button class="btn" type="button" data-act="close">إلغاء</button><span class="sp"></span>${!F.isNew ? `<button class="btn danger" type="button" data-act="f-del">${F.confirmDel ? 'تأكيد الحذف' : 'حذف'}</button>` : ''}`;
-  const st = $('#layer .sh-b') ? $('#layer .sh-b').scrollTop : 0;
-  openSheet(head, body, foot, { label: 'نشاط', noFocus: keepFocus });
-  if (st) $('#layer .sh-b').scrollTop = st;
+  const cancel = F.dock ? 'f-cancel' : 'close';
+  const foot = ro ? `<button class="btn pri" type="button" data-act="f-save">حفظ المتابعة</button><button class="btn" type="button" data-act="${cancel}">إغلاق</button>`
+    : `<button class="btn pri" type="button" data-act="f-save" ${!tid ? 'disabled' : ''}>${F.isNew ? 'أضف النشاط' : 'احفظ'}</button><button class="btn" type="button" data-act="${cancel}">إلغاء</button><span class="sp"></span>${!F.isNew && mode === 'full' ? `<button class="btn danger" type="button" data-act="f-del">${F.confirmDel ? 'تأكيد الحذف' : 'حذف'}</button>` : ''}`;
+  return { head, body, foot };
 }
+function drawAct(keepFocus) {
+  if (F.dock && !$('#dock')) F.dock = false;
+  const { head, body, foot } = actParts();
+  if (F.dock) {
+    const el = $('#dock'), st = $('#dock .dk-b') ? $('#dock .dk-b').scrollTop : 0, fk = focusKey('#dock');
+    el.innerHTML = `<div class="dk-h form">${head}<button class="btn icon" type="button" data-act="f-cancel" aria-label="إغلاق">${svg('x')}</button></div><div class="dk-b">${body}</div><div class="dk-f">${foot}</div>`;
+    el.classList.add('editing');
+    if (st) $('#dock .dk-b').scrollTop = st;
+    markSel(); refocus('#dock', fk);
+    if (!keepFocus) { const f = $('#dock [autofocus]'); if (f) f.focus({ preventScroll: true }); }
+    return;
+  }
+  const st = $('#layer .sh-b') ? $('#layer .sh-b').scrollTop : 0, keepPrev = LAYER && $('#layer .sheet') ? LAYER.prevFocus : null, fk = focusKey('#layer');
+  openSheet(head, body, foot, { label: 'نشاط', noFocus: keepFocus });
+  if (keepPrev) LAYER.prevFocus = keepPrev;
+  if (st) $('#layer .sh-b').scrollTop = st;
+  refocus('#layer', fk);
+}
+// إبراز النشاط المفتوح في الجدول ويومه
+function markSel() {
+  $$('.ev.sel').forEach(e => e.classList.remove('sel')); $$('tr.selrow,.mday.selrow').forEach(e => e.classList.remove('selrow'));
+  if (!F || !F.dock) return;
+  if (F.id) $$(`.ev[data-id="${F.id}"]`).forEach(e => e.classList.add('sel'));
+  const r = document.getElementById('d-' + F.d); if (r) r.classList.add('selrow');
+}
+// إبقاء التركيز على الزر نفسه بعد إعادة رسم النموذج
+function focusKey(sc) { const ae = document.activeElement; if (!ae || !ae.closest || !ae.closest(sc) || !ae.dataset || !ae.dataset.act) return ''; return `[data-act="${ae.dataset.act}"]` + (ae.dataset.v ? `[data-v="${CSS.escape(ae.dataset.v)}"]` : ''); }
+function refocus(sc, k) { if (!k) return; const n = $(sc + ' ' + k); if (n) n.focus({ preventScroll: true }); }
+function closeAct() { if (F && F.dock) { F = null; render(); } else closeLayer(); }
 function readF() {
   if (!F) return;
   const g = id => $('#' + id);
@@ -64,27 +111,30 @@ function readF() {
   if (g('f-time')) F.time = g('f-time').value;
   if (g('f-dur')) F.dur = +g('f-dur').value;
   if (g('f-note')) F.note = g('f-note').value;
-  if (g('f-link')) F.link = g('f-link').value;
+  if (g('f-link')) F.link = g('f-link').value.trim();
+  const nw = g('f-whonew'); if (nw && nw.value.trim()) { F.who = [...new Set((F.who || []).concat(nw.value.trim()))]; nw.value = ''; }
 }
 async function saveF() {
   readF();
   const f = F, tid = f.tid;
   if (!tid) return toast('اختر المسار', 'err');
-  const ro = !canEdit(tid);
+  const mode = fMode();
   let patch;
-  if (ro) patch = { id: f.id, done: !!f.done, note: f.note || '', link: f.link || '' };
+  if (mode === 'ro') patch = { id: f.id, done: !!f.done, note: f.note || '', link: f.link || '' };
   else {
     if (!f.title.trim()) { toast('اكتب اسم النشاط', 'err'); $('#f-title') && $('#f-title').focus(); return; }
+    if (f.link && !/^https?:\/\//i.test(f.link)) { toast('الرابط يبدأ بـ https://', 'err'); $('#f-link') && $('#f-link').focus(); return; }
     patch = { title: f.title.trim(), type: f.type, d: f.d, time: f.time || '', dur: f.dur || 0, who: f.who || [], idea: f.idea || '', rem: f.rem };
     if (!f.isNew) Object.assign(patch, { id: f.id, done: !!f.done, note: f.note || '', link: f.link || '' });
     if (isAdmin()) { const was = !!(f.cal && f.cal.id); if (f.calOn !== was) patch.calOn = !!f.calOn; }
     const s = semFor(tid, f.d); if (s) patch.sem = s;
   }
   const newNames = (f.who || []).filter(w => !members(tid).includes(w));
-  closeLayer();
+  const cl = mode !== 'ro' && MEET_T.includes(f.type) ? dayMeets(tid, f.d, f.id) : [];
+  if (f.dock) F = null; else closeLayer();
   try {
     await saveAct(tid, patch);
-    toast(f.isNew ? `أُضيف «${patch.title}»` : 'حُفظ');
+    toast((f.isNew ? `أُضيف ${qt(patch.title)}` : 'حُفظ') + (cl.length ? ` — تنبيه: ${clashText(cl.concat(qt(patch.title)))}` : '') + (!isAdmin() && !f.isNew && mode !== 'ro' ? '. وصل الإدارةَ تنبيه بالتغيير' : ''));
     if (newNames.length && canEdit(tid)) trackSave(tid, { members: members(tid).concat(newNames) }).catch(() => {});
   } catch (e) {}
 }
@@ -182,9 +232,9 @@ VIEWS.calendar = {
     let acts = ids.flatMap(id => actsOf(id, curN(id)).map(a => Object.assign(a, { t: id }))).filter(a => a.d <= until && (c.range !== 'upcoming' || a.d >= TODAY));
     if (c.meet) acts = acts.filter(remindable);
     const stOf = a => !a.cal || !a.cal.id ? 'none' : a.cal.err ? 'err' : 'on';
+    const cnt = { on: 0, none: 0, err: 0 }; acts.forEach(a => cnt[stOf(a)]++);
     if (c.status !== 'all') acts = acts.filter(a => stOf(a) === c.status);
     acts.sort(sortA);
-    const cnt = { on: 0, none: 0, err: 0 }; ids.flatMap(id => actsOf(id, curN(id))).forEach(a => cnt[stOf(a)]++);
     const groups = new Map(); acts.forEach(a => { const w = wkStart(a.d); if (!groups.has(w)) groups.set(w, []); groups.get(w).push(a); });
     const stBadge = a => { const s = stOf(a); return s === 'on' ? `<span class="pill ok" data-tip="أُرسل ${ago(a.cal.at)}">${svg('check')}في التقويم</span>` : s === 'err' ? `<span class="pill warn" data-tip="${esc(a.cal.err)}">${svg('alert')}تعذّر التحديث</span>` : `<span class="pill dash">غير مُرسل</span>`; };
     const key = a => a.t + '|' + a.id;
@@ -204,7 +254,7 @@ VIEWS.calendar = {
       <button class="chip" type="button" aria-pressed="${!!c.meet}" data-act="cal-meet">اللقاءات فقط</button><span class="sp"></span>
       <button class="btn sm" type="button" data-act="cal-selall">${acts.length && acts.every(a => CS.sel.has(key(a))) ? 'ألغِ التحديد' : 'حدّد الكل (' + acts.length + ')'}</button></div>
     ${list || `<div class="card empty">${svg('gcal')}<h3>لا أنشطة بهذه التصفية</h3><p>غيّر المسار أو الحالة أو المدى.</p></div>`}
-    ${CS.sel.size ? `<div class="bulk" role="region" aria-label="إجراءات المحدد"><b class="sm">${nActs(CS.sel.size)} محددة</b><button class="btn pri sm" type="button" data-act="cal-push" ${CS.busy ? 'disabled' : ''}>${CS.busy ? '<span class="spin"></span>' : svg('gcal')}أرسل إلى التقويم</button><button class="btn sm" type="button" data-act="cal-pull" ${CS.busy ? 'disabled' : ''}>أزل من التقويم</button><button class="btn sm ghost" type="button" data-act="cal-clear">إلغاء</button></div>` : ''}`;
+    ${CS.sel.size ? `<div class="bulk" role="region" aria-label="إجراءات المحدد"><b class="sm">حُدّد ${nActs(CS.sel.size)}</b><button class="btn pri sm" type="button" data-act="cal-push" ${CS.busy ? 'disabled' : ''}>${CS.busy ? '<span class="spin"></span>' : svg('gcal')}أرسل إلى التقويم</button><button class="btn sm" type="button" data-act="cal-pull" ${CS.busy ? 'disabled' : ''}>أزل من التقويم</button><button class="btn sm ghost" type="button" data-act="cal-clear">إلغاء</button></div>` : ''}`;
   }
 };
 async function calPush(on) {
@@ -253,7 +303,7 @@ VIEWS.bot = {
         </ol></div>
         <div class="card"><div class="card-h"><h3>هكذا تصل التذكيرات</h3></div><div class="tgwall">${tgPreview(s, 'd3')}${tgPreview(s, 'd1')}</div></div></div>`;
     const bot = BS.bot || {}, lt = BS.lastTick;
-    const trRows = BS.tracks.map(t => { const tt = T(t.id); return `<div class="li">${logoImg(t.id)}<div class="tx"><div class="tt">${esc(tt.full || tt.name)}</div><div class="mt">${t.chat ? `مربوط بـ «${esc(t.chat.title)}»${t.remind ? '' : ' · التذكيرات موقفة'}` : 'لم تُربط مجموعة بعد'}</div></div>
+    const trRows = BS.tracks.map(t => { const tt = T(t.id); return `<div class="li botrow">${logoImg(t.id)}<div class="tx"><div class="tt">${esc(tt.full || tt.name)}</div><div class="mt">${t.chat ? `مربوط بـ «${esc(t.chat.title)}»${t.remind ? '' : ' · التذكيرات موقفة'}` : 'لم تُربط مجموعة بعد'}</div></div>
       ${t.chat ? `<button class="sw" type="button" role="switch" aria-checked="${t.remind}" data-act="bot-remind" data-id="${t.id}" aria-label="تذكيرات ${esc(tt.name)}" data-tip="${t.remind ? 'أوقف التذكيرات' : 'شغّل التذكيرات'}"></button><button class="btn sm ghost" type="button" data-act="bot-test" data-id="${t.id}">تجربة</button><button class="btn icon" type="button" data-act="bot-unlink" data-chat="${esc(t.chat.id)}" aria-label="إلغاء الربط" data-tip="إلغاء الربط">${svg('x')}</button>`
         : `<a class="btn sm pri" href="${esc(t.link)}" target="_blank" rel="noopener" data-act="tgwatch">${svg('send')}أضف البوت إلى مجموعة ${esc(tt.name)}</a>`}</div>`; }).join('');
     const unassigned = (BS.chats || []).filter(c => !c.to && !c.left && c.type !== 'private');
@@ -311,7 +361,7 @@ function watchLink() {   // بعد فتح رابط الربط: نتحقق كل �
     try {
       const r = await API.me('tg_check');
       if (isAdmin()) { const before = (BS && BS.tracks || []).filter(t => t.chat).length + (BS && BS.adminChat ? 1 : 0); BS = r; const after = r.tracks.filter(t => t.chat).length + (r.adminChat ? 1 : 0); if (after > before) { clearInterval(WATCH); WATCH = null; toast('تم الربط ✓'); boot(true); } else if (route().name === 'bot') render(); }
-      else if (r.linked) { clearInterval(WATCH); WATCH = null; toast(`تم ربط مجموعتكم «${r.title}» ✓`); boot(true); }
+      else if (r.linked) { clearInterval(WATCH); WATCH = null; toast(`تم ربط مجموعتكم ${qt(r.title)} ✓`); boot(true); }
     } catch (e) {}
   }, 4000);
 }
@@ -334,8 +384,8 @@ function accEdit(uid) {
   openDialog(`<h3>${uid ? 'تعديل الحساب' : 'حساب جديد'}</h3>
     <div class="field"><label for="ac-n">الاسم</label><input class="inp" id="ac-n" value="${esc(a.name)}" placeholder="مثل: فريق جذور، أو اسم العضو"></div>
     <div class="field"><label for="ac-u">اسم المستخدم (للدخول)</label><input class="inp ltr" style="display:block;text-align:left" id="ac-u" value="${esc(a.user)}" autocomplete="off" placeholder="judhoor2"></div>
-    <div class="field"><label for="ac-r">النوع</label><select class="inp" id="ac-r"><option value="team" ${a.role !== 'admin' ? 'selected' : ''}>فريق مسار</option><option value="admin" ${a.role === 'admin' ? 'selected' : ''}>الإدارة</option></select></div>
-    <div class="field"><label for="ac-t">المسار</label><select class="inp" id="ac-t">${D.tracks.map(t => `<option value="${t.id}" ${a.track === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></div>
+    <div class="field"><label for="ac-r">النوع</label><select class="inp" id="ac-r" data-act="ac-role"><option value="team" ${a.role !== 'admin' ? 'selected' : ''}>فريق مسار</option><option value="admin" ${a.role === 'admin' ? 'selected' : ''}>الإدارة</option></select></div>
+    <div class="field" id="ac-tf" ${a.role === 'admin' ? 'hidden' : ''}><label for="ac-t">المسار</label><select class="inp" id="ac-t">${D.tracks.map(t => `<option value="${t.id}" ${a.track === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></div>
     ${uid && uid !== D.me.uid ? `<div class="opt"><div class="tx"><b>موقوف</b><span>لا يستطيع الدخول</span></div><button class="sw" type="button" role="switch" aria-checked="${!!a.disabled}" data-act="ac-dis"></button></div>` : ''}
     <div class="row"><button class="btn pri" type="button" data-act="ac-save" data-id="${uid || ''}">احفظ</button><button class="btn" type="button" data-act="close">إلغاء</button><span class="sp"></span>${uid && uid !== D.me.uid ? `<button class="btn danger" type="button" data-act="ac-del" data-id="${uid}">حذف</button>` : ''}</div>`);
 }
@@ -343,6 +393,40 @@ function showPass(name, user, pw) {
   openDialog(`<h3>كلمة المرور الجديدة</h3><p class="muted sm">أرسلها إلى ${esc(name)}. لن تظهر مرة أخرى، ويستطيع تغييرها بعد الدخول.</p>
     <div class="card flat" style="padding:14px"><div class="xs faint">اسم المستخدم</div><div class="ltr" style="font-size:18px">${esc(user)}</div><div class="xs faint" style="margin-top:8px">كلمة المرور</div><div class="ltr" style="font-size:22px;letter-spacing:.04em">${esc(pw)}</div></div>
     <div class="row"><button class="btn pri" type="button" data-act="copy" data-v="${esc(`منصة الأنشطة التربوية\n${location.origin + location.pathname}\nاسم المستخدم: ${user}\nكلمة المرور: ${pw}`)}">${svg('copy')}انسخ بيانات الدخول</button><button class="btn" type="button" data-act="close">تم</button></div>`);
+}
+
+/* ---------- تغييرات الفرق (تنبيهات الإدارة) ---------- */
+const AL_KIND = { add: 'أضاف', del: 'حذف', move: 'غيّر موعد', who: 'غيّر المسؤول عن', edit: 'عدّل' };
+let AL_NEW = new Set();
+VIEWS.alerts = {
+  admin: true,
+  render() {
+    const L = D.alerts || [];
+    const side = `<a class="btn sm ghost" href="#bot">${svg('bot')}${D.settings && D.settings.adminChat && D.settings.adminChat.id ? 'تصلك في تليجرام أيضًا' : 'اربط تليجرام الإدارة'}</a>`;
+    const head = pageHead('', 'تغييرات الفرق', 'كل ما تغيّره الفرق في خططها: المواعيد، والمسؤولون، والإضافة والحذف. ويصلك تغيير المواعيد والمسؤولين في تليجرام أيضًا.', side);
+    if (!L.length) return head + `<div class="card empty">${svg('bell')}<h3>لا تغييرات بعد</h3><p>حين يغيّر فريقٌ موعد نشاط أو المسؤول عنه يظهر هنا.</p></div>`;
+    let day = '', h = '';
+    for (const x of L) {
+      const d = dateOf(x.at);
+      if (d !== day) { day = d; h += `<div class="al-day">${d === TODAY ? 'اليوم' : d === add(TODAY, -1) ? 'أمس' : gDay(d)}</div>`; }
+      const t = T(x.t), act = x.aid && t && planOf(x.t).acts.find(a => a.id === x.aid);
+      const ch = (x.changes || []).filter(c => c[1] || c[2]).map(c => `<div class="al-ch"><span class="k">${esc(c[0])}</span><s>${esc(c[1] || '—')}</s>${svg('fwd')}<b>${esc(c[2] || '—')}</b></div>`).join('')
+        + (x.kind === 'add' && x.to ? `<div class="al-ch"><span class="k">الموعد</span><b>${esc(x.to)}</b></div>` : '') + (x.kind === 'del' && x.from ? `<div class="al-ch"><span class="k">كان</span><s>${esc(x.from)}</s></div>` : '');
+      h += `<div class="al ${AL_NEW.has(x.id) ? 'new' : ''} k-${x.kind}">${avatar(x.by, t ? t.color : 'var(--ink3)')}<div class="tx">
+        <div><b>${esc(x.by)}</b>${t ? ` <span class="tbadge" style="--tcol:${t.color}">${esc(t.name)}</span>` : ''} ${AL_KIND[x.kind] || 'عدّل'} «${esc(x.title)}» <span class="xs faint">${ago(x.at)}</span></div>${ch}</div>
+        ${act ? `<button class="btn sm ghost" type="button" data-act="openact" data-id="${act.id}" data-track="${x.t}">افتحه</button>` : ''}</div>`;
+    }
+    return head + `<div class="card alerts">${h}</div>`;
+  },
+  after() { if (D.unseen) alertsSeen(false); }
+};
+const dateOf = ms => { const d = new Date(ms + 3 * 3600e3); return d.toISOString().slice(0, 10); };
+async function alertsSeen(manual) {
+  AL_NEW = new Set((D.alerts || []).filter(x => !x.seen).map(x => x.id));
+  (D.alerts || []).forEach(x => x.seen = true); D.unseen = 0;
+  $$('.nl[href="#alerts"] .badge,.bellb .badge').forEach(e => e.remove());
+  try { await API.me('alerts_seen', 'all'); } catch (e) {}
+  if (manual) render();
 }
 
 /* ---------- التقارير الأسبوعية (الإدارة) ---------- */
@@ -387,7 +471,7 @@ function openCmd() {
 function cmdItems(q) {
   const n = normAr(q.trim()), out = [];
   const pages = [['home', 'الرئيسية', 'home'], ['timeline', 'المنظور الزمني', 'tl']].concat(isAdmin() ? [['calendar', 'تقويم جوجل', 'gcal'], ['bot', 'بوت التذكيرات', 'bot'], ['accounts', 'الحسابات', 'key']] : [['t/' + myTrack(), 'خطة الفصل', 'table']]);
-  const acts = [{ g: 'إجراءات', l: 'نشاط جديد', ic: 'plus', run: () => openAct(isAdmin() ? '' : myTrack()) }, { g: 'إجراءات', l: P.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن', ic: P.theme === 'dark' ? 'sun' : 'moon', run: toggleTheme }];
+  const acts = [...(isAdmin() || canEdit(myTrack()) ? [{ g: 'إجراءات', l: 'نشاط جديد', ic: 'plus', run: () => openAct(isAdmin() ? '' : myTrack()) }] : []), { g: 'إجراءات', l: P.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن', ic: P.theme === 'dark' ? 'sun' : 'moon', run: toggleTheme }];
   const m = s => !n || normAr(s).includes(n);
   acts.filter(a => m(a.l) || (n && 'جديد'.includes(n))).forEach(a => out.push(a));
   pages.filter(p => m(p[1])).forEach(p => out.push({ g: 'الصفحات', l: p[1], ic: p[2], run: () => go(p[0]) }));
@@ -415,18 +499,20 @@ const H = {
   retry: () => boot(), 'demo-reset': () => { if (window.DEMO) window.DEMO.reset(); },
   lgwho: el => { LG.who = el.dataset.id; LG.err = ''; render(); }, lgother: () => { LG.other = !LG.other; LG.err = ''; render(); },
   openact: el => { if (SUPPRESS) return; openAct(el.dataset.track, el.dataset.id); },
-  newact: el => openAct(el.dataset.track || '', null, { date: el.dataset.date, type: el.dataset.type, track: el.dataset.track }),
-  done: el => { const tid = el.dataset.track, a = planOf(tid).acts.find(x => x.id === el.dataset.id); if (!a) return; const v = !a.done; saveAct(tid, { id: a.id, done: v }).then(() => toast(v ? `تم تنفيذ «${a.title}»` : 'أُعيد إلى الخطة', '', () => saveAct(tid, { id: a.id, done: !v }))).catch(() => {}); },
+  newact: el => openAct(el.dataset.track || '', null, { date: el.dataset.date, type: el.dataset.type, track: el.dataset.track, title: el.dataset.title }),
+  'f-cancel': closeAct, 'f-day': el => { readF(); F.d = el.dataset.v; drawAct(true); },
+  'al-seen': () => alertsSeen(true),
+  done: el => { const tid = el.dataset.track, a = planOf(tid).acts.find(x => x.id === el.dataset.id); if (!a) return; const v = !a.done; saveAct(tid, { id: a.id, done: v }).then(() => toast(v ? `تم تنفيذ ${qt(a.title)}` : 'أُعيد إلى الخطة', '', () => saveAct(tid, { id: a.id, done: !v }))).catch(() => {}); },
   'f-track': el => { readF(); F.tid = el.dataset.v; drawAct(true); }, 'f-type': el => { readF(); F.type = el.dataset.v; drawAct(true); },
   'f-who': el => { readF(); const w = el.dataset.v; F.who = (F.who || []).includes(w) ? F.who.filter(x => x !== w) : (F.who || []).concat(w); drawAct(true); },
   'f-rem': () => { readF(); const cur = F.rem === true || (F.rem !== false && (D.remindTypes || []).includes(F.type)); F.rem = !cur; drawAct(true); },
   'f-cal': () => { readF(); F.calOn = !F.calOn; drawAct(true); }, 'f-done': () => { readF(); F.done = !F.done; drawAct(true); },
-  'f-save': saveF, 'f-del': () => { if (!F.confirmDel) { readF(); F.confirmDel = true; drawAct(true); return; } const { tid, id } = F; closeLayer(); delAct(tid, id); },
+  'f-save': saveF, 'f-del': () => { if (!F.confirmDel) { readF(); F.confirmDel = true; drawAct(true); return; } const { tid, id } = F; if (F.dock) F = null; else closeLayer(); delAct(tid, id); },
   ed: el => inlineEdit(el), dayedit: el => dayEdit(el.dataset.id, el.dataset.n, el.dataset.d),
   'de-save': el => { const p = {}; ['ax', 'c', 'q', 'r', 'ev', 'p'].forEach(k => p[k] = $('#de-' + k).value.trim()); closeLayer(); saveDay(el.dataset.id, el.dataset.n, el.dataset.d, p); },
   tblax: el => { P.tbl.ax = el.dataset.v; savePrefs(); render(); }, tblempty: () => { P.tbl.hideEmpty = !P.tbl.hideEmpty; savePrefs(); render(); }, tblclear: () => { TB.q = ''; P.tbl.ax = ''; P.tbl.hideEmpty = false; render(); },
   semmenu: el => semMenu(el.dataset.id, el.dataset.n), semimport: el => semImport(el.dataset.id, el.dataset.n), semnew: el => semNew(el.dataset.id, el.dataset.n),
-  semdel: async el => { closeLayer(); try { await API.me('sem_del', el.dataset.id, el.dataset.n); delete planOf(el.dataset.id).sems[el.dataset.n]; render(); toast('حُذف جدول الفصل'); } catch (e) { toast(e.message, 'err'); } },
+  semdel: async el => { if (!armed(el, 'اضغط مرة ثانية لتأكيد الحذف')) return; closeLayer(); try { await API.me('sem_del', el.dataset.id, el.dataset.n); delete planOf(el.dataset.id).sems[el.dataset.n]; render(); toast('حُذف جدول الفصل'); } catch (e) { toast(e.message, 'err'); } },
   'si-check': async el => {
     const url = $('#si-url').value.trim(), out = $('#si-out'); out.innerHTML = '<span class="spin"></span>';
     try { const r = await API.me('sem_import', el.dataset.id, el.dataset.n, url, true); const ds = r.days, ex = ds.filter(d => d.ev).map(d => d.ev);
@@ -435,19 +521,20 @@ const H = {
     } catch (e) { out.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
   },
   'si-save': () => semPut(SI.id, SI.n, SI.days, SI.url),
-  'sn-save': el => { const a = $('#sn-a').value, b = $('#sn-b').value; if (!a || !b || b < a) return toast('حدّد البداية والنهاية', 'err'); const s0 = wkStart(a), days = []; for (let d = a; d <= b; d = add(d, 1)) days.push({ d, h: hijri(d), w: Math.floor(diffD(d, s0) / 7) + 1 }); semPut(el.dataset.id, el.dataset.n, days, ''); },
+  'sn-save': el => { const a = $('#sn-a').value, b = $('#sn-b').value; if (!a || !b) return toast('حدّد البداية والنهاية', 'err'); if (b < a) return toast('تاريخ النهاية قبل البداية', 'err'); const s0 = wkStart(a), days = []; for (let d = a; d <= b; d = add(d, 1)) days.push({ d, h: hijri(d), w: Math.floor(diffD(d, s0) / 7) + 1 }); semPut(el.dataset.id, el.dataset.n, days, ''); },
   members: el => membersSheet(el.dataset.id), 'mb-save': el => { const L = [...new Set($('#mb-list').value.split('\n').map(x => x.trim()).filter(Boolean))]; closeLayer(); trackSave(el.dataset.id, { members: L }).then(() => toast('حُفظ الفريق')).catch(() => {}); },
   toggleedit: el => { const t = T(el.dataset.id); trackSave(t.id, { canEdit: !t.canEdit }).then(r => toast(r.canEdit ? `فُتح تعديل الخطة لفريق ${t.name}` : `أُغلق تعديل الخطة لفريق ${t.name}`)).catch(() => {}); },
   grant: el => { const t = T(el.dataset.id); trackSave(t.id, { canEdit: true }).then(() => toast(`فُتح تعديل الخطة لفريق ${t.name}`)).catch(() => {}); },
   askedit: () => openDialog(`<h3>طلب فتح تعديل الخطة</h3><p class="muted sm">يصل الطلب إلى الإدارة في المنصة${D.tg ? ' وفي تليجرام' : ''}.</p><div class="field"><label for="ae-n">ماذا تريدون تعديله؟ (اختياري)</label><textarea class="inp" id="ae-n" rows="3" placeholder="مثل: نضيف مسابقة في الأسبوع الثالث"></textarea></div><div class="row"><button class="btn pri" type="button" data-act="ae-send">أرسل الطلب</button><button class="btn" type="button" data-act="close">إلغاء</button></div>`),
   'ae-send': async () => { const note = $('#ae-n').value; closeLayer(); try { await API.me('edit_request', note); T(myTrack()).editReq = { at: Date.now(), by: D.me.name, note }; render(); toast('أُرسل الطلب إلى الإدارة'); } catch (e) { toast(e.message, 'err'); } },
   hbw: el => { const n = +el.dataset.n; HB.ws = n ? add(HB.ws, n) : focusWeek(); render(); },
-  tlweek: el => { P.tl.range = 'week'; P.tl.anchor = el.dataset.date; if (isAdmin() && el.dataset.id) P.tl.tracks = [el.dataset.id]; savePrefs(); go('timeline'); },
+  mweek: el => { const k = el.dataset.id + '|' + el.dataset.n; if (el.dataset.v === 'now') delete MW[k]; else MW[k] = +el.dataset.v; render(); const pg = $('.wpager'); if (pg) window.scrollTo(0, pg.getBoundingClientRect().top + scrollY - 70); },
+  tlweek: el => { P.tl.range = 'week'; P.tl.anchor = el.dataset.date; if (isAdmin() && el.dataset.id) { P.tl.tracks = [el.dataset.id]; P.tl.tmp = true; } savePrefs(); go('timeline'); },
   tlrange: el => { P.tl.range = el.dataset.v; savePrefs(); VIEWS.timeline.sc = 0; render(); },
-  tlnav: el => { const n = +el.dataset.n, rg = P.tl.range, a = rg !== 'week' && rg !== 'sem' ? tlSpan().from : tlAnchor(); P.tl.anchor = !n ? '' : rg === 'week' ? add(a, 7 * n) : addMon(monStart(a), (rg === 'q3' ? 3 : 1) * n); savePrefs(); VIEWS.timeline.sc = 0; render(); },
+  tlnav: el => { const n = +el.dataset.n, rg = P.tl.range, a = rg !== 'week' && rg !== 'sem' ? tlSpan().from : tlAnchor(); P.tl.anchor = !n ? TODAY : rg === 'week' ? add(a, 7 * n) : addMon(monStart(a), (rg === 'q3' ? 3 : 1) * n); savePrefs(); VIEWS.timeline.sc = 0; render(); },
   tltrack: el => { const v = el.dataset.v; if (!v) P.tl.tracks = []; else { const s = new Set(P.tl.tracks || []); s.has(v) ? s.delete(v) : s.add(v); P.tl.tracks = [...s]; } savePrefs(); render(); },
   dayview: el => { const d = el.dataset.date, ids = tlTracks(); const L = ids.flatMap(id => actsOf(id).filter(a => a.d === d).map(a => [a, id])).sort((x, y) => sortA(x[0], y[0])); openSheet(`<b style="font-family:var(--fd);font-weight:500;font-size:19px">${gLong(d)}</b>`, `<div class="col" style="gap:8px">${L.map(([a, id]) => evChip(a, id, { track: ids.length > 1, noDrag: true })).join('')}</div>`); },
-  'cal-f': el => { P.cal[el.dataset.k] = el.dataset.v; savePrefs(); render(); }, 'cal-meet': () => { P.cal.meet = !P.cal.meet; savePrefs(); render(); },
+  'cal-f': el => { P.cal[el.dataset.k] = el.dataset.v; CS.sel.clear(); savePrefs(); render(); }, 'cal-meet': () => { P.cal.meet = !P.cal.meet; CS.sel.clear(); savePrefs(); render(); },
   'cal-sel': el => { const k = el.dataset.k; CS.sel.has(k) ? CS.sel.delete(k) : CS.sel.add(k); render(); },
   'cal-selw': el => { const w = el.dataset.w, ks = $$('.calrow [data-act="cal-sel"]').map(b => b.dataset.k).filter(k => { const [t, id] = k.split('|'); const a = planOf(t).acts.find(x => x.id === id); return a && wkStart(a.d) === w; }); const all = ks.every(k => CS.sel.has(k)); ks.forEach(k => all ? CS.sel.delete(k) : CS.sel.add(k)); render(); },
   'cal-selall': () => { const ks = $$('.calrow [data-act="cal-sel"]').map(b => b.dataset.k); const all = ks.length && ks.every(k => CS.sel.has(k)); ks.forEach(k => all ? CS.sel.delete(k) : CS.sel.add(k)); render(); },
@@ -457,8 +544,8 @@ const H = {
   'bot-token': async () => { const v = $('#bt-tok').value.trim(); if (!v) return; setSync('busy'); try { BS = await API.me('tg_token', v); setSync('ok'); toast('رُبط البوت ✓'); boot(true); render(); } catch (e) { setSync('ok'); toast(e.message, 'err'); } },
   'bot-remind': async el => { const t = BS.tracks.find(x => x.id === el.dataset.id); try { await trackSave(t.id, { remind: !t.remind }); t.remind = !t.remind; render(); } catch (e) {} },
   'bot-test': async el => { try { await API.me('tg_test', el.dataset.id); toast('أُرسلت رسالة التجربة'); } catch (e) { toast(e.message, 'err'); } },
-  'bot-unlink': async el => { try { BS = await API.me('tg_assign', el.dataset.chat, ''); toast('أُلغي الربط'); boot(true); } catch (e) { toast(e.message, 'err'); } },
-  'bot-now': async () => { try { const r = await API.me('remind_now'); toast(r.sent ? `أُرسل ${r.sent}` : 'لا شيء مستحق الآن'); if (r.errs && r.errs.length && r.errs[0] !== 'لا بوت') toast(r.errs[0], 'err'); BS = null; BS_LOAD = false; render(); } catch (e) { toast(e.message, 'err'); } },
+  'bot-unlink': async el => { if (!armed(el, 'تأكيد إلغاء الربط')) return; try { BS = await API.me('tg_assign', el.dataset.chat, ''); toast('أُلغي الربط'); boot(true); } catch (e) { toast(e.message, 'err'); } },
+  'bot-now': async () => { try { const r = await API.me('remind_now'); toast(r.sent ? (r.sent === 1 ? 'أُرسل تذكير واحد' : r.sent === 2 ? 'أُرسل تذكيران' : `أُرسلت ${r.sent} ${r.sent <= 10 ? 'تذكيرات' : 'تذكيرًا'}`) : 'لا شيء مستحق الآن'); if (r.errs && r.errs.length && r.errs[0] !== 'لا بوت') toast(r.errs[0], 'err'); BS = null; BS_LOAD = false; render(); } catch (e) { toast(e.message, 'err'); } },
   'bs-type': el => { const s = BS.settings, v = el.dataset.v; s.remindTypes = s.remindTypes.includes(v) ? s.remindTypes.filter(x => x !== v) : s.remindTypes.concat(v); keepTpl(); render(); },
   'bs-digest': () => { BS.settings.digest = Object.assign({}, BS.settings.digest, { on: !BS.settings.digest.on }); keepTpl(); render(); },
   'bs-chg': () => { BS.settings.notifyChanges = !BS.settings.notifyChanges; keepTpl(); render(); }, 'bs-adig': () => { BS.settings.adminDigest = !BS.settings.adminDigest; keepTpl(); render(); },
@@ -467,13 +554,20 @@ const H = {
   'acc-edit': el => accEdit(el.dataset.id), 'ac-dis': el => el.setAttribute('aria-checked', el.getAttribute('aria-checked') !== 'true'),
   'ac-save': async el => { const uid = el.dataset.id, dis = $('[data-act="ac-dis"]'); const body = { uid: uid || undefined, name: $('#ac-n').value, user: $('#ac-u').value, role: $('#ac-r').value, track: $('#ac-t').value, disabled: dis ? dis.getAttribute('aria-checked') === 'true' : false };
     try { const r = await API.me('acc_save', JSON.stringify(body)); AC = null; if (r.pass) showPass(r.acc.name, r.acc.user, r.pass); else { closeLayer(); toast('حُفظ الحساب'); } render(); } catch (e) { toast(e.message, 'err'); } },
-  'ac-del': async el => { try { await API.me('acc_del', el.dataset.id); AC = null; closeLayer(); toast('حُذف الحساب'); render(); } catch (e) { toast(e.message, 'err'); } },
-  'acc-reset': async el => { const a = AC.find(x => x.uid === el.dataset.id); try { const r = await API.me('acc_reset', a.uid); if (r.token) { TOKEN = r.token; LS.set(NS + 'tok', TOKEN); } showPass(a.name, a.user, r.pass); } catch (e) { toast(e.message, 'err'); } },
+  'ac-del': async el => { if (!armed(el, 'تأكيد الحذف')) return; try { await API.me('acc_del', el.dataset.id); AC = null; closeLayer(); toast('حُذف الحساب'); render(); } catch (e) { toast(e.message, 'err'); } },
+  'acc-reset': async el => { if (!armed(el, 'تأكيد: يخرج الفريق من جلساته')) return; const a = AC.find(x => x.uid === el.dataset.id); try { const r = await API.me('acc_reset', a.uid); if (r.token) { TOKEN = r.token; LS.set(NS + 'tok', TOKEN); } showPass(a.name, a.user, r.pass); } catch (e) { toast(e.message, 'err'); } },
   'pw-save': async () => { try { const r = await API.me('pass', $('#pw-o').value, $('#pw-n').value); TOKEN = r.token; LS.set(NS + 'tok', TOKEN); closeLayer(); toast('غُيّرت كلمة المرور'); } catch (e) { toast(e.message, 'err'); } },
   copy: async el => { try { await navigator.clipboard.writeText(el.dataset.v); toast('نُسخ'); } catch (e) { toast('انسخها يدويًا', 'err'); } },
   'cmd-run': el => cmdRun(+el.dataset.i),
   'rp-toggle': el => { RP_OPEN = RP_OPEN === el.dataset.id || (!RP_OPEN && RP[0].id === el.dataset.id) ? '-' : el.dataset.id; render(); }
 };
+// تأكيد بضغطتين للإجراءات التي لا رجعة فيها
+function armed(el, label) {
+  if (el.dataset.armed) return true;
+  el.dataset.armed = '1'; const old = el.innerHTML; el.innerHTML = esc(label); el.classList.add('danger');
+  setTimeout(() => { if (document.contains(el)) { delete el.dataset.armed; el.innerHTML = old; } }, 4000);
+  return false;
+}
 let SI = null, LAST_TA = null;
 function tgOpen(el, e) { if (CFG.demo && window.DEMO) { e.preventDefault(); window.DEMO.simJoin(el.getAttribute('href')); toast('تجربة: كأنك اخترت المجموعة في تليجرام…'); } watchLink(); }
 function keepTpl() { if (!BS || !BS.settings) return; const a = $('#bs-d3'), b = $('#bs-d1'), h = $('#bs-h'); if (a) BS.settings.tpl = { d3: a.value, d1: b.value }; if (h) BS.settings.remindHour = +h.value; }
@@ -487,7 +581,7 @@ document.addEventListener('click', e => {
   if (k === 'tblq') return;
   f(el, e);
 });
-document.addEventListener('change', e => { const el = e.target; if (el.dataset.act === 'bot-assign' && el.value) API.me('tg_assign', el.dataset.chat, el.value).then(s => { BS = s; toast('رُبطت المجموعة ✓'); boot(true); }).catch(x => toast(x.message, 'err')); if (el.id === 'f-d' && F) { readF(); drawAct(true); } });
+document.addEventListener('change', e => { const el = e.target; if (el.id === 'ac-r' && $('#ac-tf')) $('#ac-tf').hidden = el.value === 'admin'; if (el.dataset.act === 'bot-assign' && el.value) API.me('tg_assign', el.dataset.chat, el.value).then(s => { BS = s; toast('رُبطت المجموعة ✓'); boot(true); }).catch(x => toast(x.message, 'err')); if (el.id === 'f-d' && F) { readF(); drawAct(true); } });
 document.addEventListener('input', e => {
   const el = e.target;
   if (el.dataset.act === 'tblq') { TB.q = el.value; clearTimeout(TB.t); TB.t = setTimeout(() => { const pos = el.selectionStart; render(); const n = $('[data-act="tblq"]'); if (n) { n.focus(); n.selectionStart = n.selectionEnd = pos; } }, 180); }
@@ -507,7 +601,9 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (e.key === 'Escape' && $('#layer').innerHTML) { e.preventDefault(); closeLayer(); return; }
+  if (e.key === 'Escape' && F && F.dock) { e.preventDefault(); closeAct(); return; }
   if (e.key === 'Tab' && $('#layer').innerHTML) trapFocus(e);
+  if (e.key === 'Enter' && (e.target.id === 'pw-n' || e.target.id === 'pw-o')) { e.preventDefault(); const b = $('[data-act="pw-save"]'); if (b) b.click(); return; }
   if (e.key === 'Enter' && F && e.target.id === 'f-whonew') { e.preventDefault(); const v = e.target.value.trim(); if (v) { readF(); F.who = [...new Set((F.who || []).concat(v))]; drawAct(true); setTimeout(() => $('#f-whonew') && $('#f-whonew').focus(), 50); } return; }
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && F) { e.preventDefault(); saveF(); return; }
   if ((e.key === 'Enter' || e.key === ' ') && !typing && e.target.matches('[role="button"][data-act]')) { e.preventDefault(); e.target.click(); return; }
@@ -516,7 +612,7 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'n' || e.key === 'ى') { const r = route(); const tid = r.name === 't' ? r.a : isAdmin() ? '' : myTrack(); if (!tid || canEdit(tid)) { e.preventDefault(); openAct(tid); } }
   else if (e.key === 't' || e.key === 'ف') { if (route().name === 'timeline') { P.tl.anchor = ''; savePrefs(); render(); } }
 });
-let MQ = isMob(); addEventListener('resize', () => { const m = isMob(); if (m !== MQ) { MQ = m; if (D && !$('#layer').innerHTML) render(); } });
+let MQ = isMob(), WQ = innerWidth >= WIDE_Q; addEventListener('resize', () => { const m = isMob(), w = innerWidth >= WIDE_Q; if (m !== MQ || w !== WQ) { MQ = m; WQ = w; if (F && F.dock) { readF(); F.dock = false; render(); drawAct(); return; } if (D && !$('#layer').innerHTML) render(); } });
 
 /* ---------- التشغيل ---------- */
 (async function start() {

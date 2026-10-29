@@ -19,7 +19,7 @@
 :root{
   color-scheme:light;
   --canvas:#f7f7f7; --surface:#ffffff; --raised:#ffffff; --sunken:#f0f0f0; --hover:#f3f3f3; --press:#e9e9e9;
-  --ink:#000000; --ink1:#171717; --ink2:#5e5e5e; --ink3:#828282; --ink4:#a3a3a3;
+  --ink:#000000; --ink1:#171717; --ink2:#5e5e5e; --ink3:#707070; --ink4:#8f8f8f;
   --line:#ececec; --line2:#d6d6d6;
   --brand:#3c7e79; --brand-ink:#2c625e; --brand-t:rgba(60,126,121,.11); --brand-t2:rgba(60,126,121,.2);
   --plum:#4c2e5f; --wine:#b6293e; --amber:#e1642b;
@@ -339,7 +339,7 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 .prog{height:6px;border-radius:99px;background:var(--sunken);overflow:hidden;margin-top:8px}
 .prog i{display:block;height:100%;background:var(--tc,var(--brand));border-radius:99px}
 .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
-.search{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 14px;min-width:200px;flex:1;max-width:340px}
+.search{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 14px;min-width:260px;flex:1;max-width:420px}
 .search svg{width:17px;height:17px;color:var(--ink3)}
 .search input{border:0;outline:0;background:transparent;width:100%;font-size:15px}
 
@@ -593,6 +593,156 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 .board .ev .tile{display:none}
 .board .ev{padding:7px 9px}
 
+/* ============ صفحة المسار: الجدول يمين ولوحة النشاط الثابتة يسار ============ */
+.wrap.wide{max-width:1560px}
+.tlay{display:grid;grid-template-columns:minmax(0,1fr) clamp(340px,27vw,400px);gap:20px;align-items:start}
+.tmain{min-width:0}
+.dock{position:sticky;top:16px;max-height:calc(100vh - 32px);display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:var(--r3);box-shadow:var(--sh1);overflow:hidden}
+.dock.editing{border-color:color-mix(in srgb,var(--brand) 40%,var(--line));box-shadow:0 0 0 3px var(--brand-t),var(--sh1)}
+.dk-h{display:flex;align-items:flex-start;gap:10px;padding:16px 18px 12px;border-bottom:1px solid var(--line)}
+.dk-h>.col,.dk-h>.row{flex:1;min-width:0}
+.dk-h b{font-family:var(--fd);font-weight:500;font-size:18px;color:var(--ink)}
+.dk-b{flex:1;overflow-y:auto;padding:14px 18px 18px;display:flex;flex-direction:column;gap:14px}
+.dk-f{display:flex;gap:8px;align-items:center;padding:12px 18px;border-top:1px solid var(--line);background:var(--surface)}
+.dk-sec h4{font-family:var(--fn);font-weight:500;font-size:13px;color:var(--ink3);margin:0 0 8px}
+.dk-note{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:start;padding:10px 12px;border-radius:14px;font-size:14px;line-height:1.55;color:var(--ink1);margin-bottom:6px}
+.dk-note>svg{width:18px;height:18px;flex:none;margin-top:2px}
+.dk-note>span:not(.tile){flex:1;min-width:0}
+.dk-note>.tile,.sug>.tile{flex:none}
+.dock .grid2{grid-template-columns:1fr}
+.dk-note .btn{flex:none;align-self:center}
+.dk-note.warn{background:var(--warn-t,color-mix(in srgb,var(--warn) 12%,var(--surface)));color:var(--ink1)}
+.dk-note.warn>svg{color:var(--warn)}
+.dk-note.sug{background:color-mix(in srgb,var(--ty-kahoot) 10%,var(--surface));border:1px dashed color-mix(in srgb,var(--ty-kahoot) 45%,var(--line))}
+button.dk-note:hover{filter:brightness(.97)}
+.card.notes .dk-note{margin-bottom:0}
+
+/* بطاقة النشاط الكبيرة في الجدول: لون نوعها ظاهر */
+.ev.big{border-inline-start:4px solid var(--tyc);background:color-mix(in srgb,var(--tyc) 7%,var(--surface));padding:9px 10px;border-color:color-mix(in srgb,var(--tyc) 22%,var(--line))}
+.ev.big .tt{font-size:15px}
+.ev.big:hover{border-color:color-mix(in srgb,var(--tyc) 45%,var(--line))}
+:root[data-theme="dark"] .ev.big{background:color-mix(in srgb,var(--tyc) 14%,var(--surface))}
+.ev .ty{color:color-mix(in srgb,var(--tyc) 75%,var(--ink2));font-weight:500}
+.ev.sel{box-shadow:0 0 0 2px var(--brand),var(--sh1);border-color:var(--brand)}
+.ev.clash{border-color:color-mix(in srgb,var(--warn) 55%,var(--line))}
+.ev .cl{color:var(--warn);display:inline-flex}
+.ev .cl svg{width:14px;height:14px}
+
+/* الجدول بثلاثة أعمدة: اليوم، الأنشطة، المقرر */
+.stbl td.dy{width:118px;white-space:nowrap;position:relative}
+.stbl td.dy .dyw{display:flex;align-items:center;gap:4px}
+.stbl td.dy .g{display:block;font-size:14px;color:var(--ink2);margin-top:2px}
+.stbl td.dy .h{display:block;font-size:12px;color:var(--ink3)}
+.stbl td.dy .dye{padding:3px;margin-top:4px;opacity:0;transition:opacity .15s}
+.stbl tr.d:hover .dye,.stbl .dye:focus-visible{opacity:1}
+.stbl td.acts{width:auto;min-width:240px}
+.stbl td.cur{width:38%;font-size:14.5px;color:var(--ink2)}
+.stbl td.cur .c1{color:var(--ink1);font-weight:500;margin-top:4px}
+.stbl td.cur .c2{font-size:14px}
+.stbl td.cur .c3{font-size:13px;color:var(--ink3);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.stbl td.cur .c3 .ed{flex:1;width:auto}
+.stbl td.cur .ed.axb{display:inline-block;width:auto;min-height:0;margin:0 -6px 0 0}
+.stbl td.cur .c1 .ed.empty::before{content:"المقرر"}
+.stbl td.cur .c2 .ed.empty::before{content:"المقدار"}
+.stbl td.cur .c3 .ed.empty::before{content:"المطلوب"}
+.stbl td.cur .ed.empty::before{color:var(--ink4);font-weight:400}
+.stbl tr.d.has td.acts{background:color-mix(in srgb,var(--brand) 2.5%,transparent)}
+.stbl .plus{opacity:.0}
+.stbl tr.d:not(.off) .plus{opacity:.45}
+.stbl tr.d:hover .plus,.stbl .plus:focus-visible{opacity:1}
+.stbl tr.selrow td{background:var(--brand-t)}
+.stbl tr.selrow td:first-child{box-shadow:inset -3px 0 0 var(--brand)}
+.mday.selrow{border-color:var(--brand)}
+.live{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;padding:1px 9px;border-radius:999px;background:color-mix(in srgb,var(--bad) 10%,transparent);color:color-mix(in srgb,var(--bad) 80%,var(--ink1));white-space:nowrap}
+.live svg{width:14px;height:14px}
+.ctx .live{align-self:flex-start}
+.clashn{display:flex;gap:7px;align-items:flex-start;font-size:13px;line-height:1.5;color:var(--ink1);background:color-mix(in srgb,var(--warn) 13%,var(--surface));border-radius:10px;padding:6px 9px}
+.clashn svg{width:15px;height:15px;color:var(--warn);flex:none;margin-top:2px}
+.sug{display:flex;gap:8px;align-items:center;font-size:13.5px;line-height:1.5;padding:7px 9px;border-radius:12px;border:1px dashed color-mix(in srgb,var(--ty-kahoot) 50%,var(--line));background:color-mix(in srgb,var(--ty-kahoot) 7%,var(--surface))}
+.sug>span:not(.tile){flex:1;min-width:0}
+.callout{display:flex;gap:10px;align-items:flex-start;border-radius:14px;padding:11px 13px;font-size:14px;line-height:1.55}
+.callout>svg{width:18px;height:18px;flex:none;margin-top:2px}
+.callout>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.callout.warn{background:color-mix(in srgb,var(--warn) 13%,var(--surface))}
+.callout.warn>svg{color:var(--warn)}
+.mday .plus{border:1px dashed var(--line2);border-radius:9px;padding:4px 10px;color:var(--ink3);font-size:13px;align-self:flex-start}
+.mday.has{border-color:var(--line2)}
+
+/* تغييرات الفرق */
+.bellb{position:relative}
+.bellb .badge{position:absolute;top:1px;inset-inline-end:1px;min-width:17px;height:17px;font-size:11px;padding:0 4px}
+.card.alerts{padding:6px 0}
+.al-day{font-family:var(--fn);font-size:12.5px;color:var(--ink3);padding:14px 20px 6px}
+.al{display:flex;gap:12px;align-items:flex-start;padding:12px 20px;border-top:1px solid var(--line)}
+.al-day+.al{border-top:0}
+.al .tx{flex:1;min-width:0;font-size:14.5px;line-height:1.6;color:var(--ink1)}
+.al.new{background:color-mix(in srgb,var(--brand) 6%,transparent);box-shadow:inset -3px 0 0 var(--brand)}
+.al-ch{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13.5px;margin-top:3px;color:var(--ink2)}
+.al-ch .k{color:var(--ink3);min-width:52px}
+.al-ch s{color:var(--ink3);text-decoration-color:color-mix(in srgb,var(--bad) 60%,transparent)}
+.al-ch svg{width:14px;height:14px;color:var(--ink4)}
+.al-ch b{font-weight:500;color:var(--ink1)}
+.al.k-del .tx>div:first-child{color:var(--bad)}
+@media (max-width:640px){.al{padding:12px 14px}.al-day{padding:12px 14px 4px}}
+.dragghost[data-when]::after{content:attr(data-when);display:block;margin-top:4px;font-size:12px;color:var(--brand-ink);font-family:var(--fn)}
+@media (max-width:640px){.li.botrow{flex-wrap:wrap}.li.botrow>.btn.pri{width:100%;white-space:normal;text-align:center}}
+
+/* ============ الجوال: أبسط وأكثر عملية ============ */
+.card.strip{padding:4px 0}
+.srow{display:flex;align-items:center;gap:12px;padding:10px 16px;text-decoration:none;color:inherit;border-top:1px solid var(--line)}
+.srow:first-child{border-top:0}
+.srow .slogo{width:44px;height:34px;display:flex;align-items:center;justify-content:center;flex:none}
+.srow .slogo img{max-width:44px;max-height:34px;object-fit:contain}
+.srow b{font-family:var(--fd);font-weight:500;font-size:16px;color:var(--ink)}
+.srow>svg{width:16px;height:16px;color:var(--ink4);flex:none}
+.srow .hl{font-size:13px}
+.agenda{display:flex;flex-direction:column;gap:10px}
+.ag-d{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.ag-d.today{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-t)}
+.ag-h{display:flex;align-items:baseline;gap:8px}
+.ag-h b{font-family:var(--fd);font-weight:500;font-size:16px;color:var(--ink)}
+.ag-empty{padding:0 4px}
+.mfacts{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}
+.mfacts span{font-size:13px;padding:4px 11px;border-radius:999px;background:color-mix(in srgb,var(--tc) 10%,var(--surface));color:var(--ink1)}
+.wpager{position:sticky;top:58px;z-index:5;display:flex;align-items:center;gap:8px;background:color-mix(in srgb,var(--canvas) 92%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);padding:8px 2px;margin-bottom:4px}
+.wpager .col{flex:1;min-width:0;line-height:1.3}
+.wpager b{font-family:var(--fd);font-weight:500;font-size:16px;color:var(--ink)}
+.wpager .btn.icon{background:var(--surface);border:1px solid var(--line)}
+.wpager .btn.icon:disabled{opacity:.35}
+details.mfold>summary{list-style:none;display:flex;align-items:baseline;gap:10px;cursor:pointer;padding:4px 0 10px}
+details.mfold>summary::-webkit-details-marker{display:none}
+details.mfold>summary h2{margin:0}
+details.mfold>summary svg{width:18px;height:18px;color:var(--ink3);margin-inline-start:auto;align-self:center;transition:transform .2s}
+details.mfold[open]>summary svg{transform:rotate(180deg)}
+.fab{display:none}
+@media (max-width:1000px){
+  .fab{display:flex;position:fixed;z-index:24;inset-inline-start:auto;inset-inline-end:16px;bottom:calc(84px + env(safe-area-inset-bottom));width:54px;height:54px;border-radius:18px;align-items:center;justify-content:center;background:var(--btn);color:var(--btn-ink);box-shadow:var(--sh3)}
+  .fab svg{width:24px;height:24px}
+  .fab:active{transform:scale(.95)}
+}
+@media (max-width:760px){
+  .mday .plus{display:none}
+  .toolbar{gap:8px}
+  .toolbar .row{flex-wrap:nowrap!important;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px;width:calc(100% + 32px)}
+  .toolbar .row::-webkit-scrollbar{display:none}
+  .toolbar .search{min-width:0;max-width:none;width:100%}
+}
+@media (max-width:760px){
+  .thead{padding:14px 16px;gap:10px}
+  .thead h1{font-size:24px}
+  .thead .meta{display:none}
+  .thead .ctl>.row{display:none}
+  .thead .perm{padding:6px 10px;font-size:13.5px}
+  .semtabs{margin-top:10px}
+  .toolbar [data-act="tblempty"],.toolbar .btn.pri{display:none}
+}
+@media (max-width:640px){
+  .sheet .types{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-22px;padding-inline:22px;padding-bottom:2px}
+  .sheet .types::-webkit-scrollbar{display:none}
+  .sheet .types button{flex:none}
+}
+@media (max-width:760px){.mday{padding:10px 12px;gap:7px}.mday .cur{font-size:13.5px;color:var(--ink2)}.mday .top .xs{font-size:11.5px}}
+
 </style>
 </head>
 <body>
@@ -634,7 +784,7 @@ const IC = {
   bell: 'M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20.5a2.2 2.2 0 0 0 4 0', eye: 'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
   edit: 'M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19zM14 7l3 3', send: 'M21 3 10 14M21 3l-7 18-4-7-7-4z', refresh: 'M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7',
   alert: 'M12 4 2.5 20h19zM12 10v4.5M12 17.5h.01', copy: 'M8 8h12v12H8zM16 8V4H4v12h4', ext: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
-  flag: 'M5 21V4M5 4h11l-2 4 2 4H5', down: 'm6 9 6 6 6-6', sheet: 'M5 3.5h10l4 4v13H5zM15 3.5v4h4M8.5 12h7M8.5 15.5h7',
+  flag: 'M5 21V4M5 4h11l-2 4 2 4H5', live: 'M12 13.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM8.6 15.4a4.8 4.8 0 0 1 0-6.8M15.4 8.6a4.8 4.8 0 0 1 0 6.8M5.8 18.2a8.8 8.8 0 0 1 0-12.4M18.2 5.8a8.8 8.8 0 0 1 0 12.4', down: 'm6 9 6 6 6-6', sheet: 'M5 3.5h10l4 4v13H5zM15 3.5v4h4M8.5 12h7M8.5 15.5h7',
   menu: 'M4 7h16M4 12h16M4 17h16', target: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01'
 };
 const svg = (k, sw = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${IC[k] || k}"/></svg>`;
@@ -735,7 +885,7 @@ const isAdmin = () => D && D.me.role === 'admin';
 const myTrack = () => D && D.me.role === 'team' ? D.me.track : null;
 const T = id => D.tracks.find(t => t.id === id);
 const planOf = id => D.plans[id] || (D.plans[id] = { sems: {}, acts: [], rev: 0 });
-const semN = id => String(P.sem[id] || (T(id) && T(id).cur) || 1);
+const semN = id => { const r = route(); return String((r.name === 't' && r.a === id && r.b) || (T(id) && T(id).cur) || 1); };
 const curN = id => String((T(id) && T(id).cur) || 1);
 const semOf = (id, n) => planOf(id).sems[String(n)];
 const daysOf = (id, n) => (semOf(id, n || curN(id)) || {}).days || [];
@@ -743,6 +893,43 @@ const dayOf = (id, n, d) => daysOf(id, n).find(x => x.d === d);
 const actsOf = (id, n) => planOf(id).acts.filter(a => n == null || a.sem === String(n));
 const allActs = () => D.tracks.flatMap(t => planOf(t.id).acts.map(a => Object.assign(a, { t: t.id })));
 const canEdit = id => isAdmin() || !!(T(id) && T(id).canEdit);
+const canAdjust = id => isAdmin() || myTrack() === id;   // تعديل نشاط قائم (الموعد، القائم، التفاصيل) — يصل الإدارةَ تنبيه به
+
+/* ---------- لقاءات اليوم: البث المباشر في الجدول + أنشطة اللقاء ---------- */
+const MEET_T = ['لقاء', 'استضافة'];
+const isLive = d => !!d && /بث/.test((d.r || '') + ' ' + (d.ev || ''));
+function dayMeets(tid, d, skipId) {
+  const x = dayOf(tid, semFor(tid, d) || curN(tid), d), L = [];
+  if (isLive(x)) L.push('البث المباشر');
+  actsOf(tid).filter(a => a.d === d && MEET_T.includes(a.type) && a.id !== skipId).forEach(a => L.push(qt(a.title)));
+  return L;
+}
+const clashText = L => (L.length === 2 ? 'لقاءان في يوم واحد: ' : L.length + ' لقاءات في يوم واحد: ') + L.join(' و');
+function clashOf(tid, a) { if (!MEET_T.includes(a.type)) return ''; const L = dayMeets(tid, a.d); return L.length >= 2 ? clashText(L) : ''; }
+// أقرب أيام دراسة بلا بث ولا لقاء
+function freeDays(tid, d, skipId, n = 3) {
+  const out = [];
+  for (const k of [1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6]) {
+    const x = add(d, k); if (x < TODAY) continue;
+    const day = dayOf(tid, semFor(tid, x) || curN(tid), x); if (!day || !day.c || dayMeets(tid, x, skipId).length) continue;
+    out.push(x); if (out.length >= n) break;
+  }
+  return out.sort();
+}
+/* ---------- اقتراح كاهوت مراجعة قبل الاختبار بأسبوع ---------- */
+function kahootSugs(tid) {
+  const S = semOf(tid, curN(tid)); if (!S) return [];
+  return S.days.filter(x => x.ev && /اختبار/.test(x.ev) && x.d > TODAY).map(x => {
+    if (actsOf(tid).some(a => a.type === 'كاهوت' && a.d >= add(x.d, -12) && a.d <= x.d)) return null;
+    let best = null;
+    for (const k of [7, 6, 8, 5, 9, 4, 10, 3, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]) { const c = add(x.d, -k); if (c < TODAY) continue; const day = dayOf(tid, curN(tid), c); if (day && day.c && !dayMeets(tid, c).length) { best = c; break; } }
+    if (!best && add(x.d, -7) >= TODAY) best = add(x.d, -7);
+    return best ? { exam: x.ev, ed: x.d, d: best, left: diffD(x.d, TODAY), title: 'كاهوت مراجعة قبل ' + x.ev } : null;
+  }).filter(Boolean);
+}
+/* ---------- لوحة النشاط الثابتة في صفحة المسار (الشاشات العريضة) ---------- */
+const WIDE_Q = 1240;
+const dockOn = tid => !!tid && route().name === 't' && route().a === tid && innerWidth >= WIDE_Q;
 const tcol = id => (T(id) && T(id).color) || '#888';
 const sortA = (x, y) => x.d < y.d ? -1 : x.d > y.d ? 1 : (x.time || '99').localeCompare(y.time || '99');
 const members = id => (T(id) && T(id).members) || [];
@@ -829,7 +1016,7 @@ function route() {
   return { name: p[0] || 'home', a: p[1] || '', b: p[2] || '' };
 }
 function go(h) { if (location.hash === '#' + h) render(); else location.hash = h; }
-addEventListener('hashchange', () => { closeLayer(); render(); window.scrollTo(0, 0); });
+addEventListener('hashchange', () => { closeLayer(); if (F && F.dock) F = null; if (route().name !== 'bot') { BS = null; BS_LOAD = false; } if (P.tl && P.tl.tmp && route().name !== 'timeline') { P.tl.tracks = []; P.tl.tmp = false; savePrefs(); } render(); window.scrollTo(0, 0); });
 
 /* ---------- الإطار ---------- */
 const logoImg = (id, cls = '') => LOGOS[id] ? `<img class="${cls}" src="${LOGOS[id]}" alt="" loading="lazy">` : `<span class="av" style="background:${tcol(id)}">${esc((T(id) || {}).name ? T(id).name[0] : '؟')}</span>`;
@@ -848,6 +1035,7 @@ function navItems() {
     const unl = D.bot ? D.tracks.filter(t => !t.linked).length : 0;
     const reqs = D.tracks.filter(t => t.editReq).length;
     return `<a class="nl" href="#home"${cur('home')}>${svg('home')}الرئيسية${reqs ? `<span class="badge">${reqs}</span>` : ''}</a>
+      <a class="nl" href="#alerts"${cur('alerts')}>${svg('bell')}تغييرات الفرق${D.unseen ? `<span class="badge">${D.unseen}</span>` : ''}</a>
       <a class="nl" href="#timeline"${cur('timeline')}>${svg('tl')}المنظور الزمني</a>
       <a class="nl" href="#reports"${cur('reports')}>${svg('sheet')}التقارير الأسبوعية</a>
       <div class="nav-h">المسارات</div>
@@ -862,11 +1050,23 @@ function navItems() {
     <a class="nl" href="#t/${id}"${cur('t')}>${svg('table')}خطة الفصل</a>
     <a class="nl" href="#timeline"${cur('timeline')}>${svg('tl')}المنظور الزمني</a>`;
 }
+// العدد مع المعدود
+const nWeeks = n => n === 1 ? 'أسبوع واحد' : n === 2 ? 'أسبوعان' : n >= 3 && n <= 10 ? n + ' أسابيع' : n + ' أسبوعًا';
+const nStudy = n => !n ? 'لا أيام دراسة' : n === 1 ? 'يوم دراسة واحد' : n === 2 ? 'يوما دراسة' : n <= 10 ? n + ' أيام دراسة' : n + ' يوم دراسة';
+const qt = t => /[«»]/.test(t) ? t : '«' + t + '»';
+// زر الإضافة العائم في الجوال
+function fabHtml(r) {
+  if (!['home', 't', 'timeline'].includes(r.name)) return '';
+  const tid = r.name === 't' ? r.a : isAdmin() ? '' : myTrack();
+  if (tid ? !canEdit(tid) : !isAdmin()) return '';
+  return `<button class="fab" type="button" data-act="newact" ${tid ? `data-track="${tid}"` : ''} aria-label="نشاط جديد">${svg('plus', 2.2)}</button>`;
+}
+const MORE_R = ['calendar', 'bot', 'accounts', 'reports', 'alerts'];
 function shell(body) {
   const me = D.me, r = route();
   const tab = (h, ic, label, on) => `<a href="#${h}"${on ? ' aria-current="page"' : ''}>${svg(ic)}<span>${label}</span></a>`;
   const tabs = isAdmin()
-    ? tab('home', 'home', 'الرئيسية', r.name === 'home') + tab('tracks', 'table', 'المسارات', r.name === 't' || r.name === 'tracks' || r.name === 'team') + tab('timeline', 'tl', 'الزمني', r.name === 'timeline') + `<button type="button" data-act="more">${svg('menu')}<span>المزيد</span></button>`
+    ? tab('home', 'home', 'الرئيسية', r.name === 'home') + tab('tracks', 'table', 'المسارات', r.name === 't' || r.name === 'tracks' || r.name === 'team') + tab('timeline', 'tl', 'الزمني', r.name === 'timeline') + `<button type="button" data-act="more"${MORE_R.includes(r.name) ? ' aria-current="page"' : ''}>${svg('menu')}<span>المزيد</span></button>`
     : tab('home', 'home', 'الرئيسية', r.name === 'home') + tab('t/' + myTrack(), 'table', 'الخطة', r.name === 't') + tab('timeline', 'tl', 'الزمني', r.name === 'timeline') + `<button type="button" data-act="more">${svg('menu')}<span>المزيد</span></button>`;
   return `<div class="app">
   <aside class="side" aria-label="التنقل">
@@ -884,12 +1084,13 @@ function shell(body) {
   <header class="topbar">
     <a href="#home" aria-label="الرئيسية">${LOGOS.anshita ? `<img class="brand-img" src="${LOGOS.anshita}" alt="الأنشطة التربوية">` : ''}</a>
     <span class="sp"></span>
+    ${isAdmin() ? `<a class="btn icon bellb" href="#alerts" aria-label="تغييرات الفرق">${svg('bell')}${D.unseen ? `<span class="badge">${D.unseen}</span>` : ''}</a>` : ''}
     <button class="btn icon" type="button" data-act="cmd" aria-label="بحث">${svg('search')}</button>
     <button class="btn icon" type="button" data-act="theme" aria-label="تبديل الوضع">${svg(P.theme === 'dark' ? 'sun' : 'moon')}</button>
     <button class="btn icon" type="button" data-act="usermenu" aria-label="الحساب">${isAdmin() ? adminAv() : avatar(T(me.track).name, tcol(me.track))}</button>
   </header>
   <main class="main" id="main"><div class="wrap">${CFG.demo ? `<div class="demo-bar">${svg('eye')}<span>نسخة تجربة: البيانات في متصفحك فقط، والبوت والتقويم محاكاة.</span><span class="sp"></span><button type="button" data-act="demo-reset">ابدأ من جديد</button></div>` : ''}${body}</div></main>
-  <nav class="tabbar" aria-label="التنقل">${tabs}</nav>
+  ${fabHtml(r)}<nav class="tabbar" aria-label="التنقل">${tabs}</nav>
 </div>`;
 }
 
@@ -904,8 +1105,13 @@ function render() {
   let v = VIEWS[r.name];
   if (!v || (v.admin && !isAdmin())) { if (r.name !== 'home') { location.replace('#home'); return; } v = VIEWS.home; }
   const y = scrollY;
+  PENDING_RENDER = false;
+  let foc = null;
+  if (F && F.dock) { readF(); const ae = document.activeElement; if (ae && ae.id && ae.closest && ae.closest('#dock')) foc = { id: ae.id, s: ae.selectionStart, e: ae.selectionEnd }; }
+  if (F && F.dock && !dockOn(F.tid)) F = null;
   app.innerHTML = shell(v.render(r));
   if (v.after) v.after(r);
+  if (F && F.dock) { markSel(); if (foc) { const el = document.getElementById(foc.id); if (el) { el.focus({ preventScroll: true }); try { if (foc.s != null) el.setSelectionRange(foc.s, foc.e); } catch (e) {} } } }
   if (!FIRST) window.scrollTo(0, y);
   FIRST = false;
 }
@@ -929,7 +1135,7 @@ function vLogin() {
     <p class="alt"><button type="button" class="lk" data-act="lgother">${LG.other ? 'اختر من القائمة' : 'حساب آخر؟ ادخل باسم المستخدم'}</button></p>
   </div></div>`;
 }
-function afterLogin() { const p = $('#lg-p'); if (p && (LG.who || LG.other)) setTimeout(() => (LG.other ? $('#lg-u') : p).focus(), 30); }
+function afterLogin() { if (LG.who || LG.other) setTimeout(() => { const el = LG.other ? $('#lg-u') : $('#lg-p'); if (el) el.focus(); }, 30); }
 async function doLogin(user, pass) {
   LG.busy = true; LG.err = ''; render();
   try {
@@ -939,7 +1145,7 @@ async function doLogin(user, pass) {
     LG.busy = false; location.hash = '#home'; await boot();
   } catch (e) { LG.busy = false; LG.err = e.message; render(); }
 }
-function logout() { TOKEN = ''; D = null; LS.del(NS + 'tok'); LS.del(NS + 'boot'); stopPoll(); closeLayer(); location.hash = ''; render(); }
+function logout() { TOKEN = ''; D = null; LG.other = false; LS.del(NS + 'tok'); LS.del(NS + 'boot'); stopPoll(); closeLayer(); location.hash = ''; render(); }
 
 /* ---------- التحميل والتحديث الدوري ---------- */
 function setBoot(b) {
@@ -974,12 +1180,17 @@ async function poll(force) {
       D.plans[id] = await API.me('plan', id); D.revs[id] = r[id]; changed.push(id);
     }
     if (r._log !== D.revs._log) { D.log = (await API.me('log_list')).slice(0, 60); D.revs._log = r._log; }
+    if (r._alerts !== undefined && r._alerts !== D.revs._alerts) {
+      const prevTop = (D.alerts || [])[0] && D.alerts[0].id;
+      D.alerts = (await API.me('alerts')).slice(0, 40); D.unseen = D.alerts.filter(x => !x.seen).length; D.revs._alerts = r._alerts;
+      const top = D.alerts[0]; if (top && top.id !== prevTop && !top.seen) { toast('تغيير من ' + top.by + ': ' + qt(top.title)); changed.push('_alerts'); }
+    }
     setSync('ok');
     if (changed.length) {
       indexHijri();
-      if (!$('#layer').innerHTML) render(); else PENDING_RENDER = true;
+      if (!$('#layer').innerHTML && !(F && F.dock)) render(); else PENDING_RENDER = true;
       const by = (D.log || []).find(x => changed.includes(x.t));
-      if (by && by.by !== D.me.name) toast(`${by.by}: ${by.what} «${by.d}»`);
+      if (by && by.by !== D.me.name) toast(`${by.by}: ${by.what} ${qt(by.d)}`);
     } else if (!$('#layer').innerHTML) { $$('.sync span').forEach(s => s.textContent = syncText()); }
   } catch (e) { if (e.code === 'auth') logout(); else setSync('off'); }
   polling = false;
@@ -1004,6 +1215,7 @@ async function saveAct(tid, patch, opt = {}) {
     setSync('ok');
     if (r.calErr) toast('حُفظ النشاط، وتعذّر تحديث تقويم جوجل: ' + r.calErr, 'err');
     if (!opt.noRender) render();
+    setTimeout(() => poll(true), 600);
     return r.act;
   } catch (e) {
     if (prev) p.acts[idx] = prev; else if (tmp) p.acts.splice(p.acts.indexOf(tmp), 1);
@@ -1013,20 +1225,20 @@ async function saveAct(tid, patch, opt = {}) {
 async function delAct(tid, id) {
   const p = planOf(tid), i = p.acts.findIndex(a => a.id === id), prev = p.acts[i];
   p.acts.splice(i, 1); render(); setSync('busy');
-  try { const r = await API.me('act_del', tid, id); p.rev = r.rev; D.revs[tid] = r.rev; setSync('ok'); toast(`حُذف «${prev.title}»`); }
+  try { const r = await API.me('act_del', tid, id); p.rev = r.rev; D.revs[tid] = r.rev; setSync('ok'); toast(`حُذف ${qt(prev.title)}`); }
   catch (e) { p.acts.splice(i, 0, prev); setSync('ok'); render(); toast(e.message, 'err'); }
 }
 function moveAct(tid, id, d) {
   const a = planOf(tid).acts.find(x => x.id === id); if (!a || a.d === d) return;
   const old = a.d;
   saveAct(tid, { id, d }).then(() => {
-    toast(`نُقل «${a.title}» إلى ${gDay(d)}`, '', () => saveAct(tid, { id, d: old }));
+    toast(`نُقل ${qt(a.title)} إلى ${gDay(d)}`, '', () => saveAct(tid, { id, d: old }));
     announce(`نُقل النشاط إلى ${gDay(d)}`);
   }).catch(() => {});
 }
 async function trackSave(tid, patch) {
   setSync('busy');
-  try { const r = await API.me('track_save', tid, JSON.stringify(patch)); const i = D.tracks.findIndex(t => t.id === tid); D.tracks[i] = Object.assign({}, D.tracks[i], r.track); setSync('ok'); render(); return r.track; }
+  try { const r = await API.me('track_save', tid, JSON.stringify(patch)); const i = D.tracks.findIndex(t => t.id === tid), nt = Object.assign({}, D.tracks[i], r.track); if (!r.track.editReq) delete nt.editReq; D.tracks[i] = nt; setSync('ok'); render(); return r.track; }
   catch (e) { setSync('ok'); toast(e.message, 'err'); throw e; }
 }
 
@@ -1046,7 +1258,7 @@ function openDialog(html, opts = {}) {
 }
 function closeLayer() {
   if (!$('#layer') || !$('#layer').innerHTML) return;
-  const l = LAYER; $('#layer').innerHTML = ''; LAYER = null; F = null; CMD = null;
+  const l = LAYER; $('#layer').innerHTML = ''; LAYER = null; if (!(F && F.dock)) F = null; CMD = null;
   if (l && l.onClose) l.onClose();
   if (PENDING_RENDER) { PENDING_RENDER = false; render(); }
   if (l && l.prevFocus && document.contains(l.prevFocus)) l.prevFocus.focus();
@@ -1065,7 +1277,7 @@ function trapFocus(e) {
 let DG = null, SUPPRESS = false;
 document.addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
-  const el = e.target.closest('[data-drag]'); if (!el || !canEdit(el.dataset.track)) return;
+  const el = e.target.closest('[data-drag]'); if (!el || !canAdjust(el.dataset.track)) return;
   DG = { el, x: e.clientX, y: e.clientY, id: el.dataset.id, track: el.dataset.track, on: false, touch: e.pointerType === 'touch', pid: e.pointerId };
   if (DG.touch) DG.timer = setTimeout(() => { if (DG && !DG.on) { startDrag(DG.x, DG.y); if (navigator.vibrate) navigator.vibrate(12); } }, 320);
 });
@@ -1106,7 +1318,7 @@ function moveGhost(x, y) {
   if (DG.over && DG.over !== (ok && t.el)) DG.over.classList.remove('drop-on');
   if (ok && !t.el.matches('.ltrack')) { t.el.classList.add('drop-on'); DG.over = t.el; } else DG.over = null;
   DG.target = ok ? t : null;
-  if (ok && DG.g) DG.g.dataset.when = gDay(t.date);
+  if (DG.g) { if (ok) DG.g.dataset.when = 'إلى ' + gDay(t.date); else delete DG.g.dataset.when; }
   const m = 60; if (y < m) scrollBy(0, -12); else if (y > innerHeight - m) scrollBy(0, 12);
 }
 function endDrag(e, cancel) {
@@ -1127,10 +1339,10 @@ function endDrag(e, cancel) {
 
 /* ---------- بطاقة النشاط ---------- */
 function evChip(a, tid, o = {}) {
-  const t = T(tid), drag = canEdit(tid) && !o.noDrag && !String(a.id).startsWith('tmp');
-  const flags = (a.cal && a.cal.id ? `<span data-tip="في تقويم جوجل">${svg('gcal')}</span>` : '') + (a.done ? `<span data-tip="تم التنفيذ">${svg('check')}</span>` : '');
-  const meta = [o.track ? `<span class="tbadge">${esc(t.name)}</span>` : '', a.time ? `<span>${timeText(a.time)}</span>` : '', a.who && a.who.length ? `<span>${esc(a.who.join('، '))}</span>` : '', o.date ? `<span>${gDay(a.d)}</span>` : '', flags ? `<span class="flag">${flags}</span>` : ''].filter(Boolean).join('');
-  return `<div class="ev ${o.track || o.tint ? 'tinted' : ''} ${a.done ? 'done' : ''} ${isLate(a) ? 'late' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${tid}" ${drag ? 'data-drag="1"' : ''} style="--tcol:${t.color}">
+  const t = T(tid), drag = canAdjust(tid) && !o.noDrag && !String(a.id).startsWith('tmp'), cl = clashOf(tid, a);
+  const flags = (cl ? `<span class="cl" data-tip="${esc(cl)}">${svg('alert')}</span>` : '') + (a.cal && a.cal.id ? `<span data-tip="في تقويم جوجل">${svg('gcal')}</span>` : '') + (a.done ? `<span data-tip="تم التنفيذ">${svg('check')}</span>` : '');
+  const meta = [o.track ? `<span class="tbadge">${esc(t.name)}</span>` : '', o.big ? `<span class="ty">${esc(a.type)}</span>` : '', a.time ? `<span>${timeText(a.time)}</span>` : '', a.who && a.who.length ? `<span>${esc(a.who.join('، '))}</span>` : '', o.date ? `<span>${gDay(a.d)}</span>` : '', flags ? `<span class="flag">${flags}</span>` : ''].filter(Boolean).join('');
+  return `<div class="ev ${o.track || o.tint ? 'tinted' : ''} ${o.big ? 'big' : ''} ${cl ? 'clash' : ''} ${a.done ? 'done' : ''} ${isLate(a) ? 'late' : ''} ${typeof F !== 'undefined' && F && F.dock && F.id === a.id ? 'sel' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${tid}" ${drag ? 'data-drag="1"' : ''} style="--tcol:${t.color};--tyc:${typeOf(a.type)[1]}">
     ${tile(a.type, 'sm')}<span class="tx"><span class="tt clamp2">${esc(a.title)}</span>${meta ? `<span class="mt">${meta}</span>` : ''}</span></div>`;
 }
 const pageHead = (eyebrow, title, lead, side = '', reveal = false) => `<div class="ph"><div class="t">${eyebrow ? `<div class="eyebrow">${eyebrow}</div>` : ''}<h1 class="${reveal ? 'reveal' : ''}">${reveal ? title.split(' ').map((w, i) => `<span class="w" style="animation-delay:${i * 70}ms">${esc(w)}</span>`).join(' ') : esc(title)}</h1>${lead ? `<p class="lead">${lead}</p>` : ''}</div>${side}</div>`;
@@ -1199,11 +1411,40 @@ function weekBoard(ws, tids) {
   return `<div class="board">${cols}</div>`;
 }
 
+/* ---------- الجوال: قائمة حالة المسارات، وأجندة الأسبوع ---------- */
+function trackStrip(ws) {
+  return `<div class="card strip">${D.tracks.map(t => { const h = health(t.id, ws); return `<a class="srow" href="#t/${t.id}" style="--tc:${t.color}"><span class="slogo">${logoImg(t.id)}</span><span class="col" style="min-width:0;flex:1"><b>${esc(t.name)}</b>${hlDot(h)}</span>${svg('fwd')}</a>`; }).join('')}</div>`;
+}
+function agenda(ws, tids, o = {}) {
+  const days = Array.from({ length: 7 }, (_, i) => add(ws, i)), empty = [];
+  let h = '';
+  for (const d of days) {
+    const acts = tids.flatMap(id => actsOf(id).filter(a => a.d === d).map(a => [a, id])).sort((x, y) => sortA(x[0], y[0]));
+    if (!acts.length) { empty.push(d); continue; }
+    h += `<div class="ag-d ${d === TODAY ? 'today' : ''}" data-drop="1" data-date="${d}" ${tids.length === 1 ? `data-track="${tids[0]}"` : ''}><div class="ag-h"><b>${d === TODAY ? 'اليوم' : d === add(TODAY, 1) ? 'غدًا' : DAYS[wd(d)]}</b><span class="xs faint">${gShort(d)}</span></div>${acts.map(([a, id]) => evChip(a, id, { track: tids.length > 1 })).join('')}</div>`;
+  }
+  if (!h) h = `<p class="muted sm" style="padding:6px 2px">لا أنشطة في هذا الأسبوع.</p>`;
+  if (empty.length && h.indexOf('ag-d') >= 0) h += `<p class="xs faint ag-empty">بلا أنشطة: ${empty.map(d => DAYS[wd(d)]).join('، ')}</p>`;
+  return `<div class="agenda">${h}</div>`;
+}
+// أسبوع الجوال في صفحة المسار
+const MW = {};
+function mobWeek(id, sem) {
+  const W = weeksOf(sem.days); if (!W.length) return null;
+  let i = MW[id + '|' + sem.n];
+  if (i == null) { i = W.findIndex(x => x.from <= TODAY && TODAY <= x.to); if (i < 0) i = TODAY < W[0].from ? 0 : W.length - 1; }
+  i = Math.max(0, Math.min(W.length - 1, i)); MW[id + '|' + sem.n] = i;
+  return { W, i };
+}
+
 /* ---------- ما يحتاج انتباه الإدارة ---------- */
 function attention(ws) {
   const L = [];
   D.tracks.filter(t => t.editReq).forEach(t => L.push({ ic: 'unlock', k: 'brand', html: `<b>${esc(t.name)}</b> طلب فتح تعديل الخطة${t.editReq.note ? `: «${esc(t.editReq.note)}»` : ''} <span class="faint">${ago(t.editReq.at)}</span>`, act: `<button class="btn sm pri" type="button" data-act="grant" data-id="${t.id}">افتح التعديل</button>` }));
-  const acts = allActs();
+  if (D.unseen) L.push({ ic: 'bell', k: 'brand', html: `${D.unseen === 1 ? 'تغيير جديد' : D.unseen === 2 ? 'تغييران جديدان' : D.unseen + ' تغييرات جديدة'} من الفرق على خططها`, act: `<a class="btn sm pri" href="#alerts">اعرضها</a>` });
+  const acts = allActs(), seenC = {};
+  acts.filter(a => a.d >= TODAY && diffD(a.d, TODAY) <= 14 && clashOf(a.t, a)).forEach(a => { const k = a.t + a.d; if (seenC[k]) return; seenC[k] = 1; L.push({ ic: 'alert', k: 'warn', html: `<b>${esc(T(a.t).name)}</b> ${gDay(a.d)}: ${esc(clashOf(a.t, a))}`, act: `<button class="btn sm" type="button" data-act="openact" data-id="${a.id}" data-track="${a.t}">راجعه</button>` }); });
+  D.tracks.forEach(t => kahootSugs(t.id).filter(s => s.left <= 14).forEach(s => L.push({ ic: 'target', k: 'brand', html: `<b>${esc(t.name)}</b>: ${esc(s.exam)} ${rel(s.ed)}. اقتراح: كاهوت مراجعة ${gDay(s.d)}`, act: `<button class="btn sm" type="button" data-act="newact" data-track="${t.id}" data-date="${s.d}" data-type="كاهوت" data-title="${esc(s.title)}">أضفه</button>` })));
   acts.filter(a => remindable(a) && !a.done && diffD(a.d, TODAY) >= 0 && diffD(a.d, TODAY) <= 3 && !(a.who && a.who.length)).forEach(a => L.push({ ic: 'users', k: 'warn', html: `لقاء «${esc(a.title)}» في ${esc(T(a.t).name)} ${rel(a.d)} بلا مسؤول`, act: `<button class="btn sm" type="button" data-act="openact" data-id="${a.id}" data-track="${a.t}">حدّد المسؤول</button>` }));
   D.tracks.forEach(t => { const h = health(t.id, ws); if (h.k === 'none') L.push({ ic: 'flag', k: 'none', html: `<b>${esc(t.name)}</b>: لا أنشطة في خطة ${ws === wkStart(TODAY) ? 'هذا الأسبوع' : 'الأسبوع الأول'}`, act: `<a class="btn sm" href="#t/${t.id}">افتح الخطة</a>` }); });
   const late = acts.filter(a => isLate(a) && diffD(TODAY, a.d) <= 14);
@@ -1234,20 +1475,21 @@ function adminHome() {
   const title = pre ? 'هل المسارات جاهزة للأسبوع الأول؟' : 'هل تعمل المسارات هذا الأسبوع؟';
   let lead = pre ? `يبدأ الفصل ${rel(s0)}، ${gDay(s0)}. ` : '';
   lead += ok.length === D.tracks.length ? 'كل المسارات وضعت أنشطة ' + (pre ? 'للأسبوع الأول.' : 'لهذا الأسبوع.') :
-    (ok.length ? `${ok.length === 1 ? 'مسار واحد' : ok.length === 2 ? 'مساران' : ok.length + ' مسارات'} وضع${ok.length > 1 ? 'ت' : ''} أنشطة ${pre ? 'للأسبوع الأول' : 'لهذا الأسبوع'}` : 'لم يضع أي مسار أنشطة بعد') +
-    (none.length ? `، ولم ${none.length > 1 ? 'تضع' : 'يضع'} ${none.map(x => '<b>' + esc(x[0].name) + '</b>').join(' و')} شيئًا بعد.` : '.');
+    (ok.length ? `${ok.length === 1 ? 'مسار واحد' : ok.length === 2 ? 'مساران' : ok.length + ' مسارات'} ${ok.length === 2 ? 'وضعا' : ok.length > 2 ? 'وضعت' : 'وضع'} أنشطة ${pre ? 'للأسبوع الأول' : 'لهذا الأسبوع'}` : 'لم يضع أي مسار أنشطة بعد') +
+    (none.length ? `، ولم يضع ${none.map(x => '<b>' + esc(x[0].name) + '</b>').join(' و')} شيئًا بعد.` : '.');
   const anim = HOME_ANIM; HOME_ANIM = false;
   const att = attention(ws), we = add(HB.ws, 6);
-  return pageHead(todayLine(), title, lead, '', anim) + pulse(ws, anim) + `
+  const mob = isMob();
+  return pageHead(todayLine(), title, lead, '', anim) + (mob ? trackStrip(ws) : pulse(ws, anim)) + `
   <div class="grid2 sect">
     <div class="card"><div class="card-h"><h3>يحتاج انتباهك</h3>${att.length ? `<span class="badge soft">${att.length}</span>` : ''}</div>
       ${att.length ? `<div class="list">${att.map(x => `<div class="li"><span class="tile sm" style="--tc:${x.k === 'warn' ? 'var(--warn)' : x.k === 'brand' ? 'var(--brand)' : 'var(--ink3)'}">${svg(x.ic)}</span><div class="tx sm">${x.html}</div>${x.act}</div>`).join('')}</div>` : `<p class="muted sm">لا شيء يحتاجك الآن.</p>`}</div>
-    <div class="card"><div class="card-h"><h3>آخر التحديثات</h3><span class="xs faint">تعديلات الفرق والإدارة</span></div>${feed(D.log, 6)}</div>
+    <div class="card"><div class="card-h"><h3>آخر التحديثات</h3><span class="xs faint">تعديلات الفرق والإدارة</span></div>${feed(D.log, mob ? 3 : 6)}</div>
   </div>
   <div class="sect"><div class="sh"><h2>${HB.ws === wkStart(TODAY) ? 'هذا الأسبوع' : HB.ws === ws && pre ? 'الأسبوع الأول' : 'أسبوع ' + gShort(HB.ws)}</h2>
       <span class="xs faint">${gShort(HB.ws)} – ${gShort(we)}</span>
       <div class="row" style="gap:2px"><button class="btn icon" type="button" data-act="hbw" data-n="-7" aria-label="الأسبوع السابق">${svg('back')}</button><button class="btn sm ghost" type="button" data-act="hbw" data-n="0">${pre ? 'الأول' : 'الآن'}</button><button class="btn icon" type="button" data-act="hbw" data-n="7" aria-label="الأسبوع التالي">${svg('fwd')}</button></div></div>
-    ${weekBoard(HB.ws, D.tracks.map(t => t.id))}</div>`;
+    ${mob ? agenda(HB.ws, D.tracks.map(t => t.id)) : weekBoard(HB.ws, D.tracks.map(t => t.id))}</div>`;
 }
 function tracksIndex() {
   const ws = focusWeek();
@@ -1270,13 +1512,13 @@ function teamHome(id, preview) {
   else if (TODAY < r.from) lead = `يبدأ ${semLabel(n)} ${rel(r.from)}، ${gDay(r.from)}.`;
   else if (TODAY > r.to) lead = `انتهى ${semLabel(n)}.`;
   else lead = `الأسبوع ${nw} من ${ws.length} في ${semLabel(n)}.`;
-  const permPill = t.canEdit ? `<span class="pill ok">${svg('unlock')}التعديل مفتوح لكم</span>` : `<span class="pill">${svg('lock')}الخطة للعرض فقط</span>`;
+  const permPill = t.canEdit ? `<span class="pill ok">${svg('unlock')}التعديل مفتوح لكم</span>` : `<span class="pill">${svg('lock')}إضافة الأنشطة مغلقة</span>`;
   const botPill = t.linked ? `<span class="pill brand">${svg('bot')}البوت يذكّر مجموعتكم</span>` : '';
   const m = nextMeeting(id);
   let hero;
   if (m) {
     const dd = diffD(m.d, TODAY), d3 = add(m.d, -3), d1 = add(m.d, -1), sent = m.sent || {};
-    const st = (d, k) => (sent[k] === m.d || d < TODAY) ? 'done' : d === TODAY ? 'now' : '';
+    const st = (d, k) => sent[k] === m.d ? 'done' : d <= TODAY ? (m.d >= TODAY ? 'now' : 'done') : '';
     hero = `<div class="hero"><div style="min-width:0">
       <div class="faint sm">${remindable(m) ? 'اللقاء القادم' : 'القادم'}</div>
       <div class="count">${dd === 0 ? 'اليوم' : dd === 1 ? 'غدًا' : dd === 2 ? 'بعد يومين' : `بعد ${dd} ${dd <= 10 ? 'أيام' : 'يومًا'}`}</div>
@@ -1297,17 +1539,28 @@ function teamHome(id, preview) {
     pageHead(todayLine(), 'أهلًا بفريق ' + t.name, esc(lead), `<div class="row" style="flex-wrap:wrap">${permPill}${botPill}</div>`) + hero + `
   <div class="cols sect">
     <section class="stack">
+      ${teamNotes(id)}
       <div class="card"><div class="card-h"><h3>القادم خلال أسبوعين</h3><a class="lk sm" href="#t/${id}">خطة الفصل كاملة</a></div>${upList}</div>
       ${late.length ? `<div class="card"><div class="card-h"><h3>مضى موعدها</h3><span class="xs faint">علّموا ما نُفّذ</span></div><div class="list">${late.slice(-8).reverse().map(a => actRow(a, id)).join('')}</div></div>` : ''}
     </section>
     <aside class="stack">
       <div class="card"><div class="card-h"><h3>مقرر الطلاب اليوم</h3></div>${today && today.c ? `<div class="ctx" style="background:none;padding:0"><b>${esc(today.c)}</b>${today.q ? `<span>${esc(today.q)}</span>` : ''}${today.r ? `<span class="faint">${esc(today.r)}</span>` : ''}</div>` : `<p class="muted sm">${today && today.p ? esc(today.p) : today && today.ev ? esc(today.ev) : 'لا مقرر اليوم.'}</p>`}</div>
       ${botCardTeam(id, preview)}
-      ${!t.canEdit && !preview && !isAdmin() ? `<div class="card"><div class="card-h"><h3>تحتاجون تعديل الخطة؟</h3></div><p class="muted sm" style="margin-bottom:12px">الخطة للعرض، وتستطيعون تعليم ما نُفّذ. لإضافة أنشطة أو نقلها اطلبوا فتح التعديل.</p>${t.editReq ? `<span class="pill brand">${svg('check')}أُرسل الطلب ${ago(t.editReq.at)}</span>` : `<button class="btn" type="button" data-act="askedit">اطلب فتح التعديل</button>`}</div>` : ''}
+      ${!t.canEdit && !preview && !isAdmin() ? `<div class="card"><div class="card-h"><h3>تحتاجون إضافة أنشطة؟</h3></div><p class="muted sm" style="margin-bottom:12px">تستطيعون تغيير مواعيد الأنشطة والمسؤولين عنها وتفاصيلها، ويصل الإدارةَ تنبيه بذلك. لإضافة أنشطة جديدة أو حذفها اطلبوا فتح الإضافة.</p>${t.editReq ? `<span class="pill brand">${svg('check')}أُرسل الطلب ${ago(t.editReq.at)}</span>` : `<button class="btn" type="button" data-act="askedit">اطلب فتح الإضافة</button>`}</div>` : ''}
       <div class="card"><div class="card-h"><h3>الفريق</h3>${canEdit(id) ? `<button class="btn sm ghost" type="button" data-act="members" data-id="${id}">تعديل</button>` : ''}</div>${members(id).length ? `<div class="whos">${members(id).map(x => `<span class="chip">${esc(x)}</span>`).join('')}</div>` : `<p class="muted sm">لم تُكتب أسماء الفريق بعد.</p>`}</div>
     </aside>
   </div>
-  <div class="sect"><div class="sh"><h2>خلاصة الفصل</h2><span class="xs faint">${semLabel(n)}</span></div>${semStats(id, n)}</div>`;
+  ${isMob() ? `<details class="sect mfold"><summary><h2>خلاصة الفصل</h2><span class="xs faint">${semLabel(n)}</span>${svg('down')}</summary>${semStats(id, n)}</details>` : `<div class="sect"><div class="sh"><h2>خلاصة الفصل</h2><span class="xs faint">${semLabel(n)}</span></div>${semStats(id, n)}</div>`}`;
+}
+function teamNotes(id) {
+  const ed = canEdit(id), seen = {};
+  const cls = actsOf(id).filter(a => a.d >= TODAY && diffD(a.d, TODAY) <= 21 && clashOf(id, a)).filter(a => !seen[a.d] && (seen[a.d] = 1));
+  const sugs = kahootSugs(id).filter(s => s.left <= 21);
+  if (!cls.length && !sugs.length) return '';
+  return `<div class="card notes"><div class="card-h"><h3>تنبيهات واقتراحات</h3></div><div class="col" style="gap:8px">
+    ${cls.map(a => `<button class="dk-note warn" type="button" data-act="openact" data-id="${a.id}" data-track="${id}">${svg('alert')}<span><b>${gDay(a.d)}:</b> ${esc(clashOf(id, a))}. الأنسب نقل اللقاء إلى يوم آخر.</span></button>`).join('')}
+    ${sugs.map(s => `<div class="dk-note sug">${tile('كاهوت', 'sm')}<span>${esc(s.exam)} ${rel(s.ed)}. <b>اقتراح:</b> كاهوت مراجعة ${gDay(s.d)} يثبّت ما درسه الطلاب قبل الاختبار.</span>${ed ? `<button class="btn sm" type="button" data-act="newact" data-track="${id}" data-date="${s.d}" data-type="كاهوت" data-title="${esc(s.title)}">أضفه</button>` : ''}</div>`).join('')}
+  </div></div>`;
 }
 function actRow(a, id) {
   const t = T(id);
@@ -1374,19 +1627,20 @@ VIEWS.t = {
   render(r) {
     const id = r.a, t = T(id);
     if (!t) return `<div class="card empty"><h3>المسار غير موجود</h3></div>`;
-    if (r.b) { P.sem[id] = r.b; savePrefs(); }
-    const n = semN(id), sem = semOf(id, n);
-    return trackHead(id) + semTabs(id, n) + (sem && sem.days.length ? semBody(id, n, sem) : semEmpty(id, n));
+    const n = semN(id), sem = semOf(id, n), body = sem && sem.days.length ? semBody(id, n, sem) : semEmpty(id, n);
+    if (!dockOn(id)) return trackHead(id) + semTabs(id, n) + body;
+    return trackHead(id) + semTabs(id, n) + `<div class="tlay"><div class="tmain">${body}</div><aside class="dock" id="dock" aria-label="لوحة النشاط">${F && F.dock && F.tid === id ? '' : dockIdle(id)}</aside></div>`;
   },
-  after(r) { const el = $('#d-' + TODAY); if (el && !VIEWS.t.scrolled) { VIEWS.t.scrolled = true; setTimeout(() => el.scrollIntoView({ block: 'center' }), 60); } }
+  after(r) { const w = $('.wrap'); if (w) w.classList.toggle('wide', dockOn(r.a)); if (F && F.dock) { if (F.tid === r.a && $('#dock')) drawAct(true); else F = null; }
+    const el = $('#d-' + TODAY); if (el && !VIEWS.t.scrolled) { VIEWS.t.scrolled = true; setTimeout(() => el.scrollIntoView({ block: 'center' }), 60); } }
 };
 function trackHead(id) {
   const t = T(id), n = semN(id), acts = actsOf(id, n);
   let ctl;
-  if (isAdmin()) ctl = `<div class="perm"><span class="row" style="gap:7px">${svg(t.canEdit ? 'unlock' : 'lock')}${t.canEdit ? 'الفريق يعدّل الخطة' : 'الفريق يعرض الخطة فقط'}</span><button class="sw" type="button" role="switch" aria-checked="${!!t.canEdit}" data-act="toggleedit" data-id="${id}" aria-label="السماح للفريق بتعديل الخطة"></button></div>
+  if (isAdmin()) ctl = `<div class="perm"><span class="row" style="gap:7px">${svg(t.canEdit ? 'unlock' : 'lock')}${t.canEdit ? 'الفريق يعدّل الخطة' : 'الفريق يعدّل المواعيد والمسؤولين فقط'}</span><button class="sw" type="button" role="switch" aria-checked="${!!t.canEdit}" data-act="toggleedit" data-id="${id}" aria-label="السماح للفريق بتعديل الخطة"></button></div>
     ${t.editReq ? `<span class="pill brand">${svg('unlock')}طلب الفريق فتح التعديل ${ago(t.editReq.at)}</span>` : ''}
     <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-end"><a class="btn sm ghost" href="#team/${id}">${svg('eye')}كما يراها الفريق</a><button class="btn sm ghost" type="button" data-act="members" data-id="${id}">${svg('users')}الفريق</button></div>`;
-  else ctl = t.canEdit ? `<span class="pill ok">${svg('unlock')}التعديل مفتوح لكم</span>` : `<span class="pill">${svg('lock')}للعرض فقط</span>${t.editReq ? `<span class="xs faint">أُرسل طلب التعديل ${ago(t.editReq.at)}</span>` : `<button class="btn sm" type="button" data-act="askedit">اطلب فتح التعديل</button>`}`;
+  else ctl = t.canEdit ? `<span class="pill ok">${svg('unlock')}التعديل مفتوح لكم</span>` : `<span class="pill">${svg('lock')}إضافة الأنشطة مغلقة</span><span class="xs faint">وتعدّلون المواعيد والمسؤولين</span>${t.editReq ? `<span class="xs faint">أُرسل طلب الفتح ${ago(t.editReq.at)}</span>` : `<button class="btn sm" type="button" data-act="askedit">اطلب فتح الإضافة</button>`}`;
   return `<div class="thead" style="--tc:${t.color}"><div class="logo">${logoImg(id)}</div>
     <div class="t"><div class="eyebrow sm faint">${isAdmin() ? '<a class="lk" href="#tracks">المسارات</a> · ' : ''}${esc(t.cohort || '')}</div><h1>${esc(t.full || t.name)}</h1>
       <div class="meta">${t.age ? `<span class="pill">${esc(t.age)}</span>` : ''}<span class="pill">${svg('users')}${members(id).length ? members(id).length + ' في الفريق' : 'الفريق لم يُكتب'}</span><span class="pill">${nActs(acts.length)} في ${semLabel(n)}</span>${t.linked ? `<span class="pill brand">${svg('bot')}مجموعة مربوطة بالبوت</span>` : ''}</div></div>
@@ -1408,11 +1662,17 @@ function semFacts(id, n, sem) {
   const acts = actsOf(id, n), done = acts.filter(a => a.done).length;
   const fact = (ic, b, s, extra = '') => `<div class="fact"><span class="tile" style="--tc:${t.color}">${svg(ic)}</span><div class="kv" style="min-width:0;flex:1"><b>${b}</b><span>${s}</span>${extra}</div></div>`;
   return `<div class="facts" style="--tc:${t.color}">
-    ${fact('cal', `${gShort(r.from)} – ${gShort(r.to)}`, `${weeks.length} أسبوعًا${TODAY >= r.from && TODAY <= r.to ? ` · نحن في الأسبوع ${nowWeek(id)}` : TODAY < r.from ? ' · ' + rel(r.from) : ''}`, `<div class="prog"><i style="width:${el / weeks.length * 100}%"></i></div>`)}
+    ${fact('cal', `${gShort(r.from)} – ${gShort(r.to)}`, `${nWeeks(weeks.length)}${TODAY >= r.from && TODAY <= r.to ? ` · نحن في الأسبوع ${nowWeek(id)}` : TODAY < r.from ? ' · ' + rel(r.from) : ''}`, `<div class="prog"><i style="width:${el / weeks.length * 100}%"></i></div>`)}
     ${exams.slice(0, 2).map(x => fact('flag', esc(x.ev.replace(/^الاختبار\s*/, 'الاختبار ')), `${gDay(x.d)} · ${rel(x.d)}`)).join('') || fact('flag', 'لا اختبارات', 'في الجدول')}
-    ${exams.length < 2 ? fact('target', `${sem.days.filter(d => d.c).length} يوم دراسة`, [...new Set(sem.days.filter(d => d.p).map(d => d.p))].join('، ') || 'بلا إجازات') : ''}
+    ${exams.length < 2 ? fact('target', nStudy(sem.days.filter(d => d.c).length), [...new Set(sem.days.filter(d => d.p).map(d => d.p))].join('، ') || 'بلا إجازات') : ''}
     ${fact('check', `${done} من ${acts.length}`, 'أنشطة نُفّذت')}
   </div>`;
+}
+function semFactsMini(id, n, sem) {
+  const weeks = weeksOf(sem.days), exam = sem.days.find(d => d.ev && /اختبار/.test(d.ev) && d.d >= TODAY), r0 = sem.days[0].d;
+  const acts = actsOf(id, n), done = acts.filter(a => a.done).length;
+  const parts = [TODAY < r0 ? 'يبدأ ' + rel(r0) : TODAY > sem.days[sem.days.length - 1].d ? 'انتهى الفصل' : `الأسبوع ${nowWeek(id)} من ${weeks.length}`, exam ? `${esc(exam.ev)} ${rel(exam.d)}` : '', `${done} من ${acts.length} نُفّذ`].filter(Boolean);
+  return `<div class="mfacts" style="--tc:${T(id).color}">${parts.map(x => `<span>${x}</span>`).join('')}</div>`;
 }
 let TB = { q: '' };
 function semBody(id, n, sem) {
@@ -1425,7 +1685,7 @@ function semBody(id, n, sem) {
     ${ed ? `<button class="btn pri sm" type="button" data-act="newact" data-track="${id}">${svg('plus')}نشاط</button>` : ''}
     ${ed ? `<button class="btn icon" type="button" data-act="semmenu" data-id="${id}" data-n="${n}" aria-label="خيارات الجدول" data-tip="خيارات الجدول">${svg('dots')}</button>` : ''}
   </div>`;
-  return semFacts(id, n, sem) + tools + (isMob() ? semCards(id, n, sem) : semTable(id, n, sem));
+  return (isMob() ? semFactsMini(id, n, sem) : semFacts(id, n, sem)) + tools + (isMob() ? semCards(id, n, sem) : semTable(id, n, sem));
 }
 function dayVisible(d, acts) {
   const q = normAr(TB.q.trim());
@@ -1435,8 +1695,21 @@ function dayVisible(d, acts) {
   return true;
 }
 const edCell = (id, n, d, k, cls = '') => canEdit(id) ? `<button class="ed ${d[k] ? '' : 'empty'} ${cls}" type="button" data-act="ed" data-id="${id}" data-n="${n}" data-d="${d.d}" data-k="${k}">${esc(d[k] || '')}</button>` : esc(d[k] || '');
+const evBadge = d => d.ev ? (/اختبار/.test(d.ev) ? `<span class="exam">${svg('flag')}${esc(d.ev)}</span>` : `<span class="pill brand">${esc(d.ev)}</span>`) : '';
+const liveBadge = d => isLive(d) ? `<span class="live" data-tip="${esc(d.r || 'بث مباشر')}">${svg('live')}بث مباشر</span>` : '';
+// خلية المقرر المختصرة: المحور، ثم المقرر والمقدار والمطلوب
+function curCell(id, n, d, ed) {
+  const ev = evBadge(d);
+  if (d.p && !d.c) return `${ev}<span class="per">${esc(d.p)}</span>`;
+  if (!d.c && !ed) return ev || '<span class="faint sm">لا مقرر</span>';
+  const ax = d.ax ? `<span class="axp" style="--ac:${axCol(d.ax)}"><i></i>${esc(d.ax)}</span>` : '';
+  return `${ev}${ed ? `<button class="ed axb" type="button" data-act="ed" data-id="${id}" data-n="${n}" data-d="${d.d}" data-k="ax">${ax || '<span class="faint xs">+ المحور</span>'}</button>` : ax}
+    <div class="c1">${edCell(id, n, d, 'c')}</div>${d.q || ed ? `<div class="c2">${edCell(id, n, d, 'q')}</div>` : ''}${d.r || ed || isLive(d) ? `<div class="c3">${liveBadge(d)}${edCell(id, n, d, 'r')}</div>` : ''}`;
+}
+const clashNote = (id, d) => { const L = dayMeets(id, d); return L.length >= 2 ? `<div class="clashn" role="note">${svg('alert')}<span>${esc(clashText(L))}</span></div>` : ''; };
+const sugCard = (id, s, ed) => `<div class="sug">${tile('كاهوت', 'sm')}<span><b>اقتراح:</b> كاهوت مراجعة قبل ${esc(s.exam)} (${gDay(s.ed)})</span>${ed ? `<button class="btn sm" type="button" data-act="newact" data-track="${id}" data-date="${s.d}" data-type="كاهوت" data-title="${esc(s.title)}">أضفه</button>` : ''}</div>`;
 function semTable(id, n, sem) {
-  const acts = actsOf(id, n), ed = canEdit(id);
+  const acts = actsOf(id, n), ed = canEdit(id), sugs = String(n) === String(curN(id)) ? kahootSugs(id) : [];
   let rows = '', shown = 0;
   for (const W of weeksOf(sem.days)) {
     let wr = '', wc = 0;
@@ -1444,38 +1717,55 @@ function semTable(id, n, sem) {
       const da = acts.filter(a => a.d === d.d).sort(sortA);
       if (!dayVisible(d, da)) continue;
       wc += da.length; shown++;
-      const ev = d.ev ? (/اختبار/.test(d.ev) ? `<span class="exam">${svg('flag')}${esc(d.ev)}</span>` : `<span class="pill brand">${esc(d.ev)}</span>`) : '';
-      let cur;
-      if (d.c) cur = `<td class="ax">${ed ? `<button class="ed" type="button" data-act="ed" data-id="${id}" data-n="${n}" data-d="${d.d}" data-k="ax">${d.ax ? `<span class="axp" style="--ac:${axCol(d.ax)}"><i></i>${esc(d.ax)}</span>` : ''}</button>` : d.ax ? `<span class="axp" style="--ac:${axCol(d.ax)}"><i></i>${esc(d.ax)}</span>` : ''}</td><td class="cur">${ev ? ev + '<div style="height:4px"></div>' : ''}${edCell(id, n, d, 'c')}</td><td class="cur">${edCell(id, n, d, 'q')}</td><td class="cur">${edCell(id, n, d, 'r')}</td>`;
-      else cur = `<td colspan="4" class="cur">${ev || (d.p ? `<span class="per">${esc(d.p)}</span>` : '<span class="faint sm">لا مقرر</span>')}</td>`;
-      wr += `<tr class="d ${d.d === TODAY ? 'today' : ''} ${d.d < TODAY ? 'past' : ''} ${d.c ? '' : 'off'}" id="d-${d.d}" data-drop="1" data-date="${d.d}" data-track="${id}">
-        <td class="dy"><b>${DAYS[wd(d.d)]}</b>${d.d === TODAY ? '<span class="today-tag">اليوم</span>' : ''}${ed ? `<button class="btn icon" type="button" style="padding:3px;margin-top:2px" data-act="dayedit" data-id="${id}" data-n="${n}" data-d="${d.d}" aria-label="تعديل اليوم" data-tip="تعديل اليوم">${svg('edit', 1.6)}</button>` : ''}</td>
-        <td class="dt num"><span>${gShort(d.d)}</span><span class="h">${esc(d.h || hijri(d.d))}</span></td>${cur}
-        <td class="acts"><div class="acts-in">${da.map(a => evChip(a, id)).join('')}${ed ? `<button class="plus" type="button" data-act="newact" data-date="${d.d}" data-track="${id}">+ نشاط</button>` : ''}</div></td></tr>`;
+      const sg = sugs.filter(s => s.d === d.d);
+      wr += `<tr class="d ${d.d === TODAY ? 'today' : ''} ${d.d < TODAY ? 'past' : ''} ${d.c ? '' : 'off'} ${da.length ? 'has' : ''}" id="d-${d.d}" data-drop="1" data-date="${d.d}" data-track="${id}">
+        <td class="dy"><div class="dyw"><b>${DAYS[wd(d.d)]}</b>${d.d === TODAY ? '<span class="today-tag">اليوم</span>' : ''}</div><span class="g num">${gShort(d.d)}</span><span class="h">${esc(d.h || hijri(d.d))}</span>${ed ? `<button class="btn icon dye" type="button" data-act="dayedit" data-id="${id}" data-n="${n}" data-d="${d.d}" aria-label="تعديل اليوم" data-tip="تعديل اليوم">${svg('edit', 1.6)}</button>` : ''}</td>
+        <td class="acts"><div class="acts-in">${clashNote(id, d.d)}${da.map(a => evChip(a, id, { big: true })).join('')}${sg.map(s => sugCard(id, s, ed)).join('')}${ed ? `<button class="plus" type="button" data-act="newact" data-date="${d.d}" data-track="${id}">+ نشاط</button>` : ''}</div></td>
+        <td class="cur">${curCell(id, n, d, ed)}</td></tr>`;
     }
     if (!wr) continue;
-    rows += `<tr class="wkh"><td colspan="7"><div class="wt"><b>الأسبوع ${W.w}</b><span class="xs faint">${gShort(W.from)} – ${gShort(W.to)}</span>${!W.study && W.per ? `<span class="per">${esc(W.per.p)}</span>` : ''}${W.from <= TODAY && TODAY <= W.to ? '<span class="pill brand">هذا الأسبوع</span>' : ''}<span class="sp"></span><span class="xs faint">${wc ? nActs(wc) : ''}</span></div></td></tr>` + wr;
+    rows += `<tr class="wkh"><td colspan="3"><div class="wt"><b>الأسبوع ${W.w}</b><span class="xs faint">${gShort(W.from)} – ${gShort(W.to)}</span>${!W.study && W.per ? `<span class="per">${esc(W.per.p)}</span>` : ''}${W.from <= TODAY && TODAY <= W.to ? '<span class="pill brand">هذا الأسبوع</span>' : ''}<span class="sp"></span><span class="xs faint">${wc ? nActs(wc) : ''}</span></div></td></tr>` + wr;
   }
+  const out = outsideActs(id, n, sem);
+  if (out.length && !TB.q && !P.tbl.ax) rows += `<tr class="wkh"><td colspan="3"><div class="wt"><b>خارج أيام الجدول</b><span class="xs faint">أنشطة تاريخها ليس في أيام هذا الفصل</span></div></td></tr><tr class="d"><td class="dy"><b>—</b></td><td class="acts"><div class="acts-in">${out.map(a => evChip(a, id, { big: true, date: true })).join('')}</div></td><td class="cur"><span class="faint sm">انقلها إلى يوم من أيام الفصل، أو صحّح تاريخها.</span></td></tr>`;
   if (!shown) return `<div class="card empty">${svg('search')}<p>لا أيام تطابق البحث.</p><button class="btn" type="button" data-act="tblclear">امسح البحث</button></div>`;
-  return `<div class="stbl"><table><thead><tr><th>اليوم</th><th>التاريخ</th><th>المحور</th><th>المقرر</th><th>المقدار</th><th>المطلوب</th><th>الأنشطة</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="stbl"><table><thead><tr><th>اليوم</th><th>الأنشطة</th><th>المقرر</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
+const outsideActs = (id, n, sem) => actsOf(id, n).filter(a => !sem.days.some(d => d.d === a.d)).sort(sortA);
 function semCards(id, n, sem) {
-  const acts = actsOf(id, n), ed = canEdit(id);
+  const acts = actsOf(id, n), ed = canEdit(id), sugs = String(n) === String(curN(id)) ? kahootSugs(id) : [];
   let h = '', shown = 0;
-  for (const W of weeksOf(sem.days)) {
+  const paged = !TB.q.trim() && !P.tbl.hideEmpty && !P.tbl.ax, mw = paged ? mobWeek(id, sem) : null;
+  if (mw) { const W = mw.W[mw.i]; h += `<div class="wpager"><button class="btn icon" type="button" data-act="mweek" data-id="${id}" data-n="${sem.n}" data-v="${mw.i - 1}" ${mw.i ? '' : 'disabled'} aria-label="الأسبوع السابق">${svg('back')}</button><div class="col"><b>الأسبوع ${W.w}</b><span class="xs faint">${gShort(W.from)} – ${gShort(W.to)}</span></div>${W.from <= TODAY && TODAY <= W.to ? '<span class="pill brand">هذا الأسبوع</span>' : `<button class="btn sm ghost" type="button" data-act="mweek" data-id="${id}" data-n="${sem.n}" data-v="now">الحالي</button>`}<button class="btn icon" type="button" data-act="mweek" data-id="${id}" data-n="${sem.n}" data-v="${mw.i + 1}" ${mw.i < mw.W.length - 1 ? '' : 'disabled'} aria-label="الأسبوع التالي">${svg('fwd')}</button></div>`; }
+  for (const W of (mw ? [mw.W[mw.i]] : weeksOf(sem.days))) {
     let wr = '';
     for (const d of W.days) {
       const da = acts.filter(a => a.d === d.d).sort(sortA);
       if (!dayVisible(d, da)) continue; shown++;
-      wr += `<div class="mday ${d.d === TODAY ? 'today' : ''}" id="d-${d.d}" data-drop="1" data-date="${d.d}" data-track="${id}">
+      const sg = sugs.filter(s => s.d === d.d);
+      wr += `<div class="mday ${d.d === TODAY ? 'today' : ''} ${da.length ? 'has' : ''}" id="d-${d.d}" data-drop="1" data-date="${d.d}" data-track="${id}">
         <div class="top"><b>${gDay(d.d)}</b><span class="xs faint">${esc(d.h || hijri(d.d))}</span>${d.d === TODAY ? '<span class="today-tag">اليوم</span>' : ''}<span class="sp"></span>${ed ? `<button class="btn icon" type="button" style="padding:4px" data-act="dayedit" data-id="${id}" data-n="${n}" data-d="${d.d}" aria-label="تعديل اليوم">${svg('edit', 1.6)}</button>` : ''}</div>
-        ${d.ev ? `<div>${/اختبار/.test(d.ev) ? `<span class="exam">${svg('flag')}${esc(d.ev)}</span>` : `<span class="pill brand">${esc(d.ev)}</span>`}</div>` : ''}
-        ${d.c ? `<div class="cur">${d.ax ? `<span class="axp" style="--ac:${axCol(d.ax)}"><i></i>${esc(d.ax)}</span> ` : ''}<b style="font-weight:500;color:var(--ink1)">${esc(d.c)}</b>${d.q ? ' — ' + esc(d.q) : ''}${d.r ? `<div class="xs faint">${esc(d.r)}</div>` : ''}</div>` : d.p ? `<span class="per">${esc(d.p)}</span>` : ''}
-        ${da.map(a => evChip(a, id)).join('')}${ed ? `<button class="plus" style="opacity:1" type="button" data-act="newact" data-date="${d.d}" data-track="${id}">+ نشاط</button>` : ''}</div>`;
+        ${clashNote(id, d.d)}${da.map(a => evChip(a, id, { big: true })).join('')}${sg.map(s => sugCard(id, s, ed)).join('')}
+        ${d.ev ? `<div>${evBadge(d)}</div>` : ''}
+        ${d.c ? `<div class="cur">${d.ax ? `<span class="axp" style="--ac:${axCol(d.ax)}"><i></i>${esc(d.ax)}</span> ` : ''}<span>${esc(d.c)}${d.q ? ' — ' + esc(d.q) : ''}</span>${d.r ? `<div class="xs faint">${liveBadge(d)}${esc(d.r)}</div>` : ''}</div>` : d.p ? `<span class="per">${esc(d.p)}</span>` : ''}
+        ${ed ? `<button class="plus" type="button" data-act="newact" data-date="${d.d}" data-track="${id}">+ نشاط</button>` : ''}</div>`;
     }
-    if (wr) h += `<div class="mwk">الأسبوع ${W.w}<span class="xs faint">${gShort(W.from)} – ${gShort(W.to)}</span></div>` + wr;
+    if (wr) h += (mw ? '' : `<div class="mwk">الأسبوع ${W.w}<span class="xs faint">${gShort(W.from)} – ${gShort(W.to)}</span></div>`) + wr;
   }
+  const out = outsideActs(id, n, sem);
+  if (out.length && !TB.q && !P.tbl.ax && (!mw || mw.i === mw.W.length - 1)) h += `<div class="mwk">خارج أيام الجدول</div><div class="mday">${out.map(a => evChip(a, id, { big: true, date: true })).join('')}</div>`;
   return shown ? `<div class="mdays">${h}</div>` : `<div class="card empty"><p>لا أيام تطابق البحث.</p></div>`;
+}
+/* ---------- لوحة النشاط الثابتة (يسار الجدول) ---------- */
+function dockIdle(id) {
+  const t = T(id), ed = canEdit(id), up = actsOf(id).filter(a => a.d >= TODAY).sort(sortA);
+  const seen = {}, cls = up.filter(a => { const c = clashOf(id, a); if (!c || seen[a.d]) return false; seen[a.d] = 1; return true; });
+  const notes = cls.map(a => `<button class="dk-note warn" type="button" data-act="openact" data-id="${a.id}" data-track="${id}">${svg('alert')}<span><b>${gDay(a.d)}:</b> ${esc(clashOf(id, a))}</span></button>`).join('') +
+    kahootSugs(id).filter(s => s.left <= 30).map(s => `<div class="dk-note sug">${tile('كاهوت', 'sm')}<span>${esc(s.exam)} ${rel(s.ed)}. <b>اقتراح:</b> كاهوت مراجعة ${gDay(s.d)}.</span>${ed ? `<button class="btn sm" type="button" data-act="newact" data-track="${id}" data-date="${s.d}" data-type="كاهوت" data-title="${esc(s.title)}">أضفه</button>` : ''}</div>`).join('');
+  return `<div class="dk-h"><div class="col"><span class="xs faint">لوحة النشاط</span><b>أنشطة ${esc(t.name)}</b></div>${ed ? `<button class="btn pri sm" type="button" data-act="newact" data-track="${id}">${svg('plus')}نشاط</button>` : ''}</div>
+  <div class="dk-b">${notes ? `<div class="dk-sec"><h4>تنبيهات واقتراحات</h4>${notes}</div>` : ''}
+    <div class="dk-sec"><h4>القادمة</h4>${up.length ? `<div class="col" style="gap:6px">${up.slice(0, 10).map(a => evChip(a, id, { date: true })).join('')}</div>${up.length > 10 ? `<p class="xs faint" style="margin-top:6px">و${nActs(up.length - 10)} بعدها في الجدول</p>` : ''}` : `<p class="muted sm">لا أنشطة قادمة في الخطة.</p>`}</div>
+    <p class="hint">${svg('edit', 1.6)} اضغط أي نشاط في الجدول ليُفتح هنا، أو اسحبه إلى يوم آخر.</p></div>`;
 }
 
 /* ---------- المنظور الزمني ---------- */
@@ -1505,7 +1795,7 @@ VIEWS.timeline = {
       ${canEdit(ids[0]) || isAdmin() ? `<span class="hint">اسحب النشاط لتغيير يومه</span>` : ''}</div>`;
     const sel = isAdmin() ? `<div class="tracksel"><button class="chip" type="button" aria-pressed="${!(P.tl.tracks || []).length}" data-act="tltrack" data-v="">كل المسارات</button>${D.tracks.map(t => `<button class="chip" type="button" aria-pressed="${(P.tl.tracks || []).includes(t.id)}" data-act="tltrack" data-v="${t.id}"><i style="background:${t.color}"></i>${esc(t.name)}</button>`).join('')}</div>` : '';
     let body;
-    if (rg === 'week') body = ids.length === 1 && !isMob() ? weekBoard(sp.from, ids) : ids.length === 1 ? weekBoard(sp.from, ids) : (isMob() ? weekBoard(sp.from, ids) : weekLanes(sp.from, ids));
+    if (rg === 'week') body = isMob() ? agenda(sp.from, ids) : ids.length === 1 ? weekBoard(sp.from, ids) : weekLanes(sp.from, ids);
     else if (rg === 'month') body = monthGrid(sp.from, ids);
     else body = lanes(sp.from, sp.to, ids);
     return pageHead('', 'المنظور الزمني', '') + bar + sel + body;
@@ -1534,7 +1824,7 @@ function monthGrid(m, ids) {
     h += `<div class="md ${out ? 'out' : ''} ${d === TODAY ? 'today' : ''} ${one && !one.c ? 'off' : ''}" data-drop="1" data-date="${d}" ${ids.length === 1 ? `data-track="${ids[0]}"` : ''}>
       <div class="dn"><b>${dnum(d)}</b><span class="hj">${esc(hShort(d))}</span></div>
       ${one && (one.ev || (one.p && !one.c)) ? `<div class="tag ellip">${esc(one.ev || one.p)}</div>` : ''}
-      <div class="acts col" style="gap:3px">${da.slice(0, max).map(([a, id]) => `<div class="mini ${a.done ? 'done' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${id}" ${canEdit(id) ? 'data-drag="1"' : ''} style="--tcol:${tcol(id)}" data-tip="${esc(T(id).name + ': ' + a.title + (a.time ? ' · ' + timeText(a.time) : ''))}"><i></i><span>${esc(a.title)}</span></div>`).join('')}
+      <div class="acts col" style="gap:3px">${da.slice(0, max).map(([a, id]) => `<div class="mini ${a.done ? 'done' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${id}" ${canAdjust(id) ? 'data-drag="1"' : ''} style="--tcol:${tcol(id)}" data-tip="${esc(T(id).name + ': ' + a.title + (a.time ? ' · ' + timeText(a.time) : ''))}"><i></i><span>${esc(a.title)}</span></div>`).join('')}
       ${da.length > max ? `<button class="more" type="button" data-act="dayview" data-date="${d}">+${da.length - max} أخرى</button>` : ''}</div></div>`;
   }
   return `<div class="mgrid">${h}</div>`;
@@ -1549,7 +1839,7 @@ function lanes(from, to, ids) {
   let rows = '';
   for (const id of ids) {
     const t = T(id), acts = actsOf(id).filter(a => a.d >= from && a.d <= to).sort(sortA), slot = {};
-    const pins = acts.map(a => { const i = diffD(a.d, s), k = slot[i] = (slot[i] || 0) + 1; return `<div class="pin ${a.done ? 'done' : ''} ${remindable(a) ? 'meet' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${id}" ${canEdit(id) ? 'data-drag="1"' : ''} style="--tcol:${t.color};inset-inline-start:${i * dw + 1}px;top:${6 + (k - 1) * 25}px;width:${Math.max(dw - 2, 8)}px" data-tip="${esc(gDay(a.d) + ' — ' + a.type + ': ' + a.title + (a.who && a.who.length ? ' (' + a.who.join('، ') + ')' : ''))}">${dw >= 70 ? esc(a.title) : ''}</div>`; }).join('');
+    const pins = acts.map(a => { const i = diffD(a.d, s), k = slot[i] = (slot[i] || 0) + 1; return `<div class="pin ${a.done ? 'done' : ''} ${remindable(a) ? 'meet' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${id}" ${canAdjust(id) ? 'data-drag="1"' : ''} style="--tcol:${t.color};inset-inline-start:${i * dw + 1}px;top:${6 + (k - 1) * 25}px;width:${Math.max(dw - 2, 8)}px" data-tip="${esc(gDay(a.d) + ' — ' + a.type + ': ' + a.title + (a.who && a.who.length ? ' (' + a.who.join('، ') + ')' : ''))}">${dw >= 70 ? esc(a.title) : ''}</div>`; }).join('');
     const rowsN = Math.max(1, ...Object.values(slot));
     const ds = daysOf(id);
     const dayCls = d => { const x = ds.find(y => y.d === d); return (wd(d) === 0 ? ' ws' : '') + (d === TODAY ? ' today' : '') + (x && !x.c ? ' off' : '') + (!x ? ' out' : ''); };
@@ -1565,58 +1855,105 @@ function lanes(from, to, ids) {
    لوحة الأوامر، الأحداث، والتشغيل
    ============================================================ */
 
-/* ---------- نافذة النشاط ---------- */
+/* ---------- نافذة النشاط (لوحة جانبية، أو لوحة ثابتة يسار الجدول في الشاشات العريضة) ---------- */
 let F = null;   // نموذج النشاط المفتوح
 function openAct(tid, id, preset = {}) {
   const a = id ? planOf(tid).acts.find(x => x.id === id) : null;
   if (id && !a) return toast('النشاط غير موجود (ربما حُذف)', 'err');
   const ids = isAdmin() ? D.tracks.map(t => t.id) : [myTrack()];
   tid = tid || preset.track || (ids.length === 1 ? ids[0] : '');
+  if (!a && tid && !canEdit(tid)) return toast('إضافة الأنشطة مغلقة لفريقكم. اطلبوا فتحها من الإدارة.', 'err');
   F = a ? Object.assign({ tid, isNew: false }, JSON.parse(JSON.stringify(a)), { calOn: !!(a.cal && a.cal.id) })
-    : { tid, isNew: true, title: '', type: preset.type || 'لقاء', d: preset.date || (tid ? defDate(tid) : TODAY), time: '', dur: 0, who: [], idea: '', rem: null, calOn: false, done: false, note: '', link: '' };
-  F.newNames = [];
+    : { tid, isNew: true, title: preset.title || '', type: preset.type || 'لقاء', d: preset.date || (tid ? defDate(tid) : TODAY), time: '', dur: 0, who: [], idea: '', rem: null, calOn: false, done: false, note: '', link: '' };
+  F.newNames = []; F.lockTrack = !!tid;
+  F.dock = dockOn(F.tid) && !!$('#dock');
   drawAct();
+  if (F.dock) { const b = $('#dock .dk-b'); if (b) b.scrollTop = 0; }
 }
 function defDate(tid) { const r = semRange(tid, curN(tid)); return r && TODAY < r.from ? r.from : TODAY; }
-function drawAct(keepFocus) {
-  const tid = F.tid, t = tid ? T(tid) : null, ro = tid && !canEdit(tid) && !F.isNew;
+// صلاحية النموذج: full تعديل كامل، adj تعديل نشاط قائم بلا حذف (يصل الإدارةَ تنبيه)، ro متابعة فقط
+function fMode() {
+  const tid = F.tid;
+  if (!tid || canEdit(tid)) return 'full';
+  if (!F.isNew && canAdjust(tid)) return 'adj';
+  return 'ro';
+}
+function actParts() {
+  const tid = F.tid, t = tid ? T(tid) : null, mode = fMode(), ro = mode === 'ro';
   const day = tid ? (dayOf(tid, semFor(tid, F.d) || curN(tid), F.d)) : null;
-  const tracksSel = F.isNew && isAdmin() ? `<div class="field"><label>المسار</label><div class="row" style="gap:6px;flex-wrap:wrap">${D.tracks.map(x => `<button class="chip" type="button" aria-pressed="${tid === x.id}" data-act="f-track" data-v="${x.id}"><i style="background:${x.color}"></i>${esc(x.name)}</button>`).join('')}</div></div>` : '';
-  const head = `<div class="row" style="gap:10px">${t ? logoImg(tid) : ''}<div class="col" style="min-width:0"><span class="xs faint">${t ? esc(t.full || t.name) : 'نشاط جديد'}</span><b style="font-family:var(--fd);font-weight:500;font-size:19px;color:var(--ink)">${F.isNew ? 'نشاط جديد' : ro ? esc(F.title) : 'تعديل النشاط'}</b></div></div>`;
-  const ctx = day ? `<div class="ctx"><span>${gLong(F.d)} · ${esc(day.h || hijri(F.d))} · الأسبوع ${day.w}</span>${day.c ? `<span>مقرر اليوم: <b>${esc(day.c)}</b>${day.q ? ' — ' + esc(day.q) : ''}</span>` : ''}${day.ev ? `<span><b>${esc(day.ev)}</b></span>` : ''}${day.p && !day.c ? `<span>${esc(day.p)}</span>` : ''}</div>` : F.d ? `<div class="ctx"><span>${gLong(F.d)} · ${esc(hijri(F.d))}</span><span class="faint">خارج أيام الفصل في الجدول</span></div>` : '';
+  const tracksSel = F.isNew && isAdmin() && !F.dock && !F.lockTrack ? `<div class="field"><label>المسار</label><div class="row" style="gap:6px;flex-wrap:wrap">${D.tracks.map(x => `<button class="chip" type="button" aria-pressed="${tid === x.id}" data-act="f-track" data-v="${x.id}"><i style="background:${x.color}"></i>${esc(x.name)}</button>`).join('')}</div></div>` : '';
+  const head = `<div class="row" style="gap:10px">${t && !F.dock ? logoImg(tid) : ''}<div class="col" style="min-width:0"><span class="xs faint">${t ? esc(t.full || t.name) : 'نشاط جديد'}</span><b style="font-family:var(--fd);font-weight:500;font-size:19px;color:var(--ink)">${F.isNew ? 'نشاط جديد' : ro ? esc(F.title) : 'تعديل النشاط'}</b></div></div>`;
+  const ctx = day ? `<div class="ctx"><span>${gLong(F.d)} · ${esc(day.h || hijri(F.d))} · الأسبوع ${day.w}</span>${day.c ? `<span>مقرر اليوم: <b>${esc(day.c)}</b>${day.q ? ' — ' + esc(day.q) : ''}</span>` : ''}${isLive(day) ? `<span class="live">${svg('live')}${esc(day.r || 'بث مباشر')}</span>` : ''}${day.ev ? `<span><b>${esc(day.ev)}</b></span>` : ''}${day.p && !day.c ? `<span>${esc(day.p)}</span>` : ''}</div>` : F.d ? `<div class="ctx"><span>${gLong(F.d)} · ${esc(hijri(F.d))}</span><span class="faint">خارج أيام الفصل في الجدول</span></div>` : '';
+  // تنبيه اجتماع لقاءين في يوم واحد (بث مباشر أو لقاء آخر)
+  let clash = '';
+  if (tid && MEET_T.includes(F.type) && F.d) {
+    const others = dayMeets(tid, F.d, F.id);
+    if (others.length) {
+      const alt = ro ? [] : freeDays(tid, F.d, F.id);
+      clash = `<div class="callout warn" role="status">${svg('alert')}<div><b>${esc(clashText(others.concat(qt(F.title.trim() || 'هذا النشاط'))))}</b><span>${others[0] === 'البث المباشر' ? 'في هذا اليوم بث مباشر للبرنامج، فيجتمع على الطلاب لقاءان.' : 'في هذا اليوم لقاء آخر في الخطة.'}${alt.length ? ' أيام قريبة بلا لقاء:' : ''}</span>${alt.length ? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${alt.map(x => `<button class="chip" type="button" data-act="f-day" data-v="${x}">${gDay(x)}</button>`).join('')}</div>` : ''}</div></div>`;
+    }
+  }
   const willRem = F.rem === true || (F.rem !== false && (D.remindTypes || []).includes(F.type));
   const remSub = !willRem ? 'لا تذكير لهذا النشاط' : !t || !t.linked ? 'سيُذكَّر به حين تُربط مجموعة المسار بالبوت' : diffD(F.d, TODAY) < 0 ? 'مضى موعده' : `تصميم الإعلان ${gDay(add(F.d, -3) < TODAY ? TODAY : add(F.d, -3))}، ونشره ${gDay(add(F.d, -1) < TODAY ? TODAY : add(F.d, -1))}`;
   const follow = !F.isNew ? `<div class="sep" style="margin:4px 0"></div><b style="font-family:var(--fd);font-weight:500;font-size:17px;color:var(--ink)">المتابعة</b>
     <div class="opt" style="border-top:0;padding-top:0"><button class="ck round ok" type="button" role="checkbox" aria-checked="${!!F.done}" data-act="f-done" aria-label="تم التنفيذ">${svg('check', 2.4)}</button><div class="tx"><b>تم التنفيذ</b><span>يُعلَّم بعد إقامة النشاط</span></div></div>
     <div class="field"><label for="f-note">ملاحظة بعد التنفيذ</label><textarea class="inp" id="f-note" rows="2" placeholder="كم حضر؟ ما الذي نجح وما الذي يُحسَّن؟">${esc(F.note || '')}</textarea></div>
-    <div class="field"><label for="f-link">رابط (الإعلان، التصميم، ورقة الفعالية)</label><input class="inp ltr" style="text-align:left;display:block" id="f-link" type="url" inputmode="url" value="${esc(F.link || '')}" placeholder="https://"></div>` : '';
+    <div class="field"><label for="f-link">رابط (الإعلان، التصميم، ورقة الفعالية)</label><div class="row" style="gap:6px"><input class="inp ltr" style="text-align:left;display:block;flex:1" id="f-link" type="url" inputmode="url" value="${esc(F.link || '')}" placeholder="https://">${/^https?:\/\//i.test(F.link || '') ? `<a class="btn icon" href="${esc(F.link)}" target="_blank" rel="noopener" aria-label="افتح الرابط" data-tip="افتح الرابط">${svg('ext')}</a>` : ''}</div></div>` : '';
   let body;
   if (ro) {
-    body = `${ctx}<div class="row" style="gap:8px">${tile(F.type)}<b>${esc(F.type)}</b>${F.time ? `<span class="pill">${svg('clock')}${timeText(F.time)}</span>` : ''}</div>
+    body = `${ctx}${clash}<div class="row" style="gap:8px">${tile(F.type)}<b>${esc(F.type)}</b>${F.time ? `<span class="pill">${svg('clock')}${timeText(F.time)}</span>` : ''}</div>
       ${F.who && F.who.length ? `<div class="field"><span class="flabel">المسؤول</span><div class="whos">${F.who.map(w => `<span class="chip">${esc(w)}</span>`).join('')}</div></div>` : ''}
       ${F.idea ? `<div class="field"><span class="flabel">الفكرة</span><div class="ro-v">${esc(F.idea)}</div></div>` : ''}
       <div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('bell')}</span><div class="tx"><b>تذكير البوت</b><span>${esc(remSub)}</span></div></div>
-      <p class="hint">${svg('lock')} الخطة للعرض. تستطيعون تسجيل المتابعة.</p>${follow}`;
+      <p class="hint">${svg('lock')} تستطيعون تسجيل المتابعة.</p>${follow}`;
   } else {
-    body = `${tracksSel}
+    body = `${tracksSel}${mode === 'adj' ? `<p class="hint">${svg('bell')} إضافة الأنشطة وحذفها مغلقان، وتستطيعون تعديل هذا النشاط. يصل الإدارةَ تنبيه بكل تغيير.</p>` : ''}
     <input class="inp big" id="f-title" value="${esc(F.title)}" placeholder="اسم النشاط" aria-label="اسم النشاط" ${F.isNew ? 'autofocus' : ''}>
     <div class="types" role="group" aria-label="نوع النشاط">${TYPE_NAMES.map(k => `<button type="button" aria-pressed="${F.type === k}" data-act="f-type" data-v="${esc(k)}" style="--tc:${typeOf(k)[1]}">${svg(typeOf(k)[0])}${esc(k)}</button>`).join('')}</div>
     <div class="grid2" style="gap:10px"><div class="field"><label for="f-d">اليوم</label><input class="inp" id="f-d" type="date" value="${F.d}"></div>
-      <div class="row" style="gap:8px;align-items:flex-end"><div class="field" style="flex:1"><label for="f-time">الوقت</label><select class="inp" id="f-time">${TIMES.map(x => `<option value="${x}" ${x === (F.time || '') ? 'selected' : ''}>${x ? timeText(x) : 'بلا وقت'}</option>`).join('')}</select></div>
+      <div class="row" style="gap:8px;align-items:flex-end"><div class="field" style="flex:1"><label for="f-time">الوقت</label><select class="inp" id="f-time">${(TIMES.includes(F.time || '') ? TIMES : TIMES.concat(F.time).sort()).map(x => `<option value="${x}" ${x === (F.time || '') ? 'selected' : ''}>${x ? timeText(x) : 'بلا وقت'}</option>`).join('')}</select></div>
       <div class="field" style="width:96px"><label for="f-dur">المدة</label><select class="inp" id="f-dur">${[[0, 'تلقائي'], [30, '٣٠ د'], [45, '٤٥ د'], [60, 'ساعة'], [90, 'ساعة ونصف'], [120, 'ساعتان']].map(([v, l]) => `<option value="${v}" ${+F.dur === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div></div>
-    ${ctx}
+    ${ctx}${clash}
     <div class="field"><span class="flabel">المسؤول من الفريق</span><div class="whos">${[...new Set(members(tid).concat(F.who || []))].map(w => `<button class="chip" type="button" aria-pressed="${(F.who || []).includes(w)}" data-act="f-who" data-v="${esc(w)}">${esc(w)}</button>`).join('')}<input id="f-whonew" placeholder="+ اسم جديد" aria-label="إضافة اسم"></div></div>
     <div class="field"><label for="f-idea">الفكرة</label><textarea class="inp" id="f-idea" rows="3" placeholder="الفكرة في سطرين: ماذا سيحدث؟ ولمن؟">${esc(F.idea || '')}</textarea></div>
     <div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('bell')}</span><div class="tx"><b>تذكير البوت في مجموعة الفريق</b><span>${esc(remSub)}</span></div><button class="sw" type="button" role="switch" aria-checked="${willRem}" data-act="f-rem" aria-label="تذكير البوت"></button></div>
     ${isAdmin() ? `<div class="opt"><span class="tile sm" style="--tc:var(--plum)">${svg('gcal')}</span><div class="tx"><b>في تقويم جوجل</b><span>${F.calOn ? (F.cal && F.cal.id ? (F.cal.err ? 'تعذّر آخر تحديث: ' + esc(F.cal.err) : 'في التقويم، ويتحدّث مع كل تعديل') : 'سيُرسل عند الحفظ') : 'لا يظهر في التقويم'}</span></div><button class="sw" type="button" role="switch" aria-checked="${!!F.calOn}" data-act="f-cal" aria-label="في تقويم جوجل"></button></div>` : ''}
     ${follow}`;
   }
-  const foot = ro ? `<button class="btn pri" type="button" data-act="f-save">حفظ المتابعة</button><button class="btn" type="button" data-act="close">إغلاق</button>`
-    : `<button class="btn pri" type="button" data-act="f-save" ${!tid ? 'disabled' : ''}>${F.isNew ? 'أضف النشاط' : 'احفظ'}</button><button class="btn" type="button" data-act="close">إلغاء</button><span class="sp"></span>${!F.isNew ? `<button class="btn danger" type="button" data-act="f-del">${F.confirmDel ? 'تأكيد الحذف' : 'حذف'}</button>` : ''}`;
-  const st = $('#layer .sh-b') ? $('#layer .sh-b').scrollTop : 0;
-  openSheet(head, body, foot, { label: 'نشاط', noFocus: keepFocus });
-  if (st) $('#layer .sh-b').scrollTop = st;
+  const cancel = F.dock ? 'f-cancel' : 'close';
+  const foot = ro ? `<button class="btn pri" type="button" data-act="f-save">حفظ المتابعة</button><button class="btn" type="button" data-act="${cancel}">إغلاق</button>`
+    : `<button class="btn pri" type="button" data-act="f-save" ${!tid ? 'disabled' : ''}>${F.isNew ? 'أضف النشاط' : 'احفظ'}</button><button class="btn" type="button" data-act="${cancel}">إلغاء</button><span class="sp"></span>${!F.isNew && mode === 'full' ? `<button class="btn danger" type="button" data-act="f-del">${F.confirmDel ? 'تأكيد الحذف' : 'حذف'}</button>` : ''}`;
+  return { head, body, foot };
 }
+function drawAct(keepFocus) {
+  if (F.dock && !$('#dock')) F.dock = false;
+  const { head, body, foot } = actParts();
+  if (F.dock) {
+    const el = $('#dock'), st = $('#dock .dk-b') ? $('#dock .dk-b').scrollTop : 0, fk = focusKey('#dock');
+    el.innerHTML = `<div class="dk-h form">${head}<button class="btn icon" type="button" data-act="f-cancel" aria-label="إغلاق">${svg('x')}</button></div><div class="dk-b">${body}</div><div class="dk-f">${foot}</div>`;
+    el.classList.add('editing');
+    if (st) $('#dock .dk-b').scrollTop = st;
+    markSel(); refocus('#dock', fk);
+    if (!keepFocus) { const f = $('#dock [autofocus]'); if (f) f.focus({ preventScroll: true }); }
+    return;
+  }
+  const st = $('#layer .sh-b') ? $('#layer .sh-b').scrollTop : 0, keepPrev = LAYER && $('#layer .sheet') ? LAYER.prevFocus : null, fk = focusKey('#layer');
+  openSheet(head, body, foot, { label: 'نشاط', noFocus: keepFocus });
+  if (keepPrev) LAYER.prevFocus = keepPrev;
+  if (st) $('#layer .sh-b').scrollTop = st;
+  refocus('#layer', fk);
+}
+// إبراز النشاط المفتوح في الجدول ويومه
+function markSel() {
+  $$('.ev.sel').forEach(e => e.classList.remove('sel')); $$('tr.selrow,.mday.selrow').forEach(e => e.classList.remove('selrow'));
+  if (!F || !F.dock) return;
+  if (F.id) $$(`.ev[data-id="${F.id}"]`).forEach(e => e.classList.add('sel'));
+  const r = document.getElementById('d-' + F.d); if (r) r.classList.add('selrow');
+}
+// إبقاء التركيز على الزر نفسه بعد إعادة رسم النموذج
+function focusKey(sc) { const ae = document.activeElement; if (!ae || !ae.closest || !ae.closest(sc) || !ae.dataset || !ae.dataset.act) return ''; return `[data-act="${ae.dataset.act}"]` + (ae.dataset.v ? `[data-v="${CSS.escape(ae.dataset.v)}"]` : ''); }
+function refocus(sc, k) { if (!k) return; const n = $(sc + ' ' + k); if (n) n.focus({ preventScroll: true }); }
+function closeAct() { if (F && F.dock) { F = null; render(); } else closeLayer(); }
 function readF() {
   if (!F) return;
   const g = id => $('#' + id);
@@ -1626,27 +1963,30 @@ function readF() {
   if (g('f-time')) F.time = g('f-time').value;
   if (g('f-dur')) F.dur = +g('f-dur').value;
   if (g('f-note')) F.note = g('f-note').value;
-  if (g('f-link')) F.link = g('f-link').value;
+  if (g('f-link')) F.link = g('f-link').value.trim();
+  const nw = g('f-whonew'); if (nw && nw.value.trim()) { F.who = [...new Set((F.who || []).concat(nw.value.trim()))]; nw.value = ''; }
 }
 async function saveF() {
   readF();
   const f = F, tid = f.tid;
   if (!tid) return toast('اختر المسار', 'err');
-  const ro = !canEdit(tid);
+  const mode = fMode();
   let patch;
-  if (ro) patch = { id: f.id, done: !!f.done, note: f.note || '', link: f.link || '' };
+  if (mode === 'ro') patch = { id: f.id, done: !!f.done, note: f.note || '', link: f.link || '' };
   else {
     if (!f.title.trim()) { toast('اكتب اسم النشاط', 'err'); $('#f-title') && $('#f-title').focus(); return; }
+    if (f.link && !/^https?:\/\//i.test(f.link)) { toast('الرابط يبدأ بـ https://', 'err'); $('#f-link') && $('#f-link').focus(); return; }
     patch = { title: f.title.trim(), type: f.type, d: f.d, time: f.time || '', dur: f.dur || 0, who: f.who || [], idea: f.idea || '', rem: f.rem };
     if (!f.isNew) Object.assign(patch, { id: f.id, done: !!f.done, note: f.note || '', link: f.link || '' });
     if (isAdmin()) { const was = !!(f.cal && f.cal.id); if (f.calOn !== was) patch.calOn = !!f.calOn; }
     const s = semFor(tid, f.d); if (s) patch.sem = s;
   }
   const newNames = (f.who || []).filter(w => !members(tid).includes(w));
-  closeLayer();
+  const cl = mode !== 'ro' && MEET_T.includes(f.type) ? dayMeets(tid, f.d, f.id) : [];
+  if (f.dock) F = null; else closeLayer();
   try {
     await saveAct(tid, patch);
-    toast(f.isNew ? `أُضيف «${patch.title}»` : 'حُفظ');
+    toast((f.isNew ? `أُضيف ${qt(patch.title)}` : 'حُفظ') + (cl.length ? ` — تنبيه: ${clashText(cl.concat(qt(patch.title)))}` : '') + (!isAdmin() && !f.isNew && mode !== 'ro' ? '. وصل الإدارةَ تنبيه بالتغيير' : ''));
     if (newNames.length && canEdit(tid)) trackSave(tid, { members: members(tid).concat(newNames) }).catch(() => {});
   } catch (e) {}
 }
@@ -1744,9 +2084,9 @@ VIEWS.calendar = {
     let acts = ids.flatMap(id => actsOf(id, curN(id)).map(a => Object.assign(a, { t: id }))).filter(a => a.d <= until && (c.range !== 'upcoming' || a.d >= TODAY));
     if (c.meet) acts = acts.filter(remindable);
     const stOf = a => !a.cal || !a.cal.id ? 'none' : a.cal.err ? 'err' : 'on';
+    const cnt = { on: 0, none: 0, err: 0 }; acts.forEach(a => cnt[stOf(a)]++);
     if (c.status !== 'all') acts = acts.filter(a => stOf(a) === c.status);
     acts.sort(sortA);
-    const cnt = { on: 0, none: 0, err: 0 }; ids.flatMap(id => actsOf(id, curN(id))).forEach(a => cnt[stOf(a)]++);
     const groups = new Map(); acts.forEach(a => { const w = wkStart(a.d); if (!groups.has(w)) groups.set(w, []); groups.get(w).push(a); });
     const stBadge = a => { const s = stOf(a); return s === 'on' ? `<span class="pill ok" data-tip="أُرسل ${ago(a.cal.at)}">${svg('check')}في التقويم</span>` : s === 'err' ? `<span class="pill warn" data-tip="${esc(a.cal.err)}">${svg('alert')}تعذّر التحديث</span>` : `<span class="pill dash">غير مُرسل</span>`; };
     const key = a => a.t + '|' + a.id;
@@ -1766,7 +2106,7 @@ VIEWS.calendar = {
       <button class="chip" type="button" aria-pressed="${!!c.meet}" data-act="cal-meet">اللقاءات فقط</button><span class="sp"></span>
       <button class="btn sm" type="button" data-act="cal-selall">${acts.length && acts.every(a => CS.sel.has(key(a))) ? 'ألغِ التحديد' : 'حدّد الكل (' + acts.length + ')'}</button></div>
     ${list || `<div class="card empty">${svg('gcal')}<h3>لا أنشطة بهذه التصفية</h3><p>غيّر المسار أو الحالة أو المدى.</p></div>`}
-    ${CS.sel.size ? `<div class="bulk" role="region" aria-label="إجراءات المحدد"><b class="sm">${nActs(CS.sel.size)} محددة</b><button class="btn pri sm" type="button" data-act="cal-push" ${CS.busy ? 'disabled' : ''}>${CS.busy ? '<span class="spin"></span>' : svg('gcal')}أرسل إلى التقويم</button><button class="btn sm" type="button" data-act="cal-pull" ${CS.busy ? 'disabled' : ''}>أزل من التقويم</button><button class="btn sm ghost" type="button" data-act="cal-clear">إلغاء</button></div>` : ''}`;
+    ${CS.sel.size ? `<div class="bulk" role="region" aria-label="إجراءات المحدد"><b class="sm">حُدّد ${nActs(CS.sel.size)}</b><button class="btn pri sm" type="button" data-act="cal-push" ${CS.busy ? 'disabled' : ''}>${CS.busy ? '<span class="spin"></span>' : svg('gcal')}أرسل إلى التقويم</button><button class="btn sm" type="button" data-act="cal-pull" ${CS.busy ? 'disabled' : ''}>أزل من التقويم</button><button class="btn sm ghost" type="button" data-act="cal-clear">إلغاء</button></div>` : ''}`;
   }
 };
 async function calPush(on) {
@@ -1815,7 +2155,7 @@ VIEWS.bot = {
         </ol></div>
         <div class="card"><div class="card-h"><h3>هكذا تصل التذكيرات</h3></div><div class="tgwall">${tgPreview(s, 'd3')}${tgPreview(s, 'd1')}</div></div></div>`;
     const bot = BS.bot || {}, lt = BS.lastTick;
-    const trRows = BS.tracks.map(t => { const tt = T(t.id); return `<div class="li">${logoImg(t.id)}<div class="tx"><div class="tt">${esc(tt.full || tt.name)}</div><div class="mt">${t.chat ? `مربوط بـ «${esc(t.chat.title)}»${t.remind ? '' : ' · التذكيرات موقفة'}` : 'لم تُربط مجموعة بعد'}</div></div>
+    const trRows = BS.tracks.map(t => { const tt = T(t.id); return `<div class="li botrow">${logoImg(t.id)}<div class="tx"><div class="tt">${esc(tt.full || tt.name)}</div><div class="mt">${t.chat ? `مربوط بـ «${esc(t.chat.title)}»${t.remind ? '' : ' · التذكيرات موقفة'}` : 'لم تُربط مجموعة بعد'}</div></div>
       ${t.chat ? `<button class="sw" type="button" role="switch" aria-checked="${t.remind}" data-act="bot-remind" data-id="${t.id}" aria-label="تذكيرات ${esc(tt.name)}" data-tip="${t.remind ? 'أوقف التذكيرات' : 'شغّل التذكيرات'}"></button><button class="btn sm ghost" type="button" data-act="bot-test" data-id="${t.id}">تجربة</button><button class="btn icon" type="button" data-act="bot-unlink" data-chat="${esc(t.chat.id)}" aria-label="إلغاء الربط" data-tip="إلغاء الربط">${svg('x')}</button>`
         : `<a class="btn sm pri" href="${esc(t.link)}" target="_blank" rel="noopener" data-act="tgwatch">${svg('send')}أضف البوت إلى مجموعة ${esc(tt.name)}</a>`}</div>`; }).join('');
     const unassigned = (BS.chats || []).filter(c => !c.to && !c.left && c.type !== 'private');
@@ -1873,7 +2213,7 @@ function watchLink() {   // بعد فتح رابط الربط: نتحقق كل �
     try {
       const r = await API.me('tg_check');
       if (isAdmin()) { const before = (BS && BS.tracks || []).filter(t => t.chat).length + (BS && BS.adminChat ? 1 : 0); BS = r; const after = r.tracks.filter(t => t.chat).length + (r.adminChat ? 1 : 0); if (after > before) { clearInterval(WATCH); WATCH = null; toast('تم الربط ✓'); boot(true); } else if (route().name === 'bot') render(); }
-      else if (r.linked) { clearInterval(WATCH); WATCH = null; toast(`تم ربط مجموعتكم «${r.title}» ✓`); boot(true); }
+      else if (r.linked) { clearInterval(WATCH); WATCH = null; toast(`تم ربط مجموعتكم ${qt(r.title)} ✓`); boot(true); }
     } catch (e) {}
   }, 4000);
 }
@@ -1896,8 +2236,8 @@ function accEdit(uid) {
   openDialog(`<h3>${uid ? 'تعديل الحساب' : 'حساب جديد'}</h3>
     <div class="field"><label for="ac-n">الاسم</label><input class="inp" id="ac-n" value="${esc(a.name)}" placeholder="مثل: فريق جذور، أو اسم العضو"></div>
     <div class="field"><label for="ac-u">اسم المستخدم (للدخول)</label><input class="inp ltr" style="display:block;text-align:left" id="ac-u" value="${esc(a.user)}" autocomplete="off" placeholder="judhoor2"></div>
-    <div class="field"><label for="ac-r">النوع</label><select class="inp" id="ac-r"><option value="team" ${a.role !== 'admin' ? 'selected' : ''}>فريق مسار</option><option value="admin" ${a.role === 'admin' ? 'selected' : ''}>الإدارة</option></select></div>
-    <div class="field"><label for="ac-t">المسار</label><select class="inp" id="ac-t">${D.tracks.map(t => `<option value="${t.id}" ${a.track === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></div>
+    <div class="field"><label for="ac-r">النوع</label><select class="inp" id="ac-r" data-act="ac-role"><option value="team" ${a.role !== 'admin' ? 'selected' : ''}>فريق مسار</option><option value="admin" ${a.role === 'admin' ? 'selected' : ''}>الإدارة</option></select></div>
+    <div class="field" id="ac-tf" ${a.role === 'admin' ? 'hidden' : ''}><label for="ac-t">المسار</label><select class="inp" id="ac-t">${D.tracks.map(t => `<option value="${t.id}" ${a.track === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></div>
     ${uid && uid !== D.me.uid ? `<div class="opt"><div class="tx"><b>موقوف</b><span>لا يستطيع الدخول</span></div><button class="sw" type="button" role="switch" aria-checked="${!!a.disabled}" data-act="ac-dis"></button></div>` : ''}
     <div class="row"><button class="btn pri" type="button" data-act="ac-save" data-id="${uid || ''}">احفظ</button><button class="btn" type="button" data-act="close">إلغاء</button><span class="sp"></span>${uid && uid !== D.me.uid ? `<button class="btn danger" type="button" data-act="ac-del" data-id="${uid}">حذف</button>` : ''}</div>`);
 }
@@ -1905,6 +2245,40 @@ function showPass(name, user, pw) {
   openDialog(`<h3>كلمة المرور الجديدة</h3><p class="muted sm">أرسلها إلى ${esc(name)}. لن تظهر مرة أخرى، ويستطيع تغييرها بعد الدخول.</p>
     <div class="card flat" style="padding:14px"><div class="xs faint">اسم المستخدم</div><div class="ltr" style="font-size:18px">${esc(user)}</div><div class="xs faint" style="margin-top:8px">كلمة المرور</div><div class="ltr" style="font-size:22px;letter-spacing:.04em">${esc(pw)}</div></div>
     <div class="row"><button class="btn pri" type="button" data-act="copy" data-v="${esc(`منصة الأنشطة التربوية\n${location.origin + location.pathname}\nاسم المستخدم: ${user}\nكلمة المرور: ${pw}`)}">${svg('copy')}انسخ بيانات الدخول</button><button class="btn" type="button" data-act="close">تم</button></div>`);
+}
+
+/* ---------- تغييرات الفرق (تنبيهات الإدارة) ---------- */
+const AL_KIND = { add: 'أضاف', del: 'حذف', move: 'غيّر موعد', who: 'غيّر المسؤول عن', edit: 'عدّل' };
+let AL_NEW = new Set();
+VIEWS.alerts = {
+  admin: true,
+  render() {
+    const L = D.alerts || [];
+    const side = `<a class="btn sm ghost" href="#bot">${svg('bot')}${D.settings && D.settings.adminChat && D.settings.adminChat.id ? 'تصلك في تليجرام أيضًا' : 'اربط تليجرام الإدارة'}</a>`;
+    const head = pageHead('', 'تغييرات الفرق', 'كل ما تغيّره الفرق في خططها: المواعيد، والمسؤولون، والإضافة والحذف. ويصلك تغيير المواعيد والمسؤولين في تليجرام أيضًا.', side);
+    if (!L.length) return head + `<div class="card empty">${svg('bell')}<h3>لا تغييرات بعد</h3><p>حين يغيّر فريقٌ موعد نشاط أو المسؤول عنه يظهر هنا.</p></div>`;
+    let day = '', h = '';
+    for (const x of L) {
+      const d = dateOf(x.at);
+      if (d !== day) { day = d; h += `<div class="al-day">${d === TODAY ? 'اليوم' : d === add(TODAY, -1) ? 'أمس' : gDay(d)}</div>`; }
+      const t = T(x.t), act = x.aid && t && planOf(x.t).acts.find(a => a.id === x.aid);
+      const ch = (x.changes || []).filter(c => c[1] || c[2]).map(c => `<div class="al-ch"><span class="k">${esc(c[0])}</span><s>${esc(c[1] || '—')}</s>${svg('fwd')}<b>${esc(c[2] || '—')}</b></div>`).join('')
+        + (x.kind === 'add' && x.to ? `<div class="al-ch"><span class="k">الموعد</span><b>${esc(x.to)}</b></div>` : '') + (x.kind === 'del' && x.from ? `<div class="al-ch"><span class="k">كان</span><s>${esc(x.from)}</s></div>` : '');
+      h += `<div class="al ${AL_NEW.has(x.id) ? 'new' : ''} k-${x.kind}">${avatar(x.by, t ? t.color : 'var(--ink3)')}<div class="tx">
+        <div><b>${esc(x.by)}</b>${t ? ` <span class="tbadge" style="--tcol:${t.color}">${esc(t.name)}</span>` : ''} ${AL_KIND[x.kind] || 'عدّل'} «${esc(x.title)}» <span class="xs faint">${ago(x.at)}</span></div>${ch}</div>
+        ${act ? `<button class="btn sm ghost" type="button" data-act="openact" data-id="${act.id}" data-track="${x.t}">افتحه</button>` : ''}</div>`;
+    }
+    return head + `<div class="card alerts">${h}</div>`;
+  },
+  after() { if (D.unseen) alertsSeen(false); }
+};
+const dateOf = ms => { const d = new Date(ms + 3 * 3600e3); return d.toISOString().slice(0, 10); };
+async function alertsSeen(manual) {
+  AL_NEW = new Set((D.alerts || []).filter(x => !x.seen).map(x => x.id));
+  (D.alerts || []).forEach(x => x.seen = true); D.unseen = 0;
+  $$('.nl[href="#alerts"] .badge,.bellb .badge').forEach(e => e.remove());
+  try { await API.me('alerts_seen', 'all'); } catch (e) {}
+  if (manual) render();
 }
 
 /* ---------- التقارير الأسبوعية (الإدارة) ---------- */
@@ -1949,7 +2323,7 @@ function openCmd() {
 function cmdItems(q) {
   const n = normAr(q.trim()), out = [];
   const pages = [['home', 'الرئيسية', 'home'], ['timeline', 'المنظور الزمني', 'tl']].concat(isAdmin() ? [['calendar', 'تقويم جوجل', 'gcal'], ['bot', 'بوت التذكيرات', 'bot'], ['accounts', 'الحسابات', 'key']] : [['t/' + myTrack(), 'خطة الفصل', 'table']]);
-  const acts = [{ g: 'إجراءات', l: 'نشاط جديد', ic: 'plus', run: () => openAct(isAdmin() ? '' : myTrack()) }, { g: 'إجراءات', l: P.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن', ic: P.theme === 'dark' ? 'sun' : 'moon', run: toggleTheme }];
+  const acts = [...(isAdmin() || canEdit(myTrack()) ? [{ g: 'إجراءات', l: 'نشاط جديد', ic: 'plus', run: () => openAct(isAdmin() ? '' : myTrack()) }] : []), { g: 'إجراءات', l: P.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن', ic: P.theme === 'dark' ? 'sun' : 'moon', run: toggleTheme }];
   const m = s => !n || normAr(s).includes(n);
   acts.filter(a => m(a.l) || (n && 'جديد'.includes(n))).forEach(a => out.push(a));
   pages.filter(p => m(p[1])).forEach(p => out.push({ g: 'الصفحات', l: p[1], ic: p[2], run: () => go(p[0]) }));
@@ -1977,18 +2351,20 @@ const H = {
   retry: () => boot(), 'demo-reset': () => { if (window.DEMO) window.DEMO.reset(); },
   lgwho: el => { LG.who = el.dataset.id; LG.err = ''; render(); }, lgother: () => { LG.other = !LG.other; LG.err = ''; render(); },
   openact: el => { if (SUPPRESS) return; openAct(el.dataset.track, el.dataset.id); },
-  newact: el => openAct(el.dataset.track || '', null, { date: el.dataset.date, type: el.dataset.type, track: el.dataset.track }),
-  done: el => { const tid = el.dataset.track, a = planOf(tid).acts.find(x => x.id === el.dataset.id); if (!a) return; const v = !a.done; saveAct(tid, { id: a.id, done: v }).then(() => toast(v ? `تم تنفيذ «${a.title}»` : 'أُعيد إلى الخطة', '', () => saveAct(tid, { id: a.id, done: !v }))).catch(() => {}); },
+  newact: el => openAct(el.dataset.track || '', null, { date: el.dataset.date, type: el.dataset.type, track: el.dataset.track, title: el.dataset.title }),
+  'f-cancel': closeAct, 'f-day': el => { readF(); F.d = el.dataset.v; drawAct(true); },
+  'al-seen': () => alertsSeen(true),
+  done: el => { const tid = el.dataset.track, a = planOf(tid).acts.find(x => x.id === el.dataset.id); if (!a) return; const v = !a.done; saveAct(tid, { id: a.id, done: v }).then(() => toast(v ? `تم تنفيذ ${qt(a.title)}` : 'أُعيد إلى الخطة', '', () => saveAct(tid, { id: a.id, done: !v }))).catch(() => {}); },
   'f-track': el => { readF(); F.tid = el.dataset.v; drawAct(true); }, 'f-type': el => { readF(); F.type = el.dataset.v; drawAct(true); },
   'f-who': el => { readF(); const w = el.dataset.v; F.who = (F.who || []).includes(w) ? F.who.filter(x => x !== w) : (F.who || []).concat(w); drawAct(true); },
   'f-rem': () => { readF(); const cur = F.rem === true || (F.rem !== false && (D.remindTypes || []).includes(F.type)); F.rem = !cur; drawAct(true); },
   'f-cal': () => { readF(); F.calOn = !F.calOn; drawAct(true); }, 'f-done': () => { readF(); F.done = !F.done; drawAct(true); },
-  'f-save': saveF, 'f-del': () => { if (!F.confirmDel) { readF(); F.confirmDel = true; drawAct(true); return; } const { tid, id } = F; closeLayer(); delAct(tid, id); },
+  'f-save': saveF, 'f-del': () => { if (!F.confirmDel) { readF(); F.confirmDel = true; drawAct(true); return; } const { tid, id } = F; if (F.dock) F = null; else closeLayer(); delAct(tid, id); },
   ed: el => inlineEdit(el), dayedit: el => dayEdit(el.dataset.id, el.dataset.n, el.dataset.d),
   'de-save': el => { const p = {}; ['ax', 'c', 'q', 'r', 'ev', 'p'].forEach(k => p[k] = $('#de-' + k).value.trim()); closeLayer(); saveDay(el.dataset.id, el.dataset.n, el.dataset.d, p); },
   tblax: el => { P.tbl.ax = el.dataset.v; savePrefs(); render(); }, tblempty: () => { P.tbl.hideEmpty = !P.tbl.hideEmpty; savePrefs(); render(); }, tblclear: () => { TB.q = ''; P.tbl.ax = ''; P.tbl.hideEmpty = false; render(); },
   semmenu: el => semMenu(el.dataset.id, el.dataset.n), semimport: el => semImport(el.dataset.id, el.dataset.n), semnew: el => semNew(el.dataset.id, el.dataset.n),
-  semdel: async el => { closeLayer(); try { await API.me('sem_del', el.dataset.id, el.dataset.n); delete planOf(el.dataset.id).sems[el.dataset.n]; render(); toast('حُذف جدول الفصل'); } catch (e) { toast(e.message, 'err'); } },
+  semdel: async el => { if (!armed(el, 'اضغط مرة ثانية لتأكيد الحذف')) return; closeLayer(); try { await API.me('sem_del', el.dataset.id, el.dataset.n); delete planOf(el.dataset.id).sems[el.dataset.n]; render(); toast('حُذف جدول الفصل'); } catch (e) { toast(e.message, 'err'); } },
   'si-check': async el => {
     const url = $('#si-url').value.trim(), out = $('#si-out'); out.innerHTML = '<span class="spin"></span>';
     try { const r = await API.me('sem_import', el.dataset.id, el.dataset.n, url, true); const ds = r.days, ex = ds.filter(d => d.ev).map(d => d.ev);
@@ -1997,19 +2373,20 @@ const H = {
     } catch (e) { out.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
   },
   'si-save': () => semPut(SI.id, SI.n, SI.days, SI.url),
-  'sn-save': el => { const a = $('#sn-a').value, b = $('#sn-b').value; if (!a || !b || b < a) return toast('حدّد البداية والنهاية', 'err'); const s0 = wkStart(a), days = []; for (let d = a; d <= b; d = add(d, 1)) days.push({ d, h: hijri(d), w: Math.floor(diffD(d, s0) / 7) + 1 }); semPut(el.dataset.id, el.dataset.n, days, ''); },
+  'sn-save': el => { const a = $('#sn-a').value, b = $('#sn-b').value; if (!a || !b) return toast('حدّد البداية والنهاية', 'err'); if (b < a) return toast('تاريخ النهاية قبل البداية', 'err'); const s0 = wkStart(a), days = []; for (let d = a; d <= b; d = add(d, 1)) days.push({ d, h: hijri(d), w: Math.floor(diffD(d, s0) / 7) + 1 }); semPut(el.dataset.id, el.dataset.n, days, ''); },
   members: el => membersSheet(el.dataset.id), 'mb-save': el => { const L = [...new Set($('#mb-list').value.split('\n').map(x => x.trim()).filter(Boolean))]; closeLayer(); trackSave(el.dataset.id, { members: L }).then(() => toast('حُفظ الفريق')).catch(() => {}); },
   toggleedit: el => { const t = T(el.dataset.id); trackSave(t.id, { canEdit: !t.canEdit }).then(r => toast(r.canEdit ? `فُتح تعديل الخطة لفريق ${t.name}` : `أُغلق تعديل الخطة لفريق ${t.name}`)).catch(() => {}); },
   grant: el => { const t = T(el.dataset.id); trackSave(t.id, { canEdit: true }).then(() => toast(`فُتح تعديل الخطة لفريق ${t.name}`)).catch(() => {}); },
   askedit: () => openDialog(`<h3>طلب فتح تعديل الخطة</h3><p class="muted sm">يصل الطلب إلى الإدارة في المنصة${D.tg ? ' وفي تليجرام' : ''}.</p><div class="field"><label for="ae-n">ماذا تريدون تعديله؟ (اختياري)</label><textarea class="inp" id="ae-n" rows="3" placeholder="مثل: نضيف مسابقة في الأسبوع الثالث"></textarea></div><div class="row"><button class="btn pri" type="button" data-act="ae-send">أرسل الطلب</button><button class="btn" type="button" data-act="close">إلغاء</button></div>`),
   'ae-send': async () => { const note = $('#ae-n').value; closeLayer(); try { await API.me('edit_request', note); T(myTrack()).editReq = { at: Date.now(), by: D.me.name, note }; render(); toast('أُرسل الطلب إلى الإدارة'); } catch (e) { toast(e.message, 'err'); } },
   hbw: el => { const n = +el.dataset.n; HB.ws = n ? add(HB.ws, n) : focusWeek(); render(); },
-  tlweek: el => { P.tl.range = 'week'; P.tl.anchor = el.dataset.date; if (isAdmin() && el.dataset.id) P.tl.tracks = [el.dataset.id]; savePrefs(); go('timeline'); },
+  mweek: el => { const k = el.dataset.id + '|' + el.dataset.n; if (el.dataset.v === 'now') delete MW[k]; else MW[k] = +el.dataset.v; render(); const pg = $('.wpager'); if (pg) window.scrollTo(0, pg.getBoundingClientRect().top + scrollY - 70); },
+  tlweek: el => { P.tl.range = 'week'; P.tl.anchor = el.dataset.date; if (isAdmin() && el.dataset.id) { P.tl.tracks = [el.dataset.id]; P.tl.tmp = true; } savePrefs(); go('timeline'); },
   tlrange: el => { P.tl.range = el.dataset.v; savePrefs(); VIEWS.timeline.sc = 0; render(); },
-  tlnav: el => { const n = +el.dataset.n, rg = P.tl.range, a = rg !== 'week' && rg !== 'sem' ? tlSpan().from : tlAnchor(); P.tl.anchor = !n ? '' : rg === 'week' ? add(a, 7 * n) : addMon(monStart(a), (rg === 'q3' ? 3 : 1) * n); savePrefs(); VIEWS.timeline.sc = 0; render(); },
+  tlnav: el => { const n = +el.dataset.n, rg = P.tl.range, a = rg !== 'week' && rg !== 'sem' ? tlSpan().from : tlAnchor(); P.tl.anchor = !n ? TODAY : rg === 'week' ? add(a, 7 * n) : addMon(monStart(a), (rg === 'q3' ? 3 : 1) * n); savePrefs(); VIEWS.timeline.sc = 0; render(); },
   tltrack: el => { const v = el.dataset.v; if (!v) P.tl.tracks = []; else { const s = new Set(P.tl.tracks || []); s.has(v) ? s.delete(v) : s.add(v); P.tl.tracks = [...s]; } savePrefs(); render(); },
   dayview: el => { const d = el.dataset.date, ids = tlTracks(); const L = ids.flatMap(id => actsOf(id).filter(a => a.d === d).map(a => [a, id])).sort((x, y) => sortA(x[0], y[0])); openSheet(`<b style="font-family:var(--fd);font-weight:500;font-size:19px">${gLong(d)}</b>`, `<div class="col" style="gap:8px">${L.map(([a, id]) => evChip(a, id, { track: ids.length > 1, noDrag: true })).join('')}</div>`); },
-  'cal-f': el => { P.cal[el.dataset.k] = el.dataset.v; savePrefs(); render(); }, 'cal-meet': () => { P.cal.meet = !P.cal.meet; savePrefs(); render(); },
+  'cal-f': el => { P.cal[el.dataset.k] = el.dataset.v; CS.sel.clear(); savePrefs(); render(); }, 'cal-meet': () => { P.cal.meet = !P.cal.meet; CS.sel.clear(); savePrefs(); render(); },
   'cal-sel': el => { const k = el.dataset.k; CS.sel.has(k) ? CS.sel.delete(k) : CS.sel.add(k); render(); },
   'cal-selw': el => { const w = el.dataset.w, ks = $$('.calrow [data-act="cal-sel"]').map(b => b.dataset.k).filter(k => { const [t, id] = k.split('|'); const a = planOf(t).acts.find(x => x.id === id); return a && wkStart(a.d) === w; }); const all = ks.every(k => CS.sel.has(k)); ks.forEach(k => all ? CS.sel.delete(k) : CS.sel.add(k)); render(); },
   'cal-selall': () => { const ks = $$('.calrow [data-act="cal-sel"]').map(b => b.dataset.k); const all = ks.length && ks.every(k => CS.sel.has(k)); ks.forEach(k => all ? CS.sel.delete(k) : CS.sel.add(k)); render(); },
@@ -2019,8 +2396,8 @@ const H = {
   'bot-token': async () => { const v = $('#bt-tok').value.trim(); if (!v) return; setSync('busy'); try { BS = await API.me('tg_token', v); setSync('ok'); toast('رُبط البوت ✓'); boot(true); render(); } catch (e) { setSync('ok'); toast(e.message, 'err'); } },
   'bot-remind': async el => { const t = BS.tracks.find(x => x.id === el.dataset.id); try { await trackSave(t.id, { remind: !t.remind }); t.remind = !t.remind; render(); } catch (e) {} },
   'bot-test': async el => { try { await API.me('tg_test', el.dataset.id); toast('أُرسلت رسالة التجربة'); } catch (e) { toast(e.message, 'err'); } },
-  'bot-unlink': async el => { try { BS = await API.me('tg_assign', el.dataset.chat, ''); toast('أُلغي الربط'); boot(true); } catch (e) { toast(e.message, 'err'); } },
-  'bot-now': async () => { try { const r = await API.me('remind_now'); toast(r.sent ? `أُرسل ${r.sent}` : 'لا شيء مستحق الآن'); if (r.errs && r.errs.length && r.errs[0] !== 'لا بوت') toast(r.errs[0], 'err'); BS = null; BS_LOAD = false; render(); } catch (e) { toast(e.message, 'err'); } },
+  'bot-unlink': async el => { if (!armed(el, 'تأكيد إلغاء الربط')) return; try { BS = await API.me('tg_assign', el.dataset.chat, ''); toast('أُلغي الربط'); boot(true); } catch (e) { toast(e.message, 'err'); } },
+  'bot-now': async () => { try { const r = await API.me('remind_now'); toast(r.sent ? (r.sent === 1 ? 'أُرسل تذكير واحد' : r.sent === 2 ? 'أُرسل تذكيران' : `أُرسلت ${r.sent} ${r.sent <= 10 ? 'تذكيرات' : 'تذكيرًا'}`) : 'لا شيء مستحق الآن'); if (r.errs && r.errs.length && r.errs[0] !== 'لا بوت') toast(r.errs[0], 'err'); BS = null; BS_LOAD = false; render(); } catch (e) { toast(e.message, 'err'); } },
   'bs-type': el => { const s = BS.settings, v = el.dataset.v; s.remindTypes = s.remindTypes.includes(v) ? s.remindTypes.filter(x => x !== v) : s.remindTypes.concat(v); keepTpl(); render(); },
   'bs-digest': () => { BS.settings.digest = Object.assign({}, BS.settings.digest, { on: !BS.settings.digest.on }); keepTpl(); render(); },
   'bs-chg': () => { BS.settings.notifyChanges = !BS.settings.notifyChanges; keepTpl(); render(); }, 'bs-adig': () => { BS.settings.adminDigest = !BS.settings.adminDigest; keepTpl(); render(); },
@@ -2029,13 +2406,20 @@ const H = {
   'acc-edit': el => accEdit(el.dataset.id), 'ac-dis': el => el.setAttribute('aria-checked', el.getAttribute('aria-checked') !== 'true'),
   'ac-save': async el => { const uid = el.dataset.id, dis = $('[data-act="ac-dis"]'); const body = { uid: uid || undefined, name: $('#ac-n').value, user: $('#ac-u').value, role: $('#ac-r').value, track: $('#ac-t').value, disabled: dis ? dis.getAttribute('aria-checked') === 'true' : false };
     try { const r = await API.me('acc_save', JSON.stringify(body)); AC = null; if (r.pass) showPass(r.acc.name, r.acc.user, r.pass); else { closeLayer(); toast('حُفظ الحساب'); } render(); } catch (e) { toast(e.message, 'err'); } },
-  'ac-del': async el => { try { await API.me('acc_del', el.dataset.id); AC = null; closeLayer(); toast('حُذف الحساب'); render(); } catch (e) { toast(e.message, 'err'); } },
-  'acc-reset': async el => { const a = AC.find(x => x.uid === el.dataset.id); try { const r = await API.me('acc_reset', a.uid); if (r.token) { TOKEN = r.token; LS.set(NS + 'tok', TOKEN); } showPass(a.name, a.user, r.pass); } catch (e) { toast(e.message, 'err'); } },
+  'ac-del': async el => { if (!armed(el, 'تأكيد الحذف')) return; try { await API.me('acc_del', el.dataset.id); AC = null; closeLayer(); toast('حُذف الحساب'); render(); } catch (e) { toast(e.message, 'err'); } },
+  'acc-reset': async el => { if (!armed(el, 'تأكيد: يخرج الفريق من جلساته')) return; const a = AC.find(x => x.uid === el.dataset.id); try { const r = await API.me('acc_reset', a.uid); if (r.token) { TOKEN = r.token; LS.set(NS + 'tok', TOKEN); } showPass(a.name, a.user, r.pass); } catch (e) { toast(e.message, 'err'); } },
   'pw-save': async () => { try { const r = await API.me('pass', $('#pw-o').value, $('#pw-n').value); TOKEN = r.token; LS.set(NS + 'tok', TOKEN); closeLayer(); toast('غُيّرت كلمة المرور'); } catch (e) { toast(e.message, 'err'); } },
   copy: async el => { try { await navigator.clipboard.writeText(el.dataset.v); toast('نُسخ'); } catch (e) { toast('انسخها يدويًا', 'err'); } },
   'cmd-run': el => cmdRun(+el.dataset.i),
   'rp-toggle': el => { RP_OPEN = RP_OPEN === el.dataset.id || (!RP_OPEN && RP[0].id === el.dataset.id) ? '-' : el.dataset.id; render(); }
 };
+// تأكيد بضغطتين للإجراءات التي لا رجعة فيها
+function armed(el, label) {
+  if (el.dataset.armed) return true;
+  el.dataset.armed = '1'; const old = el.innerHTML; el.innerHTML = esc(label); el.classList.add('danger');
+  setTimeout(() => { if (document.contains(el)) { delete el.dataset.armed; el.innerHTML = old; } }, 4000);
+  return false;
+}
 let SI = null, LAST_TA = null;
 function tgOpen(el, e) { if (CFG.demo && window.DEMO) { e.preventDefault(); window.DEMO.simJoin(el.getAttribute('href')); toast('تجربة: كأنك اخترت المجموعة في تليجرام…'); } watchLink(); }
 function keepTpl() { if (!BS || !BS.settings) return; const a = $('#bs-d3'), b = $('#bs-d1'), h = $('#bs-h'); if (a) BS.settings.tpl = { d3: a.value, d1: b.value }; if (h) BS.settings.remindHour = +h.value; }
@@ -2049,7 +2433,7 @@ document.addEventListener('click', e => {
   if (k === 'tblq') return;
   f(el, e);
 });
-document.addEventListener('change', e => { const el = e.target; if (el.dataset.act === 'bot-assign' && el.value) API.me('tg_assign', el.dataset.chat, el.value).then(s => { BS = s; toast('رُبطت المجموعة ✓'); boot(true); }).catch(x => toast(x.message, 'err')); if (el.id === 'f-d' && F) { readF(); drawAct(true); } });
+document.addEventListener('change', e => { const el = e.target; if (el.id === 'ac-r' && $('#ac-tf')) $('#ac-tf').hidden = el.value === 'admin'; if (el.dataset.act === 'bot-assign' && el.value) API.me('tg_assign', el.dataset.chat, el.value).then(s => { BS = s; toast('رُبطت المجموعة ✓'); boot(true); }).catch(x => toast(x.message, 'err')); if (el.id === 'f-d' && F) { readF(); drawAct(true); } });
 document.addEventListener('input', e => {
   const el = e.target;
   if (el.dataset.act === 'tblq') { TB.q = el.value; clearTimeout(TB.t); TB.t = setTimeout(() => { const pos = el.selectionStart; render(); const n = $('[data-act="tblq"]'); if (n) { n.focus(); n.selectionStart = n.selectionEnd = pos; } }, 180); }
@@ -2069,7 +2453,9 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (e.key === 'Escape' && $('#layer').innerHTML) { e.preventDefault(); closeLayer(); return; }
+  if (e.key === 'Escape' && F && F.dock) { e.preventDefault(); closeAct(); return; }
   if (e.key === 'Tab' && $('#layer').innerHTML) trapFocus(e);
+  if (e.key === 'Enter' && (e.target.id === 'pw-n' || e.target.id === 'pw-o')) { e.preventDefault(); const b = $('[data-act="pw-save"]'); if (b) b.click(); return; }
   if (e.key === 'Enter' && F && e.target.id === 'f-whonew') { e.preventDefault(); const v = e.target.value.trim(); if (v) { readF(); F.who = [...new Set((F.who || []).concat(v))]; drawAct(true); setTimeout(() => $('#f-whonew') && $('#f-whonew').focus(), 50); } return; }
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && F) { e.preventDefault(); saveF(); return; }
   if ((e.key === 'Enter' || e.key === ' ') && !typing && e.target.matches('[role="button"][data-act]')) { e.preventDefault(); e.target.click(); return; }
@@ -2078,7 +2464,7 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'n' || e.key === 'ى') { const r = route(); const tid = r.name === 't' ? r.a : isAdmin() ? '' : myTrack(); if (!tid || canEdit(tid)) { e.preventDefault(); openAct(tid); } }
   else if (e.key === 't' || e.key === 'ف') { if (route().name === 'timeline') { P.tl.anchor = ''; savePrefs(); render(); } }
 });
-let MQ = isMob(); addEventListener('resize', () => { const m = isMob(); if (m !== MQ) { MQ = m; if (D && !$('#layer').innerHTML) render(); } });
+let MQ = isMob(), WQ = innerWidth >= WIDE_Q; addEventListener('resize', () => { const m = isMob(), w = innerWidth >= WIDE_Q; if (m !== MQ || w !== WQ) { MQ = m; WQ = w; if (F && F.dock) { readF(); F.dock = false; render(); drawAct(); return; } if (D && !$('#layer').innerHTML) render(); } });
 
 /* ---------- التشغيل ---------- */
 (async function start() {
