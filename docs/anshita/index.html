@@ -793,6 +793,95 @@ details.awt .wt-list{padding:0 0 8px}
 .rembox{border:1px solid var(--line);border-radius:16px;padding:6px 14px 12px;display:grid;gap:10px;margin-top:-4px}
 .rembox .opt.sub{border-top:0;padding:8px 0 4px}
 
+/* أثناء التنفيذ: زر مشغول، وشريط علوي، ونشاط يُحفظ */
+[data-act].busy{cursor:progress;opacity:.78}
+[data-act].busy .spin{width:14px;height:14px;border-width:2px;margin-inline-end:6px;vertical-align:-2px}
+.btn.busy{pointer-events:none}
+.nudge{animation:nudge .32s ease}
+@keyframes nudge{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+html.net-busy body::before{content:'';position:fixed;top:0;inset-inline:0;height:3px;z-index:9999;background:linear-gradient(90deg,transparent,var(--brand),transparent);background-size:40% 100%;background-repeat:no-repeat;animation:netbar 1.1s linear infinite}
+@keyframes netbar{from{background-position:-40% 0}to{background-position:140% 0}}
+.ev.pending{opacity:.62}
+.ev.pending .flag .spin{width:11px;height:11px;border-width:1.6px}
+@media (prefers-reduced-motion:reduce){.nudge{animation:none}html.net-busy body::before{animation:none;background:var(--brand);opacity:.6}}
+/* أقسام صفحة المسار */
+.sectabs{display:flex;gap:4px;padding:5px;margin:20px 0 4px;background:var(--surface);border-radius:999px;box-shadow:var(--sh1);overflow-x:auto;scrollbar-width:none;width:max-content;max-width:100%}
+.sectabs::-webkit-scrollbar{display:none}
+.sectab{display:flex;align-items:center;gap:7px;padding:9px 16px;border-radius:999px;text-decoration:none;color:var(--ink2);font-size:15px;white-space:nowrap}
+.sectab svg{width:17px;height:17px}
+.sectab:hover{background:var(--hover);color:var(--ink)}
+.sectab[aria-current="page"]{background:var(--ink);color:var(--canvas)}
+.sectab i{font-style:normal;font-size:12px;min-width:20px;height:20px;padding:0 6px;border-radius:999px;display:inline-grid;place-items:center;background:var(--brand-t);color:var(--brand-ink)}
+.sectab i.warn{background:var(--warn-t);color:var(--warn)}
+.sectab[aria-current="page"] i{background:color-mix(in srgb,var(--canvas) 22%,transparent);color:var(--canvas)}
+.dk-link{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;text-decoration:none;color:var(--ink);margin-bottom:14px}
+.dk-link:hover{background:var(--hover)}
+.dk-link>svg{width:16px;height:16px;color:var(--ink3)}
+.secgrid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px;align-items:start;margin-top:14px}
+@media (max-width:1000px){.secgrid{grid-template-columns:minmax(0,1fr)}}
+.twpager{display:flex;align-items:center;gap:8px;padding:6px;margin:-4px 0 12px;background:var(--sunken);border-radius:14px}
+.kchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.kchips .pill svg{width:14px;height:14px}
+.tday{padding:10px 0;border-top:1px solid var(--line)}
+.tday:first-of-type{border-top:0}
+.tday-h{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
+.tday.today .tday-h b{color:var(--brand-ink)}
+.empty-s{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:26px 10px;color:var(--ink2)}
+.empty-s>svg{width:28px;height:28px;color:var(--ok)}
+.tdone{margin-top:12px;border-top:1px solid var(--line);padding-top:8px}
+.tdone summary{cursor:pointer;color:var(--ink2);font-size:14px;padding:4px 0}
+.wt-row.task.is-done .tx>span:first-child{text-decoration:line-through;color:var(--ink3)}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px}
+@media (max-width:760px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--surface);border-radius:var(--r3);box-shadow:var(--sh1);padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.kpi b{font-family:var(--fd);font-weight:500;font-size:28px;line-height:1.15;color:var(--ink)}
+.kpi span{font-size:14px;color:var(--ink2)}
+.kpi small{font-size:12.5px;color:var(--ink3)}
+.kpi.warn b{color:var(--warn)}
+.flist{display:flex;flex-direction:column}
+.frow{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.frow:first-child{border-top:0}
+.frow>.tile{margin-top:2px}
+.frow .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;text-align:start}
+.frow .tx b{font-weight:500;color:var(--ink)}
+.fact-a{display:flex;gap:6px;align-items:center}
+.rds{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:4px}
+.rd{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;color:var(--ink2)}
+.rd svg{width:13px;height:13px}
+.rd.ok svg{color:var(--ok)}.rd.warn{color:var(--warn)}.rd.bad{color:var(--bad)}
+.fnote{margin:4px 0 0;font-size:14px;line-height:1.6;color:var(--ink1);white-space:pre-wrap}
+.fnote.faint{color:var(--ink3)}
+.hbars{display:flex;flex-direction:column;gap:8px}
+.hb{display:grid;grid-template-columns:minmax(70px,auto) 1fr 32px;align-items:center;gap:10px;font-size:14px}
+.hb-l{color:var(--ink1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hb-t{height:10px;background:var(--sunken);border-radius:4px;overflow:hidden}
+.hb-t i{display:block;height:100%;border-radius:4px;background:var(--brand)}
+.hb-v{font-weight:500;color:var(--ink);text-align:end;font-variant-numeric:tabular-nums}
+.wbars{display:flex;align-items:flex-end;gap:6px;height:150px;padding-top:6px}
+.wb{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%}
+.wb-c{flex:1;width:100%;max-width:34px;display:flex;align-items:flex-end}
+.wb-c .pl{display:flex;align-items:flex-end;width:100%;background:var(--brand-t2);border-radius:4px 4px 0 0;min-height:6px;overflow:hidden}
+.wb-c .dn{display:block;width:100%;background:var(--brand);border-radius:4px 4px 0 0}
+.wb-c .zero{display:block;width:100%;height:2px;background:var(--line2)}
+.wb.fut .pl{background:repeating-linear-gradient(135deg,var(--brand-t) 0 4px,transparent 4px 7px);outline:1px solid var(--brand-t);outline-offset:-1px}
+.wb-l{font-size:12px;color:var(--ink3);font-variant-numeric:tabular-nums}
+.wb.now .wb-l{color:var(--ink);font-weight:600}
+.card-h .lg{margin-inline-start:auto;display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink2)}
+.card-h .lg i{display:inline-block;width:10px;height:10px;border-radius:3px}
+.card-h .lg i.pl{background:var(--brand-t2)}.card-h .lg i.dn{background:var(--brand);margin-inline-start:8px}
+.rep-md{font-family:var(--ft);font-size:15.5px;line-height:1.85;color:var(--ink1)}
+.secgrid>.card,.secgrid>.col>.card{margin:0}
+
+.sectab .ls{display:none}
+@media (max-width:760px){
+  .sectabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:auto;border-radius:18px;padding:4px;gap:2px;margin-top:14px}
+  .sectab{flex-direction:column;gap:3px;padding:8px 2px;border-radius:14px;font-size:13px;position:relative}
+  .sectab .lf{display:none}.sectab .ls{display:inline}
+  .sectab i{position:absolute;top:3px;inset-inline-end:8px;min-width:17px;height:17px;font-size:11px;padding:0 4px}
+}
+.secgrid .card-h,.kpis+.card .card-h{flex-wrap:wrap;row-gap:4px}
+.stbl .plus,.mday .plus{white-space:nowrap;flex-shrink:0;min-width:max-content;line-height:1.5}
+
 </style>
 </head>
 <body>
@@ -911,8 +1000,16 @@ const savePrefs = () => LS.set(NS + 'prefs', P);
 
 /* ---------- الاتصال بالخادم ---------- */
 let TOKEN = LS.get(NS + 'tok', '');
+// ما يقرأ فقط لا يُظهر شريط التنفيذ (التحديث الدوري وأمثاله)
+const READ_FNS = new Set(['revs', 'plan', 'boot', 'log_list', 'alerts', 'tg_status', 'report_list', 'acc_list', 'cal_list', 'me']);
+const NET = { n: 0 };
+function netBar() { document.documentElement.classList.toggle('net-busy', NET.n > 0); }
 const API = {
   async call(fn, ...args) {
+    const w = !READ_FNS.has(fn); if (w) { NET.n++; netBar(); }
+    try { return await API.raw(fn, ...args); } finally { if (w) { NET.n--; netBar(); } }
+  },
+  async raw(fn, ...args) {
     let j;
     if (CFG.demo) j = await window.DEMO.call(fn, args);
     else {
@@ -936,7 +1033,13 @@ const isAdmin = () => D && D.me.role === 'admin';
 const myTrack = () => D && D.me.role === 'team' ? D.me.track : null;
 const T = id => D.tracks.find(t => t.id === id);
 const planOf = id => D.plans[id] || (D.plans[id] = { sems: {}, acts: [], rev: 0 });
-const semN = id => { const r = route(); return String((r.name === 't' && r.a === id && r.b) || (T(id) && T(id).cur) || 1); };
+const semN = id => { const r = route(); return String((r.name === 't' && r.a === id && /^\d+$/.test(r.b) && r.b) || (T(id) && T(id).cur) || 1); };
+// أقسام صفحة المسار: الخطة (الجدول والتخطيط)، المهام والمطلوبات، متابعة التنفيذ، التقرير
+const T_SECS = [['plan', 'الخطة', 'table', 'الخطة'], ['tasks', 'المهام والمطلوبات', 'check', 'المهام'], ['follow', 'متابعة التنفيذ', 'target', 'المتابعة'], ['report', 'التقرير', 'sheet', 'التقرير']];
+// معاينة الأقسام على الموقع الحي قبل اعتمادها: ?secs=1 يفعّلها لهذا المتصفح، و?secs=0 يلغيها
+const secsOn = () => { const m = /[?&]secs=([01])/.exec(location.search); if (m) LS.set(NS + 'secs', m[1] === '1'); return !!(CFG.demo || CFG.secs || LS.get(NS + 'secs', false)); };
+const tSec = () => { const r = route(); if (r.name !== 't' || !secsOn()) return 'plan'; const s = /^\d+$/.test(r.b) ? r.c : r.b; return T_SECS.some(x => x[0] === s) ? s : 'plan'; };
+const tHref = (id, n, sec) => `#t/${id}/${n}${sec && sec !== 'plan' ? '/' + sec : ''}`;
 const curN = id => String((T(id) && T(id).cur) || 1);
 const semOf = (id, n) => planOf(id).sems[String(n)];
 const daysOf = (id, n) => (semOf(id, n || curN(id)) || {}).days || [];
@@ -980,7 +1083,7 @@ function kahootSugs(tid) {
 }
 /* ---------- لوحة النشاط الثابتة في صفحة المسار (الشاشات العريضة) ---------- */
 const WIDE_Q = 1240;
-const dockOn = tid => !!tid && route().name === 't' && route().a === tid && innerWidth >= WIDE_Q;
+const dockOn = tid => !!tid && route().name === 't' && route().a === tid && tSec() === 'plan' && innerWidth >= WIDE_Q;
 const tcol = id => (T(id) && T(id).color) || '#888';
 const sortA = (x, y) => x.d < y.d ? -1 : x.d > y.d ? 1 : (x.time || '99').localeCompare(y.time || '99');
 const members = id => (T(id) && T(id).members) || [];
@@ -1068,14 +1171,14 @@ document.addEventListener('scroll', () => { if (tipEl) { tipEl.remove(); tipEl =
 
 /* ---------- حالة المزامنة ---------- */
 let SYNC = { st: 'ok', at: Date.now() };
-function setSync(st) { SYNC.st = st; if (st === 'ok') SYNC.at = Date.now(); const el = $$('.sync'); el.forEach(x => { x.className = 'sync ' + (st === 'busy' ? 'busy' : st === 'off' ? 'off' : ''); x.querySelector('span').textContent = syncText(); }); }
-const syncText = () => SYNC.st === 'busy' ? 'يحفظ…' : SYNC.st === 'off' ? 'غير متصل — سيُعاد المحاولة' : 'محدّث ' + ago(SYNC.at);
+function setSync(st, label) { SYNC.st = st; SYNC.label = st === 'busy' ? (label || '') : ''; if (st === 'ok') SYNC.at = Date.now(); const el = $$('.sync'); el.forEach(x => { x.className = 'sync ' + (st === 'busy' ? 'busy' : st === 'off' ? 'off' : ''); x.querySelector('span').textContent = syncText(); }); }
+const syncText = () => SYNC.st === 'busy' ? (SYNC.label ? 'يحفظ: ' + (SYNC.label.length > 28 ? SYNC.label.slice(0, 27) + '…' : SYNC.label) : 'يحفظ…') : SYNC.st === 'off' ? 'غير متصل — سيُعاد المحاولة' : 'محدّث ' + ago(SYNC.at);
 
 /* ---------- التنقل ---------- */
 function route() {
   const h = (location.hash || '').slice(1);
   const p = h.split('/').filter(Boolean).map(decodeURIComponent);
-  return { name: p[0] || 'home', a: p[1] || '', b: p[2] || '' };
+  return { name: p[0] || 'home', a: p[1] || '', b: p[2] || '', c: p[3] || '' };
 }
 function go(h) { if (location.hash === '#' + h) render(); else location.hash = h; }
 addEventListener('hashchange', () => { closeLayer(); if (F && F.dock) F = null; if (route().name !== 'bot') { BS = null; BS_LOAD = false; } if (P.tl && P.tl.tmp && route().name !== 'timeline') { P.tl.tracks = []; P.tl.tmp = false; savePrefs(); } render(); window.scrollTo(0, 0); });
@@ -1199,6 +1302,7 @@ function vLogin() {
 }
 function afterLogin() { if (LG.who || LG.other) setTimeout(() => { const el = LG.other ? $('#lg-u') : $('#lg-p'); if (el) el.focus(); }, 30); }
 async function doLogin(user, pass) {
+  if (LG.busy) return;
   LG.busy = true; LG.err = ''; render();
   try {
     if (CFG.demo && !pass) pass = window.DEMO.pass(user);
@@ -1238,7 +1342,7 @@ async function poll(force) {
     const r = await API.me('revs'), changed = [];
     if (r._meta !== D.revs._meta) { await boot(true); polling = false; return; }
     for (const id of Object.keys(r)) {
-      if (id[0] === '_' || r[id] === D.revs[id]) continue;
+      if (id[0] === '_' || r[id] === D.revs[id] || INFLIGHT[id]) continue;   // لا تُستبدل خطة فيها حفظ جارٍ
       D.plans[id] = await API.me('plan', id); D.revs[id] = r[id]; changed.push(id);
     }
     if (r._log !== D.revs._log) { D.log = (await API.me('log_list')).slice(0, 60); D.revs._log = r._log; }
@@ -1262,50 +1366,57 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) poll
 
 /* ---------- الحفظ (تفاؤلي مع التراجع عند الخطأ) ---------- */
 async function saveAct(tid, patch, opt = {}) {
-  const p = planOf(tid), body = Object.assign({}, patch);
-  let idx = -1, prev = null, tmp = null;
-  if (patch.id) { idx = p.acts.findIndex(a => a.id === patch.id); prev = p.acts[idx]; p.acts[idx] = Object.assign({}, prev, patch); }
+  const body = Object.assign({}, patch);
+  let p = planOf(tid), idx = -1, prev = null, tmp = null;
+  if (patch.id) { idx = p.acts.findIndex(a => a.id === patch.id); prev = p.acts[idx]; p.acts[idx] = Object.assign({}, prev, patch); delete p.acts[idx].scope; }
   else { tmp = Object.assign({ id: 'tmp' + Date.now(), done: false, who: [], by: D.me.name, sem: semFor(tid, patch.d) || curN(tid) }, patch); p.acts.push(tmp); }
   if (patch.d && !patch.sem) { const s = semFor(tid, patch.d); if (s) body.sem = s; }
+  const key = patch.id || tmp.id; pendOn(tid, key);
   if (!opt.quiet) render();
-  setSync('busy');
+  setSync('busy', patch.title || (prev && prev.title) || '');
   try {
     const r = await API.me('act_save', tid, JSON.stringify(body));
-    const i = p.acts.findIndex(a => a.id === (patch.id || tmp.id));
+    p = planOf(tid);
+    const i = p.acts.findIndex(a => a.id === key || a.id === r.act.id);
     if (i >= 0) p.acts[i] = r.act; else p.acts.push(r.act);
     (r.others || []).forEach(o => { const k = p.acts.findIndex(a => a.id === o.id); if (k >= 0) p.acts[k] = o; });
     p.rev = r.rev; D.revs[tid] = r.rev;
-    setSync('ok');
+    pendOff(tid, key); setSync('ok');
     if (r.calErr) toast('حُفظ النشاط، وتعذّر تحديث تقويم جوجل: ' + r.calErr, 'err');
     if (!opt.noRender) render();
     setTimeout(() => poll(true), 600);
     return r.act;
   } catch (e) {
-    if (prev) p.acts[idx] = prev; else if (tmp) p.acts.splice(p.acts.indexOf(tmp), 1);
-    setSync(e.net ? 'off' : 'ok'); render(); toast(e.message, 'err'); throw e;
+    p = planOf(tid); const i = p.acts.findIndex(a => a.id === key);
+    if (prev && i >= 0) p.acts[i] = prev; else if (tmp && i >= 0) p.acts.splice(i, 1);
+    pendOff(tid, key); setSync(e.net ? 'off' : 'ok'); render(); toast(e.message, 'err'); throw e;
   }
 }
+// أنشطة يُحفظ تغييرها الآن: تظهر بعلامة انتظار، ولا يستبدل التحديث الدوري خطة مسارها حتى تنتهي
+const PEND = new Set(), INFLIGHT = {};
+function pendOn(tid, id) { if (id) PEND.add(id); INFLIGHT[tid] = (INFLIGHT[tid] || 0) + 1; }
+function pendOff(tid, id) { if (id) PEND.delete(id); INFLIGHT[tid] = Math.max(0, (INFLIGHT[tid] || 1) - 1); if (!INFLIGHT[tid]) delete INFLIGHT[tid]; }
 // scope = 'next': هذا الموعد وما بعده من النشاط المتكرر
 async function delAct(tid, id, scope) {
   const p = planOf(tid), x = p.acts.find(a => a.id === id), before = p.acts.slice();
   if (!x) return;
   const gone = p.acts.filter(a => a.id === id || (scope === 'next' && x.ser && a.ser === x.ser && a.d > x.d));
-  p.acts = p.acts.filter(a => !gone.includes(a)); render(); setSync('busy');
-  try { const r = await API.me('act_del', tid, id, scope || ''); p.rev = r.rev; D.revs[tid] = r.rev; setSync('ok'); toast(gone.length > 1 ? `حُذف ${qt(x.title)} و${apptText(gone.length - 1)} بعده` : `حُذف ${qt(x.title)}`); }
-  catch (e) { p.acts = before; setSync('ok'); render(); toast(e.message, 'err'); }
+  p.acts = p.acts.filter(a => !gone.includes(a)); pendOn(tid, ''); render(); setSync('busy', 'حذف ' + x.title);
+  try { const r = await API.me('act_del', tid, id, scope || ''); const q = planOf(tid); q.acts = q.acts.filter(a => !(r.ids || [id]).includes(a.id)); q.rev = r.rev; D.revs[tid] = r.rev; pendOff(tid, ''); setSync('ok'); render(); toast(gone.length > 1 ? `حُذف ${qt(x.title)} و${apptText(gone.length - 1)} بعده` : `حُذف ${qt(x.title)}`); setTimeout(() => poll(true), 600); }
+  catch (e) { planOf(tid).acts = before; pendOff(tid, ''); setSync('ok'); render(); toast(e.message, 'err'); }
 }
 // النشاط المتكرر: مواعيد مستقلة تجمعها سلسلة واحدة
 async function saveSeries(tid, body) {
-  setSync('busy');
+  setSync('busy', 'المواعيد المتكررة'); pendOn(tid, body.from || '');
   try {
-    const r = await API.me('act_series', tid, JSON.stringify(body)), p = planOf(tid);
+    const r = await API.me('act_series', tid, JSON.stringify(body)), p = planOf(tid); pendOff(tid, body.from || '');
     if (r.first) { const i = p.acts.findIndex(a => a.id === r.first.id); if (i >= 0) p.acts[i] = r.first; }
     p.acts.push(...r.acts); p.series = Object.assign({}, p.series, { [r.sid]: r.series });
     p.rev = r.rev; D.revs[tid] = r.rev; setSync('ok');
     if (r.calErr) toast('أُضيفت المواعيد، وتعذّر بعضها في تقويم جوجل: ' + r.calErr, 'err');
     render(); setTimeout(() => poll(true), 600);
     return r;
-  } catch (e) { setSync(e.net ? 'off' : 'ok'); render(); toast(e.message, 'err'); throw e; }
+  } catch (e) { pendOff(tid, body.from || ''); setSync(e.net ? 'off' : 'ok'); render(); toast(e.message, 'err'); throw e; }
 }
 const apptText = n => n === 1 ? 'موعد واحد' : n === 2 ? 'موعدان' : n <= 10 ? n + ' مواعيد' : n + ' موعدًا';
 const EVERY = { 1: 'كل أسبوع', 2: 'كل أسبوعين', 4: 'كل أربعة أسابيع' };
@@ -1438,6 +1549,46 @@ function endDrag(e, cancel) {
   DG = null;
 }
 
+/* ---------- الأزرار أثناء التنفيذ ----------
+   كل زر يبدأ أمرًا على الخادم يتحول إلى حالة «قيد التنفيذ» (دوّارة ونص يصف ما يجري)، ولا يُقبل الضغط عليه
+   مرة ثانية حتى ينتهي، ولو أُعيد رسم الصفحة في أثنائه. */
+const BUSY = new Map();
+const BUSY_LABEL = {
+  'f-save': 'يحفظ…', 'f-save-next': 'يحفظ…', 'f-meet': 'يُنشئ الرابط…', 'f-meet-del': 'يُزيل…', 'tk-save': 'يحفظ…', 'tk-del': 'يحذف…', 'mb-save': 'يحفظ الفريق…',
+  'de-save': 'يحفظ…', 'ae-send': 'يُرسل…', 'bs-save': 'يحفظ…', 'bot-menu': 'يحدّث…', 'bot-test': 'يُرسل…', 'bot-now': 'يُرسل…', 'bot-token': 'يربط…',
+  'mt-admins': 'يحفظ…', 'ac-save': 'يحفظ…', 'ac-del': 'يحذف…', 'acc-reset': 'يعيد التعيين…', 'pw-save': 'يغيّر…', 'si-check': 'يفحص…', 'si-save': 'يستورد…',
+  'sn-save': 'يُنشئ…', semdel: 'يحذف…', grant: 'يفتح…', toggleedit: 'يحفظ…', 'bs-pause': 'يحفظ…', 'bs-atasks': 'يحفظ…', 'bot-unlink': 'يُلغي…'
+};
+const busyKey = el => [el.dataset.act, el.dataset.id || '', el.dataset.v || '', el.dataset.track || '', el.dataset.n || '', el.dataset.d || ''].join('|');
+function busyEl(el, label) {
+  el.classList.add('busy'); el.setAttribute('aria-busy', 'true'); if ('disabled' in el) el.disabled = true;
+  if (label && el.tagName === 'BUTTON' && !el.classList.contains('icon') && el.textContent.trim()) { if (el.dataset.orig == null) el.dataset.orig = el.innerHTML; el.innerHTML = '<span class="spin" aria-hidden="true"></span>' + esc(label); }
+  else if (!el.querySelector('.spin')) el.insertAdjacentHTML('afterbegin', '<span class="spin" aria-hidden="true"></span>');
+}
+function unbusyEl(el) {
+  el.classList.remove('busy'); el.removeAttribute('aria-busy'); if ('disabled' in el) el.disabled = false;
+  if (el.dataset.orig != null) { el.innerHTML = el.dataset.orig; delete el.dataset.orig; } else { const sp = el.querySelector(':scope > .spin'); if (sp) sp.remove(); }
+}
+let BUSY_RAF = 0;
+function paintBusy() {
+  BUSY_RAF = 0;
+  $$('[data-act].busy').forEach(el => { if (!BUSY.has(busyKey(el))) unbusyEl(el); });
+  if (BUSY.size) $$('[data-act]').forEach(el => { const k = busyKey(el); if (BUSY.has(k) && !el.classList.contains('busy')) busyEl(el, BUSY.get(k)); });
+}
+new MutationObserver(() => { if ((BUSY.size || document.querySelector('[data-act].busy')) && !BUSY_RAF) BUSY_RAF = requestAnimationFrame(paintBusy); }).observe(document.documentElement, { childList: true, subtree: true });
+// يشغّل أمر الزر، ويحرسه من التكرار ما دام قيد التنفيذ
+function runAct(f, el, e) {
+  const k = busyKey(el);
+  if (BUSY.has(k)) { el.classList.remove('nudge'); void el.offsetWidth; el.classList.add('nudge'); return; }
+  const r = f(el, e);
+  if (r && typeof r.then === 'function') {
+    BUSY.set(k, el.dataset.busy || BUSY_LABEL[el.dataset.act] || '');
+    const t = setTimeout(paintBusy, 120);   // الأوامر السريعة لا تومض
+    r.catch(() => {}).finally(() => { clearTimeout(t); BUSY.delete(k); paintBusy(); });
+  }
+  return r;
+}
+
 /* ============================================================
    الصفحات: الرئيسية (الإدارة والفريق)، المسار وجدول الفصل، المنظور الزمني
    ============================================================ */
@@ -1445,9 +1596,10 @@ function endDrag(e, cancel) {
 /* ---------- بطاقة النشاط ---------- */
 function evChip(a, tid, o = {}) {
   const t = T(tid), drag = canAdjust(tid) && !o.noDrag && !String(a.id).startsWith('tmp'), cl = clashOf(tid, a);
-  const flags = (cl ? `<span class="cl" data-tip="${esc(cl)}">${svg('alert')}</span>` : '') + (a.ser ? `<span data-tip="نشاط متكرر">${svg('repeat')}</span>` : '') + (a.meet && a.meet.uri ? `<span data-tip="له رابط ميت">${svg('video')}</span>` : '') + (a.cal && a.cal.id ? `<span data-tip="في تقويم جوجل">${svg('gcal')}</span>` : '') + (a.done ? `<span data-tip="تم التنفيذ">${svg('check')}</span>` : '');
+  const flags = (PEND.has(a.id) || String(a.id).startsWith('tmp') ? `<span data-tip="يُحفظ الآن"><span class="spin"></span></span>` : '') + (cl ? `<span class="cl" data-tip="${esc(cl)}">${svg('alert')}</span>` : '') + (a.ser ? `<span data-tip="نشاط متكرر">${svg('repeat')}</span>` : '') + (a.meet && a.meet.uri ? `<span data-tip="له رابط ميت">${svg('video')}</span>` : '') + (a.cal && a.cal.id ? `<span data-tip="في تقويم جوجل">${svg('gcal')}</span>` : '') + (a.done ? `<span data-tip="تم التنفيذ">${svg('check')}</span>` : '');
   const meta = [o.track ? `<span class="tbadge">${esc(t.name)}</span>` : '', o.big ? `<span class="ty">${esc(a.type)}</span>` : '', a.time ? `<span>${timeText(a.time)}</span>` : '', a.who && a.who.length ? `<span>${esc(a.who.join('، '))}</span>` : '', o.date ? `<span>${gDay(a.d)}</span>` : '', flags ? `<span class="flag">${flags}</span>` : ''].filter(Boolean).join('');
-  return `<div class="ev ${o.track || o.tint ? 'tinted' : ''} ${o.big ? 'big' : ''} ${cl ? 'clash' : ''} ${a.done ? 'done' : ''} ${isLate(a) ? 'late' : ''} ${typeof F !== 'undefined' && F && F.dock && F.id === a.id ? 'sel' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${tid}" ${drag ? 'data-drag="1"' : ''} style="--tcol:${t.color};--tyc:${typeOf(a.type)[1]}">
+  const pend = PEND.has(a.id) || String(a.id).startsWith('tmp');
+  return `<div class="ev ${pend ? 'pending' : ''} ${o.track || o.tint ? 'tinted' : ''} ${o.big ? 'big' : ''} ${cl ? 'clash' : ''} ${a.done ? 'done' : ''} ${isLate(a) ? 'late' : ''} ${typeof F !== 'undefined' && F && F.dock && F.id === a.id ? 'sel' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${tid}" ${drag ? 'data-drag="1"' : ''} style="--tcol:${t.color};--tyc:${typeOf(a.type)[1]}">
     ${tile(a.type, 'sm')}<span class="tx"><span class="tt clamp2">${esc(a.title)}</span>${meta ? `<span class="mt">${meta}</span>` : ''}</span></div>`;
 }
 const pageHead = (eyebrow, title, lead, side = '', reveal = false) => `<div class="ph"><div class="t">${eyebrow ? `<div class="eyebrow">${eyebrow}</div>` : ''}<h1 class="${reveal ? 'reveal' : ''}">${reveal ? title.split(' ').map((w, i) => `<span class="w" style="animation-delay:${i * 70}ms">${esc(w)}</span>`).join(' ') : esc(title)}</h1>${lead ? `<p class="lead">${lead}</p>` : ''}</div>${side}</div>`;
@@ -1522,7 +1674,7 @@ const nTasks = n => n === 1 ? 'مهمة واحدة' : n === 2 ? 'مهمتان' :
 function weekTasks(id, ws) {
   const we = add(ws, 6), out = [], acts = actsOf(id).slice().sort(sortA), S = semOf(id, curN(id)) || { days: [] };
   acts.forEach(a => {
-    if (a.done || !remindable(a)) return;
+    if (a.done || !remindable(a) || !remCfg(a).des) return;
     const d3 = add(a.d, -3), d1 = add(a.d, -1), sent = a.sent || {};
     if (d3 >= ws && d3 <= we && sent.d3 !== a.d) out.push({ k: 'design', d: d3, ref: a.id, text: `تصميم إعلان ${qt(a.title)} وإعداده` });
     if (d1 >= ws && d1 <= we && sent.d1 !== a.d) out.push({ k: 'publish', d: d1, ref: a.id, text: `نشر إعلان ${qt(a.title)}` });
@@ -1777,12 +1929,16 @@ VIEWS.t = {
   render(r) {
     const id = r.a, t = T(id);
     if (!t) return `<div class="card empty"><h3>المسار غير موجود</h3></div>`;
-    const n = semN(id), sem = semOf(id, n), body = sem && sem.days.length ? semBody(id, n, sem) : semEmpty(id, n);
-    if (!dockOn(id)) return trackHead(id) + semTabs(id, n) + body;
-    return trackHead(id) + semTabs(id, n) + `<div class="tlay"><div class="tmain">${body}</div><aside class="dock" id="dock" aria-label="لوحة النشاط">${F && F.dock && F.tid === id ? '' : dockIdle(id)}</aside></div>`;
+    const n = semN(id), sec = tSec(), head = trackHead(id) + secTabs(id, n, sec);
+    if (sec === 'tasks') return head + tasksSec(id);
+    if (sec === 'follow') return head + semTabs(id, n, sec) + followSec(id, n);
+    if (sec === 'report') return head + semTabs(id, n, sec) + reportSec(id, n);
+    const sem = semOf(id, n), body = sem && sem.days.length ? semBody(id, n, sem) : semEmpty(id, n);
+    if (!dockOn(id)) return head + semTabs(id, n, sec) + body;
+    return head + semTabs(id, n, sec) + `<div class="tlay"><div class="tmain">${body}</div><aside class="dock" id="dock" aria-label="لوحة النشاط">${F && F.dock && F.tid === id ? '' : dockIdle(id)}</aside></div>`;
   },
   after(r) { const w = $('.wrap'); if (w) w.classList.toggle('wide', dockOn(r.a)); if (F && F.dock) { if (F.tid === r.a && $('#dock')) drawAct(true); else F = null; }
-    const el = $('#d-' + TODAY); if (el && !VIEWS.t.scrolled) { VIEWS.t.scrolled = true; setTimeout(() => el.scrollIntoView({ block: 'center' }), 60); } }
+    const el = tSec() === 'plan' && $('#d-' + TODAY); if (el && !VIEWS.t.scrolled) { VIEWS.t.scrolled = true; setTimeout(() => el.scrollIntoView({ block: 'center' }), 60); } }
 };
 function trackHead(id) {
   const t = T(id), n = semN(id), acts = actsOf(id, n);
@@ -1796,9 +1952,16 @@ function trackHead(id) {
       <div class="meta">${t.age ? `<span class="pill">${esc(t.age)}</span>` : ''}<span class="pill">${svg('users')}${members(id).length ? members(id).length + ' في الفريق' : 'الفريق لم يُكتب'}</span><span class="pill">${nActs(acts.length)} في ${semLabel(n)}</span>${t.linked ? `<span class="pill brand">${svg('bot')}مجموعة مربوطة بالبوت</span>` : ''}</div></div>
     <div class="ctl">${ctl}</div></div>`;
 }
-function semTabs(id, n) {
+// شريط أقسام المسار
+function secTabs(id, n, sec) {
+  if (!secsOn()) return '';
+  const L = weekTasks(id, wkStart(TODAY)), late = actsOf(id).filter(isLate).length;
+  const badge = { tasks: L.length, follow: late };
+  return `<nav class="sectabs" aria-label="أقسام المسار">${T_SECS.map(([k, l, ic, sh]) => `<a class="sectab" href="${tHref(id, n, k)}" aria-current="${sec === k ? 'page' : 'false'}">${svg(ic)}<span class="lf">${l}</span><span class="ls">${sh}</span>${badge[k] ? `<i class="${k === 'follow' ? 'warn' : ''}">${badge[k]}</i>` : ''}</a>`).join('')}</nav>`;
+}
+function semTabs(id, n, sec) {
   const t = T(id), cur = +curN(id);
-  return `<div class="semtabs" role="tablist" aria-label="فصول المسار">${Array.from({ length: t.sems || 6 }, (_, i) => i + 1).map(k => `<a class="semtab ${semOf(id, k) ? '' : 'nodata'}" role="tab" href="#t/${id}/${k}" aria-current="${String(k) === String(n)}" ${semOf(id, k) ? '' : 'data-tip="لا جدول لهذا الفصل بعد"'}>${semLabel(k)}<small>${k < cur ? 'انتهى' : k === cur ? 'الحالي' : 'لم يبدأ'}</small></a>`).join('')}</div>`;
+  return `<div class="semtabs" role="tablist" aria-label="فصول المسار">${Array.from({ length: t.sems || 6 }, (_, i) => i + 1).map(k => `<a class="semtab ${semOf(id, k) ? '' : 'nodata'}" role="tab" href="${tHref(id, k, sec)}" aria-current="${String(k) === String(n)}" ${semOf(id, k) ? '' : 'data-tip="لا جدول لهذا الفصل بعد"'}>${semLabel(k)}<small>${k < cur ? 'انتهى' : k === cur ? 'الحالي' : 'لم يبدأ'}</small></a>`).join('')}</div>`;
 }
 function semEmpty(id, n) {
   const t = T(id), ed = canEdit(id);
@@ -1913,10 +2076,103 @@ function dockIdle(id) {
   const notes = cls.map(a => `<button class="dk-note warn" type="button" data-act="openact" data-id="${a.id}" data-track="${id}">${svg('alert')}<span><b>${gDay(a.d)}:</b> ${esc(clashOf(id, a))}</span></button>`).join('') +
     kahootSugs(id).filter(s => s.left <= 30).map(s => `<div class="dk-note sug">${tile('كاهوت', 'sm')}<span>${esc(s.exam)} ${rel(s.ed)}. <b>اقتراح:</b> كاهوت مراجعة ${gDay(s.d)}.</span>${ed ? `<button class="btn sm" type="button" data-act="newact" data-track="${id}" data-date="${s.d}" data-type="كاهوت" data-title="${esc(s.title)}">أضفه</button>` : ''}</div>`).join('');
   return `<div class="dk-h"><div class="col"><span class="xs faint">لوحة النشاط</span><b>أنشطة ${esc(t.name)}</b></div>${ed ? `<button class="btn pri sm" type="button" data-act="newact" data-track="${id}">${svg('plus')}نشاط</button>` : ''}</div>
-  <div class="dk-b">${(() => { const L = weekTasks(id, focusWeek()); return `<div class="dk-sec"><div class="row" style="gap:6px"><h4 style="margin:0;flex:1">مهام الأسبوع${L.length ? ' · ' + L.length : ''}</h4><button class="btn sm ghost" type="button" data-act="tk-new" data-track="${id}">${svg('plus')}مهمة</button></div>${L.length ? `<div class="wt-list" style="margin-top:8px">${L.map(x => wtRow(id, x)).join('')}</div>` : '<p class="muted sm" style="margin-top:6px">لا مهام هذا الأسبوع.</p>'}</div>`; })()}
+  <div class="dk-b">${(() => { if (!secsOn()) { const L = weekTasks(id, focusWeek()); return `<div class="dk-sec"><div class="row" style="gap:6px"><h4 style="margin:0;flex:1">مهام الأسبوع${L.length ? ' · ' + L.length : ''}</h4><button class="btn sm ghost" type="button" data-act="tk-new" data-track="${id}">${svg('plus')}مهمة</button></div>${L.length ? `<div class="wt-list" style="margin-top:8px">${L.map(x => wtRow(id, x)).join('')}</div>` : '<p class="muted sm" style="margin-top:6px">لا مهام هذا الأسبوع.</p>'}</div>`; } const L = weekTasks(id, wkStart(TODAY)); return L.length ? `<a class="dk-link" href="${tHref(id, semN(id), 'tasks')}"><span class="tile sm" style="--tc:var(--brand)">${svg('check')}</span><span class="col" style="min-width:0;flex:1"><b>مهام هذا الأسبوع: ${nTasks(L.length)}</b><span class="xs faint">${esc(L.slice(0, 2).map(x => x.text).join('، '))}${L.length > 2 ? '…' : ''}</span></span>${svg('back')}</a>` : ''; })()}
     ${notes ? `<div class="dk-sec"><h4>تنبيهات واقتراحات</h4>${notes}</div>` : ''}
     <div class="dk-sec"><h4>القادمة</h4>${up.length ? `<div class="col" style="gap:6px">${up.slice(0, 10).map(a => evChip(a, id, { date: true })).join('')}</div>${up.length > 10 ? `<p class="xs faint" style="margin-top:6px">و${nActs(up.length - 10)} بعدها في الجدول</p>` : ''}` : `<p class="muted sm">لا أنشطة قادمة في الخطة.</p>`}</div>
     <p class="hint">${svg('edit', 1.6)} اضغط أي نشاط في الجدول ليُفتح هنا، أو اسحبه إلى يوم آخر.</p></div>`;
+}
+
+/* ---------- قسم «المهام والمطلوبات» ---------- */
+const TW = {};   // الأسبوع المعروض في قسم المهام لكل مسار
+function tasksSec(id) {
+  const ws = TW[id] || wkStart(TODAY), we = add(ws, 6), L = weekTasks(id, ws), ed = true;
+  const late = tasksOf(id).filter(x => !x.done && x.d && x.d < ws);
+  const byDay = {}; L.forEach(x => { const k = x.d || '—'; (byDay[k] = byDay[k] || []).push(x); });
+  const kinds = {}; L.forEach(x => kinds[x.k] = (kinds[x.k] || 0) + 1);
+  const KN = { design: 'تصميم', publish: 'نشر', who: 'تحديد مسؤول', clash: 'يوم مزدحم', kahoot: 'كاهوت', mark: 'تعليم', next: 'تخطيط', task: 'مهام الفريق' };
+  const pager = `<div class="twpager"><button class="btn icon sm" type="button" data-act="twk" data-id="${id}" data-n="-7" aria-label="الأسبوع السابق">${svg('fwd')}</button>
+    <div class="col" style="align-items:center;flex:1"><b>${ws === wkStart(TODAY) ? 'هذا الأسبوع' : ws === add(wkStart(TODAY), 7) ? 'الأسبوع القادم' : ws === add(wkStart(TODAY), -7) ? 'الأسبوع الماضي' : 'أسبوع ' + gShort(ws)}</b><span class="xs faint">${gShort(ws)} – ${gShort(we)}</span></div>
+    ${ws !== wkStart(TODAY) ? `<button class="btn sm ghost" type="button" data-act="twk" data-id="${id}" data-n="0">اليوم</button>` : ''}<button class="btn icon sm" type="button" data-act="twk" data-id="${id}" data-n="7" aria-label="الأسبوع التالي">${svg('back')}</button></div>`;
+  const days = Object.keys(byDay).sort((a, b) => a === '—' ? 1 : b === '—' ? -1 : a < b ? -1 : 1);
+  const main = `<div class="card"><div class="card-h"><h3>المطلوب ${ws === wkStart(TODAY) ? 'هذا الأسبوع' : 'في الأسبوع'}</h3><span class="xs faint">${L.length ? nTasks(L.length) : ''}</span></div>${pager}
+    ${L.length ? `<div class="kchips">${Object.keys(kinds).map(k => `<span class="pill">${svg(WT_IC[k] || 'check')}${KN[k] || k} ${kinds[k]}</span>`).join('')}</div>` : ''}
+    ${days.length ? days.map(d => `<div class="tday ${d === TODAY ? 'today' : ''}"><div class="tday-h"><b>${d === '—' ? 'بلا موعد' : d === TODAY ? 'اليوم' : DAYS[wd(d)]}</b>${d !== '—' ? `<span class="xs faint">${gShort(d)}</span>` : ''}</div><div class="wt-list">${byDay[d].map(x => wtRow(id, x)).join('')}</div></div>`).join('')
+      : `<div class="empty-s">${svg('check')}<b>لا مطلوبات في هذا الأسبوع</b><span class="muted sm">المطلوبات تُحسب من الخطة: تصميم الإعلانات ونشرها، والمسؤولون، والأيام المزدحمة، وتعليم ما نُفّذ.</span></div>`}</div>`;
+  const open = tasksOf(id).filter(x => !x.done).sort((a, b) => (a.d || '9') < (b.d || '9') ? -1 : 1), done = tasksOf(id).filter(x => x.done);
+  const tRow = x => `<div class="wt-row task ${x.done ? 'is-done' : ''}"><button class="ck round ${x.done ? 'ok' : ''}" type="button" role="checkbox" aria-checked="${!!x.done}" data-act="${x.done ? 'tk-undo' : 'tk-done'}" data-id="${x.id}" data-track="${id}" aria-label="تمت">${svg('check', 2.4)}</button><button class="tx lk-plain" type="button" data-act="tk-edit" data-id="${x.id}" data-track="${id}"><span>${esc(x.title)}</span><span class="xs ${!x.done && x.d && x.d < TODAY ? 'late' : 'faint'}">${[x.d ? (x.d === TODAY ? 'اليوم' : 'قبل ' + gDay(x.d)) : '', (x.who || []).join('، ')].filter(Boolean).join(' · ')}</span></button></div>`;
+  const side = `<div class="card"><div class="card-h"><h3>مهام الفريق</h3><span class="xs faint">${open.length ? 'المفتوحة: ' + open.length : ''}</span><span class="sp"></span>${ed ? `<button class="btn sm pri" type="button" data-act="tk-new" data-track="${id}">${svg('plus')}مهمة</button>` : ''}</div>
+    ${late.length ? `<p class="xs late" style="margin:0 0 6px">${svg('alert')} ${nTasks(late.length)} تجاوزت موعدها</p>` : ''}
+    ${open.length ? `<div class="wt-list">${open.map(tRow).join('')}</div>` : `<p class="muted sm">لا مهام مفتوحة. المهمة شيء يقوم به الفريق ولا يُعدّ نشاطًا للطلاب: تجهيز أسئلة، التواصل مع ضيف، مراجعة تصميم…</p>`}
+    ${done.length ? `<details class="tdone"><summary>المنجزة (${done.length})</summary><div class="wt-list">${done.slice(-30).reverse().map(tRow).join('')}</div></details>` : ''}</div>`;
+  return `<div class="secgrid">${main}${side}</div>`;
+}
+
+/* ---------- قسم «متابعة التنفيذ» ---------- */
+function readiness(id, a) {
+  const c = remCfg(a), t = T(id), em = (t && t.emails) || {}, L = [];
+  L.push((a.who || []).length ? ['ok', 'المسؤول: ' + a.who.join('، ')] : ['bad', 'بلا مسؤول']);
+  if (remindable(a) && c.des) L.push(a.link ? ['ok', 'التصميم مرفوع'] : ['warn', 'التصميم لم يُرفع']);
+  if (MEET_T.includes(a.type)) L.push(a.meet && a.meet.uri ? ['ok', 'رابط ميت جاهز'] : ['warn', 'بلا رابط ميت']);
+  if (remindable(a) && t.linked) { const s = a.sent || {}, n = ['d3', 'd2', 'd1', 'd0'].filter(k => s[k] === a.d).length; if (n) L.push(['ok', n === 1 ? 'وصل تذكير' : 'وصل ' + n + ' تذكيرات']); }
+  return L;
+}
+function fRow(id, a, mode) {
+  const marks = mode === 'week' ? readiness(id, a).map(([k, l]) => `<span class="rd ${k}">${svg(k === 'ok' ? 'check' : 'alert')}${esc(l)}</span>`).join('') : '';
+  const note = mode === 'done' ? (a.note ? `<p class="fnote">${esc(a.note)}</p>` : `<p class="fnote faint">لا ملاحظة عن التنفيذ بعد.</p>`) : '';
+  const act = mode === 'late' || mode === 'week' ? `<button class="btn sm ${mode === 'late' ? 'pri' : ''}" type="button" data-act="done" data-id="${a.id}" data-track="${id}">${svg('check')}تم</button>` : (a.link ? `<a class="btn icon sm" href="${esc(a.link)}" target="_blank" rel="noopener" aria-label="الرابط" data-tip="الرابط">${svg('ext')}</a>` : '');
+  return `<div class="frow ${mode}">${tile(a.type)}<button class="tx lk-plain" type="button" data-act="openact" data-id="${a.id}" data-track="${id}"><b>${esc(a.title)}</b><span class="xs faint">${gDay(a.d)}${a.time ? ' · ' + timeText(a.time) : ''}${(a.who || []).length && mode !== 'week' ? ' · ' + esc(a.who.join('، ')) : ''}${mode === 'late' ? ' · ' + rel(a.d) : ''}</span>${marks ? `<span class="rds">${marks}</span>` : ''}${note}</button><div class="fact-a">${act}</div></div>`;
+}
+function followSec(id, n) {
+  const acts = actsOf(id, n).slice().sort(sortA), ws = wkStart(TODAY), we = add(ws, 6);
+  const late = acts.filter(isLate), week = acts.filter(a => a.d >= TODAY && a.d <= we && !a.done), done = acts.filter(a => a.done).reverse();
+  const past = acts.filter(a => a.d < TODAY), rate = past.length ? Math.round(done.filter(a => a.d < TODAY).length / past.length * 100) : 0;
+  const kpi = (v, l, k = '') => `<div class="kpi ${k}"><b>${v}</b><span>${l}</span></div>`;
+  return `<div class="kpis">${kpi(done.length, 'نُفّذ')}${kpi(late.length, 'بانتظار التعليم', late.length ? 'warn' : '')}${kpi(week.length, 'باقي هذا الأسبوع')}${kpi(past.length ? rate + '٪' : '—', 'نسبة التنفيذ مما مضى')}</div>
+    <div class="secgrid">
+      <div class="col" style="gap:18px">
+        <div class="card"><div class="card-h"><h3>بانتظار التعليم</h3><span class="xs faint">مضى موعدها ولم تُعلَّم «تم»</span></div>${late.length ? `<div class="flist">${late.map(a => fRow(id, a, 'late')).join('')}</div><p class="hint">إن لم يُقم النشاط فافتحه واكتب السبب في الملاحظة، أو انقله إلى يوم آخر.</p>` : `<p class="muted sm">${past.length ? 'كل ما مضى معلَّم. أحسنتم.' : 'لم يمضِ نشاط بعد في هذا الفصل.'}</p>`}</div>
+        <div class="card"><div class="card-h"><h3>جاهزية هذا الأسبوع</h3><span class="xs faint">${gShort(TODAY)} – ${gShort(we)}</span></div>${week.length ? `<div class="flist">${week.map(a => fRow(id, a, 'week')).join('')}</div>` : `<p class="muted sm">لا أنشطة باقية هذا الأسبوع.</p>`}</div>
+      </div>
+      <div class="card"><div class="card-h"><h3>ما نُفّذ</h3><span class="xs faint">${done.length ? nActs(done.length) : ''}</span></div>${done.length ? `<div class="flist">${done.slice(0, 40).map(a => fRow(id, a, 'done')).join('')}</div>` : `<p class="muted sm">حين يُعلَّم نشاط «تم» يظهر هنا مع ملاحظة تنفيذه.</p>`}</div>
+    </div>`;
+}
+
+/* ---------- قسم «التقرير» ---------- */
+function bars(rows, o = {}) {   // أعمدة أفقية: [الاسم، القيمة، اللون، النص]
+  const max = Math.max(1, ...rows.map(r => r[1]));
+  return `<div class="hbars">${rows.map(([l, v, c, tip]) => `<div class="hb" data-tip="${esc(tip || l + ': ' + v)}"><span class="hb-l">${l}</span><span class="hb-t"><i style="width:${Math.max(v ? 3 : 0, v / max * 100)}%;${c ? 'background:' + c : ''}"></i></span><b class="hb-v">${v}</b></div>`).join('')}</div>`;
+}
+function reportSec(id, n) {
+  const t = T(id), sem = semOf(id, n), acts = actsOf(id, n), done = acts.filter(a => a.done), past = acts.filter(a => a.d < TODAY);
+  if (!sem || !sem.days.length) return `<div class="card empty">${svg('sheet')}<h3>لا جدول لهذا الفصل</h3><p>التقرير يُبنى من أيام الفصل وأنشطته.</p></div>`;
+  const W = weeksOf(sem.days), nowW = W.filter(w => w.from <= TODAY).length;
+  const emptyW = W.slice(0, nowW).filter(w => !acts.some(a => a.d >= w.from && a.d <= w.to)).length;
+  const kpi = (v, l, s = '') => `<div class="kpi"><b>${v}</b><span>${l}</span>${s ? `<small>${s}</small>` : ''}</div>`;
+  const weeks = W.map((w, i) => { const A = acts.filter(a => a.d >= w.from && a.d <= w.to), dn = A.filter(a => a.done).length, fut = w.from > TODAY;
+    return `<div class="wb ${fut ? 'fut' : ''} ${w.from <= TODAY && TODAY <= w.to ? 'now' : ''}" data-tip="الأسبوع ${i + 1} (${gShort(w.from)}): ${nActs(A.length)}${A.length && !fut ? '، نُفّذ ' + dn : ''}"><span class="wb-c">${A.length ? `<i class="pl" style="height:${Math.min(100, A.length * 22)}%"><i class="dn" style="height:${A.length ? dn / A.length * 100 : 0}%"></i></i>` : '<i class="zero"></i>'}</span><span class="wb-l">${i + 1}</span></div>`; }).join('');
+  const types = TYPE_NAMES.map(k => [k, acts.filter(a => a.type === k).length, typeOf(k)[1]]).filter(r => r[1]).sort((a, b) => b[1] - a[1]);
+  const who = {}; acts.forEach(a => (a.who || []).forEach(w => who[w] = (who[w] || 0) + 1));
+  const whoRows = Object.keys(who).map(w => [esc(w), who[w], '']).sort((a, b) => b[1] - a[1]);
+  const noWho = acts.filter(a => !(a.who || []).length).length;
+  const rep = isAdmin() ? repExcerpt(t) : '';
+  return `<div class="kpis">${kpi(acts.length, 'في الخطة', 'القادم منها: ' + acts.filter(a => a.d >= TODAY).length)}${kpi(done.length, 'نُفّذ', past.length ? Math.round(done.length / past.length * 100) + '٪ مما مضى' : '')}${kpi(emptyW, 'أسابيع مضت بلا نشاط', nowW ? 'من ' + nowW : '')}${kpi(tasksOf(id).filter(x => x.done).length + ' / ' + tasksOf(id).length, 'مهام الفريق المنجزة')}</div>
+    <div class="card"><div class="card-h"><h3>الأنشطة أسبوعًا أسبوعًا</h3><span class="lg"><i class="pl"></i>مخطط<i class="dn"></i>نُفّذ</span></div><div class="wbars" role="img" aria-label="عدد الأنشطة في كل أسبوع وما نُفّذ منها">${weeks}</div></div>
+    <div class="secgrid">
+      <div class="card"><div class="card-h"><h3>حسب النوع</h3></div>${types.length ? bars(types.map(r => [esc(r[0]), r[1], r[2]])) : '<p class="muted sm">لا أنشطة بعد.</p>'}</div>
+      <div class="card"><div class="card-h"><h3>توزيع المسؤوليات</h3>${noWho ? `<span class="xs late">${nActs(noWho)} بلا مسؤول</span>` : ''}</div>${whoRows.length ? bars(whoRows) : '<p class="muted sm">لم يُحدَّد مسؤول لأي نشاط بعد.</p>'}</div>
+    </div>${rep}`;
+}
+// مقطع المسار من آخر تقرير أسبوعي (للإدارة)
+function repExcerpt(t) {
+  if (typeof RP === 'undefined') return '';
+  if (!RP) { if (!RP_LOAD) { RP_LOAD = true; API.me('report_list').then(l => { RP = l; RP_AT = Date.now(); RP_LOAD = false; if (tSec() === 'report') render(); }).catch(() => { RP = []; RP_LOAD = false; }); } return `<div class="card"><div class="card-h"><h3>من التقرير الأسبوعي</h3></div><span class="spin"></span></div>`; }
+  const r = RP[0]; if (!r) return '';
+  const key = s => normAr(s).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/مسار\s*/, '').replace(/[^ء-ي0-9]/g, '');
+  const names = [t.name, t.full].filter(Boolean).map(key);
+  const lines = String(r.text || '').split('\n'); let on = false; const out = [];
+  for (const ln of lines) { const m = /^#{2,3}\s+(.*)$/.exec(ln); if (m) { if (on) break; on = names.some(nm => key(m[1]) === nm || key(m[1]).startsWith(nm)); continue; } if (on) out.push(ln); }
+  if (!out.join('').trim()) return '';
+  return `<div class="card"><div class="card-h"><h3>من التقرير الأسبوعي</h3><span class="xs faint">${esc(r.title || '')}</span><span class="sp"></span><a class="btn sm ghost" href="#reports">التقرير كاملًا</a></div><div class="rep-md">${md(out.join('\n'))}</div></div>`;
 }
 
 /* ---------- المنظور الزمني ---------- */
@@ -2194,10 +2450,11 @@ async function saveF(scope) {
   if (rep && rep.length > 60) return toast('أقصى التكرار ٦٠ موعدًا. قصّر المدة أو باعد بين المواعيد', 'err');
   if (rep && (rep.length > 1 || !f.isNew)) {
     const rule = { every: f.rep.every, wd: f.rep.wd, until: f.rep.until };
-    if (f.dock) F = null; else closeLayer();
+    // المتكرر أثقل على الخادم: تبقى النافذة مفتوحة وزرها «يحفظ…» حتى تُحفظ المواعيد كلها، ثم تُغلق
     try {
       if (f.isNew) { const base = Object.assign({}, patch); ['d', 'sem', 'calOn'].forEach(k => delete base[k]); await saveSeries(tid, { base, dates: rep, rule, calOn: !!patch.calOn }); toast(`أُضيف ${qt(patch.title)} في ${apptText(rep.length)}`); }
       else { await saveAct(tid, patch, { noRender: true }); const r = await saveSeries(tid, { from: f.id, dates: rep, rule }); toast(`كُرّر ${qt(patch.title)}: ${apptText(r.acts.length)} بعده`); }
+      if (F === f) { if (f.dock) { F = null; render(); } else closeLayer(); }
     } catch (e) {}
     return;
   }
@@ -2627,7 +2884,7 @@ const H = {
   close: closeLayer, theme: () => { closeLayer(); toggleTheme(); }, cmd: openCmd, usermenu: userMenu, more: userMenu, logout: () => { closeLayer(); logout(); }, mypass: passDialog,
   retry: () => boot(), 'demo-reset': () => { if (window.DEMO) window.DEMO.reset(); },
   lgwho: el => { LG.who = el.dataset.id; LG.err = ''; render(); }, lgother: () => { LG.other = !LG.other; LG.err = ''; render(); },
-  openact: el => { if (SUPPRESS) return; openAct(el.dataset.track, el.dataset.id); },
+  openact: el => { if (SUPPRESS) return; if (String(el.dataset.id).startsWith('tmp')) return toast('يُحفظ النشاط الآن، لحظات ويُفتح'); openAct(el.dataset.track, el.dataset.id); },
   newact: el => openAct(el.dataset.track || '', null, { date: el.dataset.date, type: el.dataset.type, track: el.dataset.track, title: el.dataset.title }),
   'f-meet': async () => {
     readF(); if (!F || !F.id) return; const f = F; f.meetBusy = true; drawAct(true);
@@ -2644,29 +2901,31 @@ const H = {
   'tk-edit': el => taskDialog(el.dataset.track, el.dataset.id),
   'tk-who': el => { readTK(); const w = el.dataset.v; TK.who = (TK.who || []).includes(w) ? TK.who.filter(x => x !== w) : (TK.who || []).concat(w); drawTask(); },
   'tk-tgl': () => { readTK(); TK.done = !TK.done; drawTask(); },
-  'tk-save': () => { readTK(); if (!TK.title.trim()) { toast('اكتب المهمة', 'err'); return; } const k = TK, patch = { title: k.title.trim(), d: k.d || '', who: k.who || [] }; if (!k.isNew) Object.assign(patch, { id: k.id, done: !!k.done }); closeLayer(); saveTask(k.tid, patch).then(r => toast(k.isNew ? 'أُضيفت المهمة' : 'حُفظت المهمة')).catch(() => {}); },
+  'tk-save': () => { readTK(); if (!TK.title.trim()) { toast('اكتب المهمة', 'err'); return; } const k = TK, patch = { title: k.title.trim(), d: k.d || '', who: k.who || [] }; if (!k.isNew) Object.assign(patch, { id: k.id, done: !!k.done }); return saveTask(k.tid, patch).then(r => { if (TK === k) closeLayer(); toast(k.isNew ? 'أُضيفت المهمة' : 'حُفظت المهمة'); }).catch(() => {}); },
   'tk-del': async el => { if (!armed(el, 'تأكيد الحذف')) return; const k = TK; closeLayer(); const p = planOf(k.tid), i = p.tasks.findIndex(x => x.id === k.id), prev = p.tasks[i]; p.tasks.splice(i, 1); render(); try { const r = await API.me('task_del', k.tid, k.id); p.rev = r.rev; D.revs[k.tid] = r.rev; toast('حُذفت المهمة'); } catch (e) { p.tasks.splice(i, 0, prev); render(); toast(e.message, 'err'); } },
-  'tk-done': el => { saveTask(el.dataset.track, { id: el.dataset.id, done: true }).then(() => toast('أُنجزت المهمة', '', () => saveTask(el.dataset.track, { id: el.dataset.id, done: false }))).catch(() => {}); },
+  twk: el => { const id = el.dataset.id, n = +el.dataset.n; TW[id] = n ? add(TW[id] || wkStart(TODAY), n) : wkStart(TODAY); render(); },
+  'tk-undo': el => saveTask(el.dataset.track, { id: el.dataset.id, done: false }),
+  'tk-done': el => { return saveTask(el.dataset.track, { id: el.dataset.id, done: true }).then(() => toast('أُنجزت المهمة', '', () => saveTask(el.dataset.track, { id: el.dataset.id, done: false }))).catch(() => {}); },
   'bot-menu': async () => { try { const r = await API.me('tg_menu'); toast('حُدّثت قائمة أوامر البوت في تليجرام (' + r.n + ')'); } catch (e) { toast(e.message, 'err'); } },
   'bs-atasks': async () => { const v = !(BS.settings.adminTasks !== false); try { await API.me('settings_save', JSON.stringify({ adminTasks: v })); BS.settings.adminTasks = v; render(); } catch (e) { toast(e.message, 'err'); } },
   'f-cancel': closeAct, 'f-day': el => { readF(); F.d = el.dataset.v; drawAct(true); },
   'al-seen': () => alertsSeen(true),
-  done: el => { const tid = el.dataset.track, a = planOf(tid).acts.find(x => x.id === el.dataset.id); if (!a) return; const v = !a.done; saveAct(tid, { id: a.id, done: v }).then(() => toast(v ? `تم تنفيذ ${qt(a.title)}` : 'أُعيد إلى الخطة', '', () => saveAct(tid, { id: a.id, done: !v }))).catch(() => {}); },
+  done: el => { const tid = el.dataset.track, a = planOf(tid).acts.find(x => x.id === el.dataset.id); if (!a) return; const v = !a.done; return saveAct(tid, { id: a.id, done: v }).then(() => toast(v ? `تم تنفيذ ${qt(a.title)}` : 'أُعيد إلى الخطة', '', () => saveAct(tid, { id: a.id, done: !v }))).catch(() => {}); },
   'f-track': el => { readF(); F.tid = el.dataset.v; drawAct(true); }, 'f-type': el => { readF(); F.type = el.dataset.v; drawAct(true); },
   'f-who': el => { readF(); const w = el.dataset.v; F.who = (F.who || []).includes(w) ? F.who.filter(x => x !== w) : (F.who || []).concat(w); drawAct(true); },
   'f-rem': () => { readF(); const cur = F.rem === true || (F.rem !== false && (D.remindTypes || []).includes(F.type)); F.rem = !cur; drawAct(true); },
   'f-cal': () => { readF(); F.calOn = !F.calOn; drawAct(true); },
   'f-rp': el => { readF(); const k = el.dataset.v, c = remCfg(F); F.rp = Object.assign({}, F.rp || {}, { [k]: !c[k] }); drawAct(true); }, 'f-done': () => { readF(); F.done = !F.done; drawAct(true); },
   'f-save': () => saveF(), 'f-save-next': () => saveF('next'),
-  'f-del': () => { if (!F.confirmDel) { readF(); F.confirmDel = true; drawAct(true); return; } const { tid, id } = F; if (F.dock) F = null; else closeLayer(); delAct(tid, id); },
-  'f-del-next': () => { const { tid, id } = F; if (F.dock) F = null; else closeLayer(); delAct(tid, id, 'next'); },
+  'f-del': () => { if (!F.confirmDel) { readF(); F.confirmDel = true; drawAct(true); return; } const { tid, id } = F; if (F.dock) F = null; else closeLayer(); return delAct(tid, id); },
+  'f-del-next': () => { const { tid, id } = F; if (F.dock) F = null; else closeLayer(); return delAct(tid, id, 'next'); },
   'f-rep': () => { readF(); if (!F.rep) F.rep = newRep(); else F.rep.on = !F.rep.on; drawAct(true); },
   'f-rep-ev': el => { readF(); F.rep.every = +el.dataset.v; drawAct(true); },
   'f-rep-wd': el => { readF(); const i = +el.dataset.v, w = F.rep.wd; F.rep.wd = w.includes(i) ? (w.length > 1 ? w.filter(x => x !== i) : w) : w.concat(i); F.rep.wdAuto = false; drawAct(true); },
   'f-rep-d': el => { readF(); const d = el.dataset.v; F.rep.tog[d] = !F.rep.tog[d]; drawAct(true); },
   'f-rep-end': el => { readF(); F.rep.until = el.dataset.v; drawAct(true); },
   ed: el => inlineEdit(el), dayedit: el => dayEdit(el.dataset.id, el.dataset.n, el.dataset.d),
-  'de-save': el => { const p = {}; ['ax', 'c', 'q', 'r', 'ev', 'p'].forEach(k => p[k] = $('#de-' + k).value.trim()); closeLayer(); saveDay(el.dataset.id, el.dataset.n, el.dataset.d, p); },
+  'de-save': el => { const p = {}; ['ax', 'c', 'q', 'r', 'ev', 'p'].forEach(k => p[k] = $('#de-' + k).value.trim()); closeLayer(); return saveDay(el.dataset.id, el.dataset.n, el.dataset.d, p); },
   tblax: el => { P.tbl.ax = el.dataset.v; savePrefs(); render(); }, tblempty: () => { P.tbl.hideEmpty = !P.tbl.hideEmpty; savePrefs(); render(); }, tblclear: () => { TB.q = ''; P.tbl.ax = ''; P.tbl.hideEmpty = false; render(); },
   semmenu: el => semMenu(el.dataset.id, el.dataset.n), semimport: el => semImport(el.dataset.id, el.dataset.n), semnew: el => semNew(el.dataset.id, el.dataset.n),
   semdel: async el => { if (!armed(el, 'اضغط مرة ثانية لتأكيد الحذف')) return; closeLayer(); try { await API.me('sem_del', el.dataset.id, el.dataset.n); delete planOf(el.dataset.id).sems[el.dataset.n]; render(); toast('حُذف جدول الفصل'); } catch (e) { toast(e.message, 'err'); } },
@@ -2686,13 +2945,13 @@ const H = {
     readMB(); const bad = MB.find(m => m.n && m.e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m.e));
     if (bad) return toast('البريد غير صحيح: ' + bad.e, 'err');
     const L = [], E = {}; MB.forEach(m => { if (m.n && !L.includes(m.n)) { L.push(m.n); if (m.e) E[m.n] = m.e.toLowerCase(); } });
-    closeLayer(); trackSave(el.dataset.id, { members: L, emails: E }).then(() => toast('حُفظ الفريق')).catch(() => {});
+    return trackSave(el.dataset.id, { members: L, emails: E }).then(() => { closeLayer(); toast('حُفظ الفريق'); }).catch(() => {});
   },
   'mt-admins': async () => { const v = ($('#mt-admins').value || '').split(/[\s,،]+/).map(x => x.trim()).filter(Boolean); try { const r = await API.me('settings_save', JSON.stringify({ meetAdmins: v })); D.settings = r.settings; toast('حُفظ بريد الإدارة'); render(); } catch (e) { toast(e.message, 'err'); } },
-  toggleedit: el => { const t = T(el.dataset.id); trackSave(t.id, { canEdit: !t.canEdit }).then(r => toast(r.canEdit ? `فُتح تعديل الخطة لفريق ${t.name}` : `أُغلق تعديل الخطة لفريق ${t.name}`)).catch(() => {}); },
-  grant: el => { const t = T(el.dataset.id); trackSave(t.id, { canEdit: true }).then(() => toast(`فُتح تعديل الخطة لفريق ${t.name}`)).catch(() => {}); },
+  toggleedit: el => { const t = T(el.dataset.id); return trackSave(t.id, { canEdit: !t.canEdit }).then(r => toast(r.canEdit ? `فُتح تعديل الخطة لفريق ${t.name}` : `أُغلق تعديل الخطة لفريق ${t.name}`)).catch(() => {}); },
+  grant: el => { const t = T(el.dataset.id); return trackSave(t.id, { canEdit: true }).then(() => toast(`فُتح تعديل الخطة لفريق ${t.name}`)).catch(() => {}); },
   askedit: () => openDialog(`<h3>طلب فتح تعديل الخطة</h3><p class="muted sm">يصل الطلب إلى الإدارة في المنصة${D.tg ? ' وفي تليجرام' : ''}.</p><div class="field"><label for="ae-n">ماذا تريدون تعديله؟ (اختياري)</label><textarea class="inp" id="ae-n" rows="3" placeholder="مثل: نضيف مسابقة في الأسبوع الثالث"></textarea></div><div class="row"><button class="btn pri" type="button" data-act="ae-send">أرسل الطلب</button><button class="btn" type="button" data-act="close">إلغاء</button></div>`),
-  'ae-send': async () => { const note = $('#ae-n').value; closeLayer(); try { await API.me('edit_request', note); T(myTrack()).editReq = { at: Date.now(), by: D.me.name, note }; render(); toast('أُرسل الطلب إلى الإدارة'); } catch (e) { toast(e.message, 'err'); } },
+  'ae-send': async () => { const note = $('#ae-n').value; try { await API.me('edit_request', note); closeLayer(); T(myTrack()).editReq = { at: Date.now(), by: D.me.name, note }; render(); toast('أُرسل الطلب إلى الإدارة'); } catch (e) { toast(e.message, 'err'); } },
   hbw: el => { const n = +el.dataset.n; HB.ws = n ? add(HB.ws, n) : focusWeek(); render(); },
   mweek: el => { const k = el.dataset.id + '|' + el.dataset.n; if (el.dataset.v === 'now') delete MW[k]; else MW[k] = +el.dataset.v; render(); const pg = $('.wpager'); if (pg) window.scrollTo(0, pg.getBoundingClientRect().top + scrollY - 70); },
   tlweek: el => { P.tl.range = 'week'; P.tl.anchor = el.dataset.date; if (isAdmin() && el.dataset.id) { P.tl.tracks = [el.dataset.id]; P.tl.tmp = true; } savePrefs(); go('timeline'); },
@@ -2746,7 +3005,7 @@ document.addEventListener('click', e => {
   if (el.tagName === 'A' && k === 'tlweek') e.preventDefault();
   if (el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && k !== 'tblq')) return;
   if (k === 'tblq') return;
-  f(el, e);
+  runAct(f, el, e);
 });
 document.addEventListener('change', e => { const el = e.target; if (el.id === 'ac-r' && $('#ac-tf')) $('#ac-tf').hidden = el.value === 'admin'; if (el.dataset.act === 'bot-assign' && el.value) API.me('tg_assign', el.dataset.chat, el.value).then(s => { BS = s; toast('رُبطت المجموعة ✓'); boot(true); }).catch(x => toast(x.message, 'err')); if ((el.id === 'f-d' || el.id === 'f-rep-until') && F) { readF(); drawAct(true); } });
 document.addEventListener('input', e => {

@@ -10,8 +10,8 @@ fs.mkdirSync(outDir, { recursive: true });
 let fails = 0;
 const ok = (c, m) => { console.log((c ? '✓ ' : '✗ ') + m); if (!c) fails++; };
 const PAGES = {
-  admin: ['#home', '#tracks', '#t/judhoor', '#timeline', '#calendar', '#bot', '#accounts', '#alerts', '#reports'],
-  judhoor: ['#home', '#t/judhoor', '#calendar']
+  admin: ['#home', '#tracks', '#t/judhoor', '#t/judhoor/tasks', '#t/judhoor/follow', '#t/judhoor/report', '#timeline', '#calendar', '#bot', '#accounts', '#alerts', '#reports'],
+  judhoor: ['#home', '#t/judhoor', '#t/judhoor/tasks', '#t/judhoor/follow', '#t/judhoor/report', '#calendar']
 };
 const VIEWPORTS = [['desk', 1280, 860], ['mob', 390, 844]];
 

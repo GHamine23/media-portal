@@ -106,8 +106,16 @@ const savePrefs = () => LS.set(NS + 'prefs', P);
 
 /* ---------- الاتصال بالخادم ---------- */
 let TOKEN = LS.get(NS + 'tok', '');
+// ما يقرأ فقط لا يُظهر شريط التنفيذ (التحديث الدوري وأمثاله)
+const READ_FNS = new Set(['revs', 'plan', 'boot', 'log_list', 'alerts', 'tg_status', 'report_list', 'acc_list', 'cal_list', 'me']);
+const NET = { n: 0 };
+function netBar() { document.documentElement.classList.toggle('net-busy', NET.n > 0); }
 const API = {
   async call(fn, ...args) {
+    const w = !READ_FNS.has(fn); if (w) { NET.n++; netBar(); }
+    try { return await API.raw(fn, ...args); } finally { if (w) { NET.n--; netBar(); } }
+  },
+  async raw(fn, ...args) {
     let j;
     if (CFG.demo) j = await window.DEMO.call(fn, args);
     else {
@@ -131,7 +139,13 @@ const isAdmin = () => D && D.me.role === 'admin';
 const myTrack = () => D && D.me.role === 'team' ? D.me.track : null;
 const T = id => D.tracks.find(t => t.id === id);
 const planOf = id => D.plans[id] || (D.plans[id] = { sems: {}, acts: [], rev: 0 });
-const semN = id => { const r = route(); return String((r.name === 't' && r.a === id && r.b) || (T(id) && T(id).cur) || 1); };
+const semN = id => { const r = route(); return String((r.name === 't' && r.a === id && /^\d+$/.test(r.b) && r.b) || (T(id) && T(id).cur) || 1); };
+// أقسام صفحة المسار: الخطة (الجدول والتخطيط)، المهام والمطلوبات، متابعة التنفيذ، التقرير
+const T_SECS = [['plan', 'الخطة', 'table', 'الخطة'], ['tasks', 'المهام والمطلوبات', 'check', 'المهام'], ['follow', 'متابعة التنفيذ', 'target', 'المتابعة'], ['report', 'التقرير', 'sheet', 'التقرير']];
+// معاينة الأقسام على الموقع الحي قبل اعتمادها: ?secs=1 يفعّلها لهذا المتصفح، و?secs=0 يلغيها
+const secsOn = () => { const m = /[?&]secs=([01])/.exec(location.search); if (m) LS.set(NS + 'secs', m[1] === '1'); return !!(CFG.demo || CFG.secs || LS.get(NS + 'secs', false)); };
+const tSec = () => { const r = route(); if (r.name !== 't' || !secsOn()) return 'plan'; const s = /^\d+$/.test(r.b) ? r.c : r.b; return T_SECS.some(x => x[0] === s) ? s : 'plan'; };
+const tHref = (id, n, sec) => `#t/${id}/${n}${sec && sec !== 'plan' ? '/' + sec : ''}`;
 const curN = id => String((T(id) && T(id).cur) || 1);
 const semOf = (id, n) => planOf(id).sems[String(n)];
 const daysOf = (id, n) => (semOf(id, n || curN(id)) || {}).days || [];
@@ -175,7 +189,7 @@ function kahootSugs(tid) {
 }
 /* ---------- لوحة النشاط الثابتة في صفحة المسار (الشاشات العريضة) ---------- */
 const WIDE_Q = 1240;
-const dockOn = tid => !!tid && route().name === 't' && route().a === tid && innerWidth >= WIDE_Q;
+const dockOn = tid => !!tid && route().name === 't' && route().a === tid && tSec() === 'plan' && innerWidth >= WIDE_Q;
 const tcol = id => (T(id) && T(id).color) || '#888';
 const sortA = (x, y) => x.d < y.d ? -1 : x.d > y.d ? 1 : (x.time || '99').localeCompare(y.time || '99');
 const members = id => (T(id) && T(id).members) || [];
@@ -263,14 +277,14 @@ document.addEventListener('scroll', () => { if (tipEl) { tipEl.remove(); tipEl =
 
 /* ---------- حالة المزامنة ---------- */
 let SYNC = { st: 'ok', at: Date.now() };
-function setSync(st) { SYNC.st = st; if (st === 'ok') SYNC.at = Date.now(); const el = $$('.sync'); el.forEach(x => { x.className = 'sync ' + (st === 'busy' ? 'busy' : st === 'off' ? 'off' : ''); x.querySelector('span').textContent = syncText(); }); }
-const syncText = () => SYNC.st === 'busy' ? 'يحفظ…' : SYNC.st === 'off' ? 'غير متصل — سيُعاد المحاولة' : 'محدّث ' + ago(SYNC.at);
+function setSync(st, label) { SYNC.st = st; SYNC.label = st === 'busy' ? (label || '') : ''; if (st === 'ok') SYNC.at = Date.now(); const el = $$('.sync'); el.forEach(x => { x.className = 'sync ' + (st === 'busy' ? 'busy' : st === 'off' ? 'off' : ''); x.querySelector('span').textContent = syncText(); }); }
+const syncText = () => SYNC.st === 'busy' ? (SYNC.label ? 'يحفظ: ' + (SYNC.label.length > 28 ? SYNC.label.slice(0, 27) + '…' : SYNC.label) : 'يحفظ…') : SYNC.st === 'off' ? 'غير متصل — سيُعاد المحاولة' : 'محدّث ' + ago(SYNC.at);
 
 /* ---------- التنقل ---------- */
 function route() {
   const h = (location.hash || '').slice(1);
   const p = h.split('/').filter(Boolean).map(decodeURIComponent);
-  return { name: p[0] || 'home', a: p[1] || '', b: p[2] || '' };
+  return { name: p[0] || 'home', a: p[1] || '', b: p[2] || '', c: p[3] || '' };
 }
 function go(h) { if (location.hash === '#' + h) render(); else location.hash = h; }
 addEventListener('hashchange', () => { closeLayer(); if (F && F.dock) F = null; if (route().name !== 'bot') { BS = null; BS_LOAD = false; } if (P.tl && P.tl.tmp && route().name !== 'timeline') { P.tl.tracks = []; P.tl.tmp = false; savePrefs(); } render(); window.scrollTo(0, 0); });
@@ -394,6 +408,7 @@ function vLogin() {
 }
 function afterLogin() { if (LG.who || LG.other) setTimeout(() => { const el = LG.other ? $('#lg-u') : $('#lg-p'); if (el) el.focus(); }, 30); }
 async function doLogin(user, pass) {
+  if (LG.busy) return;
   LG.busy = true; LG.err = ''; render();
   try {
     if (CFG.demo && !pass) pass = window.DEMO.pass(user);
@@ -433,7 +448,7 @@ async function poll(force) {
     const r = await API.me('revs'), changed = [];
     if (r._meta !== D.revs._meta) { await boot(true); polling = false; return; }
     for (const id of Object.keys(r)) {
-      if (id[0] === '_' || r[id] === D.revs[id]) continue;
+      if (id[0] === '_' || r[id] === D.revs[id] || INFLIGHT[id]) continue;   // لا تُستبدل خطة فيها حفظ جارٍ
       D.plans[id] = await API.me('plan', id); D.revs[id] = r[id]; changed.push(id);
     }
     if (r._log !== D.revs._log) { D.log = (await API.me('log_list')).slice(0, 60); D.revs._log = r._log; }
@@ -457,50 +472,57 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) poll
 
 /* ---------- الحفظ (تفاؤلي مع التراجع عند الخطأ) ---------- */
 async function saveAct(tid, patch, opt = {}) {
-  const p = planOf(tid), body = Object.assign({}, patch);
-  let idx = -1, prev = null, tmp = null;
-  if (patch.id) { idx = p.acts.findIndex(a => a.id === patch.id); prev = p.acts[idx]; p.acts[idx] = Object.assign({}, prev, patch); }
+  const body = Object.assign({}, patch);
+  let p = planOf(tid), idx = -1, prev = null, tmp = null;
+  if (patch.id) { idx = p.acts.findIndex(a => a.id === patch.id); prev = p.acts[idx]; p.acts[idx] = Object.assign({}, prev, patch); delete p.acts[idx].scope; }
   else { tmp = Object.assign({ id: 'tmp' + Date.now(), done: false, who: [], by: D.me.name, sem: semFor(tid, patch.d) || curN(tid) }, patch); p.acts.push(tmp); }
   if (patch.d && !patch.sem) { const s = semFor(tid, patch.d); if (s) body.sem = s; }
+  const key = patch.id || tmp.id; pendOn(tid, key);
   if (!opt.quiet) render();
-  setSync('busy');
+  setSync('busy', patch.title || (prev && prev.title) || '');
   try {
     const r = await API.me('act_save', tid, JSON.stringify(body));
-    const i = p.acts.findIndex(a => a.id === (patch.id || tmp.id));
+    p = planOf(tid);
+    const i = p.acts.findIndex(a => a.id === key || a.id === r.act.id);
     if (i >= 0) p.acts[i] = r.act; else p.acts.push(r.act);
     (r.others || []).forEach(o => { const k = p.acts.findIndex(a => a.id === o.id); if (k >= 0) p.acts[k] = o; });
     p.rev = r.rev; D.revs[tid] = r.rev;
-    setSync('ok');
+    pendOff(tid, key); setSync('ok');
     if (r.calErr) toast('حُفظ النشاط، وتعذّر تحديث تقويم جوجل: ' + r.calErr, 'err');
     if (!opt.noRender) render();
     setTimeout(() => poll(true), 600);
     return r.act;
   } catch (e) {
-    if (prev) p.acts[idx] = prev; else if (tmp) p.acts.splice(p.acts.indexOf(tmp), 1);
-    setSync(e.net ? 'off' : 'ok'); render(); toast(e.message, 'err'); throw e;
+    p = planOf(tid); const i = p.acts.findIndex(a => a.id === key);
+    if (prev && i >= 0) p.acts[i] = prev; else if (tmp && i >= 0) p.acts.splice(i, 1);
+    pendOff(tid, key); setSync(e.net ? 'off' : 'ok'); render(); toast(e.message, 'err'); throw e;
   }
 }
+// أنشطة يُحفظ تغييرها الآن: تظهر بعلامة انتظار، ولا يستبدل التحديث الدوري خطة مسارها حتى تنتهي
+const PEND = new Set(), INFLIGHT = {};
+function pendOn(tid, id) { if (id) PEND.add(id); INFLIGHT[tid] = (INFLIGHT[tid] || 0) + 1; }
+function pendOff(tid, id) { if (id) PEND.delete(id); INFLIGHT[tid] = Math.max(0, (INFLIGHT[tid] || 1) - 1); if (!INFLIGHT[tid]) delete INFLIGHT[tid]; }
 // scope = 'next': هذا الموعد وما بعده من النشاط المتكرر
 async function delAct(tid, id, scope) {
   const p = planOf(tid), x = p.acts.find(a => a.id === id), before = p.acts.slice();
   if (!x) return;
   const gone = p.acts.filter(a => a.id === id || (scope === 'next' && x.ser && a.ser === x.ser && a.d > x.d));
-  p.acts = p.acts.filter(a => !gone.includes(a)); render(); setSync('busy');
-  try { const r = await API.me('act_del', tid, id, scope || ''); p.rev = r.rev; D.revs[tid] = r.rev; setSync('ok'); toast(gone.length > 1 ? `حُذف ${qt(x.title)} و${apptText(gone.length - 1)} بعده` : `حُذف ${qt(x.title)}`); }
-  catch (e) { p.acts = before; setSync('ok'); render(); toast(e.message, 'err'); }
+  p.acts = p.acts.filter(a => !gone.includes(a)); pendOn(tid, ''); render(); setSync('busy', 'حذف ' + x.title);
+  try { const r = await API.me('act_del', tid, id, scope || ''); const q = planOf(tid); q.acts = q.acts.filter(a => !(r.ids || [id]).includes(a.id)); q.rev = r.rev; D.revs[tid] = r.rev; pendOff(tid, ''); setSync('ok'); render(); toast(gone.length > 1 ? `حُذف ${qt(x.title)} و${apptText(gone.length - 1)} بعده` : `حُذف ${qt(x.title)}`); setTimeout(() => poll(true), 600); }
+  catch (e) { planOf(tid).acts = before; pendOff(tid, ''); setSync('ok'); render(); toast(e.message, 'err'); }
 }
 // النشاط المتكرر: مواعيد مستقلة تجمعها سلسلة واحدة
 async function saveSeries(tid, body) {
-  setSync('busy');
+  setSync('busy', 'المواعيد المتكررة'); pendOn(tid, body.from || '');
   try {
-    const r = await API.me('act_series', tid, JSON.stringify(body)), p = planOf(tid);
+    const r = await API.me('act_series', tid, JSON.stringify(body)), p = planOf(tid); pendOff(tid, body.from || '');
     if (r.first) { const i = p.acts.findIndex(a => a.id === r.first.id); if (i >= 0) p.acts[i] = r.first; }
     p.acts.push(...r.acts); p.series = Object.assign({}, p.series, { [r.sid]: r.series });
     p.rev = r.rev; D.revs[tid] = r.rev; setSync('ok');
     if (r.calErr) toast('أُضيفت المواعيد، وتعذّر بعضها في تقويم جوجل: ' + r.calErr, 'err');
     render(); setTimeout(() => poll(true), 600);
     return r;
-  } catch (e) { setSync(e.net ? 'off' : 'ok'); render(); toast(e.message, 'err'); throw e; }
+  } catch (e) { pendOff(tid, body.from || ''); setSync(e.net ? 'off' : 'ok'); render(); toast(e.message, 'err'); throw e; }
 }
 const apptText = n => n === 1 ? 'موعد واحد' : n === 2 ? 'موعدان' : n <= 10 ? n + ' مواعيد' : n + ' موعدًا';
 const EVERY = { 1: 'كل أسبوع', 2: 'كل أسبوعين', 4: 'كل أربعة أسابيع' };
@@ -631,4 +653,44 @@ function endDrag(e, cancel) {
     if (!cancel && DG.target) moveAct(DG.track, DG.id, DG.target.date);
   }
   DG = null;
+}
+
+/* ---------- الأزرار أثناء التنفيذ ----------
+   كل زر يبدأ أمرًا على الخادم يتحول إلى حالة «قيد التنفيذ» (دوّارة ونص يصف ما يجري)، ولا يُقبل الضغط عليه
+   مرة ثانية حتى ينتهي، ولو أُعيد رسم الصفحة في أثنائه. */
+const BUSY = new Map();
+const BUSY_LABEL = {
+  'f-save': 'يحفظ…', 'f-save-next': 'يحفظ…', 'f-meet': 'يُنشئ الرابط…', 'f-meet-del': 'يُزيل…', 'tk-save': 'يحفظ…', 'tk-del': 'يحذف…', 'mb-save': 'يحفظ الفريق…',
+  'de-save': 'يحفظ…', 'ae-send': 'يُرسل…', 'bs-save': 'يحفظ…', 'bot-menu': 'يحدّث…', 'bot-test': 'يُرسل…', 'bot-now': 'يُرسل…', 'bot-token': 'يربط…',
+  'mt-admins': 'يحفظ…', 'ac-save': 'يحفظ…', 'ac-del': 'يحذف…', 'acc-reset': 'يعيد التعيين…', 'pw-save': 'يغيّر…', 'si-check': 'يفحص…', 'si-save': 'يستورد…',
+  'sn-save': 'يُنشئ…', semdel: 'يحذف…', grant: 'يفتح…', toggleedit: 'يحفظ…', 'bs-pause': 'يحفظ…', 'bs-atasks': 'يحفظ…', 'bot-unlink': 'يُلغي…'
+};
+const busyKey = el => [el.dataset.act, el.dataset.id || '', el.dataset.v || '', el.dataset.track || '', el.dataset.n || '', el.dataset.d || ''].join('|');
+function busyEl(el, label) {
+  el.classList.add('busy'); el.setAttribute('aria-busy', 'true'); if ('disabled' in el) el.disabled = true;
+  if (label && el.tagName === 'BUTTON' && !el.classList.contains('icon') && el.textContent.trim()) { if (el.dataset.orig == null) el.dataset.orig = el.innerHTML; el.innerHTML = '<span class="spin" aria-hidden="true"></span>' + esc(label); }
+  else if (!el.querySelector('.spin')) el.insertAdjacentHTML('afterbegin', '<span class="spin" aria-hidden="true"></span>');
+}
+function unbusyEl(el) {
+  el.classList.remove('busy'); el.removeAttribute('aria-busy'); if ('disabled' in el) el.disabled = false;
+  if (el.dataset.orig != null) { el.innerHTML = el.dataset.orig; delete el.dataset.orig; } else { const sp = el.querySelector(':scope > .spin'); if (sp) sp.remove(); }
+}
+let BUSY_RAF = 0;
+function paintBusy() {
+  BUSY_RAF = 0;
+  $$('[data-act].busy').forEach(el => { if (!BUSY.has(busyKey(el))) unbusyEl(el); });
+  if (BUSY.size) $$('[data-act]').forEach(el => { const k = busyKey(el); if (BUSY.has(k) && !el.classList.contains('busy')) busyEl(el, BUSY.get(k)); });
+}
+new MutationObserver(() => { if ((BUSY.size || document.querySelector('[data-act].busy')) && !BUSY_RAF) BUSY_RAF = requestAnimationFrame(paintBusy); }).observe(document.documentElement, { childList: true, subtree: true });
+// يشغّل أمر الزر، ويحرسه من التكرار ما دام قيد التنفيذ
+function runAct(f, el, e) {
+  const k = busyKey(el);
+  if (BUSY.has(k)) { el.classList.remove('nudge'); void el.offsetWidth; el.classList.add('nudge'); return; }
+  const r = f(el, e);
+  if (r && typeof r.then === 'function') {
+    BUSY.set(k, el.dataset.busy || BUSY_LABEL[el.dataset.act] || '');
+    const t = setTimeout(paintBusy, 120);   // الأوامر السريعة لا تومض
+    r.catch(() => {}).finally(() => { clearTimeout(t); BUSY.delete(k); paintBusy(); });
+  }
+  return r;
 }

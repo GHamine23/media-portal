@@ -191,10 +191,11 @@ async function saveF(scope) {
   if (rep && rep.length > 60) return toast('أقصى التكرار ٦٠ موعدًا. قصّر المدة أو باعد بين المواعيد', 'err');
   if (rep && (rep.length > 1 || !f.isNew)) {
     const rule = { every: f.rep.every, wd: f.rep.wd, until: f.rep.until };
-    if (f.dock) F = null; else closeLayer();
+    // المتكرر أثقل على الخادم: تبقى النافذة مفتوحة وزرها «يحفظ…» حتى تُحفظ المواعيد كلها، ثم تُغلق
     try {
       if (f.isNew) { const base = Object.assign({}, patch); ['d', 'sem', 'calOn'].forEach(k => delete base[k]); await saveSeries(tid, { base, dates: rep, rule, calOn: !!patch.calOn }); toast(`أُضيف ${qt(patch.title)} في ${apptText(rep.length)}`); }
       else { await saveAct(tid, patch, { noRender: true }); const r = await saveSeries(tid, { from: f.id, dates: rep, rule }); toast(`كُرّر ${qt(patch.title)}: ${apptText(r.acts.length)} بعده`); }
+      if (F === f) { if (f.dock) { F = null; render(); } else closeLayer(); }
     } catch (e) {}
     return;
   }
@@ -624,7 +625,7 @@ const H = {
   close: closeLayer, theme: () => { closeLayer(); toggleTheme(); }, cmd: openCmd, usermenu: userMenu, more: userMenu, logout: () => { closeLayer(); logout(); }, mypass: passDialog,
   retry: () => boot(), 'demo-reset': () => { if (window.DEMO) window.DEMO.reset(); },
   lgwho: el => { LG.who = el.dataset.id; LG.err = ''; render(); }, lgother: () => { LG.other = !LG.other; LG.err = ''; render(); },
-  openact: el => { if (SUPPRESS) return; openAct(el.dataset.track, el.dataset.id); },
+  openact: el => { if (SUPPRESS) return; if (String(el.dataset.id).startsWith('tmp')) return toast('يُحفظ النشاط الآن، لحظات ويُفتح'); openAct(el.dataset.track, el.dataset.id); },
   newact: el => openAct(el.dataset.track || '', null, { date: el.dataset.date, type: el.dataset.type, track: el.dataset.track, title: el.dataset.title }),
   'f-meet': async () => {
     readF(); if (!F || !F.id) return; const f = F; f.meetBusy = true; drawAct(true);
@@ -641,29 +642,31 @@ const H = {
   'tk-edit': el => taskDialog(el.dataset.track, el.dataset.id),
   'tk-who': el => { readTK(); const w = el.dataset.v; TK.who = (TK.who || []).includes(w) ? TK.who.filter(x => x !== w) : (TK.who || []).concat(w); drawTask(); },
   'tk-tgl': () => { readTK(); TK.done = !TK.done; drawTask(); },
-  'tk-save': () => { readTK(); if (!TK.title.trim()) { toast('اكتب المهمة', 'err'); return; } const k = TK, patch = { title: k.title.trim(), d: k.d || '', who: k.who || [] }; if (!k.isNew) Object.assign(patch, { id: k.id, done: !!k.done }); closeLayer(); saveTask(k.tid, patch).then(r => toast(k.isNew ? 'أُضيفت المهمة' : 'حُفظت المهمة')).catch(() => {}); },
+  'tk-save': () => { readTK(); if (!TK.title.trim()) { toast('اكتب المهمة', 'err'); return; } const k = TK, patch = { title: k.title.trim(), d: k.d || '', who: k.who || [] }; if (!k.isNew) Object.assign(patch, { id: k.id, done: !!k.done }); return saveTask(k.tid, patch).then(r => { if (TK === k) closeLayer(); toast(k.isNew ? 'أُضيفت المهمة' : 'حُفظت المهمة'); }).catch(() => {}); },
   'tk-del': async el => { if (!armed(el, 'تأكيد الحذف')) return; const k = TK; closeLayer(); const p = planOf(k.tid), i = p.tasks.findIndex(x => x.id === k.id), prev = p.tasks[i]; p.tasks.splice(i, 1); render(); try { const r = await API.me('task_del', k.tid, k.id); p.rev = r.rev; D.revs[k.tid] = r.rev; toast('حُذفت المهمة'); } catch (e) { p.tasks.splice(i, 0, prev); render(); toast(e.message, 'err'); } },
-  'tk-done': el => { saveTask(el.dataset.track, { id: el.dataset.id, done: true }).then(() => toast('أُنجزت المهمة', '', () => saveTask(el.dataset.track, { id: el.dataset.id, done: false }))).catch(() => {}); },
+  twk: el => { const id = el.dataset.id, n = +el.dataset.n; TW[id] = n ? add(TW[id] || wkStart(TODAY), n) : wkStart(TODAY); render(); },
+  'tk-undo': el => saveTask(el.dataset.track, { id: el.dataset.id, done: false }),
+  'tk-done': el => { return saveTask(el.dataset.track, { id: el.dataset.id, done: true }).then(() => toast('أُنجزت المهمة', '', () => saveTask(el.dataset.track, { id: el.dataset.id, done: false }))).catch(() => {}); },
   'bot-menu': async () => { try { const r = await API.me('tg_menu'); toast('حُدّثت قائمة أوامر البوت في تليجرام (' + r.n + ')'); } catch (e) { toast(e.message, 'err'); } },
   'bs-atasks': async () => { const v = !(BS.settings.adminTasks !== false); try { await API.me('settings_save', JSON.stringify({ adminTasks: v })); BS.settings.adminTasks = v; render(); } catch (e) { toast(e.message, 'err'); } },
   'f-cancel': closeAct, 'f-day': el => { readF(); F.d = el.dataset.v; drawAct(true); },
   'al-seen': () => alertsSeen(true),
-  done: el => { const tid = el.dataset.track, a = planOf(tid).acts.find(x => x.id === el.dataset.id); if (!a) return; const v = !a.done; saveAct(tid, { id: a.id, done: v }).then(() => toast(v ? `تم تنفيذ ${qt(a.title)}` : 'أُعيد إلى الخطة', '', () => saveAct(tid, { id: a.id, done: !v }))).catch(() => {}); },
+  done: el => { const tid = el.dataset.track, a = planOf(tid).acts.find(x => x.id === el.dataset.id); if (!a) return; const v = !a.done; return saveAct(tid, { id: a.id, done: v }).then(() => toast(v ? `تم تنفيذ ${qt(a.title)}` : 'أُعيد إلى الخطة', '', () => saveAct(tid, { id: a.id, done: !v }))).catch(() => {}); },
   'f-track': el => { readF(); F.tid = el.dataset.v; drawAct(true); }, 'f-type': el => { readF(); F.type = el.dataset.v; drawAct(true); },
   'f-who': el => { readF(); const w = el.dataset.v; F.who = (F.who || []).includes(w) ? F.who.filter(x => x !== w) : (F.who || []).concat(w); drawAct(true); },
   'f-rem': () => { readF(); const cur = F.rem === true || (F.rem !== false && (D.remindTypes || []).includes(F.type)); F.rem = !cur; drawAct(true); },
   'f-cal': () => { readF(); F.calOn = !F.calOn; drawAct(true); },
   'f-rp': el => { readF(); const k = el.dataset.v, c = remCfg(F); F.rp = Object.assign({}, F.rp || {}, { [k]: !c[k] }); drawAct(true); }, 'f-done': () => { readF(); F.done = !F.done; drawAct(true); },
   'f-save': () => saveF(), 'f-save-next': () => saveF('next'),
-  'f-del': () => { if (!F.confirmDel) { readF(); F.confirmDel = true; drawAct(true); return; } const { tid, id } = F; if (F.dock) F = null; else closeLayer(); delAct(tid, id); },
-  'f-del-next': () => { const { tid, id } = F; if (F.dock) F = null; else closeLayer(); delAct(tid, id, 'next'); },
+  'f-del': () => { if (!F.confirmDel) { readF(); F.confirmDel = true; drawAct(true); return; } const { tid, id } = F; if (F.dock) F = null; else closeLayer(); return delAct(tid, id); },
+  'f-del-next': () => { const { tid, id } = F; if (F.dock) F = null; else closeLayer(); return delAct(tid, id, 'next'); },
   'f-rep': () => { readF(); if (!F.rep) F.rep = newRep(); else F.rep.on = !F.rep.on; drawAct(true); },
   'f-rep-ev': el => { readF(); F.rep.every = +el.dataset.v; drawAct(true); },
   'f-rep-wd': el => { readF(); const i = +el.dataset.v, w = F.rep.wd; F.rep.wd = w.includes(i) ? (w.length > 1 ? w.filter(x => x !== i) : w) : w.concat(i); F.rep.wdAuto = false; drawAct(true); },
   'f-rep-d': el => { readF(); const d = el.dataset.v; F.rep.tog[d] = !F.rep.tog[d]; drawAct(true); },
   'f-rep-end': el => { readF(); F.rep.until = el.dataset.v; drawAct(true); },
   ed: el => inlineEdit(el), dayedit: el => dayEdit(el.dataset.id, el.dataset.n, el.dataset.d),
-  'de-save': el => { const p = {}; ['ax', 'c', 'q', 'r', 'ev', 'p'].forEach(k => p[k] = $('#de-' + k).value.trim()); closeLayer(); saveDay(el.dataset.id, el.dataset.n, el.dataset.d, p); },
+  'de-save': el => { const p = {}; ['ax', 'c', 'q', 'r', 'ev', 'p'].forEach(k => p[k] = $('#de-' + k).value.trim()); closeLayer(); return saveDay(el.dataset.id, el.dataset.n, el.dataset.d, p); },
   tblax: el => { P.tbl.ax = el.dataset.v; savePrefs(); render(); }, tblempty: () => { P.tbl.hideEmpty = !P.tbl.hideEmpty; savePrefs(); render(); }, tblclear: () => { TB.q = ''; P.tbl.ax = ''; P.tbl.hideEmpty = false; render(); },
   semmenu: el => semMenu(el.dataset.id, el.dataset.n), semimport: el => semImport(el.dataset.id, el.dataset.n), semnew: el => semNew(el.dataset.id, el.dataset.n),
   semdel: async el => { if (!armed(el, 'اضغط مرة ثانية لتأكيد الحذف')) return; closeLayer(); try { await API.me('sem_del', el.dataset.id, el.dataset.n); delete planOf(el.dataset.id).sems[el.dataset.n]; render(); toast('حُذف جدول الفصل'); } catch (e) { toast(e.message, 'err'); } },
@@ -683,13 +686,13 @@ const H = {
     readMB(); const bad = MB.find(m => m.n && m.e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m.e));
     if (bad) return toast('البريد غير صحيح: ' + bad.e, 'err');
     const L = [], E = {}; MB.forEach(m => { if (m.n && !L.includes(m.n)) { L.push(m.n); if (m.e) E[m.n] = m.e.toLowerCase(); } });
-    closeLayer(); trackSave(el.dataset.id, { members: L, emails: E }).then(() => toast('حُفظ الفريق')).catch(() => {});
+    return trackSave(el.dataset.id, { members: L, emails: E }).then(() => { closeLayer(); toast('حُفظ الفريق'); }).catch(() => {});
   },
   'mt-admins': async () => { const v = ($('#mt-admins').value || '').split(/[\s,،]+/).map(x => x.trim()).filter(Boolean); try { const r = await API.me('settings_save', JSON.stringify({ meetAdmins: v })); D.settings = r.settings; toast('حُفظ بريد الإدارة'); render(); } catch (e) { toast(e.message, 'err'); } },
-  toggleedit: el => { const t = T(el.dataset.id); trackSave(t.id, { canEdit: !t.canEdit }).then(r => toast(r.canEdit ? `فُتح تعديل الخطة لفريق ${t.name}` : `أُغلق تعديل الخطة لفريق ${t.name}`)).catch(() => {}); },
-  grant: el => { const t = T(el.dataset.id); trackSave(t.id, { canEdit: true }).then(() => toast(`فُتح تعديل الخطة لفريق ${t.name}`)).catch(() => {}); },
+  toggleedit: el => { const t = T(el.dataset.id); return trackSave(t.id, { canEdit: !t.canEdit }).then(r => toast(r.canEdit ? `فُتح تعديل الخطة لفريق ${t.name}` : `أُغلق تعديل الخطة لفريق ${t.name}`)).catch(() => {}); },
+  grant: el => { const t = T(el.dataset.id); return trackSave(t.id, { canEdit: true }).then(() => toast(`فُتح تعديل الخطة لفريق ${t.name}`)).catch(() => {}); },
   askedit: () => openDialog(`<h3>طلب فتح تعديل الخطة</h3><p class="muted sm">يصل الطلب إلى الإدارة في المنصة${D.tg ? ' وفي تليجرام' : ''}.</p><div class="field"><label for="ae-n">ماذا تريدون تعديله؟ (اختياري)</label><textarea class="inp" id="ae-n" rows="3" placeholder="مثل: نضيف مسابقة في الأسبوع الثالث"></textarea></div><div class="row"><button class="btn pri" type="button" data-act="ae-send">أرسل الطلب</button><button class="btn" type="button" data-act="close">إلغاء</button></div>`),
-  'ae-send': async () => { const note = $('#ae-n').value; closeLayer(); try { await API.me('edit_request', note); T(myTrack()).editReq = { at: Date.now(), by: D.me.name, note }; render(); toast('أُرسل الطلب إلى الإدارة'); } catch (e) { toast(e.message, 'err'); } },
+  'ae-send': async () => { const note = $('#ae-n').value; try { await API.me('edit_request', note); closeLayer(); T(myTrack()).editReq = { at: Date.now(), by: D.me.name, note }; render(); toast('أُرسل الطلب إلى الإدارة'); } catch (e) { toast(e.message, 'err'); } },
   hbw: el => { const n = +el.dataset.n; HB.ws = n ? add(HB.ws, n) : focusWeek(); render(); },
   mweek: el => { const k = el.dataset.id + '|' + el.dataset.n; if (el.dataset.v === 'now') delete MW[k]; else MW[k] = +el.dataset.v; render(); const pg = $('.wpager'); if (pg) window.scrollTo(0, pg.getBoundingClientRect().top + scrollY - 70); },
   tlweek: el => { P.tl.range = 'week'; P.tl.anchor = el.dataset.date; if (isAdmin() && el.dataset.id) { P.tl.tracks = [el.dataset.id]; P.tl.tmp = true; } savePrefs(); go('timeline'); },
@@ -743,7 +746,7 @@ document.addEventListener('click', e => {
   if (el.tagName === 'A' && k === 'tlweek') e.preventDefault();
   if (el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && k !== 'tblq')) return;
   if (k === 'tblq') return;
-  f(el, e);
+  runAct(f, el, e);
 });
 document.addEventListener('change', e => { const el = e.target; if (el.id === 'ac-r' && $('#ac-tf')) $('#ac-tf').hidden = el.value === 'admin'; if (el.dataset.act === 'bot-assign' && el.value) API.me('tg_assign', el.dataset.chat, el.value).then(s => { BS = s; toast('رُبطت المجموعة ✓'); boot(true); }).catch(x => toast(x.message, 'err')); if ((el.id === 'f-d' || el.id === 'f-rep-until') && F) { readF(); drawAct(true); } });
 document.addEventListener('input', e => {

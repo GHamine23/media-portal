@@ -42,7 +42,12 @@ window.DEMO = (function () {
     const f = new Function(...names, window.GAS_SRC + '\n;return {doPost:doPost,setup:setup,tick:tick};');
     CTX = f(...names.map(n => G[n]));
   }
-  function call(fn, args) { const r = JSON.parse(CTX.doPost({ postData: { contents: JSON.stringify({ fn, args }) } }).getContent()); persist(); return Promise.resolve(r); }
+  // ?lat=2000 في الرابط يحاكي تأخر الخادم الحقيقي (لاختبار حالات الانتظار)
+  const LAT = +(new URLSearchParams(location.search).get('lat') || 0);
+  function call(fn, args) {
+    const r = JSON.parse(CTX.doPost({ postData: { contents: JSON.stringify({ fn, args }) } }).getContent()); persist();
+    return LAT && fn !== 'revs' ? new Promise(ok => setTimeout(() => ok(r), LAT * (0.6 + Math.random() * 0.8))) : Promise.resolve(r);
+  }
   function c(fn, ...args) { const r = JSON.parse(CTX.doPost({ postData: { contents: JSON.stringify({ fn, args }) } }).getContent()); if (r.error) throw new Error(fn + ': ' + r.error); let v = r.result; try { v = JSON.parse(v); } catch (e) {} return v; }
   function upd(o) { UPD.push(Object.assign({ update_id: UID++ }, o)); }
   function seed() {
