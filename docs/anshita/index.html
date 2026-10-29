@@ -1117,8 +1117,7 @@ const planOf = id => D.plans[id] || (D.plans[id] = { sems: {}, acts: [], rev: 0 
 const semN = id => { const r = route(); return String((r.name === 't' && r.a === id && /^\d+$/.test(r.b) && r.b) || (T(id) && T(id).cur) || 1); };
 // أقسام صفحة المسار: الخطة (الجدول والتخطيط)، المهام والمطلوبات، متابعة التنفيذ، التقرير
 const T_SECS = [['plan', 'الخطة', 'table', 'الخطة'], ['tasks', 'المهام والمطلوبات', 'check', 'المهام'], ['follow', 'متابعة التنفيذ', 'target', 'المتابعة'], ['report', 'التقرير', 'sheet', 'التقرير']];
-// معاينة الأقسام على الموقع الحي قبل اعتمادها: ?secs=1 يفعّلها لهذا المتصفح، و?secs=0 يلغيها
-const secsOn = () => { const m = /[?&]secs=([01])/.exec(location.search); if (m) LS.set(NS + 'secs', m[1] === '1'); return !!(CFG.demo || CFG.secs || LS.get(NS + 'secs', false)); };
+const secsOn = () => true;   // اعتمدها أمين للجميع (٢٩ أكتوبر)
 const tSec = () => { const r = route(); if (r.name !== 't' || !secsOn()) return 'plan'; const s = /^\d+$/.test(r.b) ? r.c : r.b; return T_SECS.some(x => x[0] === s) ? s : 'plan'; };
 const tHref = (id, n, sec) => `#t/${id}/${n}${sec && sec !== 'plan' ? '/' + sec : ''}`;
 const curN = id => String((T(id) && T(id).cur) || 1);
