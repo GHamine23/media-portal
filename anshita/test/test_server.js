@@ -14,8 +14,19 @@ vm.runInContext(fs.readFileSync(path.join(ROOT, 'anshita/server/Code.gs'), 'utf8
 // تليجرام وهمي: طابور تحديثات + سجل الرسائل
 const TG = { sent: [], updates: [], uid: 1 };
 const SHEET = fs.readFileSync(path.join(__dirname, 'fixtures/judhoor.csv'), 'utf8');
+const MEET = { calls: [], off: false, n: 0 };
 GAS._fetch.handler = function (url, opt) {
   if (url.indexOf('docs.google.com/spreadsheets') >= 0) return { code: 200, body: SHEET };
+  if (url.indexOf('meet.googleapis.com') >= 0) {
+    const m = (opt.method || 'get').toLowerCase(), body = typeof opt.payload === 'string' ? JSON.parse(opt.payload) : (opt.payload || {}), p = url.split('/v2/')[1];
+    MEET.calls.push([m, p, body]);
+    if (!/^Bearer /.test((opt.headers || {}).Authorization || '')) return { code: 401, body: '{"error":{"message":"no token"}}' };
+    if (MEET.off) return { code: 403, body: JSON.stringify({ error: { message: 'Google Meet REST API has not been used in project 123 before or it is disabled.' } }) };
+    if (m === 'post' && p === 'spaces') { const c = 'abc-defg-' + (++MEET.n); return { code: 200, body: JSON.stringify({ name: 'spaces/S' + MEET.n, meetingUri: 'https://meet.google.com/' + c, meetingCode: c, config: body.config }) }; }
+    if (m === 'post' && /\/members$/.test(p)) return { code: 200, body: JSON.stringify({ name: p + '/M' + (++MEET.n), email: body.email, role: body.role }) };
+    if (m === 'delete') return { code: 200, body: '{}' };
+    return { code: 404, body: '{"error":{"message":"not found"}}' };
+  }
   if (url.indexOf('api.telegram.org') >= 0) {
     const m = url.split('/').pop(), p = opt.payload || {};
     if (url.indexOf('/botBAD') >= 0) return { code: 401, body: JSON.stringify({ ok: false, description: 'Unauthorized' }) };
@@ -224,6 +235,35 @@ ok(rs2.saved && rs2.sent >= 3 && TG.sent.slice(n0r).every(m => m.chat === '5555'
 ok(call('report_list', A2)[0].title === 'تقرير الأسبوع الأول', 'قائمة التقارير');
 const rk2 = call('report_key', A2, true).key; ok(rk2 !== rk, 'تجديد المفتاح');
 throws(() => call('report_data', rk), /مفتاح/, 'المفتاح القديم يسقط بعد التجديد');
+
+// ١١) لقاءات ميت: الغرفة من حساب المنصة، والمسؤولون وبريد الإدارة مشرفون مشاركون
+{
+  const AM = call('login', 'admin', cred.admin).token, JM = call('login', 'judhoor', rs.pass).token;
+  call('track_save', AM, 'judhoor', JSON.stringify({ canEdit: false }));
+  const tr = call('track_save', JM, 'judhoor', JSON.stringify({ members: ['أنس', 'معاذ', 'أبو عبد الله'], emails: { 'أنس': ' Anas@Gmail.com ', 'معاذ': 'not-an-email' } })).track;
+  ok(tr.emails && tr.emails['أنس'] === 'anas@gmail.com' && !tr.emails['معاذ'], 'الفريق يكتب بريد أعضائه ولو كان التعديل مغلقًا، والبريد الخاطئ يُرفض');
+  call('settings_save', AM, JSON.stringify({ meetAdmins: ['admin@jeelacademy.app', 'x'] }));
+  const mm = call('act_save', AM, 'judhoor', JSON.stringify({ title: 'لقاء ميت', type: 'لقاء', d: '2026-12-20', time: '20:00', who: ['أنس', 'معاذ'] })).act;
+  MEET.calls.length = 0;
+  const r1 = call('meet_create', JM, 'judhoor', mm.id).act;
+  const sp = MEET.calls.find(c => c[1] === 'spaces');
+  ok(r1.meet && /^https:\/\/meet\.google\.com\//.test(r1.meet.uri) && sp && sp[2].config.accessType === 'OPEN', 'رابط ميت مفتوح لمن معه الرابط');
+  ok(Object.keys(r1.meet.hosts).sort().join() === 'admin@jeelacademy.app,anas@gmail.com' && r1.meet.miss.join() === 'معاذ', 'المشرفون: المسؤول الذي له بريد وبريد الإدارة، ومن لا بريد له يُذكر');
+  ok(MEET.calls.filter(c => /members$/.test(c[1])).every(c => c[2].role === 'COHOST'), 'دورهم مشرف مشارك');
+  MEET.calls.length = 0;
+  const r2 = call('act_save', JM, 'judhoor', JSON.stringify({ id: mm.id, who: ['معاذ'] })).act;
+  ok(!r2.meet.hosts['anas@gmail.com'] && MEET.calls.some(c => c[0] === 'delete'), 'تغيير المسؤول يزيل إشرافه من الغرفة');
+  call('track_save', JM, 'judhoor', JSON.stringify({ members: ['أنس', 'معاذ', 'أبو عبد الله'], emails: { 'أنس': 'anas@gmail.com', 'معاذ': 'muadh@jeelacademy.app' } }));
+  const r3 = call('plan', AM, 'judhoor').acts.find(a => a.id === mm.id);
+  ok(r3.meet.hosts['muadh@jeelacademy.app'] && !r3.meet.miss.length, 'إضافة بريد عضو تجعله مشرفًا في لقاءاته القادمة');
+  ok(/رابط اللقاء: https:\/\/meet\.google\.com\//.test(ctx.remindText_('تذكير: {العنوان}', r3, { name: 'جذور' }, 3)), 'التذكير يحمل رابط اللقاء');
+  MEET.off = true;
+  const mm2 = call('act_save', AM, 'judhoor', JSON.stringify({ title: 'لقاء آخر', type: 'لقاء', d: '2026-12-21' })).act;
+  throws(() => call('meet_create', AM, 'judhoor', mm2.id), /غير مفعّلة/, 'رسالة واضحة إن لم تُفعَّل واجهة ميت');
+  MEET.off = false;
+  throws(() => call('meet_create', call('login', 'ishraq', cred.ishraq).token, 'judhoor', mm.id), /صلاحيتك/, 'فريق آخر لا ينشئ رابطًا لمسار غيره');
+  call('meet_unlink', JM, 'judhoor', mm.id); ok(!call('plan', AM, 'judhoor').acts.find(a => a.id === mm.id).meet, 'إزالة الرابط');
+}
 
 // ١٠) اقتراح الكاهوت قبل الاختبار النصفي (٨ ديسمبر) بنحو أسبوع، مرة واحدة
 NOW = Date.UTC(2026, 11, 2, 16, 0); TG.sent.length = 0; ctx.tick();

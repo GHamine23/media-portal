@@ -53,7 +53,7 @@ function actParts() {
       ${F.who && F.who.length ? `<div class="field"><span class="flabel">المسؤول</span><div class="whos">${F.who.map(w => `<span class="chip">${esc(w)}</span>`).join('')}</div></div>` : ''}
       ${F.idea ? `<div class="field"><span class="flabel">الفكرة</span><div class="ro-v">${esc(F.idea)}</div></div>` : ''}
       <div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('bell')}</span><div class="tx"><b>تذكير البوت</b><span>${esc(remSub)}</span></div></div>
-      <p class="hint">${svg('lock')} تستطيعون تسجيل المتابعة.</p>${follow}`;
+      <p class="hint">${svg('lock')} تستطيعون تسجيل المتابعة.</p><!--MEET-->${follow}`;
   } else {
     body = `${tracksSel}${mode === 'adj' ? `<p class="hint">${svg('bell')} إضافة الأنشطة وحذفها مغلقان، وتستطيعون تعديل هذا النشاط. يصل الإدارةَ تنبيه بكل تغيير.</p>` : ''}
     <input class="inp big" id="f-title" value="${esc(F.title)}" placeholder="اسم النشاط" aria-label="اسم النشاط" ${F.isNew ? 'autofocus' : ''}>
@@ -66,12 +66,26 @@ function actParts() {
     <div class="field"><label for="f-idea">الفكرة</label><textarea class="inp" id="f-idea" rows="3" placeholder="الفكرة في سطرين: ماذا سيحدث؟ ولمن؟">${esc(F.idea || '')}</textarea></div>
     <div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('bell')}</span><div class="tx"><b>تذكير البوت في مجموعة الفريق</b><span>${esc(remSub)}</span></div><button class="sw" type="button" role="switch" aria-checked="${willRem}" data-act="f-rem" aria-label="تذكير البوت"></button></div>
     ${isAdmin() ? `<div class="opt"><span class="tile sm" style="--tc:var(--plum)">${svg('gcal')}</span><div class="tx"><b>في تقويم جوجل</b><span>${F.calOn ? (F.cal && F.cal.id ? (F.cal.err ? 'تعذّر آخر تحديث: ' + esc(F.cal.err) : 'في التقويم، ويتحدّث مع كل تعديل') : 'سيُرسل عند الحفظ') : 'لا يظهر في التقويم'}</span></div><button class="sw" type="button" role="switch" aria-checked="${!!F.calOn}" data-act="f-cal" aria-label="في تقويم جوجل"></button></div>` : ''}
-    ${follow}`;
+    <!--MEET-->${follow}`;
   }
   const cancel = F.dock ? 'f-cancel' : 'close';
+  body = body.replace('<!--MEET-->', !F.isNew && tid ? meetBlock() : '');
   const foot = ro ? `<button class="btn pri" type="button" data-act="f-save">حفظ المتابعة</button><button class="btn" type="button" data-act="${cancel}">إغلاق</button>`
     : `<button class="btn pri" type="button" data-act="f-save" ${!tid ? 'disabled' : ''}>${F.isNew ? 'أضف النشاط' : 'احفظ'}</button><button class="btn" type="button" data-act="${cancel}">إلغاء</button><span class="sp"></span>${!F.isNew && mode === 'full' ? `<button class="btn danger" type="button" data-act="f-del">${F.confirmDel ? 'تأكيد الحذف' : 'حذف'}</button>` : ''}`;
   return { head, body, foot };
+}
+// رابط ميت للنشاط: يُنشأ من حساب الأنشطة، والمسؤولون عنه (ببريدهم في «الفريق») وبريد الإدارة مشرفون فيه
+function meetBlock() {
+  const m = F.meet, t = T(F.tid), em = (t && t.emails) || {};
+  if (!m || !m.uri) return `<div class="opt meetopt"><span class="tile sm" style="--tc:var(--ty-meet)">${svg('video')}</span><div class="tx"><b>رابط ميت</b><span>يُنشأ من حساب الأنشطة، والمسؤولون عن النشاط مشرفون فيه بحساباتهم.</span></div><button class="btn sm" type="button" data-act="f-meet" ${F.meetBusy ? 'disabled' : ''}>${F.meetBusy ? '<span class="spin"></span>' : ''}أنشئ الرابط</button></div>`;
+  const hostsN = (F.who || []).filter(w => em[w]), miss = (F.who || []).filter(w => !em[w]);
+  return `<div class="opt meetopt on"><span class="tile sm" style="--tc:var(--ty-meet)">${svg('video')}</span><div class="tx"><b>رابط ميت</b>
+    <span class="mlink"><bdi dir="ltr">${esc(m.uri.replace('https://', ''))}</bdi></span>
+    <span>${hostsN.length ? 'المشرفون: ' + esc(hostsN.join('، ')) + ((D.settings && (D.settings.meetAdmins || []).length) || isAdmin() ? ' والإدارة' : '') : 'لا مشرف من الفريق بعد'}</span>
+    ${miss.length ? `<span class="warnt">${svg('alert')}بلا بريد: ${esc(miss.join('، '))}. يُضاف في «الفريق» فيصيرون مشرفين.</span>` : ''}
+    ${m.err ? `<span class="warnt">${svg('alert')}تعذّر جزء من الإشراف: ${esc(m.err)}</span>` : ''}</div>
+    <div class="col" style="gap:6px;align-items:stretch"><a class="btn sm pri" href="${esc(m.uri)}" target="_blank" rel="noopener">${svg('ext')}افتح</a><button class="btn sm" type="button" data-act="f-copy" data-v="${esc(m.uri)}">${svg('copy')}انسخ</button></div></div>
+    <div class="row" style="justify-content:flex-end;margin-top:-8px"><button class="lk xs" type="button" data-act="f-meet-del">إزالة الرابط من النشاط</button></div>`;
 }
 function drawAct(keepFocus) {
   if (F.dock && !$('#dock')) F.dock = false;
@@ -198,12 +212,23 @@ async function semPut(id, n, days, src) {
 }
 
 /* ---------- أعضاء الفريق ---------- */
+let MB = [];
 function membersSheet(id) {
-  const t = T(id);
-  openDialog(`<h3>فريق ${esc(t.name)}</h3><p class="muted sm">الأسماء تظهر عند اختيار المسؤول عن النشاط. اكتب اسمًا في كل سطر.</p>
-    <textarea class="inp" id="mb-list" rows="8">${esc(members(id).join('\n'))}</textarea>
-    <div class="row"><button class="btn pri" type="button" data-act="mb-save" data-id="${id}">احفظ</button><button class="btn" type="button" data-act="close">إلغاء</button></div>`);
+  const em = T(id).emails || {};
+  MB = members(id).map(n => ({ n, e: em[n] || '' })); if (!MB.length) MB.push({ n: '', e: '' });
+  drawMembers(id);
 }
+const mbRows = () => MB.map((m, i) => `<div class="mbr"><input class="inp" data-mb="n" data-i="${i}" value="${esc(m.n)}" placeholder="الاسم" aria-label="الاسم"><input class="inp ltr" type="email" inputmode="email" data-mb="e" data-i="${i}" value="${esc(m.e)}" placeholder="name@gmail.com" aria-label="البريد"><button class="btn icon" type="button" data-act="mb-del" data-i="${i}" aria-label="احذف">${svg('x')}</button></div>`).join('');
+function drawMembers(id, focusLast) {
+  const t = T(id), box = $('#layer .mbl');
+  if (box) { box.innerHTML = mbRows(); if (focusLast) { const ins = $$('[data-mb="n"]'); if (ins.length) ins[ins.length - 1].focus(); } return; }
+  openDialog(`<h3>فريق ${esc(t.name)}</h3><p class="muted sm">الأسماء تظهر عند اختيار المسؤول عن النشاط. والبريد حساب جوجل لصاحبه: به يصير مشرفًا في لقاءات ميت التي هو مسؤول عنها.</p>
+    <div class="mbl">${mbRows()}</div>
+    <button class="btn sm ghost" type="button" data-act="mb-add" data-id="${id}" style="align-self:flex-start">${svg('plus')}عضو</button>
+    <div class="row"><button class="btn pri" type="button" data-act="mb-save" data-id="${id}">احفظ</button><button class="btn" type="button" data-act="close">إلغاء</button></div>`);
+  if (focusLast) { const ins = $$('[data-mb="n"]'); if (ins.length) ins[ins.length - 1].focus(); }
+}
+function readMB() { $$('[data-mb]').forEach(el => { const m = MB[+el.dataset.i]; if (m) m[el.dataset.mb] = el.value.trim(); }); }
 
 /* ---------- قائمة الحساب ---------- */
 function userMenu() {
@@ -254,6 +279,8 @@ VIEWS.calendar = {
       <button class="chip" type="button" aria-pressed="${!!c.meet}" data-act="cal-meet">اللقاءات فقط</button><span class="sp"></span>
       <button class="btn sm" type="button" data-act="cal-selall">${acts.length && acts.every(a => CS.sel.has(key(a))) ? 'ألغِ التحديد' : 'حدّد الكل (' + acts.length + ')'}</button></div>
     ${list || `<div class="card empty">${svg('gcal')}<h3>لا أنشطة بهذه التصفية</h3><p>غيّر المسار أو الحالة أو المدى.</p></div>`}
+    <div class="card sect"><div class="card-h"><h3>روابط ميت</h3></div><p class="muted sm">تُنشأ من نافذة النشاط بزر «أنشئ الرابط»، من حساب الأنشطة، ويكون المسؤولون عن النشاط مشرفين فيها ببريدهم المكتوب في «الفريق». وبريد الإدارة هنا يصير مشرفًا في كل لقاء.</p>
+      <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px"><input class="inp ltr" style="flex:1;min-width:220px;text-align:left" id="mt-admins" inputmode="email" placeholder="admin@jeelacademy.app" value="${esc(((D.settings && D.settings.meetAdmins) || []).join(', '))}"><button class="btn" type="button" data-act="mt-admins">احفظ</button></div></div>
     ${CS.sel.size ? `<div class="bulk" role="region" aria-label="إجراءات المحدد"><b class="sm">حُدّد ${nActs(CS.sel.size)}</b><button class="btn pri sm" type="button" data-act="cal-push" ${CS.busy ? 'disabled' : ''}>${CS.busy ? '<span class="spin"></span>' : svg('gcal')}أرسل إلى التقويم</button><button class="btn sm" type="button" data-act="cal-pull" ${CS.busy ? 'disabled' : ''}>أزل من التقويم</button><button class="btn sm ghost" type="button" data-act="cal-clear">إلغاء</button></div>` : ''}`;
   }
 };
@@ -500,6 +527,16 @@ const H = {
   lgwho: el => { LG.who = el.dataset.id; LG.err = ''; render(); }, lgother: () => { LG.other = !LG.other; LG.err = ''; render(); },
   openact: el => { if (SUPPRESS) return; openAct(el.dataset.track, el.dataset.id); },
   newact: el => openAct(el.dataset.track || '', null, { date: el.dataset.date, type: el.dataset.type, track: el.dataset.track, title: el.dataset.title }),
+  'f-meet': async () => {
+    readF(); if (!F || !F.id) return; const f = F; f.meetBusy = true; drawAct(true);
+    try { const r = await API.me('meet_create', f.tid, f.id); const p = planOf(f.tid), i = p.acts.findIndex(a => a.id === f.id); if (i >= 0) p.acts[i] = r.act; p.rev = r.rev; D.revs[f.tid] = r.rev; if (F === f) { F.meet = r.act.meet; F.meetBusy = false; drawAct(true); } render(); toast('أُنشئ رابط ميت'); }
+    catch (e) { if (F === f) { F.meetBusy = false; drawAct(true); } toast(e.message, 'err'); }
+  },
+  'f-meet-del': async el => {
+    if (!armed(el, 'تأكيد إزالة الرابط')) return; const f = F;
+    try { const r = await API.me('meet_unlink', f.tid, f.id); const p = planOf(f.tid), i = p.acts.findIndex(a => a.id === f.id); if (i >= 0) p.acts[i] = r.act; p.rev = r.rev; D.revs[f.tid] = r.rev; if (F === f) { readF(); delete F.meet; drawAct(true); } render(); toast('أُزيل الرابط من النشاط'); } catch (e) { toast(e.message, 'err'); }
+  },
+  'f-copy': el => { const v = el.dataset.v; const ok = () => toast('نُسخ الرابط'); try { navigator.clipboard.writeText(v).then(ok, () => toast(v)); } catch (e) { toast(v); } },
   'f-cancel': closeAct, 'f-day': el => { readF(); F.d = el.dataset.v; drawAct(true); },
   'al-seen': () => alertsSeen(true),
   done: el => { const tid = el.dataset.track, a = planOf(tid).acts.find(x => x.id === el.dataset.id); if (!a) return; const v = !a.done; saveAct(tid, { id: a.id, done: v }).then(() => toast(v ? `تم تنفيذ ${qt(a.title)}` : 'أُعيد إلى الخطة', '', () => saveAct(tid, { id: a.id, done: !v }))).catch(() => {}); },
@@ -522,7 +559,16 @@ const H = {
   },
   'si-save': () => semPut(SI.id, SI.n, SI.days, SI.url),
   'sn-save': el => { const a = $('#sn-a').value, b = $('#sn-b').value; if (!a || !b) return toast('حدّد البداية والنهاية', 'err'); if (b < a) return toast('تاريخ النهاية قبل البداية', 'err'); const s0 = wkStart(a), days = []; for (let d = a; d <= b; d = add(d, 1)) days.push({ d, h: hijri(d), w: Math.floor(diffD(d, s0) / 7) + 1 }); semPut(el.dataset.id, el.dataset.n, days, ''); },
-  members: el => membersSheet(el.dataset.id), 'mb-save': el => { const L = [...new Set($('#mb-list').value.split('\n').map(x => x.trim()).filter(Boolean))]; closeLayer(); trackSave(el.dataset.id, { members: L }).then(() => toast('حُفظ الفريق')).catch(() => {}); },
+  members: el => membersSheet(el.dataset.id),
+  'mb-add': el => { readMB(); MB.push({ n: '', e: '' }); drawMembers(el.dataset.id, true); },
+  'mb-del': el => { readMB(); MB.splice(+el.dataset.i, 1); if (!MB.length) MB.push({ n: '', e: '' }); drawMembers($('[data-act="mb-save"]').dataset.id); },
+  'mb-save': el => {
+    readMB(); const bad = MB.find(m => m.n && m.e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m.e));
+    if (bad) return toast('البريد غير صحيح: ' + bad.e, 'err');
+    const L = [], E = {}; MB.forEach(m => { if (m.n && !L.includes(m.n)) { L.push(m.n); if (m.e) E[m.n] = m.e.toLowerCase(); } });
+    closeLayer(); trackSave(el.dataset.id, { members: L, emails: E }).then(() => toast('حُفظ الفريق')).catch(() => {});
+  },
+  'mt-admins': async () => { const v = ($('#mt-admins').value || '').split(/[\s,،]+/).map(x => x.trim()).filter(Boolean); try { const r = await API.me('settings_save', JSON.stringify({ meetAdmins: v })); D.settings = r.settings; toast('حُفظ بريد الإدارة'); render(); } catch (e) { toast(e.message, 'err'); } },
   toggleedit: el => { const t = T(el.dataset.id); trackSave(t.id, { canEdit: !t.canEdit }).then(r => toast(r.canEdit ? `فُتح تعديل الخطة لفريق ${t.name}` : `أُغلق تعديل الخطة لفريق ${t.name}`)).catch(() => {}); },
   grant: el => { const t = T(el.dataset.id); trackSave(t.id, { canEdit: true }).then(() => toast(`فُتح تعديل الخطة لفريق ${t.name}`)).catch(() => {}); },
   askedit: () => openDialog(`<h3>طلب فتح تعديل الخطة</h3><p class="muted sm">يصل الطلب إلى الإدارة في المنصة${D.tg ? ' وفي تليجرام' : ''}.</p><div class="field"><label for="ae-n">ماذا تريدون تعديله؟ (اختياري)</label><textarea class="inp" id="ae-n" rows="3" placeholder="مثل: نضيف مسابقة في الأسبوع الثالث"></textarea></div><div class="row"><button class="btn pri" type="button" data-act="ae-send">أرسل الطلب</button><button class="btn" type="button" data-act="close">إلغاء</button></div>`),

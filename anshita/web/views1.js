@@ -5,7 +5,7 @@
 /* ---------- بطاقة النشاط ---------- */
 function evChip(a, tid, o = {}) {
   const t = T(tid), drag = canAdjust(tid) && !o.noDrag && !String(a.id).startsWith('tmp'), cl = clashOf(tid, a);
-  const flags = (cl ? `<span class="cl" data-tip="${esc(cl)}">${svg('alert')}</span>` : '') + (a.cal && a.cal.id ? `<span data-tip="في تقويم جوجل">${svg('gcal')}</span>` : '') + (a.done ? `<span data-tip="تم التنفيذ">${svg('check')}</span>` : '');
+  const flags = (cl ? `<span class="cl" data-tip="${esc(cl)}">${svg('alert')}</span>` : '') + (a.meet && a.meet.uri ? `<span data-tip="له رابط ميت">${svg('video')}</span>` : '') + (a.cal && a.cal.id ? `<span data-tip="في تقويم جوجل">${svg('gcal')}</span>` : '') + (a.done ? `<span data-tip="تم التنفيذ">${svg('check')}</span>` : '');
   const meta = [o.track ? `<span class="tbadge">${esc(t.name)}</span>` : '', o.big ? `<span class="ty">${esc(a.type)}</span>` : '', a.time ? `<span>${timeText(a.time)}</span>` : '', a.who && a.who.length ? `<span>${esc(a.who.join('، '))}</span>` : '', o.date ? `<span>${gDay(a.d)}</span>` : '', flags ? `<span class="flag">${flags}</span>` : ''].filter(Boolean).join('');
   return `<div class="ev ${o.track || o.tint ? 'tinted' : ''} ${o.big ? 'big' : ''} ${cl ? 'clash' : ''} ${a.done ? 'done' : ''} ${isLate(a) ? 'late' : ''} ${typeof F !== 'undefined' && F && F.dock && F.id === a.id ? 'sel' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${tid}" ${drag ? 'data-drag="1"' : ''} style="--tcol:${t.color};--tyc:${typeOf(a.type)[1]}">
     ${tile(a.type, 'sm')}<span class="tx"><span class="tt clamp2">${esc(a.title)}</span>${meta ? `<span class="mt">${meta}</span>` : ''}</span></div>`;
@@ -194,7 +194,7 @@ function teamHome(id, preview) {
         <div class="stp ${st(d1, 'd1')}"><i></i><b>نشر الإعلان</b><span>${gDay(d1 < TODAY ? TODAY : d1)}</span></div>
         <div class="stp big ${m.d === TODAY ? 'now' : ''}"><i></i><b>اللقاء</b><span>${gDay(m.d)}</span></div>
       </div></div>
-      <div class="side-l"><button class="btn pri" type="button" data-act="openact" data-id="${m.id}" data-track="${id}">تفاصيل اللقاء</button>${t.linked ? `<span class="xs faint">يصل التذكير مجموعتكم في موعده</span>` : ''}</div></div>`;
+      <div class="side-l">${m.meet && m.meet.uri ? `<a class="btn pri" href="${esc(m.meet.uri)}" target="_blank" rel="noopener">${svg('video')}ادخل اللقاء</a><button class="btn" type="button" data-act="openact" data-id="${m.id}" data-track="${id}">تفاصيل اللقاء</button>` : `<button class="btn pri" type="button" data-act="openact" data-id="${m.id}" data-track="${id}">تفاصيل اللقاء</button>`}${t.linked ? `<span class="xs faint">يصل التذكير مجموعتكم في موعده</span>` : ''}</div></div>`;
   } else hero = `<div class="hero"><div><div class="faint sm">اللقاء القادم</div><div class="ttl">لا لقاء في الخطة بعد</div><p class="muted sm" style="margin-top:6px">${canEdit(id) ? 'أضيفوا لقاءات الفصل لتظهر هنا ويذكّر بها البوت.' : 'ستظهر هنا اللقاءات حين تُضاف إلى الخطة.'}</p></div>${canEdit(id) ? `<div class="side-l"><button class="btn pri" type="button" data-act="newact" data-track="${id}" data-type="لقاء">+ لقاء</button></div>` : ''}</div>`;
   const up = acts.filter(a => a.d >= TODAY && diffD(a.d, TODAY) <= 14);
   const late = acts.filter(isLate);
@@ -212,7 +212,7 @@ function teamHome(id, preview) {
       <div class="card"><div class="card-h"><h3>مقرر الطلاب اليوم</h3></div>${today && today.c ? `<div class="ctx" style="background:none;padding:0"><b>${esc(today.c)}</b>${today.q ? `<span>${esc(today.q)}</span>` : ''}${today.r ? `<span class="faint">${esc(today.r)}</span>` : ''}</div>` : `<p class="muted sm">${today && today.p ? esc(today.p) : today && today.ev ? esc(today.ev) : 'لا مقرر اليوم.'}</p>`}</div>
       ${botCardTeam(id, preview)}
       ${!t.canEdit && !preview && !isAdmin() ? `<div class="card"><div class="card-h"><h3>تحتاجون إضافة أنشطة؟</h3></div><p class="muted sm" style="margin-bottom:12px">تستطيعون تغيير مواعيد الأنشطة والمسؤولين عنها وتفاصيلها، ويصل الإدارةَ تنبيه بذلك. لإضافة أنشطة جديدة أو حذفها اطلبوا فتح الإضافة.</p>${t.editReq ? `<span class="pill brand">${svg('check')}أُرسل الطلب ${ago(t.editReq.at)}</span>` : `<button class="btn" type="button" data-act="askedit">اطلب فتح الإضافة</button>`}</div>` : ''}
-      <div class="card"><div class="card-h"><h3>الفريق</h3>${canEdit(id) ? `<button class="btn sm ghost" type="button" data-act="members" data-id="${id}">تعديل</button>` : ''}</div>${members(id).length ? `<div class="whos">${members(id).map(x => `<span class="chip">${esc(x)}</span>`).join('')}</div>` : `<p class="muted sm">لم تُكتب أسماء الفريق بعد.</p>`}</div>
+      <div class="card"><div class="card-h"><h3>الفريق</h3>${canAdjust(id) ? `<button class="btn sm ghost" type="button" data-act="members" data-id="${id}">تعديل</button>` : ''}</div>${members(id).length ? `<div class="whos">${members(id).map(x => `<span class="chip">${esc(x)}</span>`).join('')}</div>` : `<p class="muted sm">لم تُكتب أسماء الفريق بعد.</p>`}</div>
     </aside>
   </div>
   ${isMob() ? `<details class="sect mfold"><summary><h2>خلاصة الفصل</h2><span class="xs faint">${semLabel(n)}</span>${svg('down')}</summary>${semStats(id, n)}</details>` : `<div class="sect"><div class="sh"><h2>خلاصة الفصل</h2><span class="xs faint">${semLabel(n)}</span></div>${semStats(id, n)}</div>`}`;

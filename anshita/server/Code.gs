@@ -58,7 +58,7 @@ function apiFns_() {
     tg_check: tg_check, edit_request: edit_request,
     ui_fonts: ui_fonts, ui_font_get: ui_font_get, font_put: font_put,
     report_key: report_key, report_data: report_data, report_send: report_send, report_list: report_list,
-    alerts: alerts, alerts_seen: alerts_seen
+    alerts: alerts, alerts_seen: alerts_seen, meet_create: meet_create, meet_unlink: meet_unlink
   };
 }
 function doPost(e) {
@@ -434,6 +434,7 @@ function act_save(token, tid, json) {
       var left = dayDiff_(old.d, today_());
       if (left >= 0 && left <= 14) notice = 'تعديل في الخطة: لقاء «' + x.title + '» صار ' + whenText_(x) + ' (كان ' + whenText_(old) + ').';
     }
+    if (old && x.meet && x.meet.space && (old.who || []).join() !== (x.who || []).join()) meetSync_(t, x, s);
     if (old) p.acts[i] = x; else p.acts.push(x);
     savePlan_(tid, p);
     var what = !old ? 'أضاف نشاطاً' : old.d !== x.d || (old.time || '') !== (x.time || '') ? 'غيّر موعد نشاط' : (old.who || []).join() !== (x.who || []).join() ? 'غيّر القائم على نشاط' : old.done !== x.done ? (x.done ? 'أتمّ نشاطاً' : 'أعاد نشاطاً إلى الخطة') : al ? 'عدّل نشاطاً' : 'تابع نشاطاً';
@@ -572,11 +573,18 @@ function parseSemCsv_(rows) {
 
 /* ================= المسار والإعدادات ================= */
 function track_save(token, tid, json) {
-  var a = auth_(token), o = JSON.parse(json); canEdit_(a, tid);
-  return JSON.stringify(withLock_(function () {
+  var a = auth_(token), o = JSON.parse(json);
+  var teamOnly = Object.keys(o).every(function (k) { return k === 'members' || k === 'emails'; });
+  if (teamOnly) canView_(a, tid); else canEdit_(a, tid);   // أعضاء الفريق وبريدهم يكتبها الفريق نفسه دائمًا
+  var res = withLock_(function () {
     var ts = tracks_(), t = ts.filter(function (x) { return x.id === tid; })[0];
     if (!t) throw new Error('المسار غير موجود');
     if ('members' in o) t.members = (o.members || []).map(function (m) { return txt_(m, 40); }).filter(String).slice(0, 40);
+    if ('emails' in o) {
+      var em = {}, src = o.emails || {};
+      (t.members || []).forEach(function (m) { var e = String(src[m] || '').trim().toLowerCase(); if (isEmail_(e)) em[m] = e; });
+      t.emails = em;
+    } else if ('members' in o && t.emails) { var keep = {}; t.members.forEach(function (m) { if (t.emails[m]) keep[m] = t.emails[m]; }); t.emails = keep; }
     if (a.role === 'admin') {
       ['name', 'full', 'age', 'cohort'].forEach(function (k) { if (k in o) t[k] = txt_(o[k], 60); });
       if ('color' in o && /^#[0-9a-f]{6}$/i.test(o.color)) t.color = o.color;
@@ -588,14 +596,17 @@ function track_save(token, tid, json) {
     }
     writeJson_('tracks.json', ts);
     props_().setProperty('rev_meta', String(now_()));
-    var what = ('canEdit' in o && a.role === 'admin') ? (o.canEdit ? 'فتح تعديل الخطة للفريق' : 'أغلق تعديل الخطة للفريق') : 'عدّل بيانات المسار';
+    var what = ('canEdit' in o && a.role === 'admin') ? (o.canEdit ? 'فتح تعديل الخطة للفريق' : 'أغلق تعديل الخطة للفريق') : teamOnly ? 'حدّث أعضاء الفريق' : 'عدّل بيانات المسار';
     log_(a, tid, what, t.name);
-    return { track: pubTrack_(t, a.role === 'admin') };
-  }));
+    return { track: pubTrack_(t, a.role === 'admin'), t: t };
+  });
+  if ('emails' in o || 'members' in o) { try { meetResyncTrack_(res.t); } catch (e) {} }
+  delete res.t;
+  return JSON.stringify(res);
 }
 function settings_save(token, json) {
   var a = auth_(token), o = JSON.parse(json); needAdmin_(a);
-  return JSON.stringify(withLock_(function () {
+  var out = withLock_(function () {
     var s = readJson_('settings.json', {});
     if ('remindHour' in o) s.remindHour = Math.max(0, Math.min(23, Math.round(+o.remindHour || 0)));
     if ('remindTypes' in o) s.remindTypes = (o.remindTypes || []).filter(function (x) { return TYPES.indexOf(x) >= 0; });
@@ -603,12 +614,15 @@ function settings_save(token, json) {
     if ('adminDigest' in o) s.adminDigest = !!o.adminDigest;
     if ('notifyChanges' in o) s.notifyChanges = !!o.notifyChanges;
     if ('durMin' in o) s.durMin = Math.max(15, Math.min(600, Math.round(+o.durMin || 60)));
+    if ('meetAdmins' in o) s.meetAdmins = (o.meetAdmins || []).map(function (e) { return String(e || '').trim().toLowerCase(); }).filter(isEmail_).slice(0, 5);
     if ('tpl' in o) { s.tpl = s.tpl || {}; ['d3', 'd1'].forEach(function (k) { if (o.tpl[k] != null) s.tpl[k] = txt_(o.tpl[k], 1200) || DEFAULTS.tpl[k]; }); }
     writeJson_('settings.json', s);
     props_().setProperty('rev_meta', String(now_()));
     log_(a, '', 'عدّل الإعدادات', '');
     return { settings: cfg_() };
-  }));
+  });
+  if ('meetAdmins' in o) tracks_().forEach(function (t) { try { meetResyncTrack_(t); } catch (e) {} });
+  return JSON.stringify(out);
 }
 
 function adminTg_(text) { var s = cfg_(); if (s.adminChat && s.adminChat.id && props_().getProperty('TG_TOKEN')) { try { tgSend_(s.adminChat.id, text + '\n' + SITE_URL); } catch (e) {} } }
@@ -644,9 +658,100 @@ function whenText_(x) { return dayText_(x.d) + (x.time ? ' الساعة ' + time
 function leftText_(n) { return n === 0 ? 'اليوم' : n === 1 ? 'غدًا' : n === 2 ? 'بعد يومين' : 'بعد ' + n + ' أيام'; }
 function countText_(n) { return n === 1 ? 'نشاط واحد' : n === 2 ? 'نشاطان' : n <= 10 ? n + ' أنشطة' : n + ' نشاطاً'; }
 function remindable_(x, s) { if (x.rem === true) return true; if (x.rem === false) return false; return (s.remindTypes || []).indexOf(x.type) >= 0; }
+function remindText_(tpl, x, t, left) {
+  var txt = fill_(tpl, x, t, left), uri = x.meet && x.meet.uri;
+  if (uri && String(tpl).indexOf('{الرابط}') < 0) txt += '\nرابط اللقاء: ' + uri;
+  return txt;
+}
 function fill_(tpl, x, t, left) {
-  var map = { 'العنوان': x.title, 'الموعد': whenText_(x), 'متى': leftText_(left), 'المتبقي': left === 1 ? 'يوم واحد' : left === 2 ? 'يومان' : left + ' أيام', 'المسؤول': (x.who || []).join('، ') || 'لم يُحدَّد', 'المسار': t.name, 'النوع': x.type, 'الفكرة': x.idea || '' };
+  var map = { 'الرابط': (x.meet && x.meet.uri) || '', 'العنوان': x.title, 'الموعد': whenText_(x), 'متى': leftText_(left), 'المتبقي': left === 1 ? 'يوم واحد' : left === 2 ? 'يومان' : left + ' أيام', 'المسؤول': (x.who || []).join('، ') || 'لم يُحدَّد', 'المسار': t.name, 'النوع': x.type, 'الفكرة': x.idea || '' };
   return String(tpl).replace(/\{([^}]+)\}/g, function (all, k) { return map.hasOwnProperty(k) ? map[k] : all; });
+}
+
+/* ================= لقاءات ميت =================
+   الغرفة تُنشأ من حساب المنصة بواجهة ميت البرمجية، والمسؤولون عن اللقاء (ببريدهم في «الفريق») وبريد الإدارة مشرفون مشاركون فيها.
+   يحتاج مشروع المنصة: واجهة ميت مفعّلة في مشروع Google Cloud المرتبط، والنطاق meetings.space.created في appsscript.json.
+   x.meet: {space, uri, code, at, by, hosts:{email: memberName}, miss:[أسماء بلا بريد], err} */
+var MEET_API = 'https://meet.googleapis.com/v2/';
+function isEmail_(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || '')); }
+function meetCall_(method, path, body) {
+  var opt = { method: method, headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, muteHttpExceptions: true };
+  if (body) { opt.contentType = 'application/json'; opt.payload = JSON.stringify(body); }
+  var r = UrlFetchApp.fetch(MEET_API + path, opt), code = r.getResponseCode(), txt = r.getContentText(), j = {};
+  try { j = txt ? JSON.parse(txt) : {}; } catch (e) {}
+  if (code >= 300) {
+    var m = (j.error && j.error.message) || ('HTTP ' + code);
+    if (/has not been used|is disabled|SERVICE_DISABLED/i.test(m)) m = 'واجهة ميت غير مفعّلة لمشروع المنصة بعد';
+    else if (code === 401 || (code === 403 && /scope|insufficient/i.test(m))) m = 'حساب المنصة لم يأذن بإنشاء لقاءات ميت بعد';
+    var er = new Error(m); er.code = code; throw er;
+  }
+  return j;
+}
+function meetHosts_(t, x, s) {
+  var em = t.emails || {}, out = [], miss = [];
+  (x.who || []).forEach(function (w) { if (em[w]) out.push(em[w]); else miss.push(w); });
+  (s.meetAdmins || []).forEach(function (e) { out.push(e); });
+  var seen = {}; out = out.filter(function (e) { e = e.toLowerCase(); if (seen[e]) return false; seen[e] = 1; return true; });
+  return { emails: out, miss: miss };
+}
+// يجعل المشرفين المشاركين في الغرفة كما في خانة المسؤول وبريد الإدارة: يضيف الجديد ويزيل من خرج
+function meetSync_(t, x, s) {
+  if (!x.meet || !x.meet.space) return;
+  var want = meetHosts_(t, x, s || cfg_()), cur = x.meet.hosts || {}, errs = [];
+  want.emails.forEach(function (e) {
+    if (cur[e]) return;
+    try { var m = meetCall_('post', x.meet.space + '/members', { email: e, role: 'COHOST' }); cur[e] = m.name || '1'; }
+    catch (er) { errs.push(e + ': ' + er.message); }
+  });
+  Object.keys(cur).forEach(function (e) {
+    if (want.emails.indexOf(e) >= 0) return;
+    try { if (cur[e] && cur[e] !== '1') meetCall_('delete', cur[e]); delete cur[e]; } catch (er) { errs.push(e + ': ' + er.message); }
+  });
+  x.meet.hosts = cur; x.meet.miss = want.miss; x.meet.syncAt = now_();
+  if (errs.length) x.meet.err = errs[0]; else delete x.meet.err;
+}
+// لما يتغيّر بريد الأعضاء أو بريد الإدارة: تُحدَّث اللقاءات القادمة التي لها غرفة
+function meetResyncTrack_(t) {
+  var s = cfg_(), today = today_(), changed = false, p = plan_(t.id);
+  p.acts.forEach(function (x) { if (x.meet && x.meet.space && x.d >= today) { meetSync_(t, x, s); changed = true; } });
+  if (changed) withLock_(function () {
+    var p2 = plan_(t.id);
+    p.acts.forEach(function (x) { if (!x.meet) return; p2.acts.forEach(function (y, k) { if (y.id === x.id && y.meet && y.meet.space === x.meet.space) p2.acts[k].meet = x.meet; }); });
+    savePlan_(t.id, p2);
+  });
+}
+// زر «أنشئ رابط ميت» في النشاط (للإدارة ولفريق المسار)
+function meet_create(token, tid, id) {
+  var a = auth_(token), t = trackOf_(tid), s = cfg_();
+  canView_(a, tid);
+  var x0 = plan_(tid).acts.filter(function (y) { return y.id === id; })[0];
+  if (!x0) throw new Error('النشاط غير موجود (ربما حُذف)');
+  if (x0.meet && x0.meet.uri) return JSON.stringify({ act: x0, rev: plan_(tid).rev });
+  var sp = meetCall_('post', 'spaces', { config: { accessType: 'OPEN', entryPointAccess: 'ALL' } });
+  var meet = { space: sp.name, uri: sp.meetingUri, code: sp.meetingCode, at: now_(), by: a.name, hosts: {} };
+  var tmp = JSON.parse(JSON.stringify(x0)); tmp.meet = meet; meetSync_(t, tmp, s);
+  return JSON.stringify(withLock_(function () {
+    var p = plan_(tid), i = -1;
+    p.acts.forEach(function (y, k) { if (y.id === id) i = k; });
+    if (i < 0) throw new Error('النشاط غير موجود (ربما حُذف)');
+    var x = p.acts[i]; x.meet = tmp.meet;
+    if (x.cal && x.cal.id) { try { calUpsert_(t, x, s); } catch (e) { if (x.cal) x.cal.err = e.message; } }
+    savePlan_(tid, p);
+    log_(a, tid, 'أنشأ رابط ميت', x.title);
+    return { act: x, rev: p.rev };
+  }));
+}
+function meet_unlink(token, tid, id) {
+  var a = auth_(token), t = trackOf_(tid), s = cfg_();
+  canView_(a, tid);
+  return JSON.stringify(withLock_(function () {
+    var p = plan_(tid), x = p.acts.filter(function (y) { return y.id === id; })[0];
+    if (!x) throw new Error('النشاط غير موجود');
+    delete x.meet;
+    if (x.cal && x.cal.id) { try { calUpsert_(t, x, s); } catch (e) {} }
+    savePlan_(tid, p); log_(a, tid, 'أزال رابط ميت', x.title);
+    return { act: x, rev: p.rev };
+  }));
 }
 
 /* ================= تقويم جوجل ================= */
@@ -657,7 +762,7 @@ function calOf_(s, cid) {
   if (!c) throw new Error('التقويم المختار غير متاح لحساب المنصة');
   return c;
 }
-function calSig_(t, x) { return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, [t.name, x.title, x.d, x.time || '', x.dur || '', x.type, (x.who || []).join(','), x.idea || '', x.done ? 1 : 0].join('|'))).slice(0, 16); }
+function calSig_(t, x) { return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, [t.name, x.title, x.d, x.time || '', x.dur || '', x.type, (x.who || []).join(','), x.idea || '', x.done ? 1 : 0, (x.meet && x.meet.uri) || ''].join('|'))).slice(0, 16); }
 function calTimes_(x, s) {
   var y = +x.d.slice(0, 4), mo = +x.d.slice(5, 7) - 1, d = +x.d.slice(8, 10);
   if (!x.time) return { allDay: true, start: new Date(y, mo, d) };
@@ -672,13 +777,14 @@ function calUpsert_(t, x, s) {
     if (ev && x.cal.cid && x.cal.cid !== cal.getId()) { try { ev.deleteEvent(); } catch (e) {} ev = null; }
   }
   var title = t.name + ' · ' + x.title + (x.done ? ' ✓' : '');
-  var desc = ['النوع: ' + x.type, (x.who && x.who.length) ? 'المسؤول: ' + x.who.join('، ') : '', x.idea ? '\n' + x.idea : '', '\n— منصة الأنشطة التربوية: ' + SITE_URL].filter(String).join('\n');
+  var uri = (x.meet && x.meet.uri) || '';
+  var desc = [uri ? 'رابط اللقاء: ' + uri : '', 'النوع: ' + x.type, (x.who && x.who.length) ? 'المسؤول: ' + x.who.join('، ') : '', x.idea ? '\n' + x.idea : '', '\n— منصة الأنشطة التربوية: ' + SITE_URL].filter(String).join('\n');
   var tm = calTimes_(x, s);
   if (ev) {
     if (tm.allDay) ev.setAllDayDate(tm.start); else ev.setTime(tm.start, tm.end);
-    ev.setTitle(title); ev.setDescription(desc);
+    ev.setTitle(title); ev.setDescription(desc); try { ev.setLocation(uri); } catch (e) {}
   } else {
-    ev = tm.allDay ? cal.createAllDayEvent(title, tm.start, { description: desc }) : cal.createEvent(title, tm.start, tm.end, { description: desc });
+    ev = tm.allDay ? cal.createAllDayEvent(title, tm.start, { description: desc, location: uri }) : cal.createEvent(title, tm.start, tm.end, { description: desc, location: uri });
   }
   try { if (t.calColor) ev.setColor(String(t.calColor)); } catch (e) {}
   x.cal = { id: ev.getId(), cid: cal.getId(), sig: calSig_(t, x), at: now_() };
@@ -927,7 +1033,7 @@ function runReminders_(force) {
     var done = [];
     queue.forEach(function (q) {
       var x = p.acts.filter(function (y) { return y.id === q[0]; })[0];
-      try { tgSend_(t.chat.id, fill_(s.tpl[q[1]] || DEFAULTS.tpl[q[1]], x, t, q[2]), t.id); done.push(q); sent++; }
+      try { tgSend_(t.chat.id, remindText_(s.tpl[q[1]] || DEFAULTS.tpl[q[1]], x, t, q[2]), t.id); done.push(q); sent++; }
       catch (e) { errs.push(t.name + ': ' + e.message); }
     });
     if (done.length) withLock_(function () {

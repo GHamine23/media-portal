@@ -23,6 +23,12 @@ window.DEMO = (function () {
   function boot(cal) {
     GAS_EXT(G, { cal: cal || null });
     G._fetch.handler = function (url, opt) {
+      if (url.indexOf('meet.googleapis.com') >= 0) {   // ميت محاكاة: غرفة وهمية ومشرفون
+        const m = (opt.method || 'get').toLowerCase(), body = typeof opt.payload === 'string' ? JSON.parse(opt.payload) : {}, p = url.split('/v2/')[1], r = () => Math.random().toString(36).slice(2, 5);
+        if (m === 'post' && p === 'spaces') { const c = r() + '-' + r() + 'x-' + r(); return { code: 200, body: JSON.stringify({ name: 'spaces/' + c, meetingUri: 'https://meet.google.com/' + c, meetingCode: c }) }; }
+        if (m === 'post' && /\/members$/.test(p)) return { code: 200, body: JSON.stringify({ name: p + '/' + r(), email: body.email, role: body.role }) };
+        return { code: 200, body: '{}' };
+      }
       if (url.indexOf('api.telegram.org') >= 0) {
         const m = url.split('/').pop(), p = opt.payload || {};
         if (m === 'getMe') return { code: 200, body: JSON.stringify({ ok: true, result: { id: 7, username: 'anshita_demo_bot', first_name: 'تذكيرات الأنشطة' } }) };
