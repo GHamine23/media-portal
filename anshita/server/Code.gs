@@ -40,7 +40,8 @@ var DEFAULTS = {
   durMin: 60,                          // مدة الحدث في التقويم إن لم تُحدَّد
   calId: '',                           // فارغ = التقويم الأساسي لصاحب السكربت
   tpl: { d3: '', d1: '' },             // فارغ = الرسائل الغنية المتنوعة؛ ويُكتب نص مخصّص عند الحاجة
-  adminTasks: true                     // مهام الأسبوع للإدارة على الخاص يوم الملخص
+  adminTasks: true,                    // مهام الأسبوع للإدارة على الخاص يوم الملخص
+  checkins: true                       // سؤال «هل أُقيم؟» بعد النشاط بساعتين
 };
 var OLD_TPL = ['تذكير: {العنوان}\nموعده {الموعد} ({متى}).\nحان وقت تصميم إعلان اللقاء وإعداد نصّه.\nالمسؤول: {المسؤول}', 'تذكير: {العنوان}\nموعده {الموعد} ({متى}).\nاليوم موعد نشر إعلان اللقاء.\nالمسؤول: {المسؤول}'];   // نصوص قديمة تُعامل كأنها فارغة
 function customTpl_(s, k) { var v = (s.tpl || {})[k]; return v && OLD_TPL.indexOf(v) < 0 ? v : ''; }
@@ -50,7 +51,7 @@ function apiFns_() {
   return {
     info: info, login: login,
     boot: boot, revs: revs, plan: plan, pass: pass,
-    act_save: act_save, act_del: act_del, act_series: act_series,
+    act_save: act_save, act_del: act_del, act_series: act_series, share_set: share_set, pub_plan: pub_plan, tg_relay: tg_relay,
     day_save: day_save, sem_put: sem_put, sem_import: sem_import, sem_del: sem_del,
     track_save: track_save, settings_save: settings_save, log_list: log_list,
     acc_list: acc_list, acc_save: acc_save, acc_reset: acc_reset, acc_del: acc_del,
@@ -65,7 +66,7 @@ function apiFns_() {
   };
 }
 function doPost(e) {
-  var out; JC = {};
+  var out, t0 = Date.now(); JC = {};
   try {
     var req = JSON.parse(e.postData.contents);
     var fn = apiFns_()[req.fn];
@@ -75,6 +76,7 @@ function doPost(e) {
     out = { error: String(err && err.message || err) };
     if (err && err.code) out.code = err.code;
   }
+  out.ms = Date.now() - t0;   // زمن التنفيذ داخل الخادم (لقياس السرعة)
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
 }
 function doGet() {
@@ -98,24 +100,42 @@ function jfile_(name) {
   return null;
 }
 var JC = {};   // ذاكرة الطلب الواحد
+// ذاكرة الخادم السريعة: الملف الكبير يُقسَم أجزاءً (حدّ القيمة الواحدة ١٠٠ ك.ب بالبايت، والعربية حرفان أو ثلاثة لكل حرف)
+var CACHE_PART = 30000;
+function cacheGet_(c, k) {
+  var h = c.get(k); if (h == null) return null;
+  if (h.slice(0, 7) !== '#PARTS:') return h;
+  var n = +h.slice(7), keys = []; for (var i = 0; i < n; i++) keys.push(k + ':' + i);
+  var m = c.getAll(keys), out = '';
+  for (var j = 0; j < n; j++) { if (m[keys[j]] == null) return null; out += m[keys[j]]; }
+  return out;
+}
+function cachePut_(c, k, s) {
+  try {
+    if (s.length <= CACHE_PART) { c.put(k, s, 21600); return; }
+    var n = Math.ceil(s.length / CACHE_PART), o = {};
+    if (n > 40) { c.remove(k); return; }
+    for (var i = 0; i < n; i++) o[k + ':' + i] = s.slice(i * CACHE_PART, (i + 1) * CACHE_PART);
+    c.putAll(o, 21600); c.put(k, '#PARTS:' + n, 21600);
+  } catch (e) { try { c.remove(k); } catch (e2) {} }
+}
 function readJson_(name, def) {
   if (JC.hasOwnProperty(name)) return JSON.parse(JC[name]);
-  var c = CacheService.getScriptCache(), k = 'j:' + name, hit = c.get(k);
+  var c = CacheService.getScriptCache(), k = 'j:' + name, hit = cacheGet_(c, k);
   if (hit != null) { JC[name] = hit; try { return JSON.parse(hit); } catch (e) {} }
   var f = jfile_(name); if (!f) return def;
   var s = f.getBlob().getDataAsString(), v;
   try { v = JSON.parse(s); } catch (e) { return def; }
   JC[name] = s;
-  if (s.length < 90000) { try { c.put(k, s, 21600); } catch (e) {} }
+  cachePut_(c, k, s);
   return v;
 }
 function writeJson_(name, obj) {
-  var s = JSON.stringify(obj), f = jfile_(name);
-  if (f) f.setContent(s);
-  else { f = dataFolder_().createFile(name, s, 'application/json'); props_().setProperty('jf_' + name, f.getId()); }
+  var s = JSON.stringify(obj), id = props_().getProperty('jf_' + name), f = null;
+  if (id) { try { f = DriveApp.getFileById(id); f.setContent(s); } catch (e) { f = null; } }   // الطريق السريع: الملف معروف
+  if (!f) { f = jfile_(name); if (f) f.setContent(s); else { f = dataFolder_().createFile(name, s, 'application/json'); props_().setProperty('jf_' + name, f.getId()); } }
   JC[name] = s;
-  var c = CacheService.getScriptCache();
-  try { if (s.length < 90000) c.put('j:' + name, s, 21600); else c.remove('j:' + name); } catch (e) { c.remove('j:' + name); }
+  cachePut_(CacheService.getScriptCache(), 'j:' + name, s);
 }
 function withLock_(fn) {
   var lock = LockService.getScriptLock(); lock.waitLock(28000);
@@ -498,12 +518,15 @@ function act_save(token, tid, json) {
     if (o.id) p.acts.forEach(function (x, k) { if (x.id === o.id) i = k; });
     if (o.id && i < 0) throw new Error('النشاط غير موجود (ربما حُذف)');
     var old = i >= 0 ? p.acts[i] : null;
-    var calOn = o.calOn, scope = o.scope; delete o.calOn; delete o.scope;
+    var calOn = o.calOn, scope = o.scope, rpDef = !!o.rpDef; delete o.calOn; delete o.scope; delete o.rpDef;
     if (!full) {
       if (!old) throw new Error('إضافة الأنشطة مغلقة، ويفتحها المدير العام');
       var f = {}; ADJUST_FIELDS.forEach(function (k) { if (k in o) f[k] = o[k]; }); o = f;
     }
     var x = cleanAct_(o, old), calErr = '', notice = '', al = alertOf_(a, tid, old, x);
+    // آخر إعداد تذكير اختاره الفريق لهذا النوع يصير الافتراضي لما بعده
+    if (!old && !x.rp) { var dr = ((t.defs || {}).rp || {})[x.type]; if (dr) x.rp = cleanRp_(dr); }
+    var defUp = rpDef && x.rp ? remCfg_(x) : null;
     if (!old) { x.by = a.name; if (!x.sem) x.sem = String(t.cur || ''); }
     // تقويم جوجل: الاختيار للإدارة، وما أُرسل يبقى محدَّثاً
     if (a.role === 'admin' && calOn === false && x.cal) { try { calRemove_(x); } catch (e) { calErr = e.message; } delete x.cal; }
@@ -520,6 +543,7 @@ function act_save(token, tid, json) {
     var others = [];
     if (old && old.ser && scope === 'next') others = seriesApply_(p, t, s, old, x);
     savePlan_(tid, p);
+    if (defUp) saveDefs_(tid, function (d) { d.rp = d.rp || {}; d.rp[x.type] = defUp; });
     var what = !old ? 'أضاف نشاطاً' : old.d !== x.d || (old.time || '') !== (x.time || '') ? 'غيّر موعد نشاط' : (old.who || []).join() !== (x.who || []).join() ? 'غيّر القائم على نشاط' : old.done !== x.done ? (x.done ? 'أتمّ نشاطاً' : 'أعاد نشاطاً إلى الخطة') : al ? 'عدّل نشاطاً' : 'تابع نشاطاً';
     log_(a, tid, what, x.title + (others.length ? ' (وما بعده: ' + apptText_(others.length) + ')' : ''));
     if (al && others.length) al.title += ' — ومعه ' + apptText_(others.length) + ' بعده من السلسلة';
@@ -574,8 +598,7 @@ function act_series(token, tid, json) {
     if (o.from) {
       first = p.acts.filter(function (y) { return y.id === o.from; })[0];
       if (!first) throw new Error('النشاط غير موجود (ربما حُذف)');
-      if (first.ser) throw new Error('هذا النشاط متكرر من قبل');
-      first.ser = sid;
+      if (!first.ser) first.ser = sid;
       dates = dates.filter(function (d) { return d !== first.d; });
       base = { title: first.title, type: first.type, time: first.time || '', dur: first.dur || 0, who: first.who || [], idea: first.idea || '', rem: first.rem, rp: first.rp || null };
     }
@@ -586,6 +609,7 @@ function act_series(token, tid, json) {
       if (a.role === 'admin' && (o.calOn === true || (first && first.cal && first.cal.id))) { try { calUpsert_(t, x, s); } catch (e) { calErr = e.message; if (x.cal) x.cal.err = calErr; } }
       p.acts.push(x); made.push(x);
     });
+    if (o.rule && rule.every && ((trackOf_(tid).defs || {}).every || 1) !== every) saveDefs_(tid, function (d) { d.every = every; });
     p.series = p.series || {};
     p.series[sid] = { every: every, wd: (rule.wd || []).map(Number).filter(function (n) { return n >= 0 && n < 7; }), until: isIso_(rule.until) ? rule.until : '', at: now_(), by: a.name };
     savePlan_(tid, p);
@@ -598,6 +622,38 @@ function act_series(token, tid, json) {
   if (res.alert) adminTgHtml_(res.alert);
   delete res.alert;
   return JSON.stringify(res);
+}
+// تفضيلات المسار الافتراضية (آخر ما اختاره الفريق): {rp: {النوع: إعداد التذكير}, every: تكرار}
+function saveDefs_(tid, fn) {
+  var ts = tracks_(), t = ts.filter(function (y) { return y.id === tid; })[0]; if (!t) return;
+  t.defs = t.defs || {}; fn(t.defs);
+  writeJson_('tracks.json', ts); props_().setProperty('rev_meta', String(now_()));
+}
+/* رابط الخطة العام: يُرسل لأي أحد فيرى الخطة فقط (بلا ملاحظات ولا روابط ولا بريد ولا مهام)، ويُوقف متى شاء الفريق أو الإدارة */
+function share_set(token, tid, on) {
+  var a = auth_(token); canView_(a, tid);
+  return JSON.stringify(withLock_(function () {
+    var ts = tracks_(), t = ts.filter(function (y) { return y.id === tid; })[0]; if (!t) throw new Error('المسار غير موجود');
+    if (on) { if (!t.share) t.share = Utilities.getUuid().replace(/-/g, '').slice(0, 20); } else delete t.share;
+    writeJson_('tracks.json', ts); props_().setProperty('rev_meta', String(now_()));
+    log_(a, tid, on ? 'أنشأ رابط الخطة العام' : 'أوقف رابط الخطة العام', '');
+    return { share: t.share || '' };
+  }));
+}
+var PUB_DAY = ['d', 'h', 'w', 'ax', 'c', 'q', 'ev', 'p'];
+function pub_plan(key, sem) {
+  key = String(key || ''); if (key.length < 12) throw new Error('الرابط غير صحيح');
+  var t = tracks_().filter(function (y) { return y.share === key; })[0];
+  if (!t) throw new Error('هذا الرابط لم يعد متاحًا');
+  var p = plan_(t.id), ns = Object.keys(p.sems).filter(function (k) { return p.sems[k] && (p.sems[k].days || []).length; }).sort(function (x, y) { return x - y; });
+  var n = ns.indexOf(String(sem)) >= 0 ? String(sem) : (ns.indexOf(String(t.cur)) >= 0 ? String(t.cur) : ns[ns.length - 1]), S = n ? p.sems[n] : null;
+  return JSON.stringify({
+    track: { id: t.id, name: t.name, full: t.full || t.name, cohort: t.cohort || '', age: t.age || '', color: t.color || '' },
+    sems: ns, n: n || '', title: S ? (S.title || '') : '',
+    days: S ? S.days.map(function (d) { var o = {}; PUB_DAY.forEach(function (k) { if (d[k] !== undefined && d[k] !== '') o[k] = d[k]; }); return o; }) : [],
+    acts: p.acts.filter(function (x) { return x.sem === n; }).map(function (x) { return { d: x.d, time: x.time || '', type: x.type, title: x.title, who: x.who || [], done: !!x.done }; }),
+    at: now_()
+  });
 }
 function semOf_(p, d) { for (var k in p.sems) { var S = p.sems[k]; if (S && S.start <= d && d <= S.end) return k; } return ''; }
 function seriesText_(r, n) {
@@ -771,6 +827,7 @@ function settings_save(token, json) {
     if ('meetAdmins' in o) s.meetAdmins = (o.meetAdmins || []).map(function (e) { return String(e || '').trim().toLowerCase(); }).filter(isEmail_).slice(0, 5);
     if ('tpl' in o) { s.tpl = s.tpl || {}; ['d3', 'd1'].forEach(function (k) { if (o.tpl[k] != null) s.tpl[k] = txt_(o.tpl[k], 1200); }); }
     if ('adminTasks' in o) s.adminTasks = !!o.adminTasks;
+    if ('checkins' in o) s.checkins = !!o.checkins;
     writeJson_('settings.json', s);
     props_().setProperty('rev_meta', String(now_()));
     log_(a, '', 'عدّل الإعدادات', '');
@@ -1291,10 +1348,10 @@ function tgPoll_() {
   // نقرأ بلا offset فلا تُحذف التحديثات من طابور تليجرام (تبقى 24 ساعة) ويراها كل من يقرأ البوت نفسه (أثر، والربط الشخصي)،
   // ونتجاوز ما عالجناه برقمه
   var g0 = readJson_('tg.json', {}), last0 = g0.last != null ? g0.last : (g0.offset || 1) - 1;
-  var ups = tgCall_('getUpdates', { timeout: '0', limit: '100', allowed_updates: JSON.stringify(['message', 'my_chat_member']) })
+  var ups = tgCall_('getUpdates', { timeout: '0', limit: '100', allowed_updates: JSON.stringify(['message', 'my_chat_member', 'callback_query']) })
     .filter(function (u) { return u.update_id > last0; });
   if (!ups.length) return { n: 0 };
-  var welcome = [], migs = [], linked = [];
+  var welcome = [], migs = [], linked = [], cbs = [];
   withLock_(function () {
     var g = readJson_('tg.json', {}); g.known = g.known || {};
     var assigned = {}; tracks_().forEach(function (t) { if (t.chat && t.chat.id) assigned[String(t.chat.id)] = t.name; });
@@ -1302,6 +1359,7 @@ function tgPoll_() {
     ups.forEach(function (u) {
       if (u.update_id <= (g.last != null ? g.last : (g.offset || 1) - 1)) return;
       g.last = u.update_id; delete g.offset;
+      if (u.callback_query) { cbs.push(u.callback_query); return; }
       var m = u.message || u.my_chat_member; if (!m || !m.chat) return;
       var c = m.chat, id = String(c.id);
       if (u.message && u.message.migrate_to_chat_id) { migs.push([id, String(u.message.migrate_to_chat_id)]); return; }
@@ -1332,6 +1390,7 @@ function tgPoll_() {
   if (linked.length) withLock_(function () { linked.forEach(function (l) { log_(null, l[2] === 'admin' ? '' : l[2], l[2] === 'admin' ? 'ربط محادثة الإدارة في تليجرام' : 'ربط مجموعة تليجرام', l[3]); }); });
   welcome = welcome.filter(function (w) { return !linked.some(function (l) { return l[0] === w[0]; }); });
   welcome.concat(linked).forEach(function (w) { try { tgSend_(w[0], w[1]); } catch (e) {} });
+  cbs.forEach(function (cq) { try { tgCallback_(cq); } catch (e) {} });
   return { n: ups.length };
 }
 // رابط إضافة البوت إلى مجموعة المسار: يفتح تليجرام لاختيار المجموعة، فيصل البوتَ «/start رمز» فيربطها تلقائياً
@@ -1374,7 +1433,7 @@ function tg_status(token) {
   var chats = Object.keys(known).map(function (k) { var c = known[k]; return { id: c.id, title: c.title, type: c.type, at: c.at, left: !!c.left, to: map[String(c.id)] || '' }; })
     .sort(function (x, y) { return (y.at || 0) - (x.at || 0); });
   if (g.bot && g.bot.username) { ts.forEach(function (t) { t.link = tgLink_(g.bot.username, t.id); }); }
-  return JSON.stringify({ bot: g.bot || null, hasToken: !!props_().getProperty('TG_TOKEN'), chats: chats, tracks: ts, adminChat: s.adminChat || null, adminLink: g.bot && g.bot.username ? tgLink_(g.bot.username, 'admin') : '', lastTick: g.lastTick || null, upcoming: upcoming_(s), settings: { remindHour: s.remindHour, remindTypes: s.remindTypes, digest: s.digest, adminDigest: s.adminDigest, notifyChanges: s.notifyChanges, tpl: s.tpl, groupsPaused: !!s.groupsPaused, adminTasks: s.adminTasks !== false } });
+  return JSON.stringify({ bot: g.bot || null, hasToken: !!props_().getProperty('TG_TOKEN'), chats: chats, tracks: ts, adminChat: s.adminChat || null, adminLink: g.bot && g.bot.username ? tgLink_(g.bot.username, 'admin') : '', lastTick: g.lastTick || null, upcoming: upcoming_(s), settings: { remindHour: s.remindHour, remindTypes: s.remindTypes, digest: s.digest, adminDigest: s.adminDigest, notifyChanges: s.notifyChanges, tpl: s.tpl, groupsPaused: !!s.groupsPaused, adminTasks: s.adminTasks !== false, checkins: s.checkins !== false } });
 }
 function tg_poll(token) {
   var a = auth_(token); needAdmin_(a);
@@ -1501,6 +1560,93 @@ function runDigests_() {
   withLock_(function () { var g2 = readJson_('tg.json', {}); g2.digestWeek = wk; writeJson_('tg.json', g2); });
   return n;
 }
+/* ================= سؤال المتابعة بعد النشاط =================
+   بعد النشاط بساعتين (وما لا وقت له: الساعة التاسعة مساءً) يسأل البوت مجموعة الفريق: هل أُقيم؟ بأزرار.
+   «تم» يعلّم النشاط في المنصة ويذكّر بالخطوة التالية؛ «لم يُقم» يرشد إلى نقله أو كتابة السبب. */
+function ckDue_(x, today, nowMin) {
+  if (x.done || (x.sent || {}).ck === x.d) return false;
+  var left = dayDiff_(x.d, today);
+  if (left === -1) return true;   // فات أمس (لم يصادف المؤقّت أو كان الإرسال موقوفًا): يُسأل اليوم
+  if (left !== 0) return false;
+  var st = x.time ? (+x.time.slice(0, 2)) * 60 + (+x.time.slice(3, 5)) : 19 * 60, dur = +x.dur || 60;
+  return nowMin >= st + Math.max(120, dur + 60);
+}
+function ckHtml_(x, t) {
+  return '<b>' + pick_(['كيف كان ', 'نسأل عن ', 'أخبرونا عن '], x.id + 'ck') + h_(q_(x.title)) + '؟</b>\n' +
+    'كان موعده ' + h_(whenText_(x)) + ((x.who && x.who.length) ? '، بإشراف ' + h_(x.who.join('، ')) : '') + '.\n\n' +
+    'هل أُقيم؟ اختاروا من الأزرار، فيُسجَّل في المنصة مباشرة.\nوإن أحببتم فاكتبوا عدد الحضور أو ملاحظة قصيرة ردًّا على هذه الرسالة.';
+}
+function ckKb_(t, x) {
+  var cb = function (v) { return 'an:ck:' + t.id + ':' + x.id + ':' + v; };
+  return JSON.stringify({ inline_keyboard: [[{ text: 'تم ✅', callback_data: cb('done') }, { text: 'لم يُقم', callback_data: cb('no') }]] });
+}
+function runCheckins_() {
+  var s = cfg_(), tz = tz_(), now = new Date(), today = Utilities.formatDate(now, tz, 'yyyy-MM-dd'), hm = Utilities.formatDate(now, tz, 'HH:mm');
+  var nowMin = (+hm.slice(0, 2)) * 60 + (+hm.slice(3, 5)), n = 0;
+  if (!props_().getProperty('TG_TOKEN') || s.groupsPaused || s.checkins === false) return 0;
+  tracks_().forEach(function (t) {
+    if (!t.chat || !t.chat.id || t.remind === false) return;
+    var p = plan_(t.id), due = p.acts.filter(function (x) { return remindable_(x, s) && ckDue_(x, today, nowMin); });
+    if (!due.length) return;
+    var done = [];
+    due.forEach(function (x) { try { tgCall_('sendMessage', { chat_id: String(t.chat.id), text: ckHtml_(x, t), parse_mode: 'HTML', reply_markup: ckKb_(t, x), disable_web_page_preview: 'true' }); done.push(x.id); n++; } catch (e) {} });
+    if (done.length) withLock_(function () { var p2 = plan_(t.id); p2.acts.forEach(function (y) { if (done.indexOf(y.id) >= 0) { y.sent = y.sent || {}; y.sent.ck = y.d; } }); writeJson_('plan_' + t.id + '.json', p2); });
+  });
+  return n;
+}
+// الخطوة التالية للفريق بعد نشاط
+function nextStep_(t, p, x) {
+  var today = today_(), up = p.acts.filter(function (y) { return y.id !== x.id && !y.done && y.d >= today; }).sort(function (a, b) { return (a.d + (a.time || '')) < (b.d + (b.time || '')) ? -1 : 1; })[0];
+  var L = [];
+  if (!x.note) L.push('• سجّلوا عدد الحضور أو ملاحظة قصيرة في النشاط، فالتقرير يُبنى عليها.');
+  if (up) {
+    var R = remCfg_(up), d3 = addDays_(up.d, -3), steps = [];
+    if (!(up.who && up.who.length)) steps.push('تحديد المسؤول عنه');
+    if (R.des && !up.link) steps.push(d3 <= today ? 'تصميم إعلانه الآن' : 'تصميم إعلانه ' + dayText_(d3));
+    if (['لقاء', 'استضافة'].indexOf(up.type) >= 0 && !(up.meet && up.meet.uri)) steps.push('إنشاء رابط ميت له');
+    L.push('• التالي: ' + h_(q_(up.title)) + ' ' + h_(whenText_(up)) + (steps.length ? '، والمطلوب: ' + h_(steps.join('، ')) : '') + '.');
+  } else L.push('• لا نشاط بعده في الخطة بعد، فأضيفوا نشاط الأسبوع القادم.');
+  return L.join('\n');
+}
+// يعالج ضغطة زر من أزرار البوت (من القراءة الدورية أو مما ينقله الربط)
+function tgCallback_(cq) {
+  var m = /^an:ck:([\w-]+):([\w-]+):(done|no)$/.exec(String(cq && cq.data || '')); if (!m) return false;
+  var g = readJson_('tg.json', {}), seen = g.cbDone || [];
+  if (seen.indexOf(cq.id) >= 0) return true;
+  var ans = function (txt) { try { tgCall_('answerCallbackQuery', { callback_query_id: cq.id, text: txt || '' }); } catch (e) {} };
+  var t = null; try { t = trackOf_(m[1]); } catch (e) {}
+  var msg = cq.message || {}, chat = msg.chat ? String(msg.chat.id) : '';
+  if (!t || !t.chat || String(t.chat.id) !== chat) { ans('هذه الرسالة ليست لهذه المجموعة'); return false; }
+  var who = [cq.from && cq.from.first_name, cq.from && cq.from.last_name].filter(function (x) { return x; }).join(' ') || 'عضو من الفريق';
+  var res = withLock_(function () {
+    var g2 = readJson_('tg.json', {}); g2.cbDone = (g2.cbDone || []).concat(cq.id).slice(-300); writeJson_('tg.json', g2);
+    var p = plan_(t.id), x = p.acts.filter(function (y) { return y.id === m[2]; })[0];
+    if (!x) return { gone: true };
+    if (m[3] === 'done') {
+      var was = x.done; x.done = true; x.upd = now_(); x.doneBy = who; savePlan_(t.id, p);
+      if (!was) log_({ name: who + ' (من تليجرام)', role: 'team' }, t.id, 'أتمّ نشاطاً', x.title);
+      return { x: x, p: p, was: was };
+    }
+    log_({ name: who + ' (من تليجرام)', role: 'team' }, t.id, 'أفاد أن النشاط لم يُقم', x.title);
+    return { x: x, p: p, no: true };
+  });
+  var txt;
+  if (res.gone) { ans('النشاط لم يعد في الخطة'); txt = '<b>' + h_(q_('النشاط')) + '</b> لم يعد في الخطة.'; }
+  else if (res.no) { ans('سُجّل، شكرًا'); txt = '<b>لم يُقم ' + h_(q_(res.x.title)) + '</b> (أفاد ' + h_(who) + ')\nإن تأجّل فانقلوه إلى موعده الجديد في المنصة، وإن أُلغي فاكتبوا السبب في ملاحظته.\n' + siteLink_('#t/' + t.id, 'افتح خطة ' + t.name); }
+  else { ans(res.was ? 'معلَّم من قبل' : 'تم، بارك الله فيكم'); txt = '<b>تم ✅ ' + h_(q_(res.x.title)) + '</b>\nعلّمه ' + h_(who) + ' في المنصة. ' + pick_(['بارك الله في جهدكم.', 'جزاكم الله خيرًا.', 'أحسنتم، وتقبّل الله منكم.'], res.x.id + 'dn') + '\n\n' + nextStep_(t, res.p, res.x) + '\n' + siteLink_('#t/' + t.id, 'افتح خطة ' + t.name); }
+  try { tgCall_('editMessageText', { chat_id: chat, message_id: String(msg.message_id), text: txt, parse_mode: 'HTML', disable_web_page_preview: 'true' }); }
+  catch (e) { try { tgSend_(chat, txt, t.id, true); } catch (e2) {} }
+  return true;
+}
+// ينقل إلينا ضغطات الأزرار من يقرأ البوت غيرنا (محادثة الربط)، والتحقق برمز البوت نفسه
+function tg_relay(botToken, json) {
+  var tok = props_().getProperty('TG_TOKEN');
+  if (!tok || String(botToken || '') !== tok) throw err_('غير مصرّح', 'auth');
+  var u = typeof json === 'string' ? JSON.parse(json) : json, cq = u && (u.callback_query || (u.data && u.id ? u : null));
+  if (!cq) return JSON.stringify({ ok: false, why: 'ليس ضغطة زر' });
+  return JSON.stringify({ ok: !!tgCallback_(cq) });
+}
+
 /* ================= التقرير الأسبوعي =================
    مهمة مجدولة (Claude) تقرأ بيانات المنصة بمفتاح خاص للقراءة فقط، وتكتب تقريرًا شاملًا،
    ثم تحفظه هنا (صفحة «التقارير») وترسل خلاصته إلى محادثة الإدارة مع البوت. */
@@ -1593,10 +1739,18 @@ function tick() {
   var r = { at: now_(), ok: true, msg: '', sent: 0 };
   try { tgPoll_(); } catch (e) { r.msg += 'استقبال: ' + e.message + ' '; }
   try { var x = runReminders_(false); r.sent += x.sent; if (x.errs.length) { r.ok = false; r.msg += x.errs.join('؛ '); } } catch (e) { r.ok = false; r.msg += e.message; }
+  try { r.sent += runCheckins_(); } catch (e) { r.msg += ' سؤال المتابعة: ' + e.message; }
+  try { ensureQuick_(); } catch (e) {}
   try { r.sent += runDigests_(); } catch (e) { r.ok = false; r.msg += ' ملخص: ' + e.message; }
   try { r.sent += runSuggest_(); } catch (e) { r.msg += ' اقتراح: ' + e.message; }
   try { withLock_(function () { var g = readJson_('tg.json', {}); g.lastTick = r; writeJson_('tg.json', g); }); } catch (e) {}
   return r;
+}
+// مؤقّت سريع (كل ٥ دقائق) يقرأ أزرار البوت فقط، حتى يصل جواب «تم» سريعًا
+function quick() { try { tgPoll_(); } catch (e) {} }
+function ensureQuick_() {
+  if (ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'quick'; })) return;
+  ScriptApp.newTrigger('quick').timeBased().everyMinutes(5).create();
 }
 function ensureTriggers_(log) {
   var has = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'tick'; });

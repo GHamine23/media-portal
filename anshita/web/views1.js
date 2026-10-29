@@ -5,7 +5,7 @@
 /* ---------- بطاقة النشاط ---------- */
 function evChip(a, tid, o = {}) {
   const t = T(tid), drag = canAdjust(tid) && !o.noDrag && !String(a.id).startsWith('tmp'), cl = clashOf(tid, a);
-  const flags = (PEND.has(a.id) || String(a.id).startsWith('tmp') ? `<span data-tip="يُحفظ الآن"><span class="spin"></span></span>` : '') + (cl ? `<span class="cl" data-tip="${esc(cl)}">${svg('alert')}</span>` : '') + (a.ser ? `<span data-tip="نشاط متكرر">${svg('repeat')}</span>` : '') + (a.meet && a.meet.uri ? `<span data-tip="له رابط ميت">${svg('video')}</span>` : '') + (a.cal && a.cal.id ? `<span data-tip="في تقويم جوجل">${svg('gcal')}</span>` : '') + (a.done ? `<span data-tip="تم التنفيذ">${svg('check')}</span>` : '');
+  const flags = (PEND.has(a.id) || String(a.id).startsWith('tmp') ? `<span data-tip="يُحفظ الآن"><span class="spin"></span></span>` : '') + (cl ? `<span class="cl" data-tip="${esc(cl)}">${svg('alert')}</span>` : '') + (a.meet && a.meet.uri ? `<span data-tip="له رابط ميت">${svg('video')}</span>` : '') + (a.cal && a.cal.id ? `<span data-tip="في تقويم جوجل">${svg('gcal')}</span>` : '') + (a.done ? `<span data-tip="تم التنفيذ">${svg('check')}</span>` : '');
   const meta = [o.track ? `<span class="tbadge">${esc(t.name)}</span>` : '', o.big ? `<span class="ty">${esc(a.type)}</span>` : '', a.time ? `<span>${timeText(a.time)}</span>` : '', a.who && a.who.length ? `<span>${esc(a.who.join('، '))}</span>` : '', o.date ? `<span>${gDay(a.d)}</span>` : '', flags ? `<span class="flag">${flags}</span>` : ''].filter(Boolean).join('');
   const pend = PEND.has(a.id) || String(a.id).startsWith('tmp');
   return `<div class="ev ${pend ? 'pending' : ''} ${o.track || o.tint ? 'tinted' : ''} ${o.big ? 'big' : ''} ${cl ? 'clash' : ''} ${a.done ? 'done' : ''} ${isLate(a) ? 'late' : ''} ${typeof F !== 'undefined' && F && F.dock && F.id === a.id ? 'sel' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${tid}" ${drag ? 'data-drag="1"' : ''} style="--tcol:${t.color};--tyc:${typeOf(a.type)[1]}">
@@ -406,6 +406,8 @@ function semBody(id, n, sem) {
     <button class="chip" type="button" aria-pressed="${!!P.tbl.hideEmpty}" data-act="tblempty">الأيام التي فيها أنشطة</button>
     ${ed ? `<button class="btn pri sm" type="button" data-act="newact" data-track="${id}">${svg('plus')}نشاط</button>` : ''}
     ${ed ? `<button class="btn icon" type="button" data-act="semmenu" data-id="${id}" data-n="${n}" aria-label="خيارات الجدول" data-tip="خيارات الجدول">${svg('dots')}</button>` : ''}
+    <button class="btn sm" type="button" data-act="pdf" data-id="${id}" data-n="${n}" data-tip="تحميل الخطة PDF">${svg('sheet')}PDF</button>
+    <button class="btn sm" type="button" data-act="share" data-id="${id}" data-tip="رابط يعرض الخطة لأي أحد">${svg('link')}مشاركة</button>
   </div>`;
   return (isMob() ? semFactsMini(id, n, sem) : semFacts(id, n, sem)) + tools + (isMob() ? semCards(id, n, sem) : semTable(id, n, sem));
 }
@@ -439,9 +441,9 @@ function semTable(id, n, sem) {
       const da = acts.filter(a => a.d === d.d).sort(sortA);
       if (!dayVisible(d, da)) continue;
       wc += da.length; shown++;
-      const sg = sugs.filter(s => s.d === d.d);
-      wr += `<tr class="d ${d.d === TODAY ? 'today' : ''} ${d.d < TODAY ? 'past' : ''} ${d.c ? '' : 'off'} ${da.length ? 'has' : ''}" id="d-${d.d}" data-drop="1" data-date="${d.d}" data-track="${id}">
-        <td class="dy"><div class="dyw"><b>${DAYS[wd(d.d)]}</b>${d.d === TODAY ? '<span class="today-tag">اليوم</span>' : ''}</div><span class="g num">${gShort(d.d)}</span><span class="h">${esc(d.h || hijri(d.d))}</span>${ed ? `<button class="btn icon dye" type="button" data-act="dayedit" data-id="${id}" data-n="${n}" data-d="${d.d}" aria-label="تعديل اليوم" data-tip="تعديل اليوم">${svg('edit', 1.6)}</button>` : ''}</td>
+      const sg = sugs.filter(s => s.d === d.d), sp = spanInfo(sem.days, sem.days.indexOf(d));
+      wr += `<tr class="d ${d.d === TODAY ? 'today' : ''} ${d.d < TODAY ? 'past' : ''} ${d.c ? '' : 'off'} ${da.length ? 'has' : ''} ${sp ? 'sp sp-' + sp.k : ''}" id="d-${d.d}" data-drop="1" data-date="${d.d}" data-track="${id}">
+        <td class="dy">${sp && sp.start && sp.n > 1 ? `<span class="spn">${esc(sp.lb)} · ${sp.n} ${sp.n <= 10 ? 'أيام' : 'يومًا'}</span>` : ''}<div class="dyw"><b>${DAYS[wd(d.d)]}</b>${d.d === TODAY ? '<span class="today-tag">اليوم</span>' : ''}</div><span class="g num">${gShort(d.d)}</span><span class="h">${esc(d.h || hijri(d.d))}</span>${ed ? `<button class="btn icon dye" type="button" data-act="dayedit" data-id="${id}" data-n="${n}" data-d="${d.d}" aria-label="تعديل اليوم" data-tip="تعديل اليوم">${svg('edit', 1.6)}</button>` : ''}</td>
         <td class="acts"><div class="acts-in">${clashNote(id, d.d)}${da.map(a => evChip(a, id, { big: true })).join('')}${sg.map(s => sugCard(id, s, ed)).join('')}${ed ? `<button class="plus" type="button" data-act="newact" data-date="${d.d}" data-track="${id}">+ نشاط</button>` : ''}</div></td>
         <td class="cur">${curCell(id, n, d, ed)}</td></tr>`;
     }
@@ -464,8 +466,8 @@ function semCards(id, n, sem) {
     for (const d of W.days) {
       const da = acts.filter(a => a.d === d.d).sort(sortA);
       if (!dayVisible(d, da)) continue; shown++;
-      const sg = sugs.filter(s => s.d === d.d);
-      wr += `<div class="mday ${d.d === TODAY ? 'today' : ''} ${da.length ? 'has' : ''}" id="d-${d.d}" data-drop="1" data-date="${d.d}" data-track="${id}">
+      const sg = sugs.filter(s => s.d === d.d), sp = spanInfo(sem.days, sem.days.indexOf(d));
+      wr += `<div class="mday ${d.d === TODAY ? 'today' : ''} ${da.length ? 'has' : ''} ${sp ? 'sp sp-' + sp.k : ''}" id="d-${d.d}" data-drop="1" data-date="${d.d}" data-track="${id}">
         <div class="top"><b>${gDay(d.d)}</b><span class="xs faint">${esc(d.h || hijri(d.d))}</span>${d.d === TODAY ? '<span class="today-tag">اليوم</span>' : ''}<span class="sp"></span>${ed ? `<button class="btn icon" type="button" style="padding:4px" data-act="dayedit" data-id="${id}" data-n="${n}" data-d="${d.d}" aria-label="تعديل اليوم">${svg('edit', 1.6)}</button>` : ''}</div>
         ${clashNote(id, d.d)}${da.map(a => evChip(a, id, { big: true })).join('')}${sg.map(s => sugCard(id, s, ed)).join('')}
         ${d.ev ? `<div>${evBadge(d)}</div>` : ''}
@@ -490,6 +492,69 @@ function dockIdle(id) {
     <div class="dk-sec"><h4>القادمة</h4>${up.length ? `<div class="col" style="gap:6px">${up.slice(0, 10).map(a => evChip(a, id, { date: true })).join('')}</div>${up.length > 10 ? `<p class="xs faint" style="margin-top:6px">و${nActs(up.length - 10)} بعدها في الجدول</p>` : ''}` : `<p class="muted sm">لا أنشطة قادمة في الخطة.</p>`}</div>
     <p class="hint">${svg('edit', 1.6)} اضغط أي نشاط في الجدول ليُفتح هنا، أو اسحبه إلى يوم آخر.</p></div>`;
 }
+
+/* ---------- وثيقة الخطة: للطباعة وتحميل PDF، وللرابط العام ----------
+   o = {id, name, full, cohort, color, semTitle, days, acts} */
+function planDoc(o, forPrint) {
+  const W = weeksOf(o.days), logo = LOGOS[o.id] ? `<img src="${LOGOS[o.id]}" alt="">` : '';
+  const r0 = o.days[0], r1 = o.days[o.days.length - 1];
+  let rows = '';
+  W.forEach(w => {
+    let wr = '';
+    w.days.forEach(d => {
+      const i = o.days.indexOf(d), sp = spanInfo(o.days, i), A = o.acts.filter(a => a.d === d.d).sort(sortA);
+      if (!A.length && !d.c && !d.ev && !(sp && sp.start)) return;
+      if (!A.length && !d.c && sp && !sp.start) return;
+      const cur = d.c ? `${d.ax ? `<span class="pd-ax">${esc(d.ax)}</span>` : ''}<b>${esc(d.c)}</b>${d.q ? `<span>${esc(d.q)}</span>` : ''}` : sp ? `<span class="pd-sp">${esc(sp.lb)}${sp.start && sp.n > 1 ? ` · ${sp.n} ${sp.n <= 10 ? 'أيام' : 'يومًا'} حتى ${gShort(sp.to)}` : ''}</span>` : '';
+      wr += `<tr class="${sp ? 'sp sp-' + sp.k : ''}"><td class="pd-d"><b>${DAYS[wd(d.d)]}</b><span>${gShort(d.d)}</span><small>${esc(d.h || hijri(d.d))}</small></td>
+        <td class="pd-a">${d.ev && /اختبار/.test(d.ev) ? `<div class="pd-ev">${esc(d.ev)}</div>` : ''}${A.map(a => `<div class="pd-act" style="--tyc:${typeOf(a.type)[1]}"><span class="pd-ty">${esc(a.type)}</span><b>${esc(a.title)}</b><span class="pd-m">${[a.time ? timeText(a.time) : '', (a.who || []).join('، ')].filter(Boolean).join(' · ')}</span></div>`).join('') || '<span class="pd-none">—</span>'}</td>
+        <td class="pd-c">${cur}</td></tr>`;
+    });
+    if (wr) rows += `<tr class="pd-w"><td colspan="3"><b>الأسبوع ${w.w}</b><span> · ${gShort(w.from)} – ${gShort(w.to)}</span></td></tr>` + wr;
+  });
+  const n = o.acts.length, types = TYPE_NAMES.map(k => [k, o.acts.filter(a => a.type === k).length]).filter(x => x[1]);
+  return `<div class="pdoc ${forPrint ? 'print' : ''}" dir="rtl" style="--tc:${o.color || 'var(--brand)'}">
+    <header class="pd-h"><div class="pd-logo">${logo}</div><div class="pd-t"><span>${esc(o.cohort || 'أكاديمية الجيل الصاعد الإلكترونية')}</span><h1>خطة أنشطة ${esc(o.full || o.name)}</h1><p>${esc(o.semTitle || '')}${r0 ? ` · ${gShort(r0.d)} – ${gShort(r1.d)} ${r1.d.slice(0, 4)}` : ''}</p></div>
+      <div class="pd-sum"><b>${n}</b><span>${n === 1 ? 'نشاط' : n === 2 ? 'نشاطان' : n <= 10 ? 'أنشطة' : 'نشاطًا'}</span></div></header>
+    ${types.length ? `<div class="pd-types">${types.map(([k, v]) => `<span style="--tyc:${typeOf(k)[1]}"><i></i>${esc(k)} ${v}</span>`).join('')}</div>` : ''}
+    <table class="pd-tbl"><thead><tr><th>اليوم</th><th>الأنشطة</th><th>مقرر الطلاب</th></tr></thead><tbody>${rows || '<tr><td colspan="3">لا أيام في الخطة.</td></tr>'}</tbody></table>
+    <footer class="pd-f">منصة الأنشطة التربوية · أكاديمية الجيل الصاعد الإلكترونية · ${gLong(TODAY)}</footer></div>`;
+}
+// الطباعة: يفتح نافذة الطباعة، ومنها «حفظ بصيغة PDF»
+function printPlan(o) {
+  let r = document.getElementById('printroot'); if (!r) { r = document.createElement('div'); r.id = 'printroot'; document.body.appendChild(r); }
+  r.innerHTML = planDoc(o, true);
+  const t0 = document.title; document.title = `خطة ${o.name} — ${o.semTitle || ''}`.trim();
+  const done = () => { document.title = t0; r.innerHTML = ''; removeEventListener('afterprint', done); };
+  addEventListener('afterprint', done);
+  document.fonts.ready.then(() => setTimeout(() => window.print(), 150));
+}
+function planDocOf(id, n) { const t = T(id), S = semOf(id, n) || { days: [] }; return { id, name: t.name, full: t.full, cohort: t.cohort, color: t.color, semTitle: S.title || semLabel(n), days: S.days || [], acts: actsOf(id, n) }; }
+// نافذة مشاركة الخطة
+function shareDialog(id) {
+  const t = T(id), url = t.share ? SITE_PUB() + '#pub/' + t.share : '';
+  openDialog(`<h3>مشاركة خطة ${esc(t.name)}</h3>
+    <p class="muted sm">رابط يُرسل لأي أحد، ولو لم يكن له حساب، فيرى الخطة فقط: الأيام والأنشطة ومواعيدها والمسؤولين والمقرر. لا تظهر فيه الملاحظات ولا روابط التصميم وميت ولا المهام ولا البريد.</p>
+    ${url ? `<div class="field"><label>الرابط</label><div class="row" style="gap:6px"><input class="inp ltr" style="text-align:left;flex:1" readonly value="${esc(url)}" id="sh-url"><button class="btn" type="button" data-act="copy" data-v="${esc(url)}">${svg('copy')}انسخ</button></div></div>
+      <div class="row" style="flex-wrap:wrap"><a class="btn pri" href="${esc(url)}" target="_blank" rel="noopener">${svg('ext')}افتحه</a><button class="btn" type="button" data-act="close">تم</button><span class="sp"></span><button class="btn danger" type="button" data-act="share-off" data-id="${id}">أوقف الرابط</button></div>
+      <p class="hint">إيقاف الرابط يمنع من معه الرابط القديم، وإنشاؤه بعدها يعطي رابطًا جديدًا.</p>`
+    : `<div class="row"><button class="btn pri" type="button" data-act="share-on" data-id="${id}">${svg('link')}أنشئ الرابط</button><button class="btn" type="button" data-act="close">إلغاء</button></div>`}`);
+}
+const SITE_PUB = () => (CFG.demo ? location.href.split('#')[0] : (CFG.site || 'https://ghamine23.github.io/media-portal/anshita/'));
+
+/* ---------- الرابط العام: عرض الخطة لمن ليس له حساب ---------- */
+let PUB = null;
+function pubView(key) {
+  if (!PUB || PUB.key !== key) {
+    PUB = { key, loading: true };
+    API.call('pub_plan', key).then(r => { PUB = Object.assign({ key }, r); render(); }).catch(e => { PUB = { key, err: e.message }; render(); });
+  }
+  const top = `<div class="pub-top"><span class="pub-b">${LOGOS.anshita ? `<img src="${LOGOS.anshita}" alt="">` : ''}</span><span class="sp"></span>${PUB.days ? `<button class="btn sm" type="button" data-act="pub-print">${svg('sheet')}تحميل PDF</button>` : ''}<button class="btn icon" type="button" data-act="theme" aria-label="${P.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}">${svg(P.theme === 'dark' ? 'sun' : 'moon')}</button></div>`;
+  if (PUB.loading) return `<div class="pub">${top}<div class="card empty"><span class="spin"></span></div></div>`;
+  if (PUB.err) return `<div class="pub">${top}<div class="card empty">${svg('lock')}<h3>${esc(PUB.err)}</h3><p>اطلب الرابط الجديد ممن أرسله إليك.</p></div></div>`;
+  return `<div class="pub">${top}${planDoc(pubDocData(), false)}</div>`;
+}
+const pubDocData = () => ({ id: PUB.track.id, name: PUB.track.name, full: PUB.track.full, cohort: PUB.track.cohort, color: PUB.track.color, semTitle: PUB.title, days: PUB.days, acts: PUB.acts });
 
 /* ---------- قسم «المهام والمطلوبات» ---------- */
 const TW = {};   // الأسبوع المعروض في قسم المهام لكل مسار
@@ -564,12 +629,54 @@ function reportSec(id, n) {
   const whoRows = Object.keys(who).map(w => [esc(w), who[w], '']).sort((a, b) => b[1] - a[1]);
   const noWho = acts.filter(a => !(a.who || []).length).length;
   const rep = isAdmin() ? repExcerpt(t) : '';
+  const narr = reportNarr(id, n, sem, acts, W, nowW), log = reportLog(id, n, sem, acts, W);
   return `<div class="kpis">${kpi(acts.length, 'في الخطة', 'القادم منها: ' + acts.filter(a => a.d >= TODAY).length)}${kpi(done.length, 'نُفّذ', past.length ? Math.round(done.length / past.length * 100) + '٪ مما مضى' : '')}${kpi(emptyW, 'أسابيع مضت بلا نشاط', nowW ? 'من ' + nowW : '')}${kpi(tasksOf(id).filter(x => x.done).length + ' / ' + tasksOf(id).length, 'مهام الفريق المنجزة')}</div>
     <div class="card"><div class="card-h"><h3>الأنشطة أسبوعًا أسبوعًا</h3><span class="lg"><i class="pl"></i>مخطط<i class="dn"></i>نُفّذ</span></div><div class="wbars" role="img" aria-label="عدد الأنشطة في كل أسبوع وما نُفّذ منها">${weeks}</div></div>
     <div class="secgrid">
       <div class="card"><div class="card-h"><h3>حسب النوع</h3></div>${types.length ? bars(types.map(r => [esc(r[0]), r[1], r[2]])) : '<p class="muted sm">لا أنشطة بعد.</p>'}</div>
       <div class="card"><div class="card-h"><h3>توزيع المسؤوليات</h3>${noWho ? `<span class="xs late">${nActs(noWho)} بلا مسؤول</span>` : ''}</div>${whoRows.length ? bars(whoRows) : '<p class="muted sm">لم يُحدَّد مسؤول لأي نشاط بعد.</p>'}</div>
-    </div>${rep}`;
+    </div>
+    ${narr}${log}${rep}`;
+}
+// خلاصة مكتوبة ومقترحات، مبنية على أرقام المسار
+function reportNarr(id, n, sem, acts, W, nowW) {
+  const t = T(id), past = acts.filter(a => a.d < TODAY), done = past.filter(a => a.done), late = past.filter(a => !a.done), up = acts.filter(a => a.d >= TODAY);
+  const P = [], S = [];
+  const r0 = sem.days[0].d, r1 = sem.days[sem.days.length - 1].d;
+  P.push(TODAY < r0 ? `يبدأ ${semLabel(n)} ${rel(r0)}، وفي خطته إلى الآن ${nActs(acts.length)}.` : TODAY > r1 ? `انتهى ${semLabel(n)}، وكان في خطته ${nActs(acts.length)}.` : `نحن في الأسبوع ${nowW} من ${W.length}، وفي خطة الفصل ${nActs(acts.length)}، القادم منها ${up.length}.`);
+  if (past.length) P.push(`مضى ${nActs(past.length)}، نُفّذ منها ${done.length} (${Math.round(done.length / past.length * 100)}٪)${late.length ? `، وبقي بلا تعليم: ${late.slice(0, 4).map(a => qt(a.title)).join('، ')}${late.length > 4 ? ' وغيرها' : ''}` : ''}.`);
+  const types = TYPE_NAMES.map(k => [k, acts.filter(a => a.type === k).length]).filter(x => x[1]).sort((a, b) => b[1] - a[1]);
+  if (types.length) P.push(`أكثر الأنشطة ${types[0][0] === 'لقاء' ? 'لقاءات' : 'من نوع «' + types[0][0] + '»'} (${types[0][1]})${types[1] ? `، ثم «${types[1][0]}» (${types[1][1]})` : ''}${types.length > 2 ? `، ومعها ${types.slice(2).map(x => '«' + x[0] + '»').join('، ')}` : ''}.`);
+  const who = {}; acts.forEach(a => (a.who || []).forEach(w => who[w] = (who[w] || 0) + 1));
+  const top = Object.keys(who).sort((a, b) => who[b] - who[a])[0];
+  if (top && acts.length >= 6 && who[top] / acts.length > 0.5) { P.push(`يحمل ${top} ${who[top]} من ${acts.length} نشاطًا، أي أكثر من نصف الخطة.`); S.push(`توزيع المسؤوليات: إشراك ${members(id).filter(m => m !== top).slice(0, 3).join('، ') || 'بقية الفريق'} في بعض أنشطة ${top} يخفف عنه ويقوّي الفريق.`); }
+  const emptyPast = W.slice(0, nowW).filter(w => w.study && !acts.some(a => a.d >= w.from && a.d <= w.to)).map(w => w.w);
+  const emptyNext = W.slice(nowW, nowW + 3).filter(w => w.study && !acts.some(a => a.d >= w.from && a.d <= w.to)).map(w => w.w);
+  if (emptyPast.length) P.push(`أسابيع دراسية مضت بلا نشاط: ${emptyPast.join('، ')}.`);
+  if (emptyNext.length) S.push(`الأسابيع القادمة ${emptyNext.join('، ')} بلا أنشطة بعد. نشاط واحد صغير في كل أسبوع يبقي الطلاب قريبين.`);
+  const soon = up.filter(a => diffD(a.d, TODAY) <= 14), noMeet = soon.filter(a => MEET_T.includes(a.type) && !(a.meet && a.meet.uri)), noDes = soon.filter(a => remindable(a) && remCfg(a).des && !a.link), noWho = soon.filter(a => !(a.who || []).length);
+  if (soon.length) P.push(`في الأسبوعين القادمين ${nActs(soon.length)}${noWho.length ? `، ${noWho.length} منها بلا مسؤول` : ''}${noDes.length ? `، و${noDes.length} لم يُرفع تصميمها` : ''}${noMeet.length ? `، و${noMeet.length} لقاء بلا رابط ميت` : ''}.`);
+  if (noWho.length) S.push(`تحديد المسؤول عن: ${noWho.slice(0, 3).map(a => qt(a.title)).join('، ')}.`);
+  if (noMeet.length) S.push(`إنشاء روابط ميت للقاءات القريبة من نافذة كل لقاء.`);
+  kahootSugs(id).filter(k => k.left <= 21).forEach(k => S.push(`${k.exam} ${rel(k.ed)}: كاهوت مراجعة قبله (${gDay(k.d)}) يثبّت المادة.`));
+  const seen = {}; acts.filter(a => a.d >= TODAY).forEach(a => { const c = clashOf(id, a); if (c && !seen[a.d]) { seen[a.d] = 1; S.push(`${gDay(a.d)}: ${c}. تفريقهما على يومين أخفّ على الطلاب.`); } });
+  if (late.length) S.push(`تعليم ما أُقيم «تم» مع ملاحظة الحضور، فالتقرير يُبنى عليه.`);
+  const openT = tasksOf(id).filter(x => !x.done), lateT = openT.filter(x => x.d && x.d < TODAY);
+  if (openT.length) P.push(`مهام الفريق المفتوحة ${openT.length}${lateT.length ? `، تجاوز موعدَه منها ${lateT.length}` : ''}.`);
+  return `<div class="card rnarr"><div class="card-h"><h3>الخلاصة</h3></div><div class="rn-p">${P.map(x => `<p>${esc(x)}</p>`).join('')}</div>
+    ${S.length ? `<h4>مقترحات للأسبوعين القادمين</h4><ul class="rn-s">${S.slice(0, 7).map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</div>`;
+}
+// سجل الفصل أسبوعًا أسبوعًا: كل نشاط بحاله ومسؤوله وملاحظة تنفيذه
+function reportLog(id, n, sem, acts, W) {
+  const wk = W.map(w => {
+    const A = acts.filter(a => a.d >= w.from && a.d <= w.to).sort(sortA), ev = [...new Set(w.days.map(d => spanKind(d) ? spanLabel(d) : '').filter(Boolean))];
+    if (!A.length && !ev.length) return '';
+    const now = w.from <= TODAY && TODAY <= w.to, dn = A.filter(a => a.done).length, pastN = A.filter(a => a.d < TODAY).length;
+    const st = a => a.done ? `<span class="rd ok">${svg('check')}نُفّذ</span>` : a.d < TODAY ? `<span class="rd warn">${svg('alert')}لم يُعلَّم</span>` : `<span class="rd">قادم</span>`;
+    return `<details class="rlw" ${now ? 'open' : ''}><summary><b>الأسبوع ${w.w}</b><span class="xs faint">${gShort(w.from)} – ${gShort(w.to)}</span>${ev.map(e => `<span class="pill">${esc(e)}</span>`).join('')}<span class="sp"></span><span class="xs faint">${A.length ? nActs(A.length) + (pastN ? ` · نُفّذ ${dn}` : '') : 'بلا أنشطة'}</span></summary>
+      ${A.length ? `<div class="flist">${A.map(a => `<div class="frow">${tile(a.type)}<button class="tx lk-plain" type="button" data-act="openact" data-id="${a.id}" data-track="${id}"><b>${esc(a.title)}</b><span class="xs faint">${gDay(a.d)}${a.time ? ' · ' + timeText(a.time) : ''} · ${esc((a.who || []).join('، ') || 'بلا مسؤول')}</span><span class="rds">${st(a)}${remindable(a) && remCfg(a).des ? (a.link ? `<span class="rd ok">${svg('check')}التصميم</span>` : `<span class="rd">بلا تصميم</span>`) : ''}${a.meet && a.meet.uri ? `<span class="rd ok">${svg('video')}ميت</span>` : ''}</span>${a.note ? `<p class="fnote">${esc(a.note)}</p>` : ''}</button></div>`).join('')}</div>` : ''}</details>`;
+  }).join('');
+  return wk ? `<div class="card"><div class="card-h"><h3>سجل الفصل أسبوعًا أسبوعًا</h3><span class="xs faint">كل نشاط بحاله وملاحظة تنفيذه</span></div>${wk}</div>` : '';
 }
 // مقطع المسار من آخر تقرير أسبوعي (للإدارة)
 function repExcerpt(t) {

@@ -31,11 +31,13 @@ GAS._fetch.handler = function (url, opt) {
     const m = url.split('/').pop(), p = opt.payload || {};
     if (url.indexOf('/botBAD') >= 0) return { code: 401, body: JSON.stringify({ ok: false, description: 'Unauthorized' }) };
     if (m === 'getMe') return { code: 200, body: JSON.stringify({ ok: true, result: { id: 9, username: 'anshita_bot', first_name: 'بوت الأنشطة' } }) };
+    if (m === 'editMessageText') { TG.edits = (TG.edits || []).concat({ chat: String(p.chat_id), id: p.message_id, text: p.text }); return { code: 200, body: '{"ok":true,"result":true}' }; }
+    if (m === 'answerCallbackQuery') { TG.answers = (TG.answers || []).concat(p.text); return { code: 200, body: '{"ok":true,"result":true}' }; }
     if (m === 'deleteWebhook' || m === 'setMyCommands') return { code: 200, body: '{"ok":true,"result":true}' };
     if (m === 'getUpdates') { if (p.offset) TG.offsetUsed = true; const off = +p.offset || 0; return { code: 200, body: JSON.stringify({ ok: true, result: TG.updates.filter(u => u.update_id >= off) }) }; }
     if (m === 'sendMessage') {
       if (TG.migrate && String(p.chat_id) === TG.migrate[0]) return { code: 400, body: JSON.stringify({ ok: false, description: 'Bad Request: group chat was upgraded to a supergroup chat', parameters: { migrate_to_chat_id: +TG.migrate[1] } }) };
-      TG.sent.push({ chat: String(p.chat_id), text: p.text, html: p.parse_mode === 'HTML' }); ALLSENT.push(TG.sent[TG.sent.length - 1]); return { code: 200, body: JSON.stringify({ ok: true, result: { message_id: TG.sent.length } }) };
+      TG.sent.push({ chat: String(p.chat_id), text: p.text, html: p.parse_mode === 'HTML', kb: p.reply_markup || '' }); ALLSENT.push(TG.sent[TG.sent.length - 1]); return { code: 200, body: JSON.stringify({ ok: true, result: { message_id: TG.sent.length } }) };
     }
   }
   return { code: 404, body: '' };
@@ -318,7 +320,17 @@ throws(() => call('report_data', rk), /مفتاح/, 'المفتاح القديم
   const one = call('act_save', AT, 'judhoor', JSON.stringify({ title: 'كاهوت أسبوعي', type: 'كاهوت', d: '2026-11-12', time: '19:00' })).act;
   const r2 = call('act_series', AT, 'judhoor', JSON.stringify({ from: one.id, dates: ['2026-11-12', '2026-11-26'], rule: { every: 2, wd: [5] } }));
   ok(r2.first.ser === r2.sid && r2.acts.length === 1 && r2.acts[0].type === 'كاهوت' && r2.acts[0].time === '19:00', 'تكرار نشاط قائم ينسخ حقوله ويضمّه للسلسلة');
-  throws(() => call('act_series', AT, 'judhoor', JSON.stringify({ from: one.id, dates: ['2026-12-10'] })), /متكرر من قبل/, 'لا يُكرَّر المتكرر مرتين');
+  ok(call('act_series', AT, 'judhoor', JSON.stringify({ from: one.id, dates: ['2026-12-10'] })).acts.length === 1, 'يُكرَّر النشاط ولو كان مكررًا من قبل: المواعيد مستقلة');
+  ok(ctx.trackOf_('judhoor').defs.every === 2, 'آخر تكرار اختاره الفريق يصير الافتراضي');
+  // آخر إعداد تذكير يصير الافتراضي لنوعه
+  const d1 = call('act_save', AT, 'judhoor', JSON.stringify({ title: 'لقاء أ', type: 'لقاء', d: '2026-12-20', rp: { des: false, d2: true, d1: true, d0: true }, rpDef: true })).act;
+  const d2 = call('act_save', AT, 'judhoor', JSON.stringify({ title: 'لقاء ب', type: 'لقاء', d: '2026-12-21' })).act;
+  ok(d2.rp && d2.rp.des === false && d2.rp.d2 === true, 'النشاط الجديد يأخذ آخر إعداد تذكير لنوعه');
+  const d3 = call('act_save', AT, 'judhoor', JSON.stringify({ title: 'كتابي أ', type: 'كتابي', d: '2026-12-21' })).act;
+  ok(!d3.rp, 'لكل نوع افتراضيه');
+  call('act_save', AT, 'judhoor', JSON.stringify({ id: d1.id, rp: { des: true, d2: false, d1: true, d0: true } }));
+  ok(ctx.trackOf_('judhoor').defs.rp['لقاء'].des === false, 'تعديل نشاط دون اختيار صريح لا يغيّر الافتراضي');
+  [d1, d2, d3].forEach(x => call('act_del', AT, 'judhoor', x.id));
   ok(ctx.seriesText_(ctx.plan_('judhoor').series[r2.sid], 2) === 'كل أسبوعين يوم الخميس، موعدان', 'وصف السلسلة: ' + ctx.seriesText_(ctx.plan_('judhoor').series[r2.sid], 2));
   const rd = call('report_data', call('report_key', AT).key, 7); ok(rd.tracks.find(t => t.id === 'judhoor').acts.some(x => x.ser === r2.sid), 'التقرير يعرف السلسلة');
   call('act_del', AT, 'judhoor', one.id, 'next');
@@ -328,6 +340,18 @@ throws(() => call('report_data', rk), /مفتاح/, 'المفتاح القديم
 NOW = Date.UTC(2026, 11, 2, 16, 0); TG.sent.length = 0; ctx.tick();
 ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.text) && /الاختبار النصفي/.test(m.text) && /بعد 6 أيام/.test(m.text)), 'اقتراح كاهوت قبل الاختبار: ' + (TG.sent.find(m => /كاهوت/.test(m.text)) || {}).text);
 { const k0 = TG.sent.filter(m => /كاهوت مراجعة/.test(m.text)).length; NOW += 3600e3; ctx.tick(); ok(TG.sent.filter(m => /كاهوت مراجعة/.test(m.text)).length === k0, 'الاقتراح لا يتكرر'); }
+
+// ١٦) رابط الخطة العام
+{
+  const AT = call('login', 'admin', cred.admin).token;
+  const sh = call('share_set', AT, 'judhoor', true).share; ok(sh && sh.length === 20, 'إنشاء رابط الخطة العام');
+  ok(call('share_set', AT, 'judhoor', true).share === sh, 'الرابط ثابت ما لم يُوقف');
+  call('act_save', AT, 'judhoor', JSON.stringify({ title: 'لقاء علني', type: 'لقاء', d: '2026-11-10', note: 'ملاحظة داخلية', link: 'https://x.y/z', idea: 'فكرة داخلية' }));
+  const pub = call('pub_plan', sh); const raw = JSON.stringify(pub);
+  ok(pub.track.name && pub.days.length > 10 && pub.acts.some(x => x.title === 'لقاء علني'), 'الرابط العام يعرض الخطة');
+  ok(!/ملاحظة داخلية|x\.y\/z|فكرة داخلية|emails|chat|share/.test(raw), 'لا ملاحظات ولا روابط ولا بريد في الرابط العام');
+  call('share_set', AT, 'judhoor', false); throws(() => call('pub_plan', sh), /لم يعد متاحًا/, 'إيقاف الرابط يمنع العرض');
+}
 
 // ١٥) إعداد التذكير لكل نشاط: التصميم، وقبله بيومين، وقبله بيوم، ويوم الموعد قبله بساعة
 {
@@ -351,6 +375,31 @@ ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.te
   n = at(16, 21, 30); ok(!of('لقاء الختام', n).length, 'لا تكرار ليوم الموعد');
   ok(!ctx.weekTasks_(ctx.trackOf_('judhoor'), ctx.plan_('judhoor'), '2026-12-12', ctx.cfg_()).some(x => x.ref === B1.id && x.k === 'design'), 'لا مهمة تصميم لنشاط لا يحتاجه');
   call('act_del', AT, 'judhoor', A1.id); call('act_del', AT, 'judhoor', B1.id);
+}
+
+// ١٧) سؤال المتابعة بعد النشاط، وزر «تم»
+{
+  const AT = call('login', 'admin', cred.admin).token;
+  call('settings_save', AT, JSON.stringify({ groupsPaused: false }));
+  const X = call('act_save', AT, 'judhoor', JSON.stringify({ title: 'لقاء المتابعة', type: 'لقاء', d: '2026-12-22', time: '20:00', who: ['معاذ'] })).act;
+  const Y = call('act_save', AT, 'judhoor', JSON.stringify({ title: 'لقاء بعده', type: 'لقاء', d: '2026-12-29', time: '20:00' })).act;
+  const ck = () => TG.sent.filter(m => /لقاء المتابعة/.test(m.text) && m.kb);
+  NOW = Date.UTC(2026, 11, 22, 18, 30); ctx.tick(); ok(!ck().length, 'لا سؤال قبل ساعتين من الموعد');
+  NOW = Date.UTC(2026, 11, 22, 19, 5); ctx.tick();
+  const q1 = ck(); ok(q1.length === 1 && /هل أُقيم/.test(q1[0].text) && /an:ck:judhoor:/.test(q1[0].kb), 'سؤال المتابعة بعد ساعتين بأزرار');
+  NOW = Date.UTC(2026, 11, 22, 20, 5); ctx.tick(); ok(ck().length === 1, 'لا يتكرر السؤال');
+  const chat = ctx.trackOf_('judhoor').chat.id;
+  upd({ callback_query: { id: 'cq1', from: { first_name: 'معاذ' }, data: 'an:ck:judhoor:' + X.id + ':done', message: { message_id: 77, chat: { id: +chat } } } });
+  ctx.quick();
+  ok(ctx.plan_('judhoor').acts.find(a => a.id === X.id).done, 'زر «تم» يعلّم النشاط في المنصة');
+  const ed = (TG.edits || []).slice(-1)[0] || {}; ok(/تم ✅/.test(ed.text) && /التالي: «لقاء بعده»/.test(ed.text) && /تحديد المسؤول/.test(ed.text), 'الرد يذكّر بالخطوة التالية: ' + (ed.text || '').split('\n').slice(0, 4).join(' | '));
+  ok(ctx.readJson_('log.json', [])[0].by === 'معاذ (من تليجرام)', 'السجل يذكر من ضغط');
+  const n0 = (TG.edits || []).length; ok(call('tg_relay', ctx.PropertiesService.getScriptProperties().getProperty('TG_TOKEN'), JSON.stringify({ callback_query: { id: 'cq1', data: 'an:ck:judhoor:' + X.id + ':done', message: { message_id: 77, chat: { id: +chat } } } })).ok === true, 'النقل يقبل الضغطة');
+  ok((TG.edits || []).length === n0, 'الضغطة نفسها لا تُعالج مرتين');
+  throws(() => call('tg_relay', 'BADTOKEN', '{}'), /غير مصرّح/, 'النقل يحتاج رمز البوت');
+  upd({ callback_query: { id: 'cq2', from: { first_name: 'دخيل' }, data: 'an:ck:judhoor:' + Y.id + ':done', message: { message_id: 78, chat: { id: -1 } } } });
+  ctx.quick(); ok(!ctx.plan_('judhoor').acts.find(a => a.id === Y.id).done, 'زر من مجموعة أخرى لا يعلّم');
+  call('act_del', AT, 'judhoor', X.id); call('act_del', AT, 'judhoor', Y.id);
 }
 
 if (process.env.PREVIEW) {

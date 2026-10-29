@@ -14,22 +14,21 @@ function openAct(tid, id, preset = {}) {
   F = a ? Object.assign({ tid, isNew: false }, JSON.parse(JSON.stringify(a)), { calOn: !!(a.cal && a.cal.id) })
     : { tid, isNew: true, title: preset.title || '', type: preset.type || 'لقاء', d: preset.date || (tid ? defDate(tid) : TODAY), time: '', dur: 0, who: [], idea: '', rem: null, calOn: false, done: false, note: '', link: '' };
   F.newNames = []; F.lockTrack = !!tid; F.d0 = F.d; F.rep = preset.repeat && !a ? newRep() : null;
+  if (!a && tid) F.rp = defRp(tid, F.type);
   F.dock = dockOn(F.tid) && !!$('#dock');
   drawAct();
   if (F.dock) { const b = $('#dock .dk-b'); if (b) b.scrollTop = 0; }
 }
+// آخر ما اختاره الفريق يصير الافتراضي: إعداد التذكير لكل نوع، ومعدل التكرار
+const defRp = (tid, type) => { const d = ((T(tid) || {}).defs || {}).rp || {}; return d[type] ? Object.assign({}, d[type]) : null; };
 function newRep() {
   const tid = F.tid, r = tid ? semRange(tid, semFor(tid, F.d) || curN(tid)) : null;
-  return { on: true, every: 1, wd: [wd(F.d)], wdAuto: true, until: r && r.to > F.d ? r.to : add(F.d, 7 * 12), tog: {} };
+  return { on: true, every: ((T(tid) || {}).defs || {}).every || 1, wd: [wd(F.d)], wdAuto: true, until: r && r.to > F.d ? r.to : add(F.d, 7 * 12), tog: {} };
 }
 // قسم التكرار في نموذج النشاط
 function repBlock(mode) {
   const tid = F.tid;
   if (!tid) return '';
-  if (F.ser && !F.isNew) {
-    const L = seriesOf(tid, F.ser), i = L.findIndex(a => a.id === F.id);
-    return `<div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('repeat')}</span><div class="tx"><b>نشاط متكرر</b><span>${esc(seriesText(tid, F.ser))}${i >= 0 ? ' · هذا الموعد ' + (i + 1) + ' من ' + L.length : ''}</span></div></div>`;
-  }
   if (mode !== 'full') return '';
   const R = F.rep, on = !!(R && R.on), r = semRange(tid, semFor(tid, F.d) || curN(tid)), semEnd = r ? r.to : '';
   const sum = on ? `${EVERY[R.every]}${R.wd.length ? ' يوم ' + R.wd.slice().sort((a, b) => a - b).map(i => DAYS[i]).join(' و') : ''} حتى ${gDay(R.until)}` : 'موعد واحد';
@@ -46,7 +45,7 @@ function repBlock(mode) {
   </div>`;
   return h;
 }
-const nextOf = () => F && F.ser && !F.isNew ? seriesOf(F.tid, F.ser).filter(a => a.id !== F.id && a.d > F.d0).length : 0;
+const nextOf = () => 0;   // التكرار مواعيد مستقلة: تعديل موعد لا يمس غيره
 function defDate(tid) { const r = semRange(tid, curN(tid)); return r && TODAY < r.from ? r.from : TODAY; }
 // صلاحية النموذج: full تعديل كامل، adj تعديل نشاط قائم بلا حذف (يصل الإدارةَ تنبيه)، ro متابعة فقط
 function fMode() {
@@ -107,7 +106,7 @@ function actParts() {
   body = body.replace('<!--MEET-->', !F.isNew && tid ? meetBlock() : '');
   const foot = ro ? `<button class="btn pri" type="button" data-act="f-save">حفظ المتابعة</button><button class="btn" type="button" data-act="${cancel}">إغلاق</button>`
     : (() => {
-      const nx = nextOf(), repN = F.rep && F.rep.on && !F.ser && mode === 'full' && tid ? repDates(tid, F).filter(x => x.on).length : 0;
+      const nx = nextOf(), repN = F.rep && F.rep.on && mode === 'full' && tid ? repDates(tid, F).filter(x => x.on).length : 0;
       const saveL = repN > 1 ? (F.isNew ? `أضف ${apptText(repN)}` : `احفظ وكرّره (${apptText(repN)})`) : F.isNew ? 'أضف النشاط' : nx ? 'احفظ هذا الموعد' : 'احفظ';
       const del = !F.isNew && mode === 'full' ? (F.confirmDel && nx ? `<button class="btn danger" type="button" data-act="f-del">احذف هذا الموعد</button><button class="btn danger" type="button" data-act="f-del-next">وما بعده (${nx})</button>` : `<button class="btn danger" type="button" data-act="f-del">${F.confirmDel ? 'تأكيد الحذف' : 'حذف'}</button>`) : '';
       return `<button class="btn pri" type="button" data-act="f-save" ${!tid ? 'disabled' : ''}>${saveL}</button>${nx ? `<button class="btn" type="button" data-act="f-save-next">له ولما بعده (${nx})</button>` : ''}<button class="btn" type="button" data-act="${cancel}">إلغاء</button><span class="sp"></span>${del}`;
@@ -180,20 +179,22 @@ async function saveF(scope) {
     if (!f.title.trim()) { toast('اكتب اسم النشاط', 'err'); $('#f-title') && $('#f-title').focus(); return; }
     if (f.link && !/^https?:\/\//i.test(f.link)) { toast('الرابط يبدأ بـ https://', 'err'); $('#f-link') && $('#f-link').focus(); return; }
     patch = { title: f.title.trim(), type: f.type, d: f.d, time: f.time || '', dur: f.dur || 0, who: f.who || [], idea: f.idea || '', rem: f.rem, rp: f.rp || null };
+    if (f.rpTouched) { patch.rpDef = true; const t = T(tid); t.defs = t.defs || {}; t.defs.rp = Object.assign({}, t.defs.rp, { [f.type]: remCfg(f) }); }
     if (!f.isNew) Object.assign(patch, { id: f.id, done: !!f.done, note: f.note || '', link: f.link || '' });
     if (isAdmin()) { const was = !!(f.cal && f.cal.id); if (f.calOn !== was) patch.calOn = !!f.calOn; }
     const s = semFor(tid, f.d); if (s) patch.sem = s;
     if (scope === 'next' && f.ser) patch.scope = 'next';
   }
   // التكرار: يُضاف النشاط في كل المواعيد المختارة
-  const rep = mode === 'full' && !f.ser && f.rep && f.rep.on ? repDates(tid, f).filter(x => x.on).map(x => x.d) : null;
+  const rep = mode === 'full' && f.rep && f.rep.on ? repDates(tid, f).filter(x => x.on).map(x => x.d) : null;
   if (rep && !rep.length) return toast('لا مواعيد مختارة للتكرار', 'err');
   if (rep && rep.length > 60) return toast('أقصى التكرار ٦٠ موعدًا. قصّر المدة أو باعد بين المواعيد', 'err');
   if (rep && (rep.length > 1 || !f.isNew)) {
     const rule = { every: f.rep.every, wd: f.rep.wd, until: f.rep.until };
+    { const t = T(tid); t.defs = Object.assign({}, t.defs, { every: f.rep.every }); }
     // المتكرر أثقل على الخادم: تبقى النافذة مفتوحة وزرها «يحفظ…» حتى تُحفظ المواعيد كلها، ثم تُغلق
     try {
-      if (f.isNew) { const base = Object.assign({}, patch); ['d', 'sem', 'calOn'].forEach(k => delete base[k]); await saveSeries(tid, { base, dates: rep, rule, calOn: !!patch.calOn }); toast(`أُضيف ${qt(patch.title)} في ${apptText(rep.length)}`); }
+      if (f.isNew) { const base = Object.assign({}, patch); ['d', 'sem', 'calOn', 'rpDef'].forEach(k => delete base[k]); await saveSeries(tid, { base, dates: rep, rule, calOn: !!patch.calOn }); toast(`أُضيف ${qt(patch.title)} في ${apptText(rep.length)}`); }
       else { await saveAct(tid, patch, { noRender: true }); const r = await saveSeries(tid, { from: f.id, dates: rep, rule }); toast(`كُرّر ${qt(patch.title)}: ${apptText(r.acts.length)} بعده`); }
       if (F === f) { if (f.dock) { F = null; render(); } else closeLayer(); }
     } catch (e) {}
@@ -435,7 +436,8 @@ VIEWS.bot = {
     <div class="card" style="margin-bottom:16px"><div class="card-h"><h3>مهام البوت</h3><span class="xs faint">تظهر للفرق حين يكتبون / في المجموعة</span><span class="sp"></span><button class="btn sm ghost" type="button" data-act="bot-menu">${svg('refresh')}حدّث القائمة في تليجرام</button></div>
       <div class="cmds">${BOT_CMDS.map(c => `<div class="cmd-i"><code dir="ltr">/${c[0]}</code><div class="tx"><b>${c[1]}</b><span>${c[2]}</span></div></div>`).join('')}</div>
       <p class="hint" style="margin-top:10px">${svg('bot')} يسأل البوت عن كل تفصيل ينقصه قبل التنفيذ، ثم يقول «تم». وما يحتاج صلاحية أوسع من صلاحية الفريق يرجع فيه إليك على الخاص.</p>
-      <div class="opt"><div class="tx"><b>مهام الأسبوع لك على الخاص</b><span>كل سبت مع الملخص: مهام كل مسار، وما يحتاج قرارك</span></div><button class="sw" type="button" role="switch" aria-checked="${BS.settings.adminTasks !== false}" data-act="bs-atasks" aria-label="مهام الأسبوع على الخاص"></button></div></div>
+      <div class="opt"><div class="tx"><b>مهام الأسبوع لك على الخاص</b><span>كل سبت مع الملخص: مهام كل مسار، وما يحتاج قرارك</span></div><button class="sw" type="button" role="switch" aria-checked="${BS.settings.adminTasks !== false}" data-act="bs-atasks" aria-label="مهام الأسبوع على الخاص"></button></div>
+      <div class="opt"><div class="tx"><b>سؤال المتابعة بعد النشاط</b><span>بعد النشاط بساعتين: «هل أُقيم؟» بزرّين، و«تم» يعلّمه في المنصة ويذكّر بالخطوة التالية</span></div><button class="sw" type="button" role="switch" aria-checked="${BS.settings.checkins !== false}" data-act="bs-ck" aria-label="سؤال المتابعة"></button></div></div>
     <div class="cols">
       <section class="stack">
         <div class="card"><div class="card-h"><h3>مجموعات الفرق</h3><span class="xs faint">${BS.tracks.filter(t => t.chat).length} من ${BS.tracks.length} مربوطة</span></div>
@@ -644,19 +646,25 @@ const H = {
   'tk-tgl': () => { readTK(); TK.done = !TK.done; drawTask(); },
   'tk-save': () => { readTK(); if (!TK.title.trim()) { toast('اكتب المهمة', 'err'); return; } const k = TK, patch = { title: k.title.trim(), d: k.d || '', who: k.who || [] }; if (!k.isNew) Object.assign(patch, { id: k.id, done: !!k.done }); return saveTask(k.tid, patch).then(r => { if (TK === k) closeLayer(); toast(k.isNew ? 'أُضيفت المهمة' : 'حُفظت المهمة'); }).catch(() => {}); },
   'tk-del': async el => { if (!armed(el, 'تأكيد الحذف')) return; const k = TK; closeLayer(); const p = planOf(k.tid), i = p.tasks.findIndex(x => x.id === k.id), prev = p.tasks[i]; p.tasks.splice(i, 1); render(); try { const r = await API.me('task_del', k.tid, k.id); p.rev = r.rev; D.revs[k.tid] = r.rev; toast('حُذفت المهمة'); } catch (e) { p.tasks.splice(i, 0, prev); render(); toast(e.message, 'err'); } },
+  pdf: el => printPlan(planDocOf(el.dataset.id, el.dataset.n)),
+  'pub-print': () => printPlan(pubDocData()),
+  share: el => shareDialog(el.dataset.id),
+  'share-on': async el => { const id = el.dataset.id; try { const r = await API.me('share_set', id, true); T(id).share = r.share; shareDialog(id); toast('أُنشئ رابط الخطة'); } catch (e) { toast(e.message, 'err'); } },
+  'share-off': async el => { if (!armed(el, 'تأكيد الإيقاف')) return; const id = el.dataset.id; try { await API.me('share_set', id, false); delete T(id).share; shareDialog(id); toast('أُوقف الرابط'); } catch (e) { toast(e.message, 'err'); } },
   twk: el => { const id = el.dataset.id, n = +el.dataset.n; TW[id] = n ? add(TW[id] || wkStart(TODAY), n) : wkStart(TODAY); render(); },
   'tk-undo': el => saveTask(el.dataset.track, { id: el.dataset.id, done: false }),
   'tk-done': el => { return saveTask(el.dataset.track, { id: el.dataset.id, done: true }).then(() => toast('أُنجزت المهمة', '', () => saveTask(el.dataset.track, { id: el.dataset.id, done: false }))).catch(() => {}); },
   'bot-menu': async () => { try { const r = await API.me('tg_menu'); toast('حُدّثت قائمة أوامر البوت في تليجرام (' + r.n + ')'); } catch (e) { toast(e.message, 'err'); } },
+  'bs-ck': async () => { const v = !(BS.settings.checkins !== false); try { await API.me('settings_save', JSON.stringify({ checkins: v })); BS.settings.checkins = v; render(); } catch (e) { toast(e.message, 'err'); } },
   'bs-atasks': async () => { const v = !(BS.settings.adminTasks !== false); try { await API.me('settings_save', JSON.stringify({ adminTasks: v })); BS.settings.adminTasks = v; render(); } catch (e) { toast(e.message, 'err'); } },
   'f-cancel': closeAct, 'f-day': el => { readF(); F.d = el.dataset.v; drawAct(true); },
   'al-seen': () => alertsSeen(true),
   done: el => { const tid = el.dataset.track, a = planOf(tid).acts.find(x => x.id === el.dataset.id); if (!a) return; const v = !a.done; return saveAct(tid, { id: a.id, done: v }).then(() => toast(v ? `تم تنفيذ ${qt(a.title)}` : 'أُعيد إلى الخطة', '', () => saveAct(tid, { id: a.id, done: !v }))).catch(() => {}); },
-  'f-track': el => { readF(); F.tid = el.dataset.v; drawAct(true); }, 'f-type': el => { readF(); F.type = el.dataset.v; drawAct(true); },
+  'f-track': el => { readF(); F.tid = el.dataset.v; if (F.isNew && !F.rpTouched) F.rp = defRp(F.tid, F.type); drawAct(true); }, 'f-type': el => { readF(); F.type = el.dataset.v; if (F.isNew && !F.rpTouched && F.tid) F.rp = defRp(F.tid, F.type); drawAct(true); },
   'f-who': el => { readF(); const w = el.dataset.v; F.who = (F.who || []).includes(w) ? F.who.filter(x => x !== w) : (F.who || []).concat(w); drawAct(true); },
   'f-rem': () => { readF(); const cur = F.rem === true || (F.rem !== false && (D.remindTypes || []).includes(F.type)); F.rem = !cur; drawAct(true); },
   'f-cal': () => { readF(); F.calOn = !F.calOn; drawAct(true); },
-  'f-rp': el => { readF(); const k = el.dataset.v, c = remCfg(F); F.rp = Object.assign({}, F.rp || {}, { [k]: !c[k] }); drawAct(true); }, 'f-done': () => { readF(); F.done = !F.done; drawAct(true); },
+  'f-rp': el => { readF(); const k = el.dataset.v, c = remCfg(F); F.rp = Object.assign({}, c, { [k]: !c[k] }); F.rpTouched = true; drawAct(true); }, 'f-done': () => { readF(); F.done = !F.done; drawAct(true); },
   'f-save': () => saveF(), 'f-save-next': () => saveF('next'),
   'f-del': () => { if (!F.confirmDel) { readF(); F.confirmDel = true; drawAct(true); return; } const { tid, id } = F; if (F.dock) F = null; else closeLayer(); return delAct(tid, id); },
   'f-del-next': () => { const { tid, id } = F; if (F.dock) F = null; else closeLayer(); return delAct(tid, id, 'next'); },

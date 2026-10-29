@@ -206,6 +206,18 @@ function remPlan(x) {
   return L;
 }
 const isLate = a => !a.done && a.d < TODAY;
+// الأحداث الممتدة في الجدول (اختبار، إجازة، استدراك…): نوعها ولونها، وبداية كل امتداد وطوله
+function spanKind(d) { const s = d ? (d.ev || '') + ' ' + (d.p || '') : ''; if (/إجازة|عطلة/.test(s)) return 'hol'; if (/اختبار/.test(s)) return 'exam'; if (/استدراك|مراجعة/.test(s)) return 'rev'; return s.trim() ? 'oth' : ''; }
+const spanLabel = d => (d.ev && !/إجازة/.test(d.p || '') ? d.ev : d.p || d.ev || '');
+function spanInfo(days, i) {
+  const d = days[i], k = spanKind(d); if (!k) return null;
+  const lb = spanLabel(d), same = x => x && spanKind(x) === k && spanLabel(x) === lb;
+  if (same(days[i - 1])) return { k, lb, start: false };
+  let n = 1; while (same(days[i + n])) n++;
+  return { k, lb, start: true, n, to: days[i + n - 1].d };
+}
+// أسابيع الاختبار (السبت إلى الجمعة) في فصل المسار
+const examWeeks = (id, n) => new Set(daysOf(id, n).filter(x => /اختبار/.test(x.ev || '') && !/إجازة/.test((x.ev || '') + (x.p || ''))).map(x => wkStart(x.d)));
 function semRange(id, n) { const ds = daysOf(id, n); return ds.length ? { from: ds[0].d, to: ds[ds.length - 1].d } : null; }
 function semFor(id, d) { const sems = planOf(id).sems; for (const k in sems) { const s = sems[k]; if (s.start <= d && d <= s.end) return k; } return null; }
 function weeksOf(days) {
@@ -371,6 +383,7 @@ let FIRST = true;
 function render() {
   applyTheme();
   const app = $('#app');
+  if (route().name === 'pub') { app.innerHTML = pubView(route().a); return; }
   if (!D) { app.innerHTML = TOKEN ? `<div class="login"><div class="col" style="align-items:center;gap:14px">${LOGOS.anshita ? `<img class="brand-img" src="${LOGOS.anshita}" alt="" style="height:56px">` : ''}<span class="spin"></span></div></div>` : vLogin(); afterLogin(); return; }
   const r = route();
   let v = VIEWS[r.name];
@@ -541,8 +554,8 @@ function repDates(tid, F) {
   for (let k = 0; add(w0, 7 * k) <= end && out.length < 80; k += R.every) {
     R.wd.slice().sort((a, b) => a - b).forEach(i => {
       const d = add(w0, 7 * k + i); if (d < start || d > end) return;
-      const day = dayOf(tid, semFor(tid, d) || curN(tid), d), ev = day ? (day.ev || '') + ' ' + (day.p || '') : '';
-      const reason = /إجازة/.test(ev) ? 'إجازة' : /اختبار/.test(ev) ? (day.ev || 'اختبار') : '';
+      const sn = semFor(tid, d) || curN(tid), day = dayOf(tid, sn, d), k = spanKind(day);
+      const reason = k === 'hol' ? 'إجازة' : k === 'exam' ? (day.ev || 'اختبار') : examWeeks(tid, sn).has(wkStart(d)) ? 'أسبوع الاختبار' : '';
       const clash = MEET_T.includes(F.type) && d !== start ? dayMeets(tid, d, F.id).length > 0 : false;
       const first = !F.isNew && d === start;
       out.push({ d, reason, clash, first, on: first || (R.tog[d] ? !!reason : !reason) });
@@ -660,7 +673,7 @@ function endDrag(e, cancel) {
    مرة ثانية حتى ينتهي، ولو أُعيد رسم الصفحة في أثنائه. */
 const BUSY = new Map();
 const BUSY_LABEL = {
-  'f-save': 'يحفظ…', 'f-save-next': 'يحفظ…', 'f-meet': 'يُنشئ الرابط…', 'f-meet-del': 'يُزيل…', 'tk-save': 'يحفظ…', 'tk-del': 'يحذف…', 'mb-save': 'يحفظ الفريق…',
+  'share-on': 'يُنشئ…', 'share-off': 'يُوقف…', 'f-save': 'يحفظ…', 'f-save-next': 'يحفظ…', 'f-meet': 'يُنشئ الرابط…', 'f-meet-del': 'يُزيل…', 'tk-save': 'يحفظ…', 'tk-del': 'يحذف…', 'mb-save': 'يحفظ الفريق…',
   'de-save': 'يحفظ…', 'ae-send': 'يُرسل…', 'bs-save': 'يحفظ…', 'bot-menu': 'يحدّث…', 'bot-test': 'يُرسل…', 'bot-now': 'يُرسل…', 'bot-token': 'يربط…',
   'mt-admins': 'يحفظ…', 'ac-save': 'يحفظ…', 'ac-del': 'يحذف…', 'acc-reset': 'يعيد التعيين…', 'pw-save': 'يغيّر…', 'si-check': 'يفحص…', 'si-save': 'يستورد…',
   'sn-save': 'يُنشئ…', semdel: 'يحذف…', grant: 'يفتح…', toggleedit: 'يحفظ…', 'bs-pause': 'يحفظ…', 'bs-atasks': 'يحفظ…', 'bot-unlink': 'يُلغي…'
