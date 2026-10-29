@@ -321,6 +321,16 @@ async function loadRecent(box) {
 }
 
 /* ---------- معرض قوالب الهوية ---------- */
+// شريط «تصمّم إعلان…» حين تأتي بيانات من منصة الأنشطة
+function prefillBar(T) {
+  const p = typeof prefillFor === 'function' ? prefillFor(T.id) : null; if (!p) return null;
+  const meta = [p.who, p.time].filter(Boolean).join(' · ');
+  const bar = el('div', { class: 'card pfbar6 rv', role: 'status' }, [
+    el('div', { class: 'pfm6' }, [el('b', { text: 'تصمّم إعلان «' + p.title + '»' + (meta ? ' (' + meta + ')' : '') }), el('span', { class: 'tiny', text: 'من منصة الأنشطة: اختر أي قالب فيُملأ بالعنوان والمقدّم والموعد بالتاريخين.' })]),
+    el('button', { type: 'button', class: 'btn sm line', text: 'إلغاء', onclick: function () { ls('prefill', null); bar.remove(); } })
+  ]);
+  return bar;
+}
 function showGallery6(tid, type) {
   const q0 = (location.hash.split('?q=')[1] || '');
   tid = tid.split('?')[0]; type = (type || 'all').split('?')[0];
@@ -365,6 +375,7 @@ function showGallery6(tid, type) {
     typeof secBar === 'function' ? secBar(T, sec) : null,
     sec === 'study' ? null : quickCards(T.id),
     el('section', { class: 'hsec', id: 'gmodels', hidden: true }, [el('div', { class: 'shead' }, [H('h2', 'نماذج جاهزة لهذه الهوية')]), stripNav(el('div', { class: 'strip models-strip', id: 'gmstrip' }))]),
+    prefillBar(T),
     el('div', { class: 'gbar' }, [chips, search]),
     grid, empty
   ]));

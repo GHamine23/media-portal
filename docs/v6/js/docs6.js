@@ -60,11 +60,22 @@ async function openNew(tid, tplId) {
   const tpl = TEMPLATES.find(function (t) { return t.id === tplId; }); if (!tpl) return go('#/g/' + tid);
   S.track = T; ls('lastTrack', T.id);
   const key = 'draft.' + T.id + '.' + tpl.id, draft = ls(key), pick = fromMake ? ls('makePick') : null;
+  // بيانات إعلان من منصة الأنشطة (زر «صمّمه في أثر»): أي قالب يُفتح لهذه الهوية خلال ست ساعات يُملأ بها
+  const pre = prefillFor(T.id), usePre = !fromMake && !!pre && typeof pageFromInfo === 'function';
   let doc;
-  if (pick && pick.page && pick.page.tpl === tpl.id) { ls('makePick', null); doc = { fromMake: true, kind: 'design', name: (String(pick.page.d.title || tpl.name).replace(/[*\n]/g, ' ').trim().slice(0, 50)) || tpl.name, track: T.id, program: V6.prog.id, shared: false, pages: [pick.page] }; }
+  if (usePre) {
+    doc = { kind: tpl.book ? 'book' : 'design', name: (String(pre.title || tpl.name).replace(/[*\n]/g, ' ').trim().slice(0, 50)) || tpl.name, track: T.id, program: V6.prog.id, shared: false, pages: [pageFromInfo(tpl, T, pre)] };
+    setTimeout(function () { toast('مُلئ القالب ببيانات «' + pre.title + '» من منصة الأنشطة'); }, 700);
+  }
+  else if (pick && pick.page && pick.page.tpl === tpl.id) { ls('makePick', null); doc = { fromMake: true, kind: 'design', name: (String(pick.page.d.title || tpl.name).replace(/[*\n]/g, ' ').trim().slice(0, 50)) || tpl.name, track: T.id, program: V6.prog.id, shared: false, pages: [pick.page] }; }
   else doc = draft && draft.pages ? draft : { kind: tpl.book ? 'book' : 'design', name: tpl.id === 'blank' ? 'تصميم جديد' : tpl.book ? 'كتيّب جديد' : tpl.name, track: T.id, program: V6.prog.id, shared: false, pages: [newPage(tpl, T, tpl.id !== 'blank')] };
-  showEditor6(doc, !!draft && !pick);
-  track('open', { tpl: tpl.id });
+  showEditor6(doc, !!draft && !pick && !usePre);
+  track('open', { tpl: tpl.id, from: usePre ? 'anshita' : '' });
+}
+// mp6.prefill = {tid, at, info: {kind, title, who, time, date}} تكتبه منصة الأنشطة (الأصل نفسه)
+function prefillFor(tid) {
+  const p = ls('prefill'); if (!p || !p.info || p.tid !== tid || !(Date.now() - (p.at || 0) < 6 * 36e5)) return null;
+  return p.info.title ? p.info : null;
 }
 async function openItem(id) {
   view(el('div', { class: 'boot' }, [loader6('نفتح تصميمك…')]));
