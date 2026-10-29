@@ -97,7 +97,7 @@ ok(!w1.cal, 'نشاط بلا تقويم لا يُرسل تلقائياً');
 const m1b = call('act_save', J, 'judhoor', JSON.stringify({ id: m1.id, time: '20:30', who: ['أنس', 'معاذ'], calOn: false })).act;
 ok(m1b.time === '20:30' && m1b.who.length === 2 && m1b.cal && m1b.cal.id, 'الفريق بلا صلاحية يعدّل موعد نشاط قائم والقائم عليه (ولا يملك التقويم)');
 const al1 = call('alerts', call('login', 'admin', cred.admin).token);
-ok(al1[0].kind === 'move' && al1[0].t === 'judhoor' && al1[0].changes.some(c => c[0] === 'الموعد' && /8:00 م/.test(c[1]) && /8:30 م/.test(c[2])) && al1[0].changes.some(c => c[0] === 'القائم'), 'تنبيه للإدارة بتغيير الموعد والقائم');
+ok(al1[0].kind === 'move' && al1[0].t === 'judhoor' && al1[0].changes.some(c => c[0] === 'الموعد' && /20:00/.test(c[1]) && /20:30/.test(c[2])) && al1[0].changes.some(c => c[0] === 'القائم'), 'تنبيه للإدارة بتغيير الموعد والقائم');
 const m1c = call('act_save', J, 'judhoor', JSON.stringify({ id: m1.id, time: '20:00', who: ['أنس'] })).act; void m1c;
 ok(call('boot', call('login', 'admin', cred.admin).token).unseen === 2, 'عدد التنبيهات غير المقروءة في boot');
 throws(() => call('act_save', J, 'judhoor', JSON.stringify({ title: 'جديد', d: '2026-11-05' })), /مغلقة/, 'الفريق بلا صلاحية لا يضيف');
@@ -153,7 +153,7 @@ NOW = Date.UTC(2026, 9, 30, 5, 0);   // ٣٠ أكتوبر ٨:٠٠ — قبل س�
 ctx.tick(); ok(TG.sent.length === 0, 'لا إرسال قبل الساعة العاشرة');
 NOW = Date.UTC(2026, 9, 30, 8, 0);   // ١١:٠٠ — قبل اللقاء بثلاثة أيام
 ctx.tick();
-ok(TG.sent.length === 1 && TG.sent[0].html && /إعلان «لقاء الافتتاح»/.test(TG.sent[0].text) && /الموعد: الإثنين 2 نوفمبر الساعة 9:30 م \(بعد 3 أيام\)/.test(TG.sent[0].text) && /المطلوب اليوم: تصميم الإعلان/.test(TG.sent[0].text) && /مقرر الطلاب يومها/.test(TG.sent[0].text), 'تذكير الإعداد قبل ثلاثة أيام غني بالتفاصيل: ' + (TG.sent[0] || {}).text);
+ok(TG.sent.length === 1 && TG.sent[0].html && /إعلان «لقاء الافتتاح»/.test(TG.sent[0].text) && /الموعد: الإثنين 2 نوفمبر الساعة 21:30 \(بعد 3 أيام\)/.test(TG.sent[0].text) && /المطلوب اليوم: تصميم الإعلان/.test(TG.sent[0].text) && /مقرر الطلاب يومها/.test(TG.sent[0].text), 'تذكير الإعداد قبل ثلاثة أيام غني بالتفاصيل: ' + (TG.sent[0] || {}).text);
 ctx.tick(); ok(TG.sent.length === 1, 'لا تكرار في الساعة التالية');
 NOW = Date.UTC(2026, 9, 31, 8, 0); ctx.tick(); ok(TG.sent.filter(m => /المطلوب اليوم: تصميم الإعلان/.test(m.text)).length === 1, 'لا تذكير إعداد ثانٍ قبل يومين');
 ok(TG.sent.some(m => m.chat === '-100111' && /خطة الأسبوع/.test(m.text) && /مسار جذور/.test(m.text) && /<b>الأنشطة<\/b>/.test(m.text)), 'ملخص الأسبوع ومهامه للمجموعة يوم السبت');
@@ -291,10 +291,67 @@ throws(() => call('report_data', rk), /مفتاح/, 'المفتاح القديم
   const m = call('tg_menu', AT); ok(m.ok && m.n === 8, 'قائمة أوامر البوت');
 }
 
+// ١٤) النشاط المتكرر: مواعيد مستقلة في سلسلة، وتعديل «هذا وما بعده» وحذفه
+{
+  const AT = call('login', 'admin', cred.admin).token, JT = call('login', 'judhoor', rs.pass).token;
+  const base = { title: 'حلقة الأحد', type: 'لقاء', time: '20:00', who: ['معاذ'] };
+  const r = call('act_series', AT, 'judhoor', JSON.stringify({ base, dates: ['2026-11-22', '2026-11-08', '2026-11-15', '2026-11-15'], rule: { every: 1, wd: [1] } }));
+  ok(r.acts.length === 3 && r.acts.every(x => x.ser === r.sid && x.time === '20:00') && r.acts.map(x => x.d).join() === '2026-11-08,2026-11-15,2026-11-22', 'السلسلة: ثلاثة مواعيد مرتبة بلا تكرار');
+  ok(ctx.plan_('judhoor').series[r.sid].every === 1, 'قاعدة السلسلة محفوظة');
+  throws(() => call('act_series', JT, 'judhoor', JSON.stringify({ base, dates: ['2026-11-09'] })), /مغلقة/, 'التكرار لمن يملك الإضافة');
+  throws(() => call('act_series', AT, 'judhoor', JSON.stringify({ base, dates: Array.from({ length: 61 }, (_, i) => ctx.addDays_('2026-11-01', i)) })), /أقصى/, 'حد أقصى للمواعيد');
+  const [a1, a2, a3] = r.acts;
+  const e = call('act_save', AT, 'judhoor', JSON.stringify({ id: a2.id, time: '21:00', d: '2026-11-16', scope: 'next' }));
+  const P = () => ctx.plan_('judhoor').acts, by = id => P().find(x => x.id === id);
+  ok(e.others.length === 1 && by(a3.id).time === '21:00' && by(a3.id).d === '2026-11-23' && by(a1.id).time === '20:00', 'هذا وما بعده: الوقت والإزاحة تنتقل لما بعده فقط');
+  call('act_save', AT, 'judhoor', JSON.stringify({ id: a1.id, title: 'حلقة الأحد الأولى' }));
+  ok(by(a2.id).title === 'حلقة الأحد', 'تعديل موعد وحده لا يمس السلسلة');
+  // الفريق يعدّل (والإضافة مغلقة) فيصل الإدارة تنبيه واحد
+  const nA = ctx.readJson_('alerts.json', []).length;
+  call('act_save', JT, 'judhoor', JSON.stringify({ id: a2.id, who: ['يوسف'], scope: 'next' }));
+  ok(by(a3.id).who.join() === 'يوسف' && ctx.readJson_('alerts.json', []).length === nA + 1 && /بعده من السلسلة/.test(ctx.readJson_('alerts.json', [])[0].title), 'تعديل الفريق للسلسلة: تنبيه واحد للإدارة');
+  const d = call('act_del', AT, 'judhoor', a2.id, 'next');
+  ok(d.ids.length === 2 && !by(a2.id) && !by(a3.id) && by(a1.id), 'حذف هذا وما بعده يبقي ما قبله');
+  call('act_del', AT, 'judhoor', a1.id);
+  ok(!ctx.plan_('judhoor').series[r.sid], 'السلسلة تُزال بزوال مواعيدها');
+  // تكرار نشاط قائم: يصير أول السلسلة
+  const one = call('act_save', AT, 'judhoor', JSON.stringify({ title: 'كاهوت أسبوعي', type: 'كاهوت', d: '2026-11-12', time: '19:00' })).act;
+  const r2 = call('act_series', AT, 'judhoor', JSON.stringify({ from: one.id, dates: ['2026-11-12', '2026-11-26'], rule: { every: 2, wd: [5] } }));
+  ok(r2.first.ser === r2.sid && r2.acts.length === 1 && r2.acts[0].type === 'كاهوت' && r2.acts[0].time === '19:00', 'تكرار نشاط قائم ينسخ حقوله ويضمّه للسلسلة');
+  throws(() => call('act_series', AT, 'judhoor', JSON.stringify({ from: one.id, dates: ['2026-12-10'] })), /متكرر من قبل/, 'لا يُكرَّر المتكرر مرتين');
+  ok(ctx.seriesText_(ctx.plan_('judhoor').series[r2.sid], 2) === 'كل أسبوعين يوم الخميس، موعدان', 'وصف السلسلة: ' + ctx.seriesText_(ctx.plan_('judhoor').series[r2.sid], 2));
+  const rd = call('report_data', call('report_key', AT).key, 7); ok(rd.tracks.find(t => t.id === 'judhoor').acts.some(x => x.ser === r2.sid), 'التقرير يعرف السلسلة');
+  call('act_del', AT, 'judhoor', one.id, 'next');
+}
+
 // ١٠) اقتراح الكاهوت قبل الاختبار النصفي (٨ ديسمبر) بنحو أسبوع، مرة واحدة
 NOW = Date.UTC(2026, 11, 2, 16, 0); TG.sent.length = 0; ctx.tick();
 ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.text) && /الاختبار النصفي/.test(m.text) && /بعد 6 أيام/.test(m.text)), 'اقتراح كاهوت قبل الاختبار: ' + (TG.sent.find(m => /كاهوت/.test(m.text)) || {}).text);
 { const k0 = TG.sent.filter(m => /كاهوت مراجعة/.test(m.text)).length; NOW += 3600e3; ctx.tick(); ok(TG.sent.filter(m => /كاهوت مراجعة/.test(m.text)).length === k0, 'الاقتراح لا يتكرر'); }
+
+// ١٥) إعداد التذكير لكل نشاط: التصميم، وقبله بيومين، وقبله بيوم، ويوم الموعد قبله بساعة
+{
+  const AT = call('login', 'admin', cred.admin).token;
+  call('settings_save', AT, JSON.stringify({ tpl: { d3: '', d1: '' } }));
+  const A1 = call('act_save', AT, 'judhoor', JSON.stringify({ title: 'لقاء الختام', type: 'لقاء', d: '2026-12-16', time: '21:30', rp: { d2: true } })).act;
+  const B1 = call('act_save', AT, 'judhoor', JSON.stringify({ title: 'مسابقة سريعة', type: 'مسابقة', d: '2026-12-16', rem: true, rp: { des: false, d2: true, d0: false } })).act;
+  ok(JSON.stringify(ctx.remCfg_(A1)) === '{"des":true,"d2":true,"d1":true,"d0":true}' && JSON.stringify(ctx.remCfg_(B1)) === '{"des":false,"d2":true,"d1":true,"d0":false}', 'إعداد التذكير يُحفظ ويُكمَّل بالافتراضي');
+  const of = (t, from) => TG.sent.slice(from).filter(m => m.text.indexOf(t) >= 0);
+  const at = (d, h, m = 0) => { NOW = Date.UTC(2026, 11, d, h - 3, m); const n = TG.sent.length; ctx.tick(); return n; };
+  let n = at(13, 19);
+  ok(of('لقاء الختام', n).length === 1 && /تصميم الإعلان/.test(of('لقاء الختام', n)[0].text) && !of('مسابقة سريعة', n).length, 'قبله بثلاثة: تذكير التصميم لما يحتاجه فقط');
+  n = at(14, 19);
+  ok(of('لقاء الختام', n).length === 1 && /لم يُرفع بعد/.test(of('لقاء الختام', n)[0].text), 'قبله بيومين: تذكير إتمام التصميم');
+  ok(of('مسابقة سريعة', n).length === 1 && !/التصميم/.test(of('مسابقة سريعة', n)[0].text), 'قبله بيومين لنشاط بلا تصميم: استعداد بلا ذكر للتصميم');
+  n = at(14, 20); ok(!of('لقاء الختام', n).length && !of('مسابقة سريعة', n).length, 'تذكير واحد في اليوم للنشاط');
+  n = at(15, 19);
+  ok(/نشر الإعلان/.test((of('لقاء الختام', n)[0] || {}).text) && /ذكّروا الطلاب|تذكير اليوم|رسالة قصيرة/.test((of('مسابقة سريعة', n)[0] || {}).text), 'قبله بيوم: النشر لما له تصميم، والتذكير لغيره');
+  n = at(16, 19); ok(!of('لقاء الختام', n).length && !of('مسابقة سريعة', n).length, 'يوم الموعد: لا شيء قبل ساعته');
+  n = at(16, 20, 30); ok(of('لقاء الختام', n).length === 1 && /21:30/.test(of('لقاء الختام', n)[0].text) && !of('مسابقة سريعة', n).length, 'يوم الموعد قبله بساعة: ' + ((of('لقاء الختام', n)[0] || {}).text || '').split('\n')[0]);
+  n = at(16, 21, 30); ok(!of('لقاء الختام', n).length, 'لا تكرار ليوم الموعد');
+  ok(!ctx.weekTasks_(ctx.trackOf_('judhoor'), ctx.plan_('judhoor'), '2026-12-12', ctx.cfg_()).some(x => x.ref === B1.id && x.k === 'design'), 'لا مهمة تصميم لنشاط لا يحتاجه');
+  call('act_del', AT, 'judhoor', A1.id); call('act_del', AT, 'judhoor', B1.id);
+}
 
 if (process.env.PREVIEW) {
   const seen = new Set(); ALLSENT.forEach(m => { const k = m.text.split('\n')[0].replace(/«.*»/, ''); if (m.html && !seen.has(k)) { seen.add(k); console.log('\n=== ' + m.chat + '\n' + m.text); } });

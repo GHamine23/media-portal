@@ -13,11 +13,40 @@ function openAct(tid, id, preset = {}) {
   if (!a && tid && !canEdit(tid)) return toast('إضافة الأنشطة مغلقة لفريقكم. اطلبوا فتحها من الإدارة.', 'err');
   F = a ? Object.assign({ tid, isNew: false }, JSON.parse(JSON.stringify(a)), { calOn: !!(a.cal && a.cal.id) })
     : { tid, isNew: true, title: preset.title || '', type: preset.type || 'لقاء', d: preset.date || (tid ? defDate(tid) : TODAY), time: '', dur: 0, who: [], idea: '', rem: null, calOn: false, done: false, note: '', link: '' };
-  F.newNames = []; F.lockTrack = !!tid;
+  F.newNames = []; F.lockTrack = !!tid; F.d0 = F.d; F.rep = preset.repeat && !a ? newRep() : null;
   F.dock = dockOn(F.tid) && !!$('#dock');
   drawAct();
   if (F.dock) { const b = $('#dock .dk-b'); if (b) b.scrollTop = 0; }
 }
+function newRep() {
+  const tid = F.tid, r = tid ? semRange(tid, semFor(tid, F.d) || curN(tid)) : null;
+  return { on: true, every: 1, wd: [wd(F.d)], wdAuto: true, until: r && r.to > F.d ? r.to : add(F.d, 7 * 12), tog: {} };
+}
+// قسم التكرار في نموذج النشاط
+function repBlock(mode) {
+  const tid = F.tid;
+  if (!tid) return '';
+  if (F.ser && !F.isNew) {
+    const L = seriesOf(tid, F.ser), i = L.findIndex(a => a.id === F.id);
+    return `<div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('repeat')}</span><div class="tx"><b>نشاط متكرر</b><span>${esc(seriesText(tid, F.ser))}${i >= 0 ? ' · هذا الموعد ' + (i + 1) + ' من ' + L.length : ''}</span></div></div>`;
+  }
+  if (mode !== 'full') return '';
+  const R = F.rep, on = !!(R && R.on), r = semRange(tid, semFor(tid, F.d) || curN(tid)), semEnd = r ? r.to : '';
+  const sum = on ? `${EVERY[R.every]}${R.wd.length ? ' يوم ' + R.wd.slice().sort((a, b) => a - b).map(i => DAYS[i]).join(' و') : ''} حتى ${gDay(R.until)}` : 'موعد واحد';
+  let h = `<div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('repeat')}</span><div class="tx"><b>${F.isNew ? 'يتكرر في الفصل' : 'كرّره في الفصل'}</b><span>${esc(sum)}</span></div><button class="sw" type="button" role="switch" aria-checked="${on}" data-act="f-rep" aria-label="يتكرر في الفصل"></button></div>`;
+  if (!on) return h;
+  const L = repDates(tid, F), n = L.filter(x => x.on).length, skipped = L.filter(x => !x.on && x.reason).length, fmt = R.wd.length > 1 ? gDay : gShort;
+  h += `<div class="repbox">
+    <div class="field"><span class="flabel">كل</span><div class="row" style="gap:6px;flex-wrap:wrap">${[1, 2, 4].map(v => `<button class="chip" type="button" aria-pressed="${R.every === v}" data-act="f-rep-ev" data-v="${v}">${EVERY[v].replace('كل ', '')}</button>`).join('')}</div></div>
+    <div class="field"><span class="flabel">في يوم</span><div class="row" style="gap:6px;flex-wrap:wrap">${DAYS.map((d, i) => `<button class="chip" type="button" aria-pressed="${R.wd.includes(i)}" data-act="f-rep-wd" data-v="${i}">${d}</button>`).join('')}</div></div>
+    <div class="field"><label for="f-rep-until">حتى</label><input class="inp" id="f-rep-until" type="date" value="${R.until}" min="${F.d}">${semEnd ? `<span class="hint">نهاية الفصل ${gDay(semEnd)}${R.until !== semEnd ? ` · <button class="lk" type="button" data-act="f-rep-end" data-v="${semEnd}">إليها</button>` : ''}</span>` : ''}</div>
+    <div class="field"><span class="flabel">المواعيد: ${apptText(n)}${skipped ? ` <span class="faint">· استُبعد ${apptText(skipped)} لإجازة أو اختبار</span>` : ''}</span>
+      <div class="repdates">${L.map(x => `<button class="chip rd ${x.on ? '' : 'off'} ${x.clash ? 'warn' : ''}" type="button" aria-pressed="${x.on}" data-act="f-rep-d" data-v="${x.d}" ${x.first ? 'disabled' : ''} ${x.reason || x.clash ? `data-tip="${esc(x.reason || 'فيه لقاء آخر أو بث مباشر')}"` : ''}>${fmt(x.d)}${x.reason ? ` <span class="xs">(${esc(x.reason)})</span>` : ''}${x.clash ? svg('alert') : ''}</button>`).join('') || '<span class="muted sm">لا مواعيد في هذه المدة.</span>'}</div>
+      <span class="hint">اضغط موعدًا لاستبعاده أو إعادته. كل موعد نشاط مستقل له تذكيره ورابط ميت خاص به.</span></div>
+  </div>`;
+  return h;
+}
+const nextOf = () => F && F.ser && !F.isNew ? seriesOf(F.tid, F.ser).filter(a => a.id !== F.id && a.d > F.d0).length : 0;
 function defDate(tid) { const r = semRange(tid, curN(tid)); return r && TODAY < r.from ? r.from : TODAY; }
 // صلاحية النموذج: full تعديل كامل، adj تعديل نشاط قائم بلا حذف (يصل الإدارةَ تنبيه)، ro متابعة فقط
 function fMode() {
@@ -42,7 +71,12 @@ function actParts() {
     }
   }
   const willRem = F.rem === true || (F.rem !== false && (D.remindTypes || []).includes(F.type));
-  const remSub = !willRem ? 'لا تذكير لهذا النشاط' : !t || !t.linked ? 'سيُذكَّر به حين تُربط مجموعة المسار بالبوت' : diffD(F.d, TODAY) < 0 ? 'مضى موعده' : `تصميم الإعلان ${gDay(add(F.d, -3) < TODAY ? TODAY : add(F.d, -3))}، ونشره ${gDay(add(F.d, -1) < TODAY ? TODAY : add(F.d, -1))}`;
+  const plan = remPlan(F).filter(x => x.d >= TODAY), rc = remCfg(F);
+  const remSub = !willRem ? 'لا تذكير لهذا النشاط' : diffD(F.d, TODAY) < 0 ? 'مضى موعده' : (plan.length ? plan.map(x => `${x.l} ${x.k === 'd0' ? (F.time ? timeText(add0(F.time, -60)) : gDay(x.d)) : gDay(x.d)}`).join('، ') : 'لا تذكير قادم') + (!t || !t.linked ? '. ويبدأ حين تُربط مجموعة المسار بالبوت' : '');
+  const remBox = willRem && diffD(F.d, TODAY) >= 0 ? `<div class="rembox">
+      <div class="opt sub"><div class="tx"><b>يحتاج تصميم إعلان</b><span>${rc.des ? 'يذكّر بتصميمه قبله بثلاثة أيام، وبنشره قبله بيوم' : 'لا تذكير بتصميم ولا نشر'}</span></div><button class="sw" type="button" role="switch" aria-checked="${rc.des}" data-act="f-rp" data-v="des" aria-label="يحتاج تصميم إعلان"></button></div>
+      <div class="field"><span class="flabel">تذكير الفريق</span><div class="row" style="gap:6px;flex-wrap:wrap">${[['d2', 'قبله بيومين'], ['d1', 'قبله بيوم'], ['d0', F.time ? 'قبله بساعة' : 'يوم الموعد']].map(([k, l]) => `<button class="chip" type="button" aria-pressed="${rc[k]}" data-act="f-rp" data-v="${k}">${l}</button>`).join('')}</div>
+      <span class="hint">${F.time ? 'تذكير يوم الموعد يصل قبله بساعة.' : 'بلا وقت للنشاط يصل تذكير يومه في ساعة التذكيرات.'} ولا يصل للنشاط أكثر من تذكير في اليوم.</span></div></div>` : '';
   const follow = !F.isNew ? `<div class="sep" style="margin:4px 0"></div><b style="font-family:var(--fd);font-weight:500;font-size:17px;color:var(--ink)">المتابعة</b>
     <div class="opt" style="border-top:0;padding-top:0"><button class="ck round ok" type="button" role="checkbox" aria-checked="${!!F.done}" data-act="f-done" aria-label="تم التنفيذ">${svg('check', 2.4)}</button><div class="tx"><b>تم التنفيذ</b><span>يُعلَّم بعد إقامة النشاط</span></div></div>
     <div class="field"><label for="f-note">ملاحظة بعد التنفيذ</label><textarea class="inp" id="f-note" rows="2" placeholder="كم حضر؟ ما الذي نجح وما الذي يُحسَّن؟">${esc(F.note || '')}</textarea></div>
@@ -53,7 +87,7 @@ function actParts() {
       ${F.who && F.who.length ? `<div class="field"><span class="flabel">المسؤول</span><div class="whos">${F.who.map(w => `<span class="chip">${esc(w)}</span>`).join('')}</div></div>` : ''}
       ${F.idea ? `<div class="field"><span class="flabel">الفكرة</span><div class="ro-v">${esc(F.idea)}</div></div>` : ''}
       <div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('bell')}</span><div class="tx"><b>تذكير البوت</b><span>${esc(remSub)}</span></div></div>
-      <p class="hint">${svg('lock')} تستطيعون تسجيل المتابعة.</p><!--MEET-->${follow}`;
+      ${repBlock(mode)}<p class="hint">${svg('lock')} تستطيعون تسجيل المتابعة.</p><!--MEET-->${follow}`;
   } else {
     body = `${tracksSel}${mode === 'adj' ? `<p class="hint">${svg('bell')} إضافة الأنشطة وحذفها مغلقان، وتستطيعون تعديل هذا النشاط. يصل الإدارةَ تنبيه بكل تغيير.</p>` : ''}
     <input class="inp big" id="f-title" value="${esc(F.title)}" placeholder="اسم النشاط" aria-label="اسم النشاط" ${F.isNew ? 'autofocus' : ''}>
@@ -64,14 +98,20 @@ function actParts() {
     ${ctx}${clash}
     <div class="field"><span class="flabel">المسؤول من الفريق</span><div class="whos">${[...new Set(members(tid).concat(F.who || []))].map(w => `<button class="chip" type="button" aria-pressed="${(F.who || []).includes(w)}" data-act="f-who" data-v="${esc(w)}">${esc(w)}</button>`).join('')}<input id="f-whonew" placeholder="+ اسم جديد" aria-label="إضافة اسم"></div></div>
     <div class="field"><label for="f-idea">الفكرة</label><textarea class="inp" id="f-idea" rows="3" placeholder="الفكرة في سطرين: ماذا سيحدث؟ ولمن؟">${esc(F.idea || '')}</textarea></div>
-    <div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('bell')}</span><div class="tx"><b>تذكير البوت في مجموعة الفريق</b><span>${esc(remSub)}</span></div><button class="sw" type="button" role="switch" aria-checked="${willRem}" data-act="f-rem" aria-label="تذكير البوت"></button></div>
+    <div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('bell')}</span><div class="tx"><b>تذكير البوت في مجموعة الفريق</b><span>${esc(remSub)}</span></div><button class="sw" type="button" role="switch" aria-checked="${willRem}" data-act="f-rem" aria-label="تذكير البوت"></button></div>${remBox}
+    ${repBlock(mode)}
     ${isAdmin() ? `<div class="opt"><span class="tile sm" style="--tc:var(--plum)">${svg('gcal')}</span><div class="tx"><b>في تقويم جوجل</b><span>${F.calOn ? (F.cal && F.cal.id ? (F.cal.err ? 'تعذّر آخر تحديث: ' + esc(F.cal.err) : 'في التقويم، ويتحدّث مع كل تعديل') : 'سيُرسل عند الحفظ') : 'لا يظهر في التقويم'}</span></div><button class="sw" type="button" role="switch" aria-checked="${!!F.calOn}" data-act="f-cal" aria-label="في تقويم جوجل"></button></div>` : ''}
     <!--MEET-->${follow}`;
   }
   const cancel = F.dock ? 'f-cancel' : 'close';
   body = body.replace('<!--MEET-->', !F.isNew && tid ? meetBlock() : '');
   const foot = ro ? `<button class="btn pri" type="button" data-act="f-save">حفظ المتابعة</button><button class="btn" type="button" data-act="${cancel}">إغلاق</button>`
-    : `<button class="btn pri" type="button" data-act="f-save" ${!tid ? 'disabled' : ''}>${F.isNew ? 'أضف النشاط' : 'احفظ'}</button><button class="btn" type="button" data-act="${cancel}">إلغاء</button><span class="sp"></span>${!F.isNew && mode === 'full' ? `<button class="btn danger" type="button" data-act="f-del">${F.confirmDel ? 'تأكيد الحذف' : 'حذف'}</button>` : ''}`;
+    : (() => {
+      const nx = nextOf(), repN = F.rep && F.rep.on && !F.ser && mode === 'full' && tid ? repDates(tid, F).filter(x => x.on).length : 0;
+      const saveL = repN > 1 ? (F.isNew ? `أضف ${apptText(repN)}` : `احفظ وكرّره (${apptText(repN)})`) : F.isNew ? 'أضف النشاط' : nx ? 'احفظ هذا الموعد' : 'احفظ';
+      const del = !F.isNew && mode === 'full' ? (F.confirmDel && nx ? `<button class="btn danger" type="button" data-act="f-del">احذف هذا الموعد</button><button class="btn danger" type="button" data-act="f-del-next">وما بعده (${nx})</button>` : `<button class="btn danger" type="button" data-act="f-del">${F.confirmDel ? 'تأكيد الحذف' : 'حذف'}</button>`) : '';
+      return `<button class="btn pri" type="button" data-act="f-save" ${!tid ? 'disabled' : ''}>${saveL}</button>${nx ? `<button class="btn" type="button" data-act="f-save-next">له ولما بعده (${nx})</button>` : ''}<button class="btn" type="button" data-act="${cancel}">إلغاء</button><span class="sp"></span>${del}`;
+    })();
   return { head, body, foot };
 }
 // رابط ميت للنشاط: يُنشأ من حساب الأنشطة، والمسؤولون عنه (ببريدهم في «الفريق») وبريد الإدارة مشرفون فيه
@@ -127,8 +167,9 @@ function readF() {
   if (g('f-note')) F.note = g('f-note').value;
   if (g('f-link')) F.link = g('f-link').value.trim();
   const nw = g('f-whonew'); if (nw && nw.value.trim()) { F.who = [...new Set((F.who || []).concat(nw.value.trim()))]; nw.value = ''; }
+  if (F.rep) { if (g('f-rep-until') && g('f-rep-until').value) F.rep.until = g('f-rep-until').value; if (F.rep.wdAuto && F.d) F.rep.wd = [wd(F.d)]; }
 }
-async function saveF() {
+async function saveF(scope) {
   readF();
   const f = F, tid = f.tid;
   if (!tid) return toast('اختر المسار', 'err');
@@ -138,17 +179,32 @@ async function saveF() {
   else {
     if (!f.title.trim()) { toast('اكتب اسم النشاط', 'err'); $('#f-title') && $('#f-title').focus(); return; }
     if (f.link && !/^https?:\/\//i.test(f.link)) { toast('الرابط يبدأ بـ https://', 'err'); $('#f-link') && $('#f-link').focus(); return; }
-    patch = { title: f.title.trim(), type: f.type, d: f.d, time: f.time || '', dur: f.dur || 0, who: f.who || [], idea: f.idea || '', rem: f.rem };
+    patch = { title: f.title.trim(), type: f.type, d: f.d, time: f.time || '', dur: f.dur || 0, who: f.who || [], idea: f.idea || '', rem: f.rem, rp: f.rp || null };
     if (!f.isNew) Object.assign(patch, { id: f.id, done: !!f.done, note: f.note || '', link: f.link || '' });
     if (isAdmin()) { const was = !!(f.cal && f.cal.id); if (f.calOn !== was) patch.calOn = !!f.calOn; }
     const s = semFor(tid, f.d); if (s) patch.sem = s;
+    if (scope === 'next' && f.ser) patch.scope = 'next';
   }
+  // التكرار: يُضاف النشاط في كل المواعيد المختارة
+  const rep = mode === 'full' && !f.ser && f.rep && f.rep.on ? repDates(tid, f).filter(x => x.on).map(x => x.d) : null;
+  if (rep && !rep.length) return toast('لا مواعيد مختارة للتكرار', 'err');
+  if (rep && rep.length > 60) return toast('أقصى التكرار ٦٠ موعدًا. قصّر المدة أو باعد بين المواعيد', 'err');
+  if (rep && (rep.length > 1 || !f.isNew)) {
+    const rule = { every: f.rep.every, wd: f.rep.wd, until: f.rep.until };
+    if (f.dock) F = null; else closeLayer();
+    try {
+      if (f.isNew) { const base = Object.assign({}, patch); ['d', 'sem', 'calOn'].forEach(k => delete base[k]); await saveSeries(tid, { base, dates: rep, rule, calOn: !!patch.calOn }); toast(`أُضيف ${qt(patch.title)} في ${apptText(rep.length)}`); }
+      else { await saveAct(tid, patch, { noRender: true }); const r = await saveSeries(tid, { from: f.id, dates: rep, rule }); toast(`كُرّر ${qt(patch.title)}: ${apptText(r.acts.length)} بعده`); }
+    } catch (e) {}
+    return;
+  }
+  if (rep && rep.length === 1) patch.d = rep[0];
   const newNames = (f.who || []).filter(w => !members(tid).includes(w));
   const cl = mode !== 'ro' && MEET_T.includes(f.type) ? dayMeets(tid, f.d, f.id) : [];
   if (f.dock) F = null; else closeLayer();
   try {
     await saveAct(tid, patch);
-    toast((f.isNew ? `أُضيف ${qt(patch.title)}` : 'حُفظ') + (cl.length ? ` — تنبيه: ${clashText(cl.concat(qt(patch.title)))}` : '') + (!isAdmin() && !f.isNew && mode !== 'ro' ? '. وصل الإدارةَ تنبيه بالتغيير' : ''));
+    toast((f.isNew ? `أُضيف ${qt(patch.title)}` : scope === 'next' ? `حُفظ لهذا الموعد وما بعده` : 'حُفظ') + (cl.length ? ` — تنبيه: ${clashText(cl.concat(qt(patch.title)))}` : '') + (!isAdmin() && !f.isNew && mode !== 'ro' ? '. وصل الإدارةَ تنبيه بالتغيير' : ''));
     if (newNames.length && canEdit(tid)) trackSave(tid, { members: members(tid).concat(newNames) }).catch(() => {});
   } catch (e) {}
 }
@@ -370,7 +426,7 @@ VIEWS.bot = {
       ${t.chat ? `<button class="sw" type="button" role="switch" aria-checked="${t.remind}" data-act="bot-remind" data-id="${t.id}" aria-label="تذكيرات ${esc(tt.name)}" data-tip="${t.remind ? 'أوقف التذكيرات' : 'شغّل التذكيرات'}"></button><button class="btn sm ghost" type="button" data-act="bot-test" data-id="${t.id}">تجربة</button><button class="btn icon" type="button" data-act="bot-unlink" data-chat="${esc(t.chat.id)}" aria-label="إلغاء الربط" data-tip="إلغاء الربط">${svg('x')}</button>`
         : `<a class="btn sm pri" href="${esc(t.link)}" target="_blank" rel="noopener" data-act="tgwatch">${svg('send')}أضف البوت إلى مجموعة ${esc(tt.name)}</a>`}</div>`; }).join('');
     const unassigned = (BS.chats || []).filter(c => !c.to && !c.left && c.type !== 'private');
-    const up = (BS.upcoming || []).map(u => `<div class="li"><div class="d" style="width:92px;line-height:1.35"><b style="display:block;font-weight:500">${DAYS[wd(u.on)]} ${dnum(u.on)}</b><span class="xs faint">${rel(u.on)}</span></div><span class="hl"><i style="background:${tcol(u.t)};border-radius:2px"></i></span><div class="tx"><div class="tt">${u.kind === 'd3' ? 'تصميم الإعلان' : 'نشر الإعلان'}: ${esc(u.title)}</div><div class="mt">${esc(T(u.t).name)} · اللقاء ${gDay(u.d)}</div></div>${u.sent ? `<span class="pill ok">${svg('check')}أُرسل</span>` : u.linked ? `<span class="pill">مجدول</span>` : `<span class="pill dash">المجموعة غير مربوطة</span>`}</div>`).join('');
+    const up = (BS.upcoming || []).map(u => `<div class="li"><div class="d" style="width:92px;line-height:1.35"><b style="display:block;font-weight:500">${DAYS[wd(u.on)]} ${dnum(u.on)}</b><span class="xs faint">${rel(u.on)}</span></div><span class="hl"><i style="background:${tcol(u.t)};border-radius:2px"></i></span><div class="tx"><div class="tt">${{ d3: 'تصميم الإعلان', d2: 'تذكير قبله بيومين', d1: 'تذكير قبله بيوم', d0: 'تذكير يوم الموعد' }[u.kind] || 'تذكير'}: ${esc(u.title)}</div><div class="mt">${esc(T(u.t).name)} · اللقاء ${gDay(u.d)}</div></div>${u.sent ? `<span class="pill ok">${svg('check')}أُرسل</span>` : u.linked ? `<span class="pill">مجدول</span>` : `<span class="pill dash">المجموعة غير مربوطة</span>`}</div>`).join('');
     const hours = Array.from({ length: 17 }, (_, i) => i + 6);
     return pageHead('', 'بوت التذكيرات', '', `<div class="card flat" style="padding:12px 16px;min-width:270px"><div class="row"><span class="tile" style="--tc:var(--brand)">${svg('bot')}</span><div class="col" style="flex:1;min-width:0"><b>${esc(bot.name || '')}</b><a class="xs lk" href="https://t.me/${esc(bot.username)}" target="_blank" rel="noopener"><bdi>@${esc(bot.username || '')}</bdi></a></div><button class="btn icon" type="button" data-act="bot-refresh" aria-label="تحديث" data-tip="تحديث">${svg('refresh')}</button></div>
       <div class="xs faint" style="margin-top:8px">${lt ? `آخر تشغيل ${ago(lt.at)}${lt.sent ? ' · أُرسلت ' + lt.sent : ''}${lt.ok ? '' : ' · ' + esc(lt.msg)}` : 'يعمل كل ساعة'}</div></div>`) + `
@@ -596,8 +652,16 @@ const H = {
   'f-track': el => { readF(); F.tid = el.dataset.v; drawAct(true); }, 'f-type': el => { readF(); F.type = el.dataset.v; drawAct(true); },
   'f-who': el => { readF(); const w = el.dataset.v; F.who = (F.who || []).includes(w) ? F.who.filter(x => x !== w) : (F.who || []).concat(w); drawAct(true); },
   'f-rem': () => { readF(); const cur = F.rem === true || (F.rem !== false && (D.remindTypes || []).includes(F.type)); F.rem = !cur; drawAct(true); },
-  'f-cal': () => { readF(); F.calOn = !F.calOn; drawAct(true); }, 'f-done': () => { readF(); F.done = !F.done; drawAct(true); },
-  'f-save': saveF, 'f-del': () => { if (!F.confirmDel) { readF(); F.confirmDel = true; drawAct(true); return; } const { tid, id } = F; if (F.dock) F = null; else closeLayer(); delAct(tid, id); },
+  'f-cal': () => { readF(); F.calOn = !F.calOn; drawAct(true); },
+  'f-rp': el => { readF(); const k = el.dataset.v, c = remCfg(F); F.rp = Object.assign({}, F.rp || {}, { [k]: !c[k] }); drawAct(true); }, 'f-done': () => { readF(); F.done = !F.done; drawAct(true); },
+  'f-save': () => saveF(), 'f-save-next': () => saveF('next'),
+  'f-del': () => { if (!F.confirmDel) { readF(); F.confirmDel = true; drawAct(true); return; } const { tid, id } = F; if (F.dock) F = null; else closeLayer(); delAct(tid, id); },
+  'f-del-next': () => { const { tid, id } = F; if (F.dock) F = null; else closeLayer(); delAct(tid, id, 'next'); },
+  'f-rep': () => { readF(); if (!F.rep) F.rep = newRep(); else F.rep.on = !F.rep.on; drawAct(true); },
+  'f-rep-ev': el => { readF(); F.rep.every = +el.dataset.v; drawAct(true); },
+  'f-rep-wd': el => { readF(); const i = +el.dataset.v, w = F.rep.wd; F.rep.wd = w.includes(i) ? (w.length > 1 ? w.filter(x => x !== i) : w) : w.concat(i); F.rep.wdAuto = false; drawAct(true); },
+  'f-rep-d': el => { readF(); const d = el.dataset.v; F.rep.tog[d] = !F.rep.tog[d]; drawAct(true); },
+  'f-rep-end': el => { readF(); F.rep.until = el.dataset.v; drawAct(true); },
   ed: el => inlineEdit(el), dayedit: el => dayEdit(el.dataset.id, el.dataset.n, el.dataset.d),
   'de-save': el => { const p = {}; ['ax', 'c', 'q', 'r', 'ev', 'p'].forEach(k => p[k] = $('#de-' + k).value.trim()); closeLayer(); saveDay(el.dataset.id, el.dataset.n, el.dataset.d, p); },
   tblax: el => { P.tbl.ax = el.dataset.v; savePrefs(); render(); }, tblempty: () => { P.tbl.hideEmpty = !P.tbl.hideEmpty; savePrefs(); render(); }, tblclear: () => { TB.q = ''; P.tbl.ax = ''; P.tbl.hideEmpty = false; render(); },
@@ -681,7 +745,7 @@ document.addEventListener('click', e => {
   if (k === 'tblq') return;
   f(el, e);
 });
-document.addEventListener('change', e => { const el = e.target; if (el.id === 'ac-r' && $('#ac-tf')) $('#ac-tf').hidden = el.value === 'admin'; if (el.dataset.act === 'bot-assign' && el.value) API.me('tg_assign', el.dataset.chat, el.value).then(s => { BS = s; toast('رُبطت المجموعة ✓'); boot(true); }).catch(x => toast(x.message, 'err')); if (el.id === 'f-d' && F) { readF(); drawAct(true); } });
+document.addEventListener('change', e => { const el = e.target; if (el.id === 'ac-r' && $('#ac-tf')) $('#ac-tf').hidden = el.value === 'admin'; if (el.dataset.act === 'bot-assign' && el.value) API.me('tg_assign', el.dataset.chat, el.value).then(s => { BS = s; toast('رُبطت المجموعة ✓'); boot(true); }).catch(x => toast(x.message, 'err')); if ((el.id === 'f-d' || el.id === 'f-rep-until') && F) { readF(); drawAct(true); } });
 document.addEventListener('input', e => {
   const el = e.target;
   if (el.dataset.act === 'tblq') { TB.q = el.value; clearTimeout(TB.t); TB.t = setTimeout(() => { const pos = el.selectionStart; render(); const n = $('[data-act="tblq"]'); if (n) { n.focus(); n.selectionStart = n.selectionEnd = pos; } }, 180); }

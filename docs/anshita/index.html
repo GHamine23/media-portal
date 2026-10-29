@@ -490,7 +490,7 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 .sheet .sh-h{display:flex;align-items:flex-start;gap:12px;padding:20px 22px 12px}
 .sheet .sh-h .t{flex:1;min-width:0}
 .sheet .sh-b{flex:1;overflow-y:auto;padding:4px 22px 18px;display:flex;flex-direction:column;gap:16px}
-.sheet .sh-f{display:flex;gap:8px;align-items:center;padding:14px 22px;border-top:1px solid var(--line)}
+.sheet .sh-f{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:14px 22px;border-top:1px solid var(--line)}
 .dlg{position:fixed;z-index:100;top:50%;left:50%;transform:translate(-50%,-50%);width:min(460px,calc(100vw - 28px));max-height:calc(100vh - 40px);overflow:auto;background:var(--surface);border-radius:var(--r3);box-shadow:var(--sh3);padding:22px;display:flex;flex-direction:column;gap:14px;animation:pop .25s var(--ease)}
 @keyframes pop{from{transform:translate(-50%,-48%) scale(.97);opacity:0}}
 @media (max-width:640px){
@@ -607,7 +607,7 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 .dk-h>.col,.dk-h>.row{flex:1;min-width:0}
 .dk-h b{font-family:var(--fd);font-weight:500;font-size:18px;color:var(--ink)}
 .dk-b{flex:1;overflow-y:auto;padding:14px 18px 18px;display:flex;flex-direction:column;gap:14px}
-.dk-f{display:flex;gap:8px;align-items:center;padding:12px 18px;border-top:1px solid var(--line);background:var(--surface)}
+.dk-f{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 18px;border-top:1px solid var(--line);background:var(--surface)}
 .dk-sec h4{font-family:var(--fn);font-weight:500;font-size:13px;color:var(--ink3);margin:0 0 8px}
 .dk-note{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:start;padding:10px 12px;border-radius:14px;font-size:14px;line-height:1.55;color:var(--ink1);margin-bottom:6px}
 .dk-note>svg{width:18px;height:18px;flex:none;margin-top:2px}
@@ -782,6 +782,17 @@ details.awt .wt-list{padding:0 0 8px}
 .cmd-i .tx b{font-weight:500;font-size:14.5px}
 .cmd-i .tx span{font-size:13px;color:var(--ink3)}
 
+/* النشاط المتكرر */
+.repbox{border:1px solid var(--line);border-radius:16px;padding:12px 14px;display:grid;gap:12px;margin-top:-4px;background:var(--bg2,transparent)}
+.repdates{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 2px}
+.chip.rd{font-variant-numeric:tabular-nums}
+.chip.rd.off{opacity:.55;text-decoration:line-through;text-decoration-thickness:1px}
+.chip.rd.warn svg{width:14px;height:14px;color:var(--warn,#b45309);margin-inline-start:2px}
+.chip.rd[disabled]{cursor:default}
+/* إعداد التذكير التفصيلي */
+.rembox{border:1px solid var(--line);border-radius:16px;padding:6px 14px 12px;display:grid;gap:10px;margin-top:-4px}
+.rembox .opt.sub{border-top:0;padding:8px 0 4px}
+
 </style>
 </head>
 <body>
@@ -823,7 +834,7 @@ const IC = {
   bell: 'M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20.5a2.2 2.2 0 0 0 4 0', eye: 'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
   edit: 'M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19zM14 7l3 3', send: 'M21 3 10 14M21 3l-7 18-4-7-7-4z', refresh: 'M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7',
   alert: 'M12 4 2.5 20h19zM12 10v4.5M12 17.5h.01', copy: 'M8 8h12v12H8zM16 8V4H4v12h4', ext: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
-  flag: 'M5 21V4M5 4h11l-2 4 2 4H5', video: 'M3.5 7h11a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1zM15.5 10.5l5-3v9l-5-3', live: 'M12 13.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM8.6 15.4a4.8 4.8 0 0 1 0-6.8M15.4 8.6a4.8 4.8 0 0 1 0 6.8M5.8 18.2a8.8 8.8 0 0 1 0-12.4M18.2 5.8a8.8 8.8 0 0 1 0 12.4', down: 'm6 9 6 6 6-6', sheet: 'M5 3.5h10l4 4v13H5zM15 3.5v4h4M8.5 12h7M8.5 15.5h7',
+  flag: 'M5 21V4M5 4h11l-2 4 2 4H5', repeat: 'm17 2 4 4-4 4M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v1a4 4 0 0 1-4 4H3', video: 'M3.5 7h11a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1zM15.5 10.5l5-3v9l-5-3', live: 'M12 13.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM8.6 15.4a4.8 4.8 0 0 1 0-6.8M15.4 8.6a4.8 4.8 0 0 1 0 6.8M5.8 18.2a8.8 8.8 0 0 1 0-12.4M18.2 5.8a8.8 8.8 0 0 1 0 12.4', down: 'm6 9 6 6 6-6', sheet: 'M5 3.5h10l4 4v13H5zM15 3.5v4h4M8.5 12h7M8.5 15.5h7',
   menu: 'M4 7h16M4 12h16M4 17h16', target: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01'
 };
 const svg = (k, sw = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${IC[k] || k}"/></svg>`;
@@ -851,6 +862,7 @@ let TODAY = isoOf(new Date());
 const U = s => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10));
 const fromU = t => new Date(t).toISOString().slice(0, 10);
 const add = (s, n) => fromU(U(s) + n * 864e5);
+const add0 = (t, m) => { const v = Math.max(0, (+t.slice(0, 2)) * 60 + (+t.slice(3, 5)) + m); return pad(Math.floor(v / 60)) + ':' + pad(v % 60); };   // إزاحة وقت بالدقائق
 const wd = s => (new Date(U(s)).getUTCDay() + 1) % 7;       // ٠ = السبت
 const dnum = s => +s.slice(8, 10);
 const mon = s => MONTHS[+s.slice(5, 7) - 1];
@@ -878,7 +890,7 @@ function ago(ms) {
   const h = Math.round(m / 60); if (h < 24) return h === 1 ? 'قبل ساعة' : h === 2 ? 'قبل ساعتين' : h <= 10 ? `قبل ${h} ساعات` : `قبل ${h} ساعة`;
   const d = Math.round(h / 24); return d === 1 ? 'أمس' : d === 2 ? 'قبل يومين' : d <= 10 ? `قبل ${d} أيام` : `قبل ${d} يومًا`;
 }
-const timeText = t => { if (!t) return ''; const h = +t.slice(0, 2), m = t.slice(3, 5); return `${h % 12 || 12}:${m} ${h >= 12 ? 'م' : 'ص'}`; };
+const timeText = t => t ? t.slice(0, 5) : '';   // نظام ٢٤ ساعة (21:00)
 const TIMES = (() => { const a = ['']; for (let h = 6; h <= 23; h++) { a.push(pad(h) + ':00'); a.push(pad(h) + ':30'); } return a; })();
 function countAr(n, f) { // f = [مفرد، مثنى، جمع، تمييز]
   if (n === 0) return 'لا ' + f[2]; if (n === 1) return f[0] + ' واحد'; if (n === 2) return f[1];
@@ -973,6 +985,17 @@ const tcol = id => (T(id) && T(id).color) || '#888';
 const sortA = (x, y) => x.d < y.d ? -1 : x.d > y.d ? 1 : (x.time || '99').localeCompare(y.time || '99');
 const members = id => (T(id) && T(id).members) || [];
 const remindable = a => a.rem === true || (a.rem !== false && (D.remindTypes || ['لقاء', 'استضافة']).includes(a.type));
+// إعداد التذكير لكل نشاط (يطابق الخادم): des يحتاج تصميم إعلان، d2 قبله بيومين، d1 قبله بيوم، d0 يوم الموعد
+const DESIGN_T = ['لقاء', 'استضافة', 'مسابقة', 'تحدٍّ'];
+const remCfg = x => { const r = x.rp || {}; return { des: 'des' in r ? r.des : DESIGN_T.includes(x.type), d2: !!r.d2, d1: 'd1' in r ? r.d1 : true, d0: 'd0' in r ? r.d0 : true }; };
+function remPlan(x) {
+  const c = remCfg(x), L = [];
+  if (c.des) L.push({ k: 'd3', l: 'تصميم الإعلان', d: add(x.d, -3) });
+  if (c.d2) L.push({ k: 'd2', l: c.des ? 'إتمام التصميم' : 'تذكير', d: add(x.d, -2) });
+  if (c.d1) L.push({ k: 'd1', l: c.des ? 'نشر الإعلان' : 'تذكير', d: add(x.d, -1) });
+  if (c.d0) L.push({ k: 'd0', l: x.time ? 'قبل الموعد بساعة' : 'يوم الموعد', d: x.d });
+  return L;
+}
 const isLate = a => !a.done && a.d < TODAY;
 function semRange(id, n) { const ds = daysOf(id, n); return ds.length ? { from: ds[0].d, to: ds[ds.length - 1].d } : null; }
 function semFor(id, d) { const sems = planOf(id).sems; for (const k in sems) { const s = sems[k]; if (s.start <= d && d <= s.end) return k; } return null; }
@@ -1250,6 +1273,7 @@ async function saveAct(tid, patch, opt = {}) {
     const r = await API.me('act_save', tid, JSON.stringify(body));
     const i = p.acts.findIndex(a => a.id === (patch.id || tmp.id));
     if (i >= 0) p.acts[i] = r.act; else p.acts.push(r.act);
+    (r.others || []).forEach(o => { const k = p.acts.findIndex(a => a.id === o.id); if (k >= 0) p.acts[k] = o; });
     p.rev = r.rev; D.revs[tid] = r.rev;
     setSync('ok');
     if (r.calErr) toast('حُفظ النشاط، وتعذّر تحديث تقويم جوجل: ' + r.calErr, 'err');
@@ -1261,11 +1285,53 @@ async function saveAct(tid, patch, opt = {}) {
     setSync(e.net ? 'off' : 'ok'); render(); toast(e.message, 'err'); throw e;
   }
 }
-async function delAct(tid, id) {
-  const p = planOf(tid), i = p.acts.findIndex(a => a.id === id), prev = p.acts[i];
-  p.acts.splice(i, 1); render(); setSync('busy');
-  try { const r = await API.me('act_del', tid, id); p.rev = r.rev; D.revs[tid] = r.rev; setSync('ok'); toast(`حُذف ${qt(prev.title)}`); }
-  catch (e) { p.acts.splice(i, 0, prev); setSync('ok'); render(); toast(e.message, 'err'); }
+// scope = 'next': هذا الموعد وما بعده من النشاط المتكرر
+async function delAct(tid, id, scope) {
+  const p = planOf(tid), x = p.acts.find(a => a.id === id), before = p.acts.slice();
+  if (!x) return;
+  const gone = p.acts.filter(a => a.id === id || (scope === 'next' && x.ser && a.ser === x.ser && a.d > x.d));
+  p.acts = p.acts.filter(a => !gone.includes(a)); render(); setSync('busy');
+  try { const r = await API.me('act_del', tid, id, scope || ''); p.rev = r.rev; D.revs[tid] = r.rev; setSync('ok'); toast(gone.length > 1 ? `حُذف ${qt(x.title)} و${apptText(gone.length - 1)} بعده` : `حُذف ${qt(x.title)}`); }
+  catch (e) { p.acts = before; setSync('ok'); render(); toast(e.message, 'err'); }
+}
+// النشاط المتكرر: مواعيد مستقلة تجمعها سلسلة واحدة
+async function saveSeries(tid, body) {
+  setSync('busy');
+  try {
+    const r = await API.me('act_series', tid, JSON.stringify(body)), p = planOf(tid);
+    if (r.first) { const i = p.acts.findIndex(a => a.id === r.first.id); if (i >= 0) p.acts[i] = r.first; }
+    p.acts.push(...r.acts); p.series = Object.assign({}, p.series, { [r.sid]: r.series });
+    p.rev = r.rev; D.revs[tid] = r.rev; setSync('ok');
+    if (r.calErr) toast('أُضيفت المواعيد، وتعذّر بعضها في تقويم جوجل: ' + r.calErr, 'err');
+    render(); setTimeout(() => poll(true), 600);
+    return r;
+  } catch (e) { setSync(e.net ? 'off' : 'ok'); render(); toast(e.message, 'err'); throw e; }
+}
+const apptText = n => n === 1 ? 'موعد واحد' : n === 2 ? 'موعدان' : n <= 10 ? n + ' مواعيد' : n + ' موعدًا';
+const EVERY = { 1: 'كل أسبوع', 2: 'كل أسبوعين', 4: 'كل أربعة أسابيع' };
+const seriesOf = (tid, ser) => ser ? planOf(tid).acts.filter(a => a.ser === ser).sort(sortA) : [];
+function seriesText(tid, ser) {
+  const r = (planOf(tid).series || {})[ser], L = seriesOf(tid, ser);
+  if (!r) return apptText(L.length);
+  return EVERY[r.every || 1] + ((r.wd || []).length ? ' يوم ' + r.wd.map(i => DAYS[i]).join(' و') : '') + ' · ' + apptText(L.length);
+}
+// مواعيد التكرار: من يوم النشاط حتى «حتى»، في الأيام المختارة، كل N أسابيع.
+// أيام الإجازة والاختبار في جدول الفصل تُستبعد افتراضيًا، ويستطيع المستخدم إعادة أي موعد أو استبعاده
+function repDates(tid, F) {
+  const R = F.rep, start = F.d, end = R.until, out = [];
+  if (!start || !end || end < start) return out;
+  const w0 = wkStart(start);
+  for (let k = 0; add(w0, 7 * k) <= end && out.length < 80; k += R.every) {
+    R.wd.slice().sort((a, b) => a - b).forEach(i => {
+      const d = add(w0, 7 * k + i); if (d < start || d > end) return;
+      const day = dayOf(tid, semFor(tid, d) || curN(tid), d), ev = day ? (day.ev || '') + ' ' + (day.p || '') : '';
+      const reason = /إجازة/.test(ev) ? 'إجازة' : /اختبار/.test(ev) ? (day.ev || 'اختبار') : '';
+      const clash = MEET_T.includes(F.type) && d !== start ? dayMeets(tid, d, F.id).length > 0 : false;
+      const first = !F.isNew && d === start;
+      out.push({ d, reason, clash, first, on: first || (R.tog[d] ? !!reason : !reason) });
+    });
+  }
+  return out;
 }
 function moveAct(tid, id, d) {
   const a = planOf(tid).acts.find(x => x.id === id); if (!a || a.d === d) return;
@@ -1379,7 +1445,7 @@ function endDrag(e, cancel) {
 /* ---------- بطاقة النشاط ---------- */
 function evChip(a, tid, o = {}) {
   const t = T(tid), drag = canAdjust(tid) && !o.noDrag && !String(a.id).startsWith('tmp'), cl = clashOf(tid, a);
-  const flags = (cl ? `<span class="cl" data-tip="${esc(cl)}">${svg('alert')}</span>` : '') + (a.meet && a.meet.uri ? `<span data-tip="له رابط ميت">${svg('video')}</span>` : '') + (a.cal && a.cal.id ? `<span data-tip="في تقويم جوجل">${svg('gcal')}</span>` : '') + (a.done ? `<span data-tip="تم التنفيذ">${svg('check')}</span>` : '');
+  const flags = (cl ? `<span class="cl" data-tip="${esc(cl)}">${svg('alert')}</span>` : '') + (a.ser ? `<span data-tip="نشاط متكرر">${svg('repeat')}</span>` : '') + (a.meet && a.meet.uri ? `<span data-tip="له رابط ميت">${svg('video')}</span>` : '') + (a.cal && a.cal.id ? `<span data-tip="في تقويم جوجل">${svg('gcal')}</span>` : '') + (a.done ? `<span data-tip="تم التنفيذ">${svg('check')}</span>` : '');
   const meta = [o.track ? `<span class="tbadge">${esc(t.name)}</span>` : '', o.big ? `<span class="ty">${esc(a.type)}</span>` : '', a.time ? `<span>${timeText(a.time)}</span>` : '', a.who && a.who.length ? `<span>${esc(a.who.join('، '))}</span>` : '', o.date ? `<span>${gDay(a.d)}</span>` : '', flags ? `<span class="flag">${flags}</span>` : ''].filter(Boolean).join('');
   return `<div class="ev ${o.track || o.tint ? 'tinted' : ''} ${o.big ? 'big' : ''} ${cl ? 'clash' : ''} ${a.done ? 'done' : ''} ${isLate(a) ? 'late' : ''} ${typeof F !== 'undefined' && F && F.dock && F.id === a.id ? 'sel' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${tid}" ${drag ? 'data-drag="1"' : ''} style="--tcol:${t.color};--tyc:${typeOf(a.type)[1]}">
     ${tile(a.type, 'sm')}<span class="tx"><span class="tt clamp2">${esc(a.title)}</span>${meta ? `<span class="mt">${meta}</span>` : ''}</span></div>`;
@@ -1609,8 +1675,7 @@ function teamHome(id, preview) {
       <div class="ttl">${esc(m.title)}</div>
       <div class="muted sm" style="margin-top:4px">${gDay(m.d)}${m.time ? '، الساعة ' + timeText(m.time) : ''}${m.who && m.who.length ? ' · ' + esc(m.who.join('، ')) : ''}</div>
       <div class="rtl-steps">
-        ${dd >= 2 ? `<div class="stp ${st(d3, 'd3')}"><i></i><b>تصميم الإعلان</b><span>${d3 < TODAY ? gDay(TODAY) : gDay(d3)}</span></div>` : ''}
-        <div class="stp ${st(d1, 'd1')}"><i></i><b>نشر الإعلان</b><span>${gDay(d1 < TODAY ? TODAY : d1)}</span></div>
+        ${remPlan(m).filter(x => x.k !== 'd0' && (x.d >= TODAY || sent[x.k] === m.d)).map(x => `<div class="stp ${st(x.d, x.k)}"><i></i><b>${x.l}</b><span>${gDay(x.d)}</span></div>`).join('')}
         <div class="stp big ${m.d === TODAY ? 'now' : ''}"><i></i><b>اللقاء</b><span>${gDay(m.d)}</span></div>
       </div></div>
       <div class="side-l">${m.meet && m.meet.uri ? `<a class="btn pri" href="${esc(m.meet.uri)}" target="_blank" rel="noopener">${svg('video')}ادخل اللقاء</a><button class="btn" type="button" data-act="openact" data-id="${m.id}" data-track="${id}">تفاصيل اللقاء</button>` : `<button class="btn pri" type="button" data-act="openact" data-id="${m.id}" data-track="${id}">تفاصيل اللقاء</button>`}${t.linked ? `<span class="xs faint">يصل التذكير مجموعتكم في موعده</span>` : ''}</div></div>`;
@@ -1951,11 +2016,40 @@ function openAct(tid, id, preset = {}) {
   if (!a && tid && !canEdit(tid)) return toast('إضافة الأنشطة مغلقة لفريقكم. اطلبوا فتحها من الإدارة.', 'err');
   F = a ? Object.assign({ tid, isNew: false }, JSON.parse(JSON.stringify(a)), { calOn: !!(a.cal && a.cal.id) })
     : { tid, isNew: true, title: preset.title || '', type: preset.type || 'لقاء', d: preset.date || (tid ? defDate(tid) : TODAY), time: '', dur: 0, who: [], idea: '', rem: null, calOn: false, done: false, note: '', link: '' };
-  F.newNames = []; F.lockTrack = !!tid;
+  F.newNames = []; F.lockTrack = !!tid; F.d0 = F.d; F.rep = preset.repeat && !a ? newRep() : null;
   F.dock = dockOn(F.tid) && !!$('#dock');
   drawAct();
   if (F.dock) { const b = $('#dock .dk-b'); if (b) b.scrollTop = 0; }
 }
+function newRep() {
+  const tid = F.tid, r = tid ? semRange(tid, semFor(tid, F.d) || curN(tid)) : null;
+  return { on: true, every: 1, wd: [wd(F.d)], wdAuto: true, until: r && r.to > F.d ? r.to : add(F.d, 7 * 12), tog: {} };
+}
+// قسم التكرار في نموذج النشاط
+function repBlock(mode) {
+  const tid = F.tid;
+  if (!tid) return '';
+  if (F.ser && !F.isNew) {
+    const L = seriesOf(tid, F.ser), i = L.findIndex(a => a.id === F.id);
+    return `<div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('repeat')}</span><div class="tx"><b>نشاط متكرر</b><span>${esc(seriesText(tid, F.ser))}${i >= 0 ? ' · هذا الموعد ' + (i + 1) + ' من ' + L.length : ''}</span></div></div>`;
+  }
+  if (mode !== 'full') return '';
+  const R = F.rep, on = !!(R && R.on), r = semRange(tid, semFor(tid, F.d) || curN(tid)), semEnd = r ? r.to : '';
+  const sum = on ? `${EVERY[R.every]}${R.wd.length ? ' يوم ' + R.wd.slice().sort((a, b) => a - b).map(i => DAYS[i]).join(' و') : ''} حتى ${gDay(R.until)}` : 'موعد واحد';
+  let h = `<div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('repeat')}</span><div class="tx"><b>${F.isNew ? 'يتكرر في الفصل' : 'كرّره في الفصل'}</b><span>${esc(sum)}</span></div><button class="sw" type="button" role="switch" aria-checked="${on}" data-act="f-rep" aria-label="يتكرر في الفصل"></button></div>`;
+  if (!on) return h;
+  const L = repDates(tid, F), n = L.filter(x => x.on).length, skipped = L.filter(x => !x.on && x.reason).length, fmt = R.wd.length > 1 ? gDay : gShort;
+  h += `<div class="repbox">
+    <div class="field"><span class="flabel">كل</span><div class="row" style="gap:6px;flex-wrap:wrap">${[1, 2, 4].map(v => `<button class="chip" type="button" aria-pressed="${R.every === v}" data-act="f-rep-ev" data-v="${v}">${EVERY[v].replace('كل ', '')}</button>`).join('')}</div></div>
+    <div class="field"><span class="flabel">في يوم</span><div class="row" style="gap:6px;flex-wrap:wrap">${DAYS.map((d, i) => `<button class="chip" type="button" aria-pressed="${R.wd.includes(i)}" data-act="f-rep-wd" data-v="${i}">${d}</button>`).join('')}</div></div>
+    <div class="field"><label for="f-rep-until">حتى</label><input class="inp" id="f-rep-until" type="date" value="${R.until}" min="${F.d}">${semEnd ? `<span class="hint">نهاية الفصل ${gDay(semEnd)}${R.until !== semEnd ? ` · <button class="lk" type="button" data-act="f-rep-end" data-v="${semEnd}">إليها</button>` : ''}</span>` : ''}</div>
+    <div class="field"><span class="flabel">المواعيد: ${apptText(n)}${skipped ? ` <span class="faint">· استُبعد ${apptText(skipped)} لإجازة أو اختبار</span>` : ''}</span>
+      <div class="repdates">${L.map(x => `<button class="chip rd ${x.on ? '' : 'off'} ${x.clash ? 'warn' : ''}" type="button" aria-pressed="${x.on}" data-act="f-rep-d" data-v="${x.d}" ${x.first ? 'disabled' : ''} ${x.reason || x.clash ? `data-tip="${esc(x.reason || 'فيه لقاء آخر أو بث مباشر')}"` : ''}>${fmt(x.d)}${x.reason ? ` <span class="xs">(${esc(x.reason)})</span>` : ''}${x.clash ? svg('alert') : ''}</button>`).join('') || '<span class="muted sm">لا مواعيد في هذه المدة.</span>'}</div>
+      <span class="hint">اضغط موعدًا لاستبعاده أو إعادته. كل موعد نشاط مستقل له تذكيره ورابط ميت خاص به.</span></div>
+  </div>`;
+  return h;
+}
+const nextOf = () => F && F.ser && !F.isNew ? seriesOf(F.tid, F.ser).filter(a => a.id !== F.id && a.d > F.d0).length : 0;
 function defDate(tid) { const r = semRange(tid, curN(tid)); return r && TODAY < r.from ? r.from : TODAY; }
 // صلاحية النموذج: full تعديل كامل، adj تعديل نشاط قائم بلا حذف (يصل الإدارةَ تنبيه)، ro متابعة فقط
 function fMode() {
@@ -1980,7 +2074,12 @@ function actParts() {
     }
   }
   const willRem = F.rem === true || (F.rem !== false && (D.remindTypes || []).includes(F.type));
-  const remSub = !willRem ? 'لا تذكير لهذا النشاط' : !t || !t.linked ? 'سيُذكَّر به حين تُربط مجموعة المسار بالبوت' : diffD(F.d, TODAY) < 0 ? 'مضى موعده' : `تصميم الإعلان ${gDay(add(F.d, -3) < TODAY ? TODAY : add(F.d, -3))}، ونشره ${gDay(add(F.d, -1) < TODAY ? TODAY : add(F.d, -1))}`;
+  const plan = remPlan(F).filter(x => x.d >= TODAY), rc = remCfg(F);
+  const remSub = !willRem ? 'لا تذكير لهذا النشاط' : diffD(F.d, TODAY) < 0 ? 'مضى موعده' : (plan.length ? plan.map(x => `${x.l} ${x.k === 'd0' ? (F.time ? timeText(add0(F.time, -60)) : gDay(x.d)) : gDay(x.d)}`).join('، ') : 'لا تذكير قادم') + (!t || !t.linked ? '. ويبدأ حين تُربط مجموعة المسار بالبوت' : '');
+  const remBox = willRem && diffD(F.d, TODAY) >= 0 ? `<div class="rembox">
+      <div class="opt sub"><div class="tx"><b>يحتاج تصميم إعلان</b><span>${rc.des ? 'يذكّر بتصميمه قبله بثلاثة أيام، وبنشره قبله بيوم' : 'لا تذكير بتصميم ولا نشر'}</span></div><button class="sw" type="button" role="switch" aria-checked="${rc.des}" data-act="f-rp" data-v="des" aria-label="يحتاج تصميم إعلان"></button></div>
+      <div class="field"><span class="flabel">تذكير الفريق</span><div class="row" style="gap:6px;flex-wrap:wrap">${[['d2', 'قبله بيومين'], ['d1', 'قبله بيوم'], ['d0', F.time ? 'قبله بساعة' : 'يوم الموعد']].map(([k, l]) => `<button class="chip" type="button" aria-pressed="${rc[k]}" data-act="f-rp" data-v="${k}">${l}</button>`).join('')}</div>
+      <span class="hint">${F.time ? 'تذكير يوم الموعد يصل قبله بساعة.' : 'بلا وقت للنشاط يصل تذكير يومه في ساعة التذكيرات.'} ولا يصل للنشاط أكثر من تذكير في اليوم.</span></div></div>` : '';
   const follow = !F.isNew ? `<div class="sep" style="margin:4px 0"></div><b style="font-family:var(--fd);font-weight:500;font-size:17px;color:var(--ink)">المتابعة</b>
     <div class="opt" style="border-top:0;padding-top:0"><button class="ck round ok" type="button" role="checkbox" aria-checked="${!!F.done}" data-act="f-done" aria-label="تم التنفيذ">${svg('check', 2.4)}</button><div class="tx"><b>تم التنفيذ</b><span>يُعلَّم بعد إقامة النشاط</span></div></div>
     <div class="field"><label for="f-note">ملاحظة بعد التنفيذ</label><textarea class="inp" id="f-note" rows="2" placeholder="كم حضر؟ ما الذي نجح وما الذي يُحسَّن؟">${esc(F.note || '')}</textarea></div>
@@ -1991,7 +2090,7 @@ function actParts() {
       ${F.who && F.who.length ? `<div class="field"><span class="flabel">المسؤول</span><div class="whos">${F.who.map(w => `<span class="chip">${esc(w)}</span>`).join('')}</div></div>` : ''}
       ${F.idea ? `<div class="field"><span class="flabel">الفكرة</span><div class="ro-v">${esc(F.idea)}</div></div>` : ''}
       <div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('bell')}</span><div class="tx"><b>تذكير البوت</b><span>${esc(remSub)}</span></div></div>
-      <p class="hint">${svg('lock')} تستطيعون تسجيل المتابعة.</p><!--MEET-->${follow}`;
+      ${repBlock(mode)}<p class="hint">${svg('lock')} تستطيعون تسجيل المتابعة.</p><!--MEET-->${follow}`;
   } else {
     body = `${tracksSel}${mode === 'adj' ? `<p class="hint">${svg('bell')} إضافة الأنشطة وحذفها مغلقان، وتستطيعون تعديل هذا النشاط. يصل الإدارةَ تنبيه بكل تغيير.</p>` : ''}
     <input class="inp big" id="f-title" value="${esc(F.title)}" placeholder="اسم النشاط" aria-label="اسم النشاط" ${F.isNew ? 'autofocus' : ''}>
@@ -2002,14 +2101,20 @@ function actParts() {
     ${ctx}${clash}
     <div class="field"><span class="flabel">المسؤول من الفريق</span><div class="whos">${[...new Set(members(tid).concat(F.who || []))].map(w => `<button class="chip" type="button" aria-pressed="${(F.who || []).includes(w)}" data-act="f-who" data-v="${esc(w)}">${esc(w)}</button>`).join('')}<input id="f-whonew" placeholder="+ اسم جديد" aria-label="إضافة اسم"></div></div>
     <div class="field"><label for="f-idea">الفكرة</label><textarea class="inp" id="f-idea" rows="3" placeholder="الفكرة في سطرين: ماذا سيحدث؟ ولمن؟">${esc(F.idea || '')}</textarea></div>
-    <div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('bell')}</span><div class="tx"><b>تذكير البوت في مجموعة الفريق</b><span>${esc(remSub)}</span></div><button class="sw" type="button" role="switch" aria-checked="${willRem}" data-act="f-rem" aria-label="تذكير البوت"></button></div>
+    <div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('bell')}</span><div class="tx"><b>تذكير البوت في مجموعة الفريق</b><span>${esc(remSub)}</span></div><button class="sw" type="button" role="switch" aria-checked="${willRem}" data-act="f-rem" aria-label="تذكير البوت"></button></div>${remBox}
+    ${repBlock(mode)}
     ${isAdmin() ? `<div class="opt"><span class="tile sm" style="--tc:var(--plum)">${svg('gcal')}</span><div class="tx"><b>في تقويم جوجل</b><span>${F.calOn ? (F.cal && F.cal.id ? (F.cal.err ? 'تعذّر آخر تحديث: ' + esc(F.cal.err) : 'في التقويم، ويتحدّث مع كل تعديل') : 'سيُرسل عند الحفظ') : 'لا يظهر في التقويم'}</span></div><button class="sw" type="button" role="switch" aria-checked="${!!F.calOn}" data-act="f-cal" aria-label="في تقويم جوجل"></button></div>` : ''}
     <!--MEET-->${follow}`;
   }
   const cancel = F.dock ? 'f-cancel' : 'close';
   body = body.replace('<!--MEET-->', !F.isNew && tid ? meetBlock() : '');
   const foot = ro ? `<button class="btn pri" type="button" data-act="f-save">حفظ المتابعة</button><button class="btn" type="button" data-act="${cancel}">إغلاق</button>`
-    : `<button class="btn pri" type="button" data-act="f-save" ${!tid ? 'disabled' : ''}>${F.isNew ? 'أضف النشاط' : 'احفظ'}</button><button class="btn" type="button" data-act="${cancel}">إلغاء</button><span class="sp"></span>${!F.isNew && mode === 'full' ? `<button class="btn danger" type="button" data-act="f-del">${F.confirmDel ? 'تأكيد الحذف' : 'حذف'}</button>` : ''}`;
+    : (() => {
+      const nx = nextOf(), repN = F.rep && F.rep.on && !F.ser && mode === 'full' && tid ? repDates(tid, F).filter(x => x.on).length : 0;
+      const saveL = repN > 1 ? (F.isNew ? `أضف ${apptText(repN)}` : `احفظ وكرّره (${apptText(repN)})`) : F.isNew ? 'أضف النشاط' : nx ? 'احفظ هذا الموعد' : 'احفظ';
+      const del = !F.isNew && mode === 'full' ? (F.confirmDel && nx ? `<button class="btn danger" type="button" data-act="f-del">احذف هذا الموعد</button><button class="btn danger" type="button" data-act="f-del-next">وما بعده (${nx})</button>` : `<button class="btn danger" type="button" data-act="f-del">${F.confirmDel ? 'تأكيد الحذف' : 'حذف'}</button>`) : '';
+      return `<button class="btn pri" type="button" data-act="f-save" ${!tid ? 'disabled' : ''}>${saveL}</button>${nx ? `<button class="btn" type="button" data-act="f-save-next">له ولما بعده (${nx})</button>` : ''}<button class="btn" type="button" data-act="${cancel}">إلغاء</button><span class="sp"></span>${del}`;
+    })();
   return { head, body, foot };
 }
 // رابط ميت للنشاط: يُنشأ من حساب الأنشطة، والمسؤولون عنه (ببريدهم في «الفريق») وبريد الإدارة مشرفون فيه
@@ -2065,8 +2170,9 @@ function readF() {
   if (g('f-note')) F.note = g('f-note').value;
   if (g('f-link')) F.link = g('f-link').value.trim();
   const nw = g('f-whonew'); if (nw && nw.value.trim()) { F.who = [...new Set((F.who || []).concat(nw.value.trim()))]; nw.value = ''; }
+  if (F.rep) { if (g('f-rep-until') && g('f-rep-until').value) F.rep.until = g('f-rep-until').value; if (F.rep.wdAuto && F.d) F.rep.wd = [wd(F.d)]; }
 }
-async function saveF() {
+async function saveF(scope) {
   readF();
   const f = F, tid = f.tid;
   if (!tid) return toast('اختر المسار', 'err');
@@ -2076,17 +2182,32 @@ async function saveF() {
   else {
     if (!f.title.trim()) { toast('اكتب اسم النشاط', 'err'); $('#f-title') && $('#f-title').focus(); return; }
     if (f.link && !/^https?:\/\//i.test(f.link)) { toast('الرابط يبدأ بـ https://', 'err'); $('#f-link') && $('#f-link').focus(); return; }
-    patch = { title: f.title.trim(), type: f.type, d: f.d, time: f.time || '', dur: f.dur || 0, who: f.who || [], idea: f.idea || '', rem: f.rem };
+    patch = { title: f.title.trim(), type: f.type, d: f.d, time: f.time || '', dur: f.dur || 0, who: f.who || [], idea: f.idea || '', rem: f.rem, rp: f.rp || null };
     if (!f.isNew) Object.assign(patch, { id: f.id, done: !!f.done, note: f.note || '', link: f.link || '' });
     if (isAdmin()) { const was = !!(f.cal && f.cal.id); if (f.calOn !== was) patch.calOn = !!f.calOn; }
     const s = semFor(tid, f.d); if (s) patch.sem = s;
+    if (scope === 'next' && f.ser) patch.scope = 'next';
   }
+  // التكرار: يُضاف النشاط في كل المواعيد المختارة
+  const rep = mode === 'full' && !f.ser && f.rep && f.rep.on ? repDates(tid, f).filter(x => x.on).map(x => x.d) : null;
+  if (rep && !rep.length) return toast('لا مواعيد مختارة للتكرار', 'err');
+  if (rep && rep.length > 60) return toast('أقصى التكرار ٦٠ موعدًا. قصّر المدة أو باعد بين المواعيد', 'err');
+  if (rep && (rep.length > 1 || !f.isNew)) {
+    const rule = { every: f.rep.every, wd: f.rep.wd, until: f.rep.until };
+    if (f.dock) F = null; else closeLayer();
+    try {
+      if (f.isNew) { const base = Object.assign({}, patch); ['d', 'sem', 'calOn'].forEach(k => delete base[k]); await saveSeries(tid, { base, dates: rep, rule, calOn: !!patch.calOn }); toast(`أُضيف ${qt(patch.title)} في ${apptText(rep.length)}`); }
+      else { await saveAct(tid, patch, { noRender: true }); const r = await saveSeries(tid, { from: f.id, dates: rep, rule }); toast(`كُرّر ${qt(patch.title)}: ${apptText(r.acts.length)} بعده`); }
+    } catch (e) {}
+    return;
+  }
+  if (rep && rep.length === 1) patch.d = rep[0];
   const newNames = (f.who || []).filter(w => !members(tid).includes(w));
   const cl = mode !== 'ro' && MEET_T.includes(f.type) ? dayMeets(tid, f.d, f.id) : [];
   if (f.dock) F = null; else closeLayer();
   try {
     await saveAct(tid, patch);
-    toast((f.isNew ? `أُضيف ${qt(patch.title)}` : 'حُفظ') + (cl.length ? ` — تنبيه: ${clashText(cl.concat(qt(patch.title)))}` : '') + (!isAdmin() && !f.isNew && mode !== 'ro' ? '. وصل الإدارةَ تنبيه بالتغيير' : ''));
+    toast((f.isNew ? `أُضيف ${qt(patch.title)}` : scope === 'next' ? `حُفظ لهذا الموعد وما بعده` : 'حُفظ') + (cl.length ? ` — تنبيه: ${clashText(cl.concat(qt(patch.title)))}` : '') + (!isAdmin() && !f.isNew && mode !== 'ro' ? '. وصل الإدارةَ تنبيه بالتغيير' : ''));
     if (newNames.length && canEdit(tid)) trackSave(tid, { members: members(tid).concat(newNames) }).catch(() => {});
   } catch (e) {}
 }
@@ -2308,7 +2429,7 @@ VIEWS.bot = {
       ${t.chat ? `<button class="sw" type="button" role="switch" aria-checked="${t.remind}" data-act="bot-remind" data-id="${t.id}" aria-label="تذكيرات ${esc(tt.name)}" data-tip="${t.remind ? 'أوقف التذكيرات' : 'شغّل التذكيرات'}"></button><button class="btn sm ghost" type="button" data-act="bot-test" data-id="${t.id}">تجربة</button><button class="btn icon" type="button" data-act="bot-unlink" data-chat="${esc(t.chat.id)}" aria-label="إلغاء الربط" data-tip="إلغاء الربط">${svg('x')}</button>`
         : `<a class="btn sm pri" href="${esc(t.link)}" target="_blank" rel="noopener" data-act="tgwatch">${svg('send')}أضف البوت إلى مجموعة ${esc(tt.name)}</a>`}</div>`; }).join('');
     const unassigned = (BS.chats || []).filter(c => !c.to && !c.left && c.type !== 'private');
-    const up = (BS.upcoming || []).map(u => `<div class="li"><div class="d" style="width:92px;line-height:1.35"><b style="display:block;font-weight:500">${DAYS[wd(u.on)]} ${dnum(u.on)}</b><span class="xs faint">${rel(u.on)}</span></div><span class="hl"><i style="background:${tcol(u.t)};border-radius:2px"></i></span><div class="tx"><div class="tt">${u.kind === 'd3' ? 'تصميم الإعلان' : 'نشر الإعلان'}: ${esc(u.title)}</div><div class="mt">${esc(T(u.t).name)} · اللقاء ${gDay(u.d)}</div></div>${u.sent ? `<span class="pill ok">${svg('check')}أُرسل</span>` : u.linked ? `<span class="pill">مجدول</span>` : `<span class="pill dash">المجموعة غير مربوطة</span>`}</div>`).join('');
+    const up = (BS.upcoming || []).map(u => `<div class="li"><div class="d" style="width:92px;line-height:1.35"><b style="display:block;font-weight:500">${DAYS[wd(u.on)]} ${dnum(u.on)}</b><span class="xs faint">${rel(u.on)}</span></div><span class="hl"><i style="background:${tcol(u.t)};border-radius:2px"></i></span><div class="tx"><div class="tt">${{ d3: 'تصميم الإعلان', d2: 'تذكير قبله بيومين', d1: 'تذكير قبله بيوم', d0: 'تذكير يوم الموعد' }[u.kind] || 'تذكير'}: ${esc(u.title)}</div><div class="mt">${esc(T(u.t).name)} · اللقاء ${gDay(u.d)}</div></div>${u.sent ? `<span class="pill ok">${svg('check')}أُرسل</span>` : u.linked ? `<span class="pill">مجدول</span>` : `<span class="pill dash">المجموعة غير مربوطة</span>`}</div>`).join('');
     const hours = Array.from({ length: 17 }, (_, i) => i + 6);
     return pageHead('', 'بوت التذكيرات', '', `<div class="card flat" style="padding:12px 16px;min-width:270px"><div class="row"><span class="tile" style="--tc:var(--brand)">${svg('bot')}</span><div class="col" style="flex:1;min-width:0"><b>${esc(bot.name || '')}</b><a class="xs lk" href="https://t.me/${esc(bot.username)}" target="_blank" rel="noopener"><bdi>@${esc(bot.username || '')}</bdi></a></div><button class="btn icon" type="button" data-act="bot-refresh" aria-label="تحديث" data-tip="تحديث">${svg('refresh')}</button></div>
       <div class="xs faint" style="margin-top:8px">${lt ? `آخر تشغيل ${ago(lt.at)}${lt.sent ? ' · أُرسلت ' + lt.sent : ''}${lt.ok ? '' : ' · ' + esc(lt.msg)}` : 'يعمل كل ساعة'}</div></div>`) + `
@@ -2534,8 +2655,16 @@ const H = {
   'f-track': el => { readF(); F.tid = el.dataset.v; drawAct(true); }, 'f-type': el => { readF(); F.type = el.dataset.v; drawAct(true); },
   'f-who': el => { readF(); const w = el.dataset.v; F.who = (F.who || []).includes(w) ? F.who.filter(x => x !== w) : (F.who || []).concat(w); drawAct(true); },
   'f-rem': () => { readF(); const cur = F.rem === true || (F.rem !== false && (D.remindTypes || []).includes(F.type)); F.rem = !cur; drawAct(true); },
-  'f-cal': () => { readF(); F.calOn = !F.calOn; drawAct(true); }, 'f-done': () => { readF(); F.done = !F.done; drawAct(true); },
-  'f-save': saveF, 'f-del': () => { if (!F.confirmDel) { readF(); F.confirmDel = true; drawAct(true); return; } const { tid, id } = F; if (F.dock) F = null; else closeLayer(); delAct(tid, id); },
+  'f-cal': () => { readF(); F.calOn = !F.calOn; drawAct(true); },
+  'f-rp': el => { readF(); const k = el.dataset.v, c = remCfg(F); F.rp = Object.assign({}, F.rp || {}, { [k]: !c[k] }); drawAct(true); }, 'f-done': () => { readF(); F.done = !F.done; drawAct(true); },
+  'f-save': () => saveF(), 'f-save-next': () => saveF('next'),
+  'f-del': () => { if (!F.confirmDel) { readF(); F.confirmDel = true; drawAct(true); return; } const { tid, id } = F; if (F.dock) F = null; else closeLayer(); delAct(tid, id); },
+  'f-del-next': () => { const { tid, id } = F; if (F.dock) F = null; else closeLayer(); delAct(tid, id, 'next'); },
+  'f-rep': () => { readF(); if (!F.rep) F.rep = newRep(); else F.rep.on = !F.rep.on; drawAct(true); },
+  'f-rep-ev': el => { readF(); F.rep.every = +el.dataset.v; drawAct(true); },
+  'f-rep-wd': el => { readF(); const i = +el.dataset.v, w = F.rep.wd; F.rep.wd = w.includes(i) ? (w.length > 1 ? w.filter(x => x !== i) : w) : w.concat(i); F.rep.wdAuto = false; drawAct(true); },
+  'f-rep-d': el => { readF(); const d = el.dataset.v; F.rep.tog[d] = !F.rep.tog[d]; drawAct(true); },
+  'f-rep-end': el => { readF(); F.rep.until = el.dataset.v; drawAct(true); },
   ed: el => inlineEdit(el), dayedit: el => dayEdit(el.dataset.id, el.dataset.n, el.dataset.d),
   'de-save': el => { const p = {}; ['ax', 'c', 'q', 'r', 'ev', 'p'].forEach(k => p[k] = $('#de-' + k).value.trim()); closeLayer(); saveDay(el.dataset.id, el.dataset.n, el.dataset.d, p); },
   tblax: el => { P.tbl.ax = el.dataset.v; savePrefs(); render(); }, tblempty: () => { P.tbl.hideEmpty = !P.tbl.hideEmpty; savePrefs(); render(); }, tblclear: () => { TB.q = ''; P.tbl.ax = ''; P.tbl.hideEmpty = false; render(); },
@@ -2619,7 +2748,7 @@ document.addEventListener('click', e => {
   if (k === 'tblq') return;
   f(el, e);
 });
-document.addEventListener('change', e => { const el = e.target; if (el.id === 'ac-r' && $('#ac-tf')) $('#ac-tf').hidden = el.value === 'admin'; if (el.dataset.act === 'bot-assign' && el.value) API.me('tg_assign', el.dataset.chat, el.value).then(s => { BS = s; toast('رُبطت المجموعة ✓'); boot(true); }).catch(x => toast(x.message, 'err')); if (el.id === 'f-d' && F) { readF(); drawAct(true); } });
+document.addEventListener('change', e => { const el = e.target; if (el.id === 'ac-r' && $('#ac-tf')) $('#ac-tf').hidden = el.value === 'admin'; if (el.dataset.act === 'bot-assign' && el.value) API.me('tg_assign', el.dataset.chat, el.value).then(s => { BS = s; toast('رُبطت المجموعة ✓'); boot(true); }).catch(x => toast(x.message, 'err')); if ((el.id === 'f-d' || el.id === 'f-rep-until') && F) { readF(); drawAct(true); } });
 document.addEventListener('input', e => {
   const el = e.target;
   if (el.dataset.act === 'tblq') { TB.q = el.value; clearTimeout(TB.t); TB.t = setTimeout(() => { const pos = el.selectionStart; render(); const n = $('[data-act="tblq"]'); if (n) { n.focus(); n.selectionStart = n.selectionEnd = pos; } }, 180); }

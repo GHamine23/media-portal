@@ -50,7 +50,7 @@ function apiFns_() {
   return {
     info: info, login: login,
     boot: boot, revs: revs, plan: plan, pass: pass,
-    act_save: act_save, act_del: act_del,
+    act_save: act_save, act_del: act_del, act_series: act_series,
     day_save: day_save, sem_put: sem_put, sem_import: sem_import, sem_del: sem_del,
     track_save: track_save, settings_save: settings_save, log_list: log_list,
     acc_list: acc_list, acc_save: acc_save, acc_reset: acc_reset, acc_del: acc_del,
@@ -431,14 +431,27 @@ function cleanAct_(o, old) {
   if ('who' in o) x.who = (Array.isArray(o.who) ? o.who : []).map(function (w) { return txt_(w, 40); }).filter(String).slice(0, 10);
   if ('done' in o) x.done = !!o.done;
   if ('rem' in o) { if (o.rem === null || o.rem === undefined || o.rem === '') delete x.rem; else x.rem = !!o.rem; }
+  if ('rp' in o) { var rp = cleanRp_(o.rp); if (rp) x.rp = rp; else delete x.rp; }
   if ('note' in o) x.note = txt_(o.note, 1500);
   if ('link' in o) x.link = txt_(o.link, 500);
   x.upd = now_();
   return x;
 }
+// إعداد التذكير لكل نشاط: des يحتاج تصميم إعلان (تذكير التصميم قبله بثلاثة أيام، والنشر قبله بيوم)،
+// d2 قبله بيومين، d1 قبله بيوم، d0 يوم الموعد (قبله بساعة إن كان له وقت). ما لم يُحدَّد يأخذ الافتراضي.
+function cleanRp_(o) {
+  if (!o || typeof o !== 'object') return null;
+  var r = {}; ['des', 'd2', 'd1', 'd0'].forEach(function (k) { if (k in o && o[k] !== null && o[k] !== undefined) r[k] = !!o[k]; });
+  return Object.keys(r).length ? r : null;
+}
+var DESIGN_TYPES = ['لقاء', 'استضافة', 'مسابقة', 'تحدٍّ'];
+function remCfg_(x) {
+  var r = x.rp || {};
+  return { des: 'des' in r ? r.des : DESIGN_TYPES.indexOf(x.type) >= 0, d2: !!r.d2, d1: 'd1' in r ? r.d1 : true, d0: 'd0' in r ? r.d0 : true };
+}
 var FOLLOW_FIELDS = ['id', 'done', 'note', 'link'];
 // ما يعدّله الفريق في نشاط قائم ولو كان تعديل الخطة مغلقًا (ويصل الإدارةَ تنبيه به)
-var ADJUST_FIELDS = ['id', 'title', 'type', 'd', 'time', 'dur', 'who', 'idea', 'rem', 'sem', 'done', 'note', 'link'];
+var ADJUST_FIELDS = ['id', 'title', 'type', 'd', 'time', 'dur', 'who', 'idea', 'rem', 'rp', 'sem', 'done', 'note', 'link'];
 /* تنبيهات الإدارة: alerts.json [{id, at, t, by, kind: move|who|edit|del|add, title, from, to, seen}] */
 function alertOf_(a, tid, old, x) {
   if (a.role === 'admin') return null;
@@ -485,7 +498,7 @@ function act_save(token, tid, json) {
     if (o.id) p.acts.forEach(function (x, k) { if (x.id === o.id) i = k; });
     if (o.id && i < 0) throw new Error('النشاط غير موجود (ربما حُذف)');
     var old = i >= 0 ? p.acts[i] : null;
-    var calOn = o.calOn; delete o.calOn;
+    var calOn = o.calOn, scope = o.scope; delete o.calOn; delete o.scope;
     if (!full) {
       if (!old) throw new Error('إضافة الأنشطة مغلقة، ويفتحها المدير العام');
       var f = {}; ADJUST_FIELDS.forEach(function (k) { if (k in o) f[k] = o[k]; }); o = f;
@@ -503,37 +516,110 @@ function act_save(token, tid, json) {
     }
     if (old && x.meet && x.meet.space && (old.who || []).join() !== (x.who || []).join()) meetSync_(t, x, s);
     if (old) p.acts[i] = x; else p.acts.push(x);
+    // نشاط متكرر: «هذا وما بعده» ينقل التغيير نفسه إلى المواعيد اللاحقة من السلسلة
+    var others = [];
+    if (old && old.ser && scope === 'next') others = seriesApply_(p, t, s, old, x);
     savePlan_(tid, p);
     var what = !old ? 'أضاف نشاطاً' : old.d !== x.d || (old.time || '') !== (x.time || '') ? 'غيّر موعد نشاط' : (old.who || []).join() !== (x.who || []).join() ? 'غيّر القائم على نشاط' : old.done !== x.done ? (x.done ? 'أتمّ نشاطاً' : 'أعاد نشاطاً إلى الخطة') : al ? 'عدّل نشاطاً' : 'تابع نشاطاً';
-    log_(a, tid, what, x.title);
+    log_(a, tid, what, x.title + (others.length ? ' (وما بعده: ' + apptText_(others.length) + ')' : ''));
+    if (al && others.length) al.title += ' — ومعه ' + apptText_(others.length) + ' بعده من السلسلة';
     if (al) pushAlert_(a, t, al);
-    return { act: x, rev: p.rev, calErr: calErr, notice: notice, alert: al && al.kind !== 'add' ? alertHtml_(al, t, a.name) : '' };
+    return { act: x, others: others, rev: p.rev, calErr: calErr, notice: notice, alert: al && al.kind !== 'add' ? alertHtml_(al, t, a.name) : '' };
   });
   if (res.notice && t.chat && t.chat.id) { try { tgSend_(t.chat.id, res.notice, tid, true); } catch (e) {} }
   if (res.alert) adminTgHtml_(res.alert);
   delete res.notice; delete res.alert;
   return JSON.stringify(res);
 }
-function act_del(token, tid, id) {
+// scope = 'next': يحذف هذا الموعد وما بعده من النشاط المتكرر
+function act_del(token, tid, id, scope) {
   var a = auth_(token), t = trackOf_(tid), s = cfg_();
   canEdit_(a, tid);
   var res = withLock_(function () {
-    var p = plan_(tid), x = null;
-    p.acts = p.acts.filter(function (y) { if (y.id === id) { x = y; return false; } return true; });
+    var p = plan_(tid), x = p.acts.filter(function (y) { return y.id === id; })[0];
     if (!x) throw new Error('النشاط غير موجود');
-    if (x.cal && x.cal.id) { try { calRemove_(x); } catch (e) {} }
+    var gone = p.acts.filter(function (y) { return y.id === id || (scope === 'next' && x.ser && y.ser === x.ser && y.d > x.d); });
+    p.acts = p.acts.filter(function (y) { return gone.indexOf(y) < 0; });
+    gone.forEach(function (y) { if (y.cal && y.cal.id) { try { calRemove_(y); } catch (e) {} } });
+    if (x.ser && p.series && p.series[x.ser] && !p.acts.some(function (y) { return y.ser === x.ser; })) delete p.series[x.ser];
     savePlan_(tid, p);
-    log_(a, tid, 'حذف نشاطاً', x.title);
-    var al = alertOf_(a, tid, x, null); if (al) pushAlert_(a, t, al);
+    log_(a, tid, gone.length > 1 ? 'حذف مواعيد من نشاط متكرر' : 'حذف نشاطاً', x.title + (gone.length > 1 ? ' (' + apptText_(gone.length) + ')' : ''));
+    var al = alertOf_(a, tid, x, null); if (al && gone.length > 1) al.title += ' — و' + apptText_(gone.length - 1) + ' بعده من السلسلة';
+    if (al) pushAlert_(a, t, al);
     var alertTxt = al ? alertHtml_(al, t, a.name) : '';
     var notice = '', left = dayDiff_(x.d, today_());
     if (remindable_(x, s) && s.notifyChanges && left >= 0 && left <= 14 && !x.done) notice = noticeHtml_(x, null, t);
-    return { rev: p.rev, act: x, notice: notice, alert: alertTxt };
+    return { rev: p.rev, act: x, ids: gone.map(function (y) { return y.id; }), notice: notice, alert: alertTxt };
   });
   if (res.notice && t.chat && t.chat.id) { try { tgSend_(t.chat.id, res.notice, tid, true); } catch (e) {} }
   if (res.alert) adminTgHtml_(res.alert);
   delete res.notice; delete res.alert;
   return JSON.stringify(res);
+}
+
+/* النشاط المتكرر: مواعيد مستقلة (لكل منها تذكيراته ورابط ميت وحدث تقويم) تجمعها سلسلة واحدة ser.
+   json = {base: حقول النشاط, dates: [YYYY-MM-DD...], from: معرّف نشاط قائم يصير أول السلسلة (اختياري),
+           rule: {every: 1|2|4, wd: [٠=السبت..], until}, calOn} */
+var SERIES_MAX = 60;
+function act_series(token, tid, json) {
+  var a = auth_(token), o = JSON.parse(json), t = trackOf_(tid), s = cfg_();
+  canView_(a, tid);
+  if (a.role !== 'admin' && !t.canEdit) throw new Error('إضافة الأنشطة مغلقة، ويفتحها المدير العام');
+  var dates = (o.dates || []).filter(isIso_).filter(function (d, i, arr) { return arr.indexOf(d) === i; }).sort();
+  if (!dates.length) throw new Error('لا مواعيد للتكرار');
+  if (dates.length > SERIES_MAX) throw new Error('أقصى التكرار ' + SERIES_MAX + ' موعدًا');
+  var rule = o.rule || {}, every = [1, 2, 4].indexOf(+rule.every) >= 0 ? +rule.every : 1;
+  var res = withLock_(function () {
+    var p = plan_(tid), sid = 's' + uid_(), base = o.base || {}, made = [], calErr = '', first = null;
+    if (o.from) {
+      first = p.acts.filter(function (y) { return y.id === o.from; })[0];
+      if (!first) throw new Error('النشاط غير موجود (ربما حُذف)');
+      if (first.ser) throw new Error('هذا النشاط متكرر من قبل');
+      first.ser = sid;
+      dates = dates.filter(function (d) { return d !== first.d; });
+      base = { title: first.title, type: first.type, time: first.time || '', dur: first.dur || 0, who: first.who || [], idea: first.idea || '', rem: first.rem, rp: first.rp || null };
+    }
+    dates.forEach(function (d) {
+      var f = {}; ['title', 'type', 'time', 'dur', 'who', 'idea', 'rem', 'rp'].forEach(function (k) { if (k in base) f[k] = base[k]; });
+      f.d = d; var x = cleanAct_(f, null);
+      x.by = a.name; x.ser = sid; x.sem = semOf_(p, d) || String(t.cur || '');
+      if (a.role === 'admin' && (o.calOn === true || (first && first.cal && first.cal.id))) { try { calUpsert_(t, x, s); } catch (e) { calErr = e.message; if (x.cal) x.cal.err = calErr; } }
+      p.acts.push(x); made.push(x);
+    });
+    p.series = p.series || {};
+    p.series[sid] = { every: every, wd: (rule.wd || []).map(Number).filter(function (n) { return n >= 0 && n < 7; }), until: isIso_(rule.until) ? rule.until : '', at: now_(), by: a.name };
+    savePlan_(tid, p);
+    var n = made.length + (first ? 1 : 0), title = (first || made[0]).title;
+    log_(a, tid, 'أضاف نشاطًا متكررًا', title + ' (' + apptText_(n) + ')');
+    var al = a.role === 'admin' ? null : { kind: 'add', aid: (first || made[0]).id, title: title, from: '', to: seriesText_(p.series[sid], n) };
+    if (al) pushAlert_(a, t, al);
+    return { acts: made, first: first, series: p.series[sid], sid: sid, rev: p.rev, calErr: calErr, alert: al ? alertHtml_(al, t, a.name) : '' };
+  });
+  if (res.alert) adminTgHtml_(res.alert);
+  delete res.alert;
+  return JSON.stringify(res);
+}
+function semOf_(p, d) { for (var k in p.sems) { var S = p.sems[k]; if (S && S.start <= d && d <= S.end) return k; } return ''; }
+function seriesText_(r, n) {
+  var ev = r.every === 2 ? 'كل أسبوعين' : r.every === 4 ? 'كل أربعة أسابيع' : 'كل أسبوع';
+  var days = (r.wd || []).map(function (i) { return DAYS[i]; }).join(' و');
+  return ev + (days ? ' يوم ' + days : '') + '، ' + apptText_(n) + (r.until ? ' حتى ' + dayText_(r.until) : '');
+}
+// ينقل تغيير موعد من السلسلة إلى ما بعده: الحقول المتغيّرة تُنسخ، وتغيّر اليوم يُزاح بالفرق نفسه
+function seriesApply_(p, t, s, old, x) {
+  var f = {}, shift = dayDiff_(x.d, old.d), out = [];
+  ['title', 'type', 'time', 'dur', 'idea', 'rem', 'rp'].forEach(function (k) { if (JSON.stringify(old[k]) !== JSON.stringify(x[k])) f[k] = x[k] === undefined ? null : x[k]; });
+  if ((old.who || []).join() !== (x.who || []).join()) f.who = x.who;
+  if (!Object.keys(f).length && !shift) return out;
+  p.acts.forEach(function (y, k) {
+    if (y.id === x.id || y.ser !== old.ser || y.d <= old.d) return;
+    var g = JSON.parse(JSON.stringify(f)); if (shift) g.d = addDays_(y.d, shift);
+    var z = cleanAct_(g, y);
+    if (z.cal && z.cal.id && z.cal.sig !== calSig_(t, z)) { try { calUpsert_(t, z, s); } catch (e) { if (z.cal) z.cal.err = e.message; } }
+    if (z.meet && z.meet.space && f.who) { try { meetSync_(t, z, s); } catch (e) {} }
+    p.acts[k] = z; out.push(z);
+  });
+  return out;
 }
 
 /* ================= جدول الفصل ================= */
@@ -719,13 +805,10 @@ function dayDiff_(a, b) { return Math.round((U_(a) - U_(b)) / 864e5); }
 function addDays_(s, n) { return new Date(U_(s) + n * 864e5).toISOString().slice(0, 10); }
 function wd_(s) { return (new Date(U_(s)).getUTCDay() + 1) % 7; }   // ٠ = السبت
 function dayText_(s) { return DAYS[wd_(s)] + ' ' + (+s.slice(8, 10)) + ' ' + MONTHS[+s.slice(5, 7) - 1]; }
-function timeText_(t) {
-  if (!t) return '';
-  var h = +t.slice(0, 2), m = t.slice(3, 5), pm = h >= 12, h12 = h % 12 || 12;
-  return h12 + ':' + m + (pm ? ' م' : ' ص');
-}
+function timeText_(t) { return t ? String(t).slice(0, 5) : ''; }   // نظام ٢٤ ساعة (21:00)
 function whenText_(x) { return dayText_(x.d) + (x.time ? ' الساعة ' + timeText_(x.time) : ''); }
 function leftText_(n) { return n === 0 ? 'اليوم' : n === 1 ? 'غدًا' : n === 2 ? 'بعد يومين' : 'بعد ' + n + ' أيام'; }
+function apptText_(n) { return n === 1 ? 'موعد واحد' : n === 2 ? 'موعدان' : n <= 10 ? n + ' مواعيد' : n + ' موعدًا'; }
 function countText_(n) { return n === 1 ? 'نشاط واحد' : n === 2 ? 'نشاطان' : n <= 10 ? n + ' أنشطة' : n + ' نشاطاً'; }
 function remindable_(x, s) { if (x.rem === true) return true; if (x.rem === false) return false; return (s.remindTypes || []).indexOf(x.type) >= 0; }
 function remindText_(tpl, x, t, left) {
@@ -785,6 +868,7 @@ function weekTasks_(t, p, ws, s) {
   acts.forEach(function (x) {
     if (x.done || !remindable_(x, s)) return;
     var d3 = addDays_(x.d, -3), d1 = addDays_(x.d, -1), sent = x.sent || {};
+    if (!remCfg_(x).des) return;
     if (d3 >= ws && d3 <= we && sent.d3 !== x.d) out.push({ k: 'design', d: d3, ref: x.id, text: 'تصميم إعلان ' + q_(x.title) + ' وإعداده' });
     if (d1 >= ws && d1 <= we && sent.d1 !== x.d) out.push({ k: 'publish', d: d1, ref: x.id, text: 'نشر إعلان ' + q_(x.title) + '' });
   });
@@ -928,7 +1012,8 @@ function siteLink_(hash, label) { return '<a href="' + SITE_URL + hash + '">' + 
 function whoLine_(x) { return (x.who && x.who.length) ? '• المسؤول: ' + h_(x.who.join('، ')) : '• المسؤول: <b>لم يُحدَّد بعد</b>، فحدّدوه في المنصة اليوم'; }
 // تذكيرا اللقاء: d3 تصميم الإعلان وإعداده، d1 نشره
 function remindHtml_(kind, x, t, left, p) {
-  var T = h_(q_(x.title)), when = h_(whenText_(x)), lt = leftText_(left), day = dayOfPlan_(t, p, x.d), L = [];
+  var T = h_(q_(x.title)), when = h_(whenText_(x)), lt = leftText_(left), day = dayOfPlan_(t, p, x.d), L = [], R = remCfg_(x);
+  var isMeet = ['لقاء', 'استضافة'].indexOf(x.type) >= 0, tm = x.time ? h_(timeText_(x.time)) : '';
   if (kind === 'd3') {
     L.push('<b>' + pick_(['حان وقت إعلان ', 'لنبدأ إعلان ', 'إعلان '], x.id) + T + '</b>');
     L.push(pick_([
@@ -936,21 +1021,33 @@ function remindHtml_(kind, x, t, left, p) {
       'بقي ' + remainText_(left) + ' على ' + T + '، وهذا أنسب وقت لتصميم إعلانه وكتابة نصّه.',
       'اقترب ' + T + ' (' + lt + '). اجعلوا إعلانه يليق به: صورة واضحة، ونص قصير يشوّق الطلاب.'
     ], x.id + 'o'));
+  } else if (kind === 'd2') {
+    L.push('<b>' + pick_(['بعد غدٍ موعدنا مع ', 'يومان ويحين ', 'استعدادًا لـ'], x.id) + T + '</b>');
+    L.push(R.des ? (x.link ? 'الإعلان جاهز، فراجعوه مرة أخيرة وجهّزوا نصّ نشره.' : 'الإعلان لم يُرفع بعد. هذا وقت إتمامه، حتى يُنشر غدًا في موعده.')
+      : pick_(['بقي يومان. راجعوا ما يحتاجه النشاط من مواد وأسئلة، وتأكدوا من المسؤول عنه.', 'خطوة استعداد هادئة الآن تغني عن عجلة يوم الموعد.'], x.id + 'o'));
+  } else if (kind === 'd1') {
+    L.push('<b>' + pick_(['غدًا ', 'موعدنا غدًا مع '], x.id) + T + '</b>');
+    if (left === 0) L.push('النشاط اليوم. ذكّروا الطلاب به الآن، وتأكدوا أن كل شيء جاهز.');
+    else if (R.des) L.push(pick_(['اليوم يومُ نشر الإعلان، حتى يصل الطلاب قبل الموعد بيوم كامل.', 'وقت النشر الآن: الإعلان اليوم يعني حضورًا أوسع غدًا.', 'انشروا الإعلان اليوم في القناة ومجموعات الطلاب، فالتذكير قبل يوم يصنع الفرق.'], x.id + 'o'));
+    else L.push(pick_(['ذكّروا الطلاب به اليوم، وجهّزوا ما يحتاجه.', 'تذكير اليوم للطلاب يصنع حضور الغد.', 'غدًا الموعد: رسالة قصيرة للطلاب الآن تكفي.'], x.id + 'o'));
   } else {
-    L.push('<b>' + (left === 0 ? 'اليوم ' + T : pick_(['غدًا ', 'موعدنا غدًا مع '], x.id) + T) + '</b>');
-    L.push(left === 0 ? 'اللقاء اليوم. انشروا تذكيرًا أخيرًا قبله بساعة، وتأكدوا أن الرابط يعمل.'
-      : pick_(['اليوم يومُ نشر الإعلان، حتى يصل الطلاب قبل اللقاء بيوم كامل.', 'وقت النشر الآن: الإعلان اليوم يعني حضورًا أوسع غدًا.', 'انشروا الإعلان اليوم في القناة ومجموعات الطلاب، فالتذكير قبل يوم يصنع الفرق.'], x.id + 'o'));
+    L.push('<b>' + (x.time ? pick_(['بعد قليل: ', 'اليوم الساعة ' + tm + ': '], x.id) : 'اليوم: ') + T + '</b>');
+    L.push(isMeet ? pick_(['تأكدوا أن الرابط يعمل وأن المسؤول جاهز، وذكّروا الطلاب برسالة أخيرة.', 'دقائق ونبدأ. رسالة أخيرة للطلاب، وادخلوا قبل الموعد بقليل.', 'وفقكم الله في لقاء اليوم. ذكّروا الطلاب الآن، وابدؤوا في الوقت.'], x.id + 'o')
+      : pick_(['موعده اليوم. ذكّروا الطلاب، وتابعوا مشاركتهم.', 'اليوم يومه، فلتكن البداية في وقتها.'], x.id + 'o'));
   }
   L.push('');
   L.push('• الموعد: ' + when + ' (' + lt + ')');
   L.push(whoLine_(x));
-  if (day && day.c) L.push('• مقرر الطلاب يومها: ' + h_(day.c) + (day.q ? ' — ' + h_(day.q) : ''));
-  if (day && isLiveDay_(day)) L.push('• <b>تنبيه:</b> في هذا اليوم بث مباشر للبرنامج، فانتبهوا لتوقيت اللقاء');
+  if (day && day.c && kind !== 'd0') L.push('• مقرر الطلاب يومها: ' + h_(day.c) + (day.q ? ' — ' + h_(day.q) : ''));
+  if (day && isLiveDay_(day)) L.push('• <b>تنبيه:</b> في هذا اليوم بث مباشر للبرنامج، فانتبهوا لتوقيت النشاط');
   if (x.meet && x.meet.uri) L.push('• رابط اللقاء: ' + h_(x.meet.uri));
-  if (kind === 'd1') L.push(x.link ? '• التصميم: مرفوع في المنصة ✓ أحسنتم' : '• التصميم: لم يُرفع رابطه في النشاط بعد');
-  if (x.idea) L.push('<blockquote expandable><b>الفكرة:</b> ' + h_(x.idea) + '</blockquote>');
+  if (R.des && kind !== 'd3') L.push(x.link ? '• التصميم: مرفوع في المنصة ✓ أحسنتم' : '• التصميم: لم يُرفع رابطه في النشاط بعد');
+  if (x.idea && kind !== 'd0') L.push('<blockquote expandable><b>الفكرة:</b> ' + h_(x.idea) + '</blockquote>');
   L.push('');
-  L.push(kind === 'd3' ? 'المطلوب اليوم: تصميم الإعلان وكتابة نصّه، ثم وضع رابطه في النشاط.' : 'المطلوب اليوم: نشر الإعلان، وتذكير المسؤول بالموعد.');
+  L.push(kind === 'd3' ? 'المطلوب اليوم: تصميم الإعلان وكتابة نصّه، ثم وضع رابطه في النشاط.'
+    : kind === 'd2' ? (R.des && !x.link ? 'المطلوب اليوم: إتمام التصميم ورفع رابطه.' : 'المطلوب اليوم: الاستعداد وتأكيد المسؤول.')
+    : kind === 'd1' ? (left === 0 ? 'المطلوب الآن: تذكير الطلاب.' : R.des ? 'المطلوب اليوم: نشر الإعلان، وتذكير المسؤول بالموعد.' : 'المطلوب اليوم: تذكير الطلاب والمسؤول.')
+    : 'وبعد النشاط علّموه «تم» في المنصة، واكتبوا ملاحظة قصيرة عن الحضور.');
   L.push(siteLink_('#t/' + t.id, 'افتح خطة ' + t.name));
   return L.join('\n');
 }
@@ -1312,35 +1409,48 @@ function tg_test(token, target) {
 function remind_now(token) { var a = auth_(token); needAdmin_(a); var r = runReminders_(true); return JSON.stringify(r); }
 
 /* ---------- التذكيرات ---------- */
-// تذكير الإعداد قبل اللقاء بـ٢–٣ أيام، وتذكير النشر قبله بيوم (أو يومه إن أُضيف متأخراً)
-function dueOf_(x, today) {
-  var left = dayDiff_(x.d, today), sent = x.sent || {}, out = [];
-  if (x.done) return out;
-  if (left >= 2 && left <= 3 && sent.d3 !== x.d) out.push(['d3', left]);
-  if (left >= 0 && left <= 1 && sent.d1 !== x.d) out.push(['d1', left]);
-  return out;
+// التذكير المستحق الآن لنشاط (واحد في اليوم على الأكثر):
+// d3 التصميم قبله بثلاثة أيام (أو بيومين إن أُضيف متأخرًا)، d2 قبله بيومين، d1 قبله بيوم،
+// d0 يوم الموعد: قبله بساعة إن كان له وقت، وإلا في ساعة التذكيرات. nowMin دقائق اليوم الآن.
+function dueOf_(x, today, nowMin, s) {
+  var left = dayDiff_(x.d, today), sent = x.sent || {}, R = remCfg_(x), hourOk = nowMin >= s.remindHour * 60;
+  if (x.done || left < 0 || left > 3 || sent.last === today) return [];
+  if (left === 0) {
+    if (R.d0 && sent.d0 !== x.d) {
+      var tm = x.time ? (+x.time.slice(0, 2)) * 60 + (+x.time.slice(3, 5)) : -1;
+      if (tm >= 0 ? (nowMin >= tm - 75 && nowMin < tm + 15) : hourOk) return [['d0', 0]];
+      return [];
+    }
+    if (!R.d0 && R.d1 && sent.d1 !== x.d && hourOk) return [['d1', 0]];
+    return [];
+  }
+  if (!hourOk) return [];
+  if (left === 1) return R.d1 && sent.d1 !== x.d ? [['d1', 1]] : [];
+  if (R.des && sent.d3 !== x.d) return [['d3', left]];
+  if (left === 2 && R.d2 && sent.d2 !== x.d) return [['d2', 2]];
+  return [];
 }
 function runReminders_(force) {
   var s = cfg_(), tz = tz_(), now = new Date(), today = Utilities.formatDate(now, tz, 'yyyy-MM-dd'), hour = +Utilities.formatDate(now, tz, 'H');
   var sent = 0, errs = [];
   if (!props_().getProperty('TG_TOKEN')) return { sent: 0, errs: ['لا بوت'] };
-  if (!force && hour < s.remindHour) return { sent: 0, errs: [], wait: true };
+  var hm = Utilities.formatDate(now, tz, 'HH:mm'), nowMin = force ? 24 * 60 : (+hm.slice(0, 2)) * 60 + (+hm.slice(3, 5));
   if (s.groupsPaused) return { sent: 0, errs: [], paused: true };   // لا تُعلَّم التذكيرات مُرسلة، فتصل بعد إعادة الإرسال
   tracks_().forEach(function (t) {
     if (!t.chat || !t.chat.id || t.remind === false) return;
     var p = plan_(t.id), queue = [];
-    p.acts.forEach(function (x) { if (remindable_(x, s)) dueOf_(x, today).forEach(function (k) { queue.push([x.id, k[0], k[1]]); }); });
+    p.acts.forEach(function (x) { if (remindable_(x, s)) dueOf_(x, today, nowMin, s).forEach(function (k) { queue.push([x.id, k[0], k[1]]); }); });
     if (!queue.length) return;
     var done = [];
     queue.forEach(function (q) {
       var x = p.acts.filter(function (y) { return y.id === q[0]; })[0];
-      var ct = customTpl_(s, q[1]);
+      var ct = q[1] === 'd3' || (q[1] === 'd1' && remCfg_(x).des) ? customTpl_(s, q[1]) : '';
       try { if (ct) tgSend_(t.chat.id, remindText_(ct, x, t, q[2]), t.id); else tgSend_(t.chat.id, remindHtml_(q[1], x, t, q[2], p), t.id, true); done.push(q); sent++; }
       catch (e) { errs.push(t.name + ': ' + e.message); }
     });
     if (done.length) withLock_(function () {
       var p2 = plan_(t.id);
-      done.forEach(function (q) { p2.acts.forEach(function (y) { if (y.id === q[0]) { y.sent = y.sent || {}; y.sent[q[1]] = y.d; } }); });
+      done.forEach(function (q) { p2.acts.forEach(function (y) { if (y.id === q[0]) { y.sent = y.sent || {}; y.sent[q[1]] = y.d; y.sent.last = today; } }); });
       writeJson_('plan_' + t.id + '.json', p2);   // بلا رفع الإصدار: لا تغيير في الخطة نفسها
     });
   });
@@ -1355,9 +1465,11 @@ function upcoming_(s) {
       if (!remindable_(x, s) || x.done) return;
       var left = dayDiff_(x.d, today); if (left < 0 || left > 10) return;
       var sent = x.sent || {};
-      [['d3', 3], ['d1', 1]].forEach(function (k) {
-        var on = addDays_(x.d, -k[1]); if (k[0] === 'd3' && left < 2) return;
-        if (dayDiff_(on, today) < 0) on = today;
+      var R = remCfg_(x), ks = [];
+      if (R.des) ks.push(['d3', 3]); if (R.d2 && !(R.des && left === 2)) ks.push(['d2', 2]); if (R.d1) ks.push(['d1', 1]); if (R.d0) ks.push(['d0', 0]);
+      ks.forEach(function (k) {
+        var on = addDays_(x.d, -k[1]); if (k[0] === 'd3' && left < 2) return; if (k[0] === 'd2' && left < 2) return;
+        if (dayDiff_(on, today) < 0) { if (k[0] === 'd1' && R.d0) return; on = today; }
         out.push({ t: t.id, id: x.id, title: x.title, d: x.d, kind: k[0], on: on, sent: sent[k[0]] === x.d, linked: !!(t.chat && t.chat.id) && t.remind !== false });
       });
     });
@@ -1410,7 +1522,7 @@ function report_data(key, days) {
       id: t.id, name: t.name, full: t.full, cohort: t.cohort, age: t.age, cur: t.cur, canEdit: !!t.canEdit, members: t.members || [],
       bot: { linked: !!(t.chat && t.chat.id), group: t.chat ? t.chat.title : '', remind: t.remind !== false }, editReq: t.editReq || null,
       sem: S ? { title: S.title, start: S.start, end: S.end, days: S.days } : null,
-      acts: p.acts.map(function (x) { return { title: x.title, type: x.type, d: x.d, time: x.time || '', who: x.who || [], idea: x.idea || '', done: !!x.done, note: x.note || '', link: x.link || '', meet: (x.meet && x.meet.uri) || '', sem: x.sem, by: x.by || '', calendar: !!(x.cal && x.cal.id), calErr: x.cal && x.cal.err || '', reminders: remindable_(x, s), sent: x.sent || {} }; }),
+      acts: p.acts.map(function (x) { return { title: x.title, type: x.type, d: x.d, time: x.time || '', who: x.who || [], idea: x.idea || '', done: !!x.done, note: x.note || '', link: x.link || '', meet: (x.meet && x.meet.uri) || '', ser: x.ser || '', sem: x.sem, by: x.by || '', calendar: !!(x.cal && x.cal.id), calErr: x.cal && x.cal.err || '', reminders: remindable_(x, s) ? remCfg_(x) : false, sent: x.sent || {} }; }),
       tasks: (p.tasks || []).map(function (x) { return { title: x.title, d: x.d || '', who: x.who || [], done: !!x.done, by: x.by || '' }; }),
       weekTasks: weekTasks_(t, p, weekOf_(today), s)
     };

@@ -29,7 +29,7 @@ const IC = {
   bell: 'M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20.5a2.2 2.2 0 0 0 4 0', eye: 'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
   edit: 'M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19zM14 7l3 3', send: 'M21 3 10 14M21 3l-7 18-4-7-7-4z', refresh: 'M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7',
   alert: 'M12 4 2.5 20h19zM12 10v4.5M12 17.5h.01', copy: 'M8 8h12v12H8zM16 8V4H4v12h4', ext: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
-  flag: 'M5 21V4M5 4h11l-2 4 2 4H5', video: 'M3.5 7h11a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1zM15.5 10.5l5-3v9l-5-3', live: 'M12 13.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM8.6 15.4a4.8 4.8 0 0 1 0-6.8M15.4 8.6a4.8 4.8 0 0 1 0 6.8M5.8 18.2a8.8 8.8 0 0 1 0-12.4M18.2 5.8a8.8 8.8 0 0 1 0 12.4', down: 'm6 9 6 6 6-6', sheet: 'M5 3.5h10l4 4v13H5zM15 3.5v4h4M8.5 12h7M8.5 15.5h7',
+  flag: 'M5 21V4M5 4h11l-2 4 2 4H5', repeat: 'm17 2 4 4-4 4M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v1a4 4 0 0 1-4 4H3', video: 'M3.5 7h11a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1zM15.5 10.5l5-3v9l-5-3', live: 'M12 13.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM8.6 15.4a4.8 4.8 0 0 1 0-6.8M15.4 8.6a4.8 4.8 0 0 1 0 6.8M5.8 18.2a8.8 8.8 0 0 1 0-12.4M18.2 5.8a8.8 8.8 0 0 1 0 12.4', down: 'm6 9 6 6 6-6', sheet: 'M5 3.5h10l4 4v13H5zM15 3.5v4h4M8.5 12h7M8.5 15.5h7',
   menu: 'M4 7h16M4 12h16M4 17h16', target: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01'
 };
 const svg = (k, sw = 1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${IC[k] || k}"/></svg>`;
@@ -57,6 +57,7 @@ let TODAY = isoOf(new Date());
 const U = s => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10));
 const fromU = t => new Date(t).toISOString().slice(0, 10);
 const add = (s, n) => fromU(U(s) + n * 864e5);
+const add0 = (t, m) => { const v = Math.max(0, (+t.slice(0, 2)) * 60 + (+t.slice(3, 5)) + m); return pad(Math.floor(v / 60)) + ':' + pad(v % 60); };   // إزاحة وقت بالدقائق
 const wd = s => (new Date(U(s)).getUTCDay() + 1) % 7;       // ٠ = السبت
 const dnum = s => +s.slice(8, 10);
 const mon = s => MONTHS[+s.slice(5, 7) - 1];
@@ -84,7 +85,7 @@ function ago(ms) {
   const h = Math.round(m / 60); if (h < 24) return h === 1 ? 'قبل ساعة' : h === 2 ? 'قبل ساعتين' : h <= 10 ? `قبل ${h} ساعات` : `قبل ${h} ساعة`;
   const d = Math.round(h / 24); return d === 1 ? 'أمس' : d === 2 ? 'قبل يومين' : d <= 10 ? `قبل ${d} أيام` : `قبل ${d} يومًا`;
 }
-const timeText = t => { if (!t) return ''; const h = +t.slice(0, 2), m = t.slice(3, 5); return `${h % 12 || 12}:${m} ${h >= 12 ? 'م' : 'ص'}`; };
+const timeText = t => t ? t.slice(0, 5) : '';   // نظام ٢٤ ساعة (21:00)
 const TIMES = (() => { const a = ['']; for (let h = 6; h <= 23; h++) { a.push(pad(h) + ':00'); a.push(pad(h) + ':30'); } return a; })();
 function countAr(n, f) { // f = [مفرد، مثنى، جمع، تمييز]
   if (n === 0) return 'لا ' + f[2]; if (n === 1) return f[0] + ' واحد'; if (n === 2) return f[1];
@@ -179,6 +180,17 @@ const tcol = id => (T(id) && T(id).color) || '#888';
 const sortA = (x, y) => x.d < y.d ? -1 : x.d > y.d ? 1 : (x.time || '99').localeCompare(y.time || '99');
 const members = id => (T(id) && T(id).members) || [];
 const remindable = a => a.rem === true || (a.rem !== false && (D.remindTypes || ['لقاء', 'استضافة']).includes(a.type));
+// إعداد التذكير لكل نشاط (يطابق الخادم): des يحتاج تصميم إعلان، d2 قبله بيومين، d1 قبله بيوم، d0 يوم الموعد
+const DESIGN_T = ['لقاء', 'استضافة', 'مسابقة', 'تحدٍّ'];
+const remCfg = x => { const r = x.rp || {}; return { des: 'des' in r ? r.des : DESIGN_T.includes(x.type), d2: !!r.d2, d1: 'd1' in r ? r.d1 : true, d0: 'd0' in r ? r.d0 : true }; };
+function remPlan(x) {
+  const c = remCfg(x), L = [];
+  if (c.des) L.push({ k: 'd3', l: 'تصميم الإعلان', d: add(x.d, -3) });
+  if (c.d2) L.push({ k: 'd2', l: c.des ? 'إتمام التصميم' : 'تذكير', d: add(x.d, -2) });
+  if (c.d1) L.push({ k: 'd1', l: c.des ? 'نشر الإعلان' : 'تذكير', d: add(x.d, -1) });
+  if (c.d0) L.push({ k: 'd0', l: x.time ? 'قبل الموعد بساعة' : 'يوم الموعد', d: x.d });
+  return L;
+}
 const isLate = a => !a.done && a.d < TODAY;
 function semRange(id, n) { const ds = daysOf(id, n); return ds.length ? { from: ds[0].d, to: ds[ds.length - 1].d } : null; }
 function semFor(id, d) { const sems = planOf(id).sems; for (const k in sems) { const s = sems[k]; if (s.start <= d && d <= s.end) return k; } return null; }
@@ -456,6 +468,7 @@ async function saveAct(tid, patch, opt = {}) {
     const r = await API.me('act_save', tid, JSON.stringify(body));
     const i = p.acts.findIndex(a => a.id === (patch.id || tmp.id));
     if (i >= 0) p.acts[i] = r.act; else p.acts.push(r.act);
+    (r.others || []).forEach(o => { const k = p.acts.findIndex(a => a.id === o.id); if (k >= 0) p.acts[k] = o; });
     p.rev = r.rev; D.revs[tid] = r.rev;
     setSync('ok');
     if (r.calErr) toast('حُفظ النشاط، وتعذّر تحديث تقويم جوجل: ' + r.calErr, 'err');
@@ -467,11 +480,53 @@ async function saveAct(tid, patch, opt = {}) {
     setSync(e.net ? 'off' : 'ok'); render(); toast(e.message, 'err'); throw e;
   }
 }
-async function delAct(tid, id) {
-  const p = planOf(tid), i = p.acts.findIndex(a => a.id === id), prev = p.acts[i];
-  p.acts.splice(i, 1); render(); setSync('busy');
-  try { const r = await API.me('act_del', tid, id); p.rev = r.rev; D.revs[tid] = r.rev; setSync('ok'); toast(`حُذف ${qt(prev.title)}`); }
-  catch (e) { p.acts.splice(i, 0, prev); setSync('ok'); render(); toast(e.message, 'err'); }
+// scope = 'next': هذا الموعد وما بعده من النشاط المتكرر
+async function delAct(tid, id, scope) {
+  const p = planOf(tid), x = p.acts.find(a => a.id === id), before = p.acts.slice();
+  if (!x) return;
+  const gone = p.acts.filter(a => a.id === id || (scope === 'next' && x.ser && a.ser === x.ser && a.d > x.d));
+  p.acts = p.acts.filter(a => !gone.includes(a)); render(); setSync('busy');
+  try { const r = await API.me('act_del', tid, id, scope || ''); p.rev = r.rev; D.revs[tid] = r.rev; setSync('ok'); toast(gone.length > 1 ? `حُذف ${qt(x.title)} و${apptText(gone.length - 1)} بعده` : `حُذف ${qt(x.title)}`); }
+  catch (e) { p.acts = before; setSync('ok'); render(); toast(e.message, 'err'); }
+}
+// النشاط المتكرر: مواعيد مستقلة تجمعها سلسلة واحدة
+async function saveSeries(tid, body) {
+  setSync('busy');
+  try {
+    const r = await API.me('act_series', tid, JSON.stringify(body)), p = planOf(tid);
+    if (r.first) { const i = p.acts.findIndex(a => a.id === r.first.id); if (i >= 0) p.acts[i] = r.first; }
+    p.acts.push(...r.acts); p.series = Object.assign({}, p.series, { [r.sid]: r.series });
+    p.rev = r.rev; D.revs[tid] = r.rev; setSync('ok');
+    if (r.calErr) toast('أُضيفت المواعيد، وتعذّر بعضها في تقويم جوجل: ' + r.calErr, 'err');
+    render(); setTimeout(() => poll(true), 600);
+    return r;
+  } catch (e) { setSync(e.net ? 'off' : 'ok'); render(); toast(e.message, 'err'); throw e; }
+}
+const apptText = n => n === 1 ? 'موعد واحد' : n === 2 ? 'موعدان' : n <= 10 ? n + ' مواعيد' : n + ' موعدًا';
+const EVERY = { 1: 'كل أسبوع', 2: 'كل أسبوعين', 4: 'كل أربعة أسابيع' };
+const seriesOf = (tid, ser) => ser ? planOf(tid).acts.filter(a => a.ser === ser).sort(sortA) : [];
+function seriesText(tid, ser) {
+  const r = (planOf(tid).series || {})[ser], L = seriesOf(tid, ser);
+  if (!r) return apptText(L.length);
+  return EVERY[r.every || 1] + ((r.wd || []).length ? ' يوم ' + r.wd.map(i => DAYS[i]).join(' و') : '') + ' · ' + apptText(L.length);
+}
+// مواعيد التكرار: من يوم النشاط حتى «حتى»، في الأيام المختارة، كل N أسابيع.
+// أيام الإجازة والاختبار في جدول الفصل تُستبعد افتراضيًا، ويستطيع المستخدم إعادة أي موعد أو استبعاده
+function repDates(tid, F) {
+  const R = F.rep, start = F.d, end = R.until, out = [];
+  if (!start || !end || end < start) return out;
+  const w0 = wkStart(start);
+  for (let k = 0; add(w0, 7 * k) <= end && out.length < 80; k += R.every) {
+    R.wd.slice().sort((a, b) => a - b).forEach(i => {
+      const d = add(w0, 7 * k + i); if (d < start || d > end) return;
+      const day = dayOf(tid, semFor(tid, d) || curN(tid), d), ev = day ? (day.ev || '') + ' ' + (day.p || '') : '';
+      const reason = /إجازة/.test(ev) ? 'إجازة' : /اختبار/.test(ev) ? (day.ev || 'اختبار') : '';
+      const clash = MEET_T.includes(F.type) && d !== start ? dayMeets(tid, d, F.id).length > 0 : false;
+      const first = !F.isNew && d === start;
+      out.push({ d, reason, clash, first, on: first || (R.tog[d] ? !!reason : !reason) });
+    });
+  }
+  return out;
 }
 function moveAct(tid, id, d) {
   const a = planOf(tid).acts.find(x => x.id === id); if (!a || a.d === d) return;

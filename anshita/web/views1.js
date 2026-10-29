@@ -5,7 +5,7 @@
 /* ---------- بطاقة النشاط ---------- */
 function evChip(a, tid, o = {}) {
   const t = T(tid), drag = canAdjust(tid) && !o.noDrag && !String(a.id).startsWith('tmp'), cl = clashOf(tid, a);
-  const flags = (cl ? `<span class="cl" data-tip="${esc(cl)}">${svg('alert')}</span>` : '') + (a.meet && a.meet.uri ? `<span data-tip="له رابط ميت">${svg('video')}</span>` : '') + (a.cal && a.cal.id ? `<span data-tip="في تقويم جوجل">${svg('gcal')}</span>` : '') + (a.done ? `<span data-tip="تم التنفيذ">${svg('check')}</span>` : '');
+  const flags = (cl ? `<span class="cl" data-tip="${esc(cl)}">${svg('alert')}</span>` : '') + (a.ser ? `<span data-tip="نشاط متكرر">${svg('repeat')}</span>` : '') + (a.meet && a.meet.uri ? `<span data-tip="له رابط ميت">${svg('video')}</span>` : '') + (a.cal && a.cal.id ? `<span data-tip="في تقويم جوجل">${svg('gcal')}</span>` : '') + (a.done ? `<span data-tip="تم التنفيذ">${svg('check')}</span>` : '');
   const meta = [o.track ? `<span class="tbadge">${esc(t.name)}</span>` : '', o.big ? `<span class="ty">${esc(a.type)}</span>` : '', a.time ? `<span>${timeText(a.time)}</span>` : '', a.who && a.who.length ? `<span>${esc(a.who.join('، '))}</span>` : '', o.date ? `<span>${gDay(a.d)}</span>` : '', flags ? `<span class="flag">${flags}</span>` : ''].filter(Boolean).join('');
   return `<div class="ev ${o.track || o.tint ? 'tinted' : ''} ${o.big ? 'big' : ''} ${cl ? 'clash' : ''} ${a.done ? 'done' : ''} ${isLate(a) ? 'late' : ''} ${typeof F !== 'undefined' && F && F.dock && F.id === a.id ? 'sel' : ''}" role="button" tabindex="0" data-act="openact" data-id="${a.id}" data-track="${tid}" ${drag ? 'data-drag="1"' : ''} style="--tcol:${t.color};--tyc:${typeOf(a.type)[1]}">
     ${tile(a.type, 'sm')}<span class="tx"><span class="tt clamp2">${esc(a.title)}</span>${meta ? `<span class="mt">${meta}</span>` : ''}</span></div>`;
@@ -235,8 +235,7 @@ function teamHome(id, preview) {
       <div class="ttl">${esc(m.title)}</div>
       <div class="muted sm" style="margin-top:4px">${gDay(m.d)}${m.time ? '، الساعة ' + timeText(m.time) : ''}${m.who && m.who.length ? ' · ' + esc(m.who.join('، ')) : ''}</div>
       <div class="rtl-steps">
-        ${dd >= 2 ? `<div class="stp ${st(d3, 'd3')}"><i></i><b>تصميم الإعلان</b><span>${d3 < TODAY ? gDay(TODAY) : gDay(d3)}</span></div>` : ''}
-        <div class="stp ${st(d1, 'd1')}"><i></i><b>نشر الإعلان</b><span>${gDay(d1 < TODAY ? TODAY : d1)}</span></div>
+        ${remPlan(m).filter(x => x.k !== 'd0' && (x.d >= TODAY || sent[x.k] === m.d)).map(x => `<div class="stp ${st(x.d, x.k)}"><i></i><b>${x.l}</b><span>${gDay(x.d)}</span></div>`).join('')}
         <div class="stp big ${m.d === TODAY ? 'now' : ''}"><i></i><b>اللقاء</b><span>${gDay(m.d)}</span></div>
       </div></div>
       <div class="side-l">${m.meet && m.meet.uri ? `<a class="btn pri" href="${esc(m.meet.uri)}" target="_blank" rel="noopener">${svg('video')}ادخل اللقاء</a><button class="btn" type="button" data-act="openact" data-id="${m.id}" data-track="${id}">تفاصيل اللقاء</button>` : `<button class="btn pri" type="button" data-act="openact" data-id="${m.id}" data-track="${id}">تفاصيل اللقاء</button>`}${t.linked ? `<span class="xs faint">يصل التذكير مجموعتكم في موعده</span>` : ''}</div></div>`;
