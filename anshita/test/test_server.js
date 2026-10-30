@@ -32,6 +32,7 @@ GAS._fetch.handler = function (url, opt) {
     if (url.indexOf('/botBAD') >= 0) return { code: 401, body: JSON.stringify({ ok: false, description: 'Unauthorized' }) };
     if (m === 'getMe') return { code: 200, body: JSON.stringify({ ok: true, result: { id: 9, username: 'anshita_bot', first_name: 'بوت الأنشطة' } }) };
     if (m === 'sendPhoto') { TG.photos = (TG.photos || []).concat({ chat: String(p.chat_id), photo: typeof p.photo === 'string' ? p.photo : 'blob', caption: p.caption }); return { code: 200, body: '{"ok":true,"result":{"message_id":1}}' }; }
+    if (m === 'sendDocument') { const d = p.document; TG.docs = (TG.docs || []).concat({ chat: String(p.chat_id), name: d && d.getName ? d.getName() : '', bytes: d && d.getBytes ? d.getBytes().length : 0, caption: p.caption || '' }); return { code: 200, body: JSON.stringify({ ok: true, result: { message_id: 5, document: { file_name: d && d.getName ? d.getName() : '' } } }) }; }
     if (m === 'editMessageText') { TG.edits = (TG.edits || []).concat({ chat: String(p.chat_id), id: p.message_id, text: p.text }); return { code: 200, body: '{"ok":true,"result":true}' }; }
     if (m === 'answerCallbackQuery') { TG.answers = (TG.answers || []).concat(p.text); return { code: 200, body: '{"ok":true,"result":true}' }; }
     if (m === 'deleteWebhook' || m === 'setMyCommands') return { code: 200, body: '{"ok":true,"result":true}' };
@@ -430,6 +431,53 @@ ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.te
   call('act_save', AT, 'judhoor', JSON.stringify({ id: X.id, time: '21:00' }));
   ok(call('cards_todo', K).items.some(i => i.id === 'r:' + X.id + ':d1') || true, 'تغيير الموعد يطلب رسمًا جديدًا');
   call('act_del', AT, 'judhoor', X.id);
+}
+
+// ١٩) التحكم التفصيلي في المجموعات، وحسابات أعضاء الفريق، وإرسال ملف للإدارة
+{
+  const AT = call('login', 'admin', cred.admin).token, K = call('report_key', AT).key, chat = ctx.trackOf_('judhoor').chat.id, adm = ctx.cfg_().adminChat.id;
+  call('settings_save', AT, JSON.stringify({ groupsPaused: false, notifyChanges: true, checkins: true }));
+  ok(JSON.stringify(call('tg_status', AT).tracks.find(t => t.id === 'judhoor').send) === '{"rem":true,"ck":true,"wk":true,"al":true}', 'كل ما يُرسل مفتوح افتراضيًا');
+  call('track_save', AT, 'judhoor', JSON.stringify({ send: { rem: true, ck: false, wk: true, al: false } }));
+  const sd = call('tg_status', AT).tracks.find(t => t.id === 'judhoor').send; ok(sd.rem && !sd.ck && sd.wk && !sd.al, 'يُحفظ ما يُرسل في المجموعة');
+  try { call('track_save', call('login', 'ishraq', cred.ishraq).token, 'ishraq', JSON.stringify({ send: { rem: false }, remind: false })); } catch (e) {}
+  ok(ctx.sendOf_(ctx.trackOf_('ishraq')).rem === true && ctx.trackOf_('ishraq').remind !== false, 'الفريق لا يغيّر ما يُرسل في مجموعته');
+  NOW = Date.UTC(2027, 0, 5, 7, 0);   // الثلاثاء ٥ يناير ١٠:٠٠
+  const X = call('act_save', AT, 'judhoor', JSON.stringify({ title: 'لقاء التحكم', type: 'لقاء', d: '2027-01-06', time: '20:00', who: ['معاذ'], rp: { des: false, d1: true, d0: true } })).act;
+  TG.sent.length = 0; call('act_save', AT, 'judhoor', JSON.stringify({ id: X.id, d: '2027-01-07' }));
+  ok(!TG.sent.some(m => m.chat === chat), 'التنبيه مطفأ لهذه المجموعة: لا رسالة عند نقل اللقاء');
+  TG.sent.length = 0; ctx.tick(); NOW = Date.UTC(2027, 0, 6, 7, 30); ctx.tick();
+  ok(TG.sent.some(m => m.chat === chat && /لقاء التحكم/.test(m.text)) || (TG.photos || []).some(p => p.chat === chat), 'التذكير مفتوح فيصل');
+  TG.sent.length = 0; NOW = Date.UTC(2027, 0, 7, 20, 0); ctx.tick();
+  ok(!TG.sent.some(m => m.chat === chat && /هل أُقيم/.test(m.text)), 'سؤال «هل تم؟» مطفأ لهذه المجموعة');
+  call('track_save', AT, 'judhoor', JSON.stringify({ remind: false }));
+  TG.sent.length = 0; ok(ctx.tgSend_(chat, 'تجربة').skipped === true && !TG.sent.length, 'المفتاح الرئيسي مطفأ: لا شيء يصل المجموعة');
+  ok(!ctx.tgSend_(adm, 'للإدارة').skipped, 'محادثة الإدارة لا تتأثر');
+  call('track_save', AT, 'judhoor', JSON.stringify({ remind: true, send: { rem: true, ck: true, wk: true, al: true } }));
+  call('act_del', AT, 'judhoor', X.id);
+  // الإرسال في مجموعة واحدة
+  call('settings_save', AT, JSON.stringify({ groupsPaused: true }));
+  const g1 = JSON.parse(ctx.groupsOnly_(['judhoor']));
+  ok(g1.on.length === 1 && !ctx.cfg_().groupsPaused && ctx.tracks_().every(t => (t.remind !== false) === (t.id === 'judhoor')), 'مجموعة واحدة مفتوحة والباقي موقوف');
+  ok(TG.sent.some(m => m.chat === adm && /وحدها/.test(m.text)), 'يصل الإدارة تأكيد بذلك');
+  ctx.tracks_().forEach(t => { if (t.id !== 'judhoor') call('track_save', AT, t.id, JSON.stringify({ remind: true })); });
+  // حسابات الأعضاء
+  call('track_save', AT, 'ishraq', JSON.stringify({ members: ['أحمد علي', 'خالد'] }));
+  TG.sent.length = 0;
+  const r1 = JSON.parse(ctx.memberAccounts_('ishraq', { 'أحمد علي': 'ahmad' }));
+  ok(r1.made.length === 2 && r1.made[0].user === 'ahmad' && r1.made[1].user === 'ishraq.2', 'حساب لكل عضو باسم مستخدم مختار أو تلقائي');
+  ok(!JSON.stringify(r1).match(/[a-z2-9]{4}-[a-z2-9]{5}/), 'كلمة المرور لا تظهر في الرد');
+  const msgs = TG.sent.filter(m => m.chat === adm); ok(msgs.length === 3 && msgs.every(m => m.html), 'رسالة عامة ثم رسالة لكل عضو في محادثة الإدارة');
+  const pw = /كلمة المرور: <code>([^<]+)<\/code>/.exec(msgs[1].text)[1];
+  const lg = call('login', 'ahmad', pw); ok(lg.me.track === 'ishraq' && lg.me.role === 'team' && lg.me.name === 'أحمد علي', 'العضو يدخل بحسابه في مساره');
+  ok(!TG.sent.some(m => m.chat !== adm), 'البيانات لا تصل غير الإدارة');
+  ok(!JSON.stringify(call('log_list', AT)).match(new RegExp(pw)), 'كلمة المرور ليست في السجل');
+  TG.sent.length = 0; const r2 = JSON.parse(ctx.memberAccounts_('ishraq', {})); ok(!r2.made.length && r2.had.length === 2, 'لا تكرار لمن له حساب');
+  // ملف للإدارة
+  const b64 = Buffer.alloc(5000, 3).toString('base64');
+  throws(() => call('report_file', 'bad', 'a.pdf', '', b64), /مفتاح/, 'الملف يحتاج مفتاح التقرير');
+  TG.docs = []; const rf = call('report_file', K, 'الملف التعريفي.pdf', '<b>الملف التعريفي</b>', b64);
+  ok(rf.sent === 1 && TG.docs.length === 1 && TG.docs[0].chat === adm && TG.docs[0].bytes === 5000 && TG.docs[0].name === 'الملف التعريفي.pdf', 'يصل الملف محادثة الإدارة وحدها');
 }
 
 if (process.env.PREVIEW) {

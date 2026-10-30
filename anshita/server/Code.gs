@@ -12,7 +12,7 @@
      وملخص أسبوعي، وتنبيه عند نقل لقاء قريب أو إلغائه.
    أول تشغيل: شغّل setup() من المحرر مرة، ثم انشر «تطبيق ويب» (يُنفَّذ باسمك، متاح لأي شخص).
    ===================================================================== */
-var VERSION = '1.0.0';
+var VERSION = '1.1.0';
 var SITE_URL = 'https://ghamine23.github.io/media-portal/anshita/';
 var DATA_DIR_NAME = 'منصة الأنشطة التربوية — البيانات';
 var SESSION_DAYS = 60;
@@ -59,7 +59,7 @@ function apiFns_() {
     tg_token: tg_token, tg_status: tg_status, tg_poll: tg_poll, tg_assign: tg_assign, tg_test: tg_test, remind_now: remind_now,
     tg_check: tg_check, edit_request: edit_request,
     ui_fonts: ui_fonts, ui_font_get: ui_font_get, font_put: font_put,
-    report_key: report_key, report_data: report_data, report_send: report_send, report_list: report_list,
+    report_key: report_key, report_data: report_data, report_send: report_send, report_file: report_file, report_list: report_list,
     alerts: alerts, alerts_seen: alerts_seen, meet_create: meet_create, meet_unlink: meet_unlink,
     login_atar: login_atar, atar_links: atar_links, atar_link: atar_link, atar_unlink: atar_unlink,
     task_save: task_save, task_del: task_del, tg_menu: tg_menu
@@ -206,6 +206,12 @@ function log_(a, tid, what, detail) {
     props_().setProperty('rev_log', String(now_()));
   } catch (e) {}
 }
+
+// التحكم التفصيلي في مجموعات الفرق (قرار أمين، ٣٠ أكتوبر): لكل مجموعة مفتاح رئيسي (t.remind) وما يُرسل فيها (t.send):
+// rem التذكيرات، ck سؤال «هل تم؟»، wk خطة الأسبوع ومهامه، al التنبيهات (نقل لقاء قريب أو إلغاؤه، واقتراح الكاهوت). وفوقها كلها الإيقاف العام groupsPaused.
+var SEND_KINDS = ['rem', 'ck', 'wk', 'al'];
+function sendOf_(t) { var o = {}, s = (t && t.send) || {}; SEND_KINDS.forEach(function (k) { o[k] = s[k] !== false; }); return o; }
+function gOn_(t, kind) { return !!(t && t.chat && t.chat.id) && t.remind !== false && (!kind || sendOf_(t)[kind]); }
 
 /* ================= الحسابات والجلسات =================
    accounts.json: { uid: {uid, user, name, role: admin|team, track, salt, hash, tv, fails, lockUntil, created, last, disabled} }
@@ -387,6 +393,63 @@ function acc_del(token, uid) {
   return withLock_(function () { var all = accs_(); if (!all[uid]) throw new Error('الحساب غير موجود'); var n = all[uid].name; delete all[uid]; writeJson_('accounts.json', all); log_(a, '', 'حذف حساباً', n); return 'ok'; });
 }
 
+/* ================= حسابات أعضاء الفريق =================
+   حساب لكل عضو في «الفريق» ليس له حساب باسمه في مساره. بيانات كل عضو تصل محادثة الإدارة مباشرة في رسالة جاهزة للتحويل إليه،
+   فلا تظهر كلمة المرور المؤقتة في الرد ولا في السجل. users: {اسم العضو: اسم المستخدم}، وإلا فاسم المسار ورقم. */
+function memberAccounts_(tid, users) {
+  var t = trackOf_(tid), s = cfg_();
+  if (!s.adminChat || !s.adminChat.id || !props_().getProperty('TG_TOKEN')) throw new Error('محادثة الإدارة غير مربوطة بالبوت');
+  users = users || {};
+  var res = withLock_(function () {
+    var all = accs_(), taken = {}, made = [], had = [];
+    Object.keys(all).forEach(function (k) { taken[norm_(all[k].user)] = 1; });
+    (t.members || []).forEach(function (m, i) {
+      var old = Object.keys(all).map(function (k) { return all[k]; }).filter(function (x) { return x.track === tid && x.role === 'team' && norm_(x.name) === norm_(m); })[0];
+      if (old) { had.push({ name: m, user: old.user }); return; }
+      var base = norm_(users[m] || (tid + '.' + (i + 1))).replace(/[^a-z0-9_.\-]/g, '') || (tid + '.' + (i + 1)), u = base, n = 2;
+      while (taken[u]) u = base + (n++);
+      var x = { uid: uid_(), created: now_(), tv: 0 }, pw = tempPass_(); setPass_(x, pw);
+      x.user = u; x.name = m; x.role = 'team'; x.track = tid; x.disabled = false;
+      all[x.uid] = x; taken[u] = 1; made.push({ name: m, user: u, pw: pw });
+    });
+    if (made.length) writeJson_('accounts.json', all);
+    return { made: made, had: had };
+  });
+  res.made.forEach(function (o) { log_(null, tid, 'أنشأ حساباً', o.name); });
+  var nm = t.full || t.name, chat = s.adminChat.id;
+  var head = '<b>حسابات أعضاء ' + h_(nm) + ' في منصة الأنشطة</b>\n' +
+    (res.made.length ? 'أُنشئ ' + accText_(res.made.length) + '. كل رسالة تحت هذه لعضو، فحوّلها له كما هي.' : 'لم يُنشأ حساب جديد.') +
+    (res.had.length ? '\nلهم حسابات من قبل: ' + res.had.map(function (o) { return h_(o.name) + ' (<code>' + h_(o.user) + '</code>)'; }).join('، ') + '.' : '');
+  tgSend_(chat, head, '', true);
+  res.made.forEach(function (o) {
+    tgSend_(chat, 'السلام عليكم أ. ' + h_(o.name) + ' 🌿\n' +
+      'هذا حسابك في <b>منصة الأنشطة التربوية</b> لمسار ' + h_(nm) + ':\n\n' +
+      'الرابط: ' + SITE_URL + '\n' +
+      'اسم المستخدم: <code>' + h_(o.user) + '</code>\n' +
+      'كلمة المرور: <code>' + h_(o.pw) + '</code>\n\n' +
+      'اضغط على اسم المستخدم أو كلمة المرور لنسخها. وبعد أول دخول غيّر كلمة المرور من «تغيير كلمة المرور» في قائمة حسابك.', '', true);
+  });
+  return JSON.stringify({ made: res.made.map(function (o) { return { name: o.name, user: o.user }; }), had: res.had });
+}
+// الإرسال في مجموعات بعينها فقط: يعيد الإرسال العام ويفتح مفتاح هذه المجموعات ويطفئ غيرها (ومنها ما لم يُربط بعد)
+function groupsOnly_(ids) {
+  var names = withLock_(function () {
+    var ts = tracks_(), on = [];
+    ts.forEach(function (t) { t.remind = ids.indexOf(t.id) >= 0; if (t.remind) on.push(t.full || t.name); });
+    writeJson_('tracks.json', ts);
+    var st = readJson_('settings.json', {}); st.groupsPaused = false; writeJson_('settings.json', st);
+    props_().setProperty('rev_meta', String(now_()));
+    return on;
+  });
+  JC = {};
+  log_(null, '', 'فتح الإرسال في مجموعة', names.join('، '));
+  adminTgHtml_('<b>عاد البوت يرسل في مجموعة ' + h_(names.join(' و')) + ' وحدها</b>\nوبقية المجموعات موقوفة. تتحكم في كل مجموعة وما يُرسل فيها من صفحة «بوت التذكيرات»:\n' + SITE_URL + '#bot');
+  return JSON.stringify({ on: names });
+}
+// تُشغَّل من المحرر (اختر الدالة ثم «تشغيل»)، ولا تصل إليها الواجهة لأنها ليست في apiFns_
+function makeIthmar2Accounts() { Logger.log(memberAccounts_('ithmar2', { 'صهيب وليد': 'suhaib', 'محمد حسين': 'm.hussein', 'يوسف عبدالبديع': 'yousef', 'محمد عبدالفتاح': 'm.abdelfattah' })); }
+function onlyIthmar2Group() { Logger.log(groupsOnly_(['ithmar2'])); }
+
 /* ================= القراءة ================= */
 function pubTrack_(t, admin) {
   var o = JSON.parse(JSON.stringify(t));
@@ -550,7 +613,7 @@ function act_save(token, tid, json) {
     if (al) pushAlert_(a, t, al);
     return { act: x, others: others, rev: p.rev, calErr: calErr, notice: notice, alert: al && al.kind !== 'add' ? alertHtml_(al, t, a.name) : '' };
   });
-  if (res.notice && t.chat && t.chat.id) { try { tgSend_(t.chat.id, res.notice, tid, true); } catch (e) {} }
+  if (res.notice && gOn_(t, 'al')) { try { tgSend_(t.chat.id, res.notice, tid, true); } catch (e) {} }
   if (res.alert) adminTgHtml_(res.alert);
   delete res.notice; delete res.alert;
   return JSON.stringify(res);
@@ -575,7 +638,7 @@ function act_del(token, tid, id, scope) {
     if (remindable_(x, s) && s.notifyChanges && left >= 0 && left <= 14 && !x.done) notice = noticeHtml_(x, null, t);
     return { rev: p.rev, act: x, ids: gone.map(function (y) { return y.id; }), notice: notice, alert: alertTxt };
   });
-  if (res.notice && t.chat && t.chat.id) { try { tgSend_(t.chat.id, res.notice, tid, true); } catch (e) {} }
+  if (res.notice && gOn_(t, 'al')) { try { tgSend_(t.chat.id, res.notice, tid, true); } catch (e) {} }
   if (res.alert) adminTgHtml_(res.alert);
   delete res.notice; delete res.alert;
   return JSON.stringify(res);
@@ -801,6 +864,7 @@ function track_save(token, tid, json) {
       if ('sems' in o) t.sems = Math.max(1, Math.min(12, Math.round(+o.sems || 1)));
       if ('canEdit' in o) { t.canEdit = !!o.canEdit; delete t.editReq; }
       if ('remind' in o) t.remind = !!o.remind;
+      if ('send' in o && o.send) { var sd = {}; SEND_KINDS.forEach(function (k) { sd[k] = o.send[k] !== false; }); t.send = sd; }
       if ('calColor' in o) t.calColor = String(o.calColor || '').slice(0, 2);
     }
     writeJson_('tracks.json', ts);
@@ -866,6 +930,7 @@ function timeText_(t) { return t ? String(t).slice(0, 5) : ''; }   // نظام �
 function whenText_(x) { return dayText_(x.d) + (x.time ? ' الساعة ' + timeText_(x.time) : ''); }
 function leftText_(n) { return n === 0 ? 'اليوم' : n === 1 ? 'غدًا' : n === 2 ? 'بعد يومين' : 'بعد ' + n + ' أيام'; }
 function apptText_(n) { return n === 1 ? 'موعد واحد' : n === 2 ? 'موعدان' : n <= 10 ? n + ' مواعيد' : n + ' موعدًا'; }
+function accText_(n) { return n === 1 ? 'حساب واحد' : n === 2 ? 'حسابان' : n <= 10 ? n + ' حسابات' : n + ' حسابًا'; }
 function countText_(n) { return n === 1 ? 'نشاط واحد' : n === 2 ? 'نشاطان' : n <= 10 ? n + ' أنشطة' : n + ' نشاطاً'; }
 function remindable_(x, s) { if (x.rem === true) return true; if (x.rem === false) return false; return (s.remindTypes || []).indexOf(x.type) >= 0; }
 function remindText_(tpl, x, t, left) {
@@ -1308,9 +1373,14 @@ function tgCall_(method, payload, tok) {
   return j.result;
 }
 // يرسل نصاً، ويتابع انتقال المجموعة إلى «مجموعة خارقة» (يتغير معرّفها) فيحدّث الربط
-function tgSend_(chatId, text, tid, html) {
+function groupMuted_(chatId) {   // الإيقاف العام، أو مفتاح مجموعة المسار مطفأ (محادثة الإدارة لا تُوقف)
   var s0 = cfg_();
-  if (s0.groupsPaused && !(s0.adminChat && String(s0.adminChat.id) === String(chatId))) return { skipped: true };   // الإرسال في المجموعات موقوف مؤقتًا
+  if (s0.adminChat && String(s0.adminChat.id) === String(chatId)) return false;
+  if (s0.groupsPaused) return true;
+  return tracks_().some(function (t) { return t.chat && String(t.chat.id) === String(chatId) && t.remind === false; });
+}
+function tgSend_(chatId, text, tid, html) {
+  if (groupMuted_(chatId)) return { skipped: true };
   var pay = function (id) { var o = { chat_id: String(id), text: text, disable_web_page_preview: 'true' }; if (html) o.parse_mode = 'HTML'; return o; };
   try { return tgCall_('sendMessage', pay(chatId)); }
   catch (e) {
@@ -1330,8 +1400,7 @@ function photoOf_(x) {
 }
 // يرسل صورة مع نص التذكير: النص تعليقًا إن قصر (حدّ تليجرام ١٠٢٤ حرفًا)، وإلا فالصورة ثم النص
 function tgPhoto_(chatId, ph, html, tid) {
-  var s0 = cfg_();
-  if (s0.groupsPaused && !(s0.adminChat && String(s0.adminChat.id) === String(chatId))) return { skipped: true };
+  if (groupMuted_(chatId)) return { skipped: true };
   var plain = String(html).replace(/<[^>]+>/g, ''), fits = plain.length <= 1000;
   var cap = fits ? html : String(html).split('\n')[0];
   var o = { chat_id: String(chatId), caption: cap, parse_mode: 'HTML' }; o.photo = ph.blob || ph.url;
@@ -1446,7 +1515,7 @@ function tg_check(token) {
 function tg_status(token) {
   var a = auth_(token); needAdmin_(a);
   var g = readJson_('tg.json', {}), s = cfg_(), known = g.known || {};
-  var ts = tracks_().map(function (t) { return { id: t.id, name: t.name, chat: t.chat || null, remind: t.remind !== false }; });
+  var ts = tracks_().map(function (t) { return { id: t.id, name: t.name, chat: t.chat || null, remind: t.remind !== false, send: sendOf_(t) }; });
   var map = {}; ts.forEach(function (t) { if (t.chat && t.chat.id) map[String(t.chat.id)] = t.id; });
   if (s.adminChat && s.adminChat.id) map[String(s.adminChat.id)] = 'admin';
   var chats = Object.keys(known).map(function (k) { var c = known[k]; return { id: c.id, title: c.title, type: c.type, at: c.at, left: !!c.left, to: map[String(c.id)] || '' }; })
@@ -1515,7 +1584,7 @@ function runReminders_(force) {
   var hm = Utilities.formatDate(now, tz, 'HH:mm'), nowMin = force ? 24 * 60 : (+hm.slice(0, 2)) * 60 + (+hm.slice(3, 5));
   if (s.groupsPaused) return { sent: 0, errs: [], paused: true };   // لا تُعلَّم التذكيرات مُرسلة، فتصل بعد إعادة الإرسال
   tracks_().forEach(function (t) {
-    if (!t.chat || !t.chat.id || t.remind === false) return;
+    if (!gOn_(t, 'rem')) return;
     var p = plan_(t.id), queue = [];
     p.acts.forEach(function (x) { if (remindable_(x, s)) dueOf_(x, today, nowMin, s).forEach(function (k) { queue.push([x.id, k[0], k[1]]); }); });
     if (!queue.length) return;
@@ -1550,7 +1619,7 @@ function upcoming_(s) {
       ks.forEach(function (k) {
         var on = addDays_(x.d, -k[1]); if (k[0] === 'd3' && left < 2) return; if (k[0] === 'd2' && left < 2) return;
         if (dayDiff_(on, today) < 0) { if (k[0] === 'd1' && R.d0) return; on = today; }
-        out.push({ t: t.id, id: x.id, title: x.title, d: x.d, kind: k[0], on: on, sent: sent[k[0]] === x.d, linked: !!(t.chat && t.chat.id) && t.remind !== false });
+        out.push({ t: t.id, id: x.id, title: x.title, d: x.d, kind: k[0], on: on, sent: sent[k[0]] === x.d, linked: !!(t.chat && t.chat.id), off: !!s.groupsPaused || !gOn_(t, 'rem') });
       });
     });
   });
@@ -1568,7 +1637,7 @@ function runDigests_() {
     var meet = acts.filter(function (x) { return remindable_(x, s); });
     lines.push((acts.length ? '• ' : '⚠ ') + t.name + ': ' + (acts.length ? countText_(acts.length) + (meet.length ? '، أقرب لقاء ' + dayText_(meet[0].d) : '') : 'لا أنشطة في الخطة هذا الأسبوع'));
     var wt = weekTasks_(t, p, wk, s);
-    if (!t.chat || !t.chat.id || t.remind === false || (!acts.length && !wt.length)) return;
+    if (!gOn_(t, 'wk') || (!acts.length && !wt.length)) return;
     try { var wc = cardBlob_('w:' + t.id, cardSig_(weekCardData_(t, p, wk, s))); if (wc) tgPhoto_(t.chat.id, { blob: wc }, digestHtml_(t, p, wk, s), t.id); else tgSend_(t.chat.id, digestHtml_(t, p, wk, s), t.id, true); n++; } catch (e) {}
   });
   if (s.adminTasks !== false && s.adminChat && s.adminChat.id && g.adminTasksWeek !== wk) {
@@ -1605,11 +1674,11 @@ function cards_todo(auth) {
   var wk = (dw < dd || (dw === dd && h < s.digest.hour)) ? weekOf_(today) : addDays_(weekOf_(today), 7);
   tracks_().forEach(function (t) {
     if (!A.all && t.id !== A.track) return;
-    if (!t.chat || !t.chat.id || t.remind === false) return;
+    if (!gOn_(t)) return;
     var p = plan_(t.id), w = weekCardData_(t, p, wk, s), ws = cardSig_(w);
-    if (s.digest.on && (w.acts.length || w.tasks.length) && (!idx['w:' + t.id] || idx['w:' + t.id].sig !== ws)) out.push({ id: 'w:' + t.id, sig: ws, data: w });
+    if (s.digest.on && gOn_(t, 'wk') && (w.acts.length || w.tasks.length) && (!idx['w:' + t.id] || idx['w:' + t.id].sig !== ws)) out.push({ id: 'w:' + t.id, sig: ws, data: w });
     p.acts.forEach(function (x) {
-      var left = dayDiff_(x.d, today); if (left < 0 || left > 8 || x.done || !remindable_(x, s) || x.link) return;
+      var left = dayDiff_(x.d, today); if (!gOn_(t, 'rem') || left < 0 || left > 8 || x.done || !remindable_(x, s) || x.link) return;
       var R = remCfg_(x);
       [['d1', R.d1 && R.des], ['d0', R.d0]].forEach(function (k) {
         if (!k[1]) return; var id = 'r:' + x.id + ':' + k[0], d = remCardData_(t, x, k[0]), sg = cardSig_(d);
@@ -1672,7 +1741,7 @@ function runCheckins_() {
   var nowMin = (+hm.slice(0, 2)) * 60 + (+hm.slice(3, 5)), n = 0;
   if (!props_().getProperty('TG_TOKEN') || s.groupsPaused || s.checkins === false) return 0;
   tracks_().forEach(function (t) {
-    if (!t.chat || !t.chat.id || t.remind === false) return;
+    if (!gOn_(t, 'ck')) return;
     var p = plan_(t.id), due = p.acts.filter(function (x) { return remindable_(x, s) && ckDue_(x, today, nowMin); });
     if (!due.length) return;
     var done = [];
@@ -1753,7 +1822,7 @@ function report_data(key, days) {
     var p = plan_(t.id), S = p.sems[String(t.cur)] || null;
     return {
       id: t.id, name: t.name, full: t.full, cohort: t.cohort, age: t.age, cur: t.cur, canEdit: !!t.canEdit, members: t.members || [],
-      bot: { linked: !!(t.chat && t.chat.id), group: t.chat ? t.chat.title : '', remind: t.remind !== false }, editReq: t.editReq || null,
+      bot: { linked: !!(t.chat && t.chat.id), group: t.chat ? t.chat.title : '', remind: t.remind !== false, send: sendOf_(t) }, editReq: t.editReq || null,
       sem: S ? { title: S.title, start: S.start, end: S.end, days: S.days } : null,
       acts: p.acts.map(function (x) { return { title: x.title, type: x.type, d: x.d, time: x.time || '', who: x.who || [], idea: x.idea || '', done: !!x.done, note: x.note || '', link: x.link || '', meet: (x.meet && x.meet.uri) || '', ser: x.ser || '', sem: x.sem, by: x.by || '', calendar: !!(x.cal && x.cal.id), calErr: x.cal && x.cal.err || '', reminders: remindable_(x, s) ? remCfg_(x) : false, sent: x.sent || {} }; }),
       tasks: (p.tasks || []).map(function (x) { return { title: x.title, d: x.d || '', who: x.who || [], done: !!x.done, by: x.by || '' }; }),
@@ -1789,6 +1858,22 @@ function report_send(key, title, text, tg) {
   } else err = 'لم تُربط محادثة الإدارة بالبوت بعد';
   return JSON.stringify({ id: rep.id, saved: true, sent: sent, err: err });
 }
+// يرسل ملفًا إلى محادثة الإدارة وحدها (مثل الملف التعريفي للمنصة). b64: محتوى الملف
+function report_file(key, name, caption, b64) {
+  needKey_(key);
+  var s = cfg_();
+  if (!s.adminChat || !s.adminChat.id || !props_().getProperty('TG_TOKEN')) throw new Error('لم تُربط محادثة الإدارة بالبوت بعد');
+  name = txt_(name, 120).replace(/[\\/:*?"<>|\n]/g, '') || 'ملف';
+  var bytes = Utilities.base64Decode(String(b64 || ''));
+  if (!bytes.length) throw new Error('الملف فارغ');
+  if (bytes.length > 45e6) throw new Error('الملف أكبر من حد تليجرام');
+  var mime = /\.pdf$/i.test(name) ? 'application/pdf' : /\.png$/i.test(name) ? 'image/png' : /\.jpe?g$/i.test(name) ? 'image/jpeg' : 'application/octet-stream';
+  var o = { chat_id: String(s.adminChat.id), document: Utilities.newBlob(bytes, mime, name) };
+  if (caption) { o.caption = txt_(caption, 1000); o.parse_mode = 'HTML'; }
+  var r = tgCall_('sendDocument', o);
+  log_(null, '', 'أرسل ملفًا للإدارة', name);
+  return JSON.stringify({ sent: 1, name: (r && r.document && r.document.file_name) || name, size: bytes.length });
+}
 function chunks_(t, n) {
   var out = [], cur = '';
   String(t).split('\n').forEach(function (line) {
@@ -1807,7 +1892,7 @@ function runSuggest_() {
   if (!props_().getProperty('TG_TOKEN') || hour < s.remindHour || s.groupsPaused) return 0;
   var g = readJson_('tg.json', {}), done = g.kahoot || {}, n = 0, sentKeys = [];
   tracks_().forEach(function (t) {
-    if (!t.chat || !t.chat.id || t.remind === false) return;
+    if (!gOn_(t, 'al')) return;
     var p = plan_(t.id), S = p.sems[String(t.cur)]; if (!S) return;
     (S.days || []).forEach(function (x) {
       if (!x.ev || !/اختبار/.test(x.ev)) return;

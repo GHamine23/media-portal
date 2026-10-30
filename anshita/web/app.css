@@ -543,6 +543,11 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 .steps3 li{list-style:none;display:flex;gap:12px;align-items:flex-start}
 .steps3 li::before{counter-increment:s;content:counter(s);width:28px;height:28px;border-radius:50%;background:var(--sunken);display:inline-flex;align-items:center;justify-content:center;font-family:var(--fn);font-size:13px;flex:none;color:var(--ink1)}
 .steps3{padding:0;margin:0}
+.gk{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.gk button{white-space:nowrap;display:inline-flex;align-items:center;gap:5px;font-size:13px;padding:4px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink3)}
+.gk button svg{width:14px;height:14px}
+.gk button[aria-pressed="true"]{border-color:color-mix(in srgb,var(--brand) 55%,transparent);background:color-mix(in srgb,var(--brand) 10%,transparent);color:var(--ink1)}
+.gk button.goff{opacity:.55;text-decoration:line-through}
 .ph-chips{display:flex;gap:6px;flex-wrap:wrap}
 .ph-chips button{font-size:12.5px;padding:2px 9px;border-radius:999px;background:var(--sunken);color:var(--ink2)}
 
@@ -675,7 +680,7 @@ button.dk-note:hover{filter:brightness(.97)}
 .al.k-del .tx>div:first-child{color:var(--bad)}
 @media (max-width:640px){.al{padding:12px 14px}.al-day{padding:12px 14px 4px}}
 .dragghost[data-when]::after{content:attr(data-when);display:block;margin-top:4px;font-size:12px;color:var(--brand-ink);font-family:var(--fn)}
-@media (max-width:640px){.li.botrow{flex-wrap:wrap}.li.botrow>.btn.pri{width:100%;white-space:normal;text-align:center}}
+@media (max-width:640px){.li.botrow{flex-wrap:wrap}.li.botrow>.btn.pri{width:100%;white-space:normal;text-align:center}.li.botrow>.tx{flex:1 1 calc(100% - 64px)}.li.botrow>.sw{margin-inline-start:auto}}
 
 /* ============ الجوال: أبسط وأكثر عملية ============ */
 .card.strip{padding:4px 0}
