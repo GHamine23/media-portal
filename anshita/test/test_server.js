@@ -32,6 +32,11 @@ GAS._fetch.handler = function (url, opt) {
     if (url.indexOf('/botBAD') >= 0) return { code: 401, body: JSON.stringify({ ok: false, description: 'Unauthorized' }) };
     if (m === 'getMe') return { code: 200, body: JSON.stringify({ ok: true, result: { id: 9, username: 'anshita_bot', first_name: 'بوت الأنشطة' } }) };
     if (m === 'sendPhoto') { TG.photos = (TG.photos || []).concat({ chat: String(p.chat_id), photo: typeof p.photo === 'string' ? p.photo : 'blob', caption: p.caption }); return { code: 200, body: '{"ok":true,"result":{"message_id":1}}' }; }
+    if (m === 'sendDocument' && Array.isArray(opt.payload)) { const buf = Buffer.from(opt.payload.map(x => x & 255)), txt = buf.toString('latin1'), bd = /boundary=(\S+)/.exec(opt.contentType)[1];
+      const parts = txt.split('--' + bd).filter(x => /Content-Disposition/.test(x)), get = k => { const q = parts.find(x => new RegExp('name="' + k + '"').test(x)); return q ? Buffer.from(q.split('\r\n\r\n').slice(1).join('\r\n\r\n').replace(/\r\n$/, ''), 'latin1') : null; };
+      const dp = parts.find(x => /name="document"/.test(x)), fname = Buffer.from(/filename="([^"]*)"/.exec(dp)[1], 'latin1').toString('utf8');
+      TG.docs = (TG.docs || []).concat({ chat: get('chat_id').toString(), name: fname, bytes: get('document').length, caption: (get('caption') || '').toString('utf8') });
+      return { code: 200, body: JSON.stringify({ ok: true, result: { message_id: 5, document: { file_name: fname } } }) }; }
     if (m === 'sendDocument') { const d = p.document; TG.docs = (TG.docs || []).concat({ chat: String(p.chat_id), name: d && d.getName ? d.getName() : '', bytes: d && d.getBytes ? d.getBytes().length : 0, caption: p.caption || '' }); return { code: 200, body: JSON.stringify({ ok: true, result: { message_id: 5, document: { file_name: d && d.getName ? d.getName() : '' } } }) }; }
     if (m === 'editMessageText') { TG.edits = (TG.edits || []).concat({ chat: String(p.chat_id), id: p.message_id, text: p.text }); return { code: 200, body: '{"ok":true,"result":true}' }; }
     if (m === 'answerCallbackQuery') { TG.answers = (TG.answers || []).concat(p.text); return { code: 200, body: '{"ok":true,"result":true}' }; }
@@ -477,7 +482,7 @@ ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.te
   const b64 = Buffer.alloc(5000, 3).toString('base64');
   throws(() => call('report_file', 'bad', 'a.pdf', '', b64), /مفتاح/, 'الملف يحتاج مفتاح التقرير');
   TG.docs = []; const rf = call('report_file', K, 'الملف التعريفي.pdf', '<b>الملف التعريفي</b>', b64);
-  ok(rf.sent === 1 && TG.docs.length === 1 && TG.docs[0].chat === adm && TG.docs[0].bytes === 5000 && TG.docs[0].name === 'الملف التعريفي.pdf', 'يصل الملف محادثة الإدارة وحدها');
+  ok(rf.sent === 1 && TG.docs.length === 1 && TG.docs[0].chat === adm && TG.docs[0].bytes === 5000 && TG.docs[0].name === 'الملف التعريفي.pdf' && TG.docs[0].caption === '<b>الملف التعريفي</b>' && rf.name === 'الملف التعريفي.pdf', 'يصل الملف محادثة الإدارة وحدها باسمه العربي');
 }
 
 if (process.env.PREVIEW) {

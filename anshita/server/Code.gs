@@ -12,7 +12,7 @@
      وملخص أسبوعي، وتنبيه عند نقل لقاء قريب أو إلغائه.
    أول تشغيل: شغّل setup() من المحرر مرة، ثم انشر «تطبيق ويب» (يُنفَّذ باسمك، متاح لأي شخص).
    ===================================================================== */
-var VERSION = '1.1.0';
+var VERSION = '1.1.1';
 var SITE_URL = 'https://ghamine23.github.io/media-portal/anshita/';
 var DATA_DIR_NAME = 'منصة الأنشطة التربوية — البيانات';
 var SESSION_DAYS = 60;
@@ -1868,11 +1868,21 @@ function report_file(key, name, caption, b64) {
   if (!bytes.length) throw new Error('الملف فارغ');
   if (bytes.length > 45e6) throw new Error('الملف أكبر من حد تليجرام');
   var mime = /\.pdf$/i.test(name) ? 'application/pdf' : /\.png$/i.test(name) ? 'image/png' : /\.jpe?g$/i.test(name) ? 'image/jpeg' : 'application/octet-stream';
-  var o = { chat_id: String(s.adminChat.id), document: Utilities.newBlob(bytes, mime, name) };
-  if (caption) { o.caption = txt_(caption, 1000); o.parse_mode = 'HTML'; }
-  var r = tgCall_('sendDocument', o);
+  var r = tgDoc_(s.adminChat.id, bytes, mime, name, caption ? txt_(caption, 1000) : '');
   log_(null, '', 'أرسل ملفًا للإدارة', name);
-  return JSON.stringify({ sent: 1, name: (r && r.document && r.document.file_name) || name, size: bytes.length });
+  return JSON.stringify({ sent: 1, id: r && r.message_id, name: (r && r.document && r.document.file_name) || name, size: bytes.length });
+}
+// يبني طلب multipart بنفسه ليبقى اسم الملف العربي سليمًا (UrlFetchApp يفسد الأسماء غير اللاتينية في الملفات)
+function tgDoc_(chatId, bytes, mime, name, caption) {
+  var bd = 'anshita' + uid_() + uid_(), CR = '\r\n';
+  var field = function (k, v) { return '--' + bd + CR + 'Content-Disposition: form-data; name="' + k + '"' + CR + CR + v + CR; };
+  var head = field('chat_id', String(chatId)) + (caption ? field('caption', caption) + field('parse_mode', 'HTML') : '') +
+    '--' + bd + CR + 'Content-Disposition: form-data; name="document"; filename="' + String(name).replace(/["\r\n]/g, '') + '"' + CR + 'Content-Type: ' + mime + CR + CR;
+  var body = Utilities.newBlob(head).getBytes().concat(bytes, Utilities.newBlob(CR + '--' + bd + '--' + CR).getBytes());
+  var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + tgToken_() + '/sendDocument', { method: 'post', contentType: 'multipart/form-data; boundary=' + bd, payload: body, muteHttpExceptions: true });
+  var j; try { j = JSON.parse(res.getContentText()); } catch (e) { j = { ok: false, description: 'رد غير مفهوم (' + res.getResponseCode() + ')' }; }
+  if (!j.ok) throw new Error('تليجرام: ' + (j.description || res.getResponseCode()));
+  return j.result;
 }
 function chunks_(t, n) {
   var out = [], cur = '';
