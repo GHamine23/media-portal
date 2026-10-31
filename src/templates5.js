@@ -320,3 +320,214 @@ function ntFolderPhotos(ctx, W, H, d, T, k, P, p) {
   G(ctx, 'logo'); drawLogo(ctx, T, fx + fw - 40 * u, fy + fh - 34 * u, 150 * u, onF === '#ffffff' ? '#ffffff' : 'color', 'br');
   ntInfoRow(ctx, d, fx, fx + fw, fy + fh + 90 * sv, 30 * sv, { disc: C.p, icon: '#ffffff', ink: dark ? '#ffffff' : C.ink });
 }
+
+/* ================= المرحلة الثانية: الشارة الدائرية، وعنوان على ورق الخريطة، وشهادة التخرج ================= */
+
+// نص على قوس، ويُسجَّل مستطيله ليُختار في المحرر. top: أعلى الدائرة، وإلا أسفلها
+function ntArc(ctx, str, cx, cy, r, size, color, top, role, bold) {
+  str = ntClean(str); if (!has(str)) return;
+  const span = arcSpan(ctx, str, size, r, role, bold), h = Math.min(Math.PI * 0.95, span / 2);
+  arcText(ctx, str, cx, cy, r, top ? -Math.PI / 2 : Math.PI / 2, size, color, !top, role, bold);
+  const sx = r * Math.sin(h) + size, y0 = top ? cy - r - size * 0.8 : cy + r * Math.cos(h) - size * 0.8, y1 = top ? cy - r * Math.cos(h) + size * 0.8 : cy + r + size * 0.8;
+  area(cx - sx, y0, cx + sx, y1);
+}
+// نثرات صغيرة حول المركز (روح الرسوم المطبوعة في التصاميم)، بنمط ثابت
+function ntSpecks(ctx, cx, cy, r0, r1, color, n, seed, skipBottom) {
+  const R = rng(seed || 5);
+  ctx.fillStyle = color;
+  for (let i = 0; i < n; i++) {
+    let a = R() * Math.PI * 2; if (skipBottom && Math.sin(a) > 0.35) a = -a;
+    const rr = r0 + (r1 - r0) * Math.pow(R(), 0.8), x = cx + rr * Math.cos(a), y = cy + rr * Math.sin(a), s = (2 + R() * 7) * (r1 / 230);
+    ctx.beginPath(); const k = 3 + Math.floor(R() * 3);
+    for (let j = 0; j < k; j++) { const t = j / k * Math.PI * 2 + R(), q = s * (0.5 + R() * 0.7); ctx[j ? 'lineTo' : 'moveTo'](x + q * Math.cos(t), y + q * Math.sin(t) * (0.5 + R() * 0.5)); }
+    ctx.closePath(); ctx.fill();
+  }
+}
+// نجمة رباعية صغيرة بأطراف مقعّرة (زخرفة التصاميم)
+function ntStar4(ctx, cx, cy, r, color) {
+  ctx.save(); ctx.fillStyle = color; ctx.beginPath();
+  for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 - Math.PI / 2, b = a + Math.PI / 4; ctx[i ? 'lineTo' : 'moveTo'](cx + r * Math.cos(a), cy + r * Math.sin(a)); ctx.quadraticCurveTo(cx + r * 0.22 * Math.cos(b), cy + r * 0.22 * Math.sin(b), cx + r * Math.cos(a + Math.PI / 2), cy + r * Math.sin(a + Math.PI / 2)); }
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+// بوصلة باهتة: حلقات وتدريج ووردة ثمانية
+function ntCompass(ctx, cx, cy, R, color, u) {
+  ctx.save(); ctx.strokeStyle = color; ctx.fillStyle = color;
+  [1, 0.9, 0.62].forEach(function (k, i) { ctx.lineWidth = (i ? 2 : 4) * u; ctx.beginPath(); ctx.arc(cx, cy, R * k, 0, Math.PI * 2); ctx.stroke(); });
+  for (let i = 0; i < 72; i++) { const a = i / 72 * Math.PI * 2, l = i % 9 === 0 ? 0.08 : 0.04; ctx.lineWidth = (i % 9 === 0 ? 3 : 1.5) * u; ctx.beginPath(); ctx.moveTo(cx + R * 0.9 * Math.cos(a), cy + R * 0.9 * Math.sin(a)); ctx.lineTo(cx + R * (0.9 - l) * Math.cos(a), cy + R * (0.9 - l) * Math.sin(a)); ctx.stroke(); }
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4 - Math.PI / 2, L = i % 2 ? 0.5 : 0.82, w = i % 2 ? 0.07 : 0.1;
+    [[1, 0.9], [-1, 0.45]].forEach(function (sd) {
+      ctx.globalAlpha = sd[1]; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + R * L * Math.cos(a), cy + R * L * Math.sin(a)); ctx.lineTo(cx + R * w * Math.cos(a + sd[0] * Math.PI / 2), cy + R * w * Math.sin(a + sd[0] * Math.PI / 2)); ctx.closePath(); ctx.fill();
+    });
+  }
+  ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(cx, cy, R * 0.05, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+// كرة بخطوط الطول والعرض
+function ntGlobe(ctx, cx, cy, R, color, u) {
+  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip();
+  ctx.strokeStyle = color; ctx.lineWidth = 2.2 * u;
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+  for (let i = 1; i < 6; i++) { const rx = R * Math.abs(Math.cos(i * Math.PI / 6)); ctx.beginPath(); ctx.ellipse(cx, cy, rx, R, 0, 0, Math.PI * 2); ctx.stroke(); }
+  for (let i = -4; i <= 4; i++) { const y = cy + R * Math.sin(i * Math.PI / 10); ctx.beginPath(); ctx.moveTo(cx - R, y); ctx.lineTo(cx + R, y); ctx.stroke(); }
+  ctx.restore();
+}
+const NT_ICONS = [['microphone-2', 'ميكروفون'], ['notebook', 'دفتر'], ['presentation', 'عرض'], ['book-2', 'مصحف'], ['bulb', 'فكرة'], ['pencil', 'قلم'], ['compass', 'بوصلة'], ['target', 'هدف'], ['users', 'فريق'], ['mountain', 'جبل'], ['trophy', 'كأس'], ['flag', 'راية']];
+
+TEMPLATES.push(
+
+/* ---------- ت٣. الشارة الدائرية ---------- */
+{
+  id: 'nt_emblem', type: 'cover', name: 'الشارة الدائرية', tags: 'شارة دائرة مرحلة مادة لقاء غلاف مقوس هالة شبكة أيقونة', isNew: 1, fonts: NT_FONTS,
+  sizes: ['square', 'post', 'story'],
+  variants: [{ id: 'night', name: 'ليل وهالة', sw: ['#2d4d24', '#f8f8f8', '#fbb03b'] }, { id: 'paper', name: 'ورق وشبكة', sw: ['#f8f8f8', '#2d4d24', '#fbb03b'] }],
+  colorLabels: { bg: 'لون الخلفية', title: 'لون النص المقوّس', accent: 'لون الرملي' },
+  fields: [
+    { k: 'arcTop', label: 'السطر المقوّس العلوي', def: 'المرحلة المهارية', max: 30 },
+    { k: 'arcBot', label: 'السطر المقوّس السفلي', def: 'لسان فصيح', max: 30 },
+    { k: 'img', label: 'صورة الوسط (مفرّغة الخلفية أفضل)', kind: 'image', def: '', optional: true },
+    { k: 'ic', label: 'أيقونة الوسط إن لم تضع صورة', kind: 'choice', def: 'microphone-2', options: NT_ICONS }
+  ],
+  draw: function (ctx, W, H, d, T, v, k, P) {
+    const p = ntPal(T), C = p.C, S = Math.min(W, H), u = S / 1080, paper = v === 'paper';
+    const base = OV.bg || (paper ? C.paper : p.night), dark = isDark(base);
+    const cx = W / 2, cy = H / 2 - (H > W * 1.2 ? 30 * u : 0);
+    ntGround(ctx, W, H, base, { ink: C.ink, gx: cx, gy: cy, gr: 0.32 * S / Math.max(W, H) });
+    // الهالة: قرص فاتح بحافة ناعمة
+    if (D() && !BGFX) quiet(function () {
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 300 * u);
+      g.addColorStop(0, dark ? 'rgba(255,255,255,0.13)' : alpha(C.pd, 0.07)); g.addColorStop(0.82, dark ? 'rgba(255,255,255,0.1)' : alpha(C.pd, 0.05)); g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, 300 * u, 0, Math.PI * 2); ctx.fill();
+    });
+    const txt = OV.title || (dark ? mixC(p.cream, OV.accent || p.sand, 0.25) : C.pd), sand = OV.accent || p.sand;
+    G(ctx, 'arcTop'); ntArc(ctx, d.arcTop, cx, cy, 300 * u, 50 * u * k, txt, true, 'name', 0.9);
+    G(ctx, 'arcBot'); ntArc(ctx, d.arcBot, cx, cy, 262 * u, 50 * u * k, txt, false, 'name', 0.9);
+    G(ctx, 'deco'); if (D()) { ntStar4(ctx, cx - 278 * u, cy - 145 * u, 18 * u, alpha(sand, 0.85)); ntStar4(ctx, cx + 212 * u, cy + 68 * u, 16 * u, alpha(sand, 0.85)); }
+    // الوسط: صورة المربي، وإلا قرص رملي فيه أيقونة
+    G(ctx, 'emblem');
+    const my = cy - 30 * u;
+    if (D()) ntSpecks(ctx, cx, my, 120 * u, 200 * u, alpha(dark ? p.cream : C.pd, dark ? 0.8 : 0.55), 90, 7, true);
+    if (P.img && P.img.im) {
+      const s = 250 * u; drawPhoto(ctx, P.img.im, cx - s / 2, my - s / 2, s, s, { z: P.img.z, ox: P.img.ox, oy: P.img.oy, fit: 'contain' });
+    } else {
+      ctx.beginPath(); ctx.arc(cx, my, 118 * u, 0, Math.PI * 2); ctx.fillStyle = sand; ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, my, 104 * u, 0, Math.PI * 2); ctx.strokeStyle = alpha(dark ? p.night : '#ffffff', 0.35); ctx.lineWidth = 3 * u; ctx.stroke();
+      ctx.save(); ctx.translate(cx, my); drawTIcon(ctx, d.ic || 'microphone-2', 130 * u, dark ? p.night : C.pd, 1.6); ctx.restore();
+    }
+    area(cx - 125 * u, my - 125 * u, cx + 125 * u, my + 125 * u);
+    G(ctx, 'deco'); if (D()) ntWheat(ctx, cx - 150 * u, my + 10 * u, 46 * u, dark ? p.cream : C.pd);
+    G(ctx, 'logo'); drawLogo(ctx, T, cx + 6 * u, cy + 150 * u, 300 * u, dark ? '#ffffff' : 'color', 'c');
+  }
+},
+
+/* ---------- ت٤. عنوان على ورق الخريطة ---------- */
+{
+  id: 'nt_mapcover', type: 'cover', name: 'عنوان على ورق الخريطة', tags: 'غلاف سلسلة عنوان خريطة بوصلة ورق أسئلة', isNew: 1, fonts: NT_FONTS,
+  sizes: ['square', 'post', 'story', 'yt'],
+  variants: [{ id: 'paper', name: 'ورق', sw: ['#f8f8f8', '#2d4d24', '#fbb03b'] }, { id: 'night', name: 'ليل', sw: ['#2d4d24', '#f8f8f8', '#fbb03b'] }],
+  colorLabels: { bg: 'لون الورق', title: 'لون السطر الأول', accent: 'لون السطر الثاني' },
+  fields: [
+    { k: 'title', label: 'السطر الأول', def: 'الأسئلة التثويرية', max: 34 },
+    { k: 'sub', label: 'السطر الثاني (بلون آخر)', def: 'لخارطة الثـغور', max: 34 },
+    { k: 'note', label: 'سطر صغير تحتهما (اختياري)', def: '', max: 60 }
+  ],
+  draw: function (ctx, W, H, d, T, v, k) {
+    const p = ntPal(T), C = p.C, wide = W > H * 1.3, S = Math.min(W, H), u = S / 1080, night = v === 'night';
+    const base = OV.bg || (night ? p.night : mixC(C.paper, C.warm, 0.6)), dark = isDark(base);
+    paintBg(ctx, W, H, base);
+    const deco = dark ? alpha(p.cream, 0.16) : alpha(mixC(C.a, C.ink, 0.2), 0.28);
+    if (D() && !BGFX) quiet(function () {
+      // ورق: حبيبات خفيفة
+      const R = rng(19); ctx.fillStyle = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.035)';
+      for (let i = 0; i < 1400; i++) ctx.fillRect(R() * W, R() * H, 2.2 * u, 2.2 * u);
+      ntGlobe(ctx, W - 40 * u, 60 * u, 300 * u, deco, u);
+      ntCompass(ctx, 90 * u, H - 120 * u, 230 * u, deco, u);
+    });
+    const ttl = OV.title || (dark ? '#ffffff' : C.pd), sub = OV.accent || (dark ? p.sand : p.sandInk);
+    const cw = wide ? W * 0.62 : W - 160 * u;
+    const tf = fit(ctx, ntClean(d.title), { maxW: cw, maxLines: 2, size: 104 * u * k, lh: 1.3, balance: true, bold: 0.9, title: true });
+    const sf = fit(ctx, ntClean(d.sub), { maxW: cw, maxLines: 2, size: 104 * u * k, lh: 1.3, balance: true, bold: 0.9, title: true });
+    const lgW = 340 * u, lgH = lgW * 0.5, gap1 = 90 * u, nf = has(d.note) ? 70 * u : 0;
+    const tot = lgH + gap1 + tf.h + sf.h + nf;
+    let y = Math.max(70 * u, (H - tot) / 2 - 20 * u);
+    G(ctx, 'logo'); const lg = drawLogo(ctx, T, W / 2, y, lgW, dark ? '#ffffff' : 'color', 'tc');
+    y += Math.max(lgH, lg.h || 0) + gap1;
+    G(ctx, 'title'); drawFit(ctx, tf, W / 2, y, { align: 'center', color: ttl }); y += tf.h;
+    G(ctx, 'sub'); drawFit(ctx, sf, W / 2, y, { align: 'center', color: sub }); y += sf.h;
+    G(ctx, 'note'); if (has(d.note)) line(ctx, ntClean(d.note), W / 2, y + 44 * u, { size: 36 * u, color: dark ? alpha('#ffffff', 0.8) : alpha(C.ink, 0.75), align: 'center', maxW: cw });
+  }
+},
+
+/* ---------- ت٥. شهادة تخرج ---------- */
+{
+  id: 'nt_cert', type: 'thanks', name: 'شهادة تخرج', tags: 'شهادة تخرج مسار تدريبي دورة إنجاز طالب درجة تقدير ختم طباعة', isNew: 1, fonts: NT_FONTS,
+  sizes: ['card'],
+  variants: [{ id: 'band', name: 'الشعار في الشريط', sw: ['#2d4d24', '#f8f8f8', '#fbb03b'] }, { id: 'seal', name: 'الختم المسنّن', sw: ['#2d4d24', '#fbb03b', '#f8f8f8'] }],
+  colorLabels: { bg: 'لون الشريط', title: 'لون العنوان', accent: 'لون الرملي' },
+  fields: [
+    { k: 'title', label: 'العنوان', kind: 'area', def: 'شهادة تخرّج\nمن مسار تدريبيّ', max: 40 },
+    { k: 'issuer', label: 'السطر الأول', def: 'تشهد إدارة البرنامج بأنّ الطالب', max: 60 },
+    { k: 'name', label: 'اسم الطالب', def: 'اسم الطالب', max: 40 },
+    { k: 'body', label: 'نص الشهادة', kind: 'area', def: 'قد حضر دورة إعداد المواد وتحضير الدروس، وأنجز متطلباتها من حضور اللقاءات وعمل التكليفات وتقديم مشروع التخرج.', max: 220 },
+    { k: 'grade', label: 'الدرجة والتقدير (ما بين *نجمتين* ملوّن)', def: 'وحصل في مجموع ذلك على درجة: *100* بتقدير: *ممتاز*', max: 90 },
+    { k: 'closing', label: 'نص الختام', kind: 'area', def: 'وإننا في ختام هذه الدورة نذكّره بأن يستثمر ما تعلّمه في إحسان التحضير للدروس، وإيصال رسالة الحق للناس، وإحياء منهاج النبي ﷺ.', max: 240 },
+    { k: 'signs', label: 'التاريخ والتوقيع', kind: 'toggle', def: true },
+    { k: 'date', label: 'التاريخ', def: 'حُرّرت في: 1448/4/18هـ', max: 40, half: 1 },
+    { k: 'signer', label: 'صاحب التوقيع', def: 'مدير البرنامج', max: 40, half: 1 }
+  ],
+  draw: function (ctx, W, H, d, T, v, k) {
+    const p = ntPal(T), C = p.C, U = W / 1600, u = U * 1.48;
+    const band = OV.bg || p.night, sand = OV.accent || p.sand, sandInk = OV.accent ? mixC(OV.accent, C.ink, 0.35) : p.sandInk;
+    const by = H * 0.405, light = mixC('#ffffff', C.paper, 0.5);
+    paintBg(ctx, W, H, band);
+    if (D() && !BGFX) quiet(function () {
+      ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.beginPath(); ctx.arc(-W * 0.05, -H * 0.55, W * 0.62, 0, Math.PI * 2); ctx.fill();
+    });
+    // الورقة الفاتحة بزاوية علوية مقوّسة
+    G(ctx, 'panel');
+    const r = 150 * U;
+    ctx.fillStyle = light; ctx.beginPath(); ctx.moveTo(0, H); ctx.lineTo(0, by + r); ctx.quadraticCurveTo(0, by, r, by); ctx.lineTo(W, by); ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+    if (D() && !BGFX) quiet(function () {
+      const g = ctx.createLinearGradient(W * 0.25, by, W * 0.55, H); g.addColorStop(0, 'rgba(0,0,0,0.05)'); g.addColorStop(0.5, 'rgba(255,255,255,0.4)'); g.addColorStop(1, 'rgba(0,0,0,0.04)');
+      ctx.save(); ctx.beginPath(); ctx.moveTo(0, H); ctx.lineTo(0, by + r); ctx.quadraticCurveTo(0, by, r, by); ctx.lineTo(W, by); ctx.lineTo(W, H); ctx.closePath(); ctx.clip(); ctx.fillStyle = g; ctx.fillRect(0, by, W, H - by); ctx.restore();
+    });
+    // العنوان
+    const xr = W - 110 * U;
+    const tf = fit(ctx, ntClean(d.title), { maxW: W * 0.5, maxH: by - 120 * U, size: 112 * U * k, lh: 1.15, bold: 0.85, title: true });
+    G(ctx, 'title'); drawFit(ctx, tf, xr, (by - tf.h) / 2 - 8 * U, { align: 'right', color: OV.title || '#ffffff' });
+    G(ctx, 'deco'); if (D()) xmark(ctx, xr - tf.w - 70 * U, (by - tf.h) / 2 + tf.h * 0.24, 80 * U, sand, 0.2);
+    // الشعار: في الشريط، أو داخل ختم مسنّن على حدّ الورقة
+    G(ctx, 'logo');
+    if (v === 'seal') {
+      const sx = W * 0.2, sy = by - 10 * U, R = 205 * U;
+      if (D()) { ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.2)'; ctx.shadowBlur = 20 * U; ctx.fillStyle = sand; ctx.beginPath(); for (let i = 0; i < 72; i++) { const a = i / 72 * Math.PI * 2, rr = i % 2 ? R * 0.93 : R; ctx[i ? 'lineTo' : 'moveTo'](sx + rr * Math.cos(a), sy + rr * Math.sin(a) * 0.62); } ctx.closePath(); ctx.fill(); ctx.restore(); }
+      drawLogo(ctx, T, sx, sy, 300 * U, '#ffffff', 'c');
+    } else drawLogo(ctx, T, W * 0.2, by / 2, 330 * U, '#ffffff', 'c');
+    // النصوص
+    const x0 = 120 * U, tw = xr - x0;
+    let y = by + 100 * U;
+    G(ctx, 'issuer'); if (has(d.issuer)) { line(ctx, ntClean(d.issuer), xr, y, { size: 37 * U, color: C.ink, align: 'right', bold: 0.85, role: 'name', maxW: tw }); y += 74 * U; }
+    G(ctx, 'name'); if (has(d.name)) { line(ctx, ntClean(d.name), xr - tw * 0.18, y, { size: 58 * U, color: sandInk, align: 'right', bold: 1, title: true, role: 'head', maxW: tw * 0.8 }); y += 84 * U; }
+    // حجم واحد للنصوص الثلاثة، يصغر معاً حتى تتسع فوق سطر التوقيع
+    const foot = d.signs ? 175 * U : 50 * U, room = H - foot - y - 34 * U;
+    let bs = 34 * U, bf, gf, cf;
+    for (let i = 0; i < 14; i++) {
+      bf = fit(ctx, ntClean(d.body), { maxW: tw, size: bs, min: bs, lh: 1.65, role: 'body' });
+      gf = fit(ctx, ntClean(d.grade), { maxW: tw, size: bs, lh: 1.65, role: 'body', maxLines: 1 });
+      cf = fit(ctx, ntClean(d.closing), { maxW: tw, size: bs, min: bs, lh: 1.65, role: 'body' });
+      if (bf.h + gf.h + cf.h <= room || bs < 20 * U) break;
+      bs *= 0.93;
+    }
+    G(ctx, 'body'); drawFit(ctx, bf, xr, y, { align: 'right', color: C.ink }); y += bf.h;
+    G(ctx, 'grade'); if (has(d.grade)) { drawFit(ctx, gf, xr, y, { align: 'right', color: C.ink, hl: sandInk }); y += gf.h; }
+    y += 34 * U;
+    G(ctx, 'closing'); if (has(d.closing)) drawFit(ctx, cf, xr, y, { align: 'right', color: C.ink });
+    if (d.signs) {
+      G(ctx, 'signs');
+      const fy = H - 78 * U;
+      if (has(d.date)) line(ctx, ntClean(d.date), xr, fy, { size: 26 * U, color: alpha(C.ink, 0.75), align: 'right', role: 'body' });
+      if (has(d.signer)) { line(ctx, ntClean(d.signer), x0 + 170 * U, fy - 44 * U, { size: 26 * U, color: alpha(C.ink, 0.75), align: 'center', role: 'body' }); hline(ctx, x0, x0 + 340 * U, fy + 10 * U, alpha(C.ink, 0.35), 2 * U); }
+    }
+  }
+}
+);
