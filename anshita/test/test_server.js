@@ -143,7 +143,7 @@ upd({ message: { chat: { id: -100111, title: 'فريق جذور', type: 'supergr
 upd({ message: { chat: { id: -100222, title: 'فريق مزيف', type: 'group' }, text: '/start judhoor-AAAAAAAAAA' } });
 const ck = call('tg_check', J);
 ok(ck.linked && ck.title === 'فريق جذور', 'الربط التلقائي برابط المجموعة');
-ok(TG.sent.filter(m => m.chat === '-100111').length === 1 && /تم ربط هذه المجموعة/.test(TG.sent.find(m => m.chat === '-100111').text), 'رسالة تأكيد واحدة بلا ترحيب مكرر');
+ok(!TG.sent.some(m => m.chat === '-100111' || m.chat === '-100222'), 'دخول البوت المجموعة وربطها بصمت تام: لا ترحيب ولا تأكيد');
 st = call('tg_status', A);
 ok(st.chats.find(c => c.id === '-100222').to === '', 'رمز مزوّر لا يربط');
 upd({ message: { chat: { id: 5555, first_name: 'أمين', type: 'private' }, text: '/start ' + st.adminLink.split('start=')[1] } });
@@ -153,8 +153,10 @@ ok(!TG.offsetUsed, 'المنصة تقرأ التحديثات دون حذفها �
 upd({ message: { chat: { id: 7777, first_name: 'غريب', type: 'private' }, text: '/start' } }); upd({ message: { chat: { id: 7777, first_name: 'غريب', type: 'private' }, text: 'مرحبا' } });
 call('tg_poll', A); ok(!TG.sent.some(m => m.chat === '7777'), 'البوت لا يرد في الخاص على غير الإدارة');
 { const s0 = TG.sent.length; call('tg_poll', A); ok(TG.sent.length === s0, 'لا معالجة مكررة لتحديثات قُرئت'); }
+upd({ my_chat_member: { chat: { id: -100333, title: 'قناة المسار', type: 'channel' }, new_chat_member: { status: 'administrator' } } }); call('tg_poll', A);
 st = call('tg_assign', A, '-100222', 'ishraq');
 ok(st.tracks.find(t => t.id === 'ishraq').chat.id === '-100222', 'ربط يدوي لمجموعة مكتشفة');
+ok(!TG.sent.some(m => m.chat === '-100222' || m.chat === '-100333'), 'ولا رسالة عند الربط اليدوي ولا عند إضافته لقناة');
 
 // ٦) التذكيرات: لقاء الافتتاح صار ٢ نوفمبر ٢١:٣٠
 TG.sent.length = 0;

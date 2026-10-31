@@ -12,7 +12,7 @@
      وملخص أسبوعي، وتنبيه عند نقل لقاء قريب أو إلغائه.
    أول تشغيل: شغّل setup() من المحرر مرة، ثم انشر «تطبيق ويب» (يُنفَّذ باسمك، متاح لأي شخص).
    ===================================================================== */
-var VERSION = '1.1.1';
+var VERSION = '1.2.0';
 var SITE_URL = 'https://ghamine23.github.io/media-portal/anshita/';
 var DATA_DIR_NAME = 'منصة الأنشطة التربوية — البيانات';
 var SESSION_DAYS = 60;
@@ -1588,7 +1588,7 @@ function tgPoll_() {
   var ups = tgCall_('getUpdates', { timeout: '0', limit: '100', allowed_updates: JSON.stringify(['message', 'my_chat_member', 'callback_query']) })
     .filter(function (u) { return u.update_id > last0; });
   if (!ups.length) return { n: 0 };
-  var welcome = [], migs = [], linked = [], cbs = [];
+  var migs = [], linked = [], cbs = [];
   withLock_(function () {
     var g = readJson_('tg.json', {}); g.known = g.known || {};
     var assigned = {}; tracks_().forEach(function (t) { if (t.chat && t.chat.id) assigned[String(t.chat.id)] = t.name; });
@@ -1607,7 +1607,7 @@ function tgPoll_() {
       if (u.my_chat_member) {
         var st = u.my_chat_member.new_chat_member && u.my_chat_member.new_chat_member.status;
         k.left = (st === 'left' || st === 'kicked');
-        if (!k.left && (wasLeft || !g.known[id]) && c.type !== 'private' && !assigned[id]) welcome.push([id, 'أهلاً بكم، هذا بوت منصة الأنشطة التربوية. سأرسل هنا تذكيرات اللقاءات بعد أن تربط الإدارة هذه المجموعة بمسارها من المنصة.']);
+        // دخول البوت أي مجموعة أو قناة بصمت تام (طلب أمين، ٣١ أكتوبر): لا ترحيب
       }
       g.known[id] = k;
       var sm = u.message && /^\/start(?:@\w+)?(?:\s+(\S+))?/.exec(u.message.text || '');
@@ -1625,8 +1625,8 @@ function tgPoll_() {
   });
   migs.forEach(function (p) { migrateChat_(p[0], p[1]); });
   if (linked.length) withLock_(function () { linked.forEach(function (l) { log_(null, l[2] === 'admin' ? '' : l[2], l[2] === 'admin' ? 'ربط محادثة الإدارة في تليجرام' : 'ربط مجموعة تليجرام', l[3]); }); });
-  welcome = welcome.filter(function (w) { return !linked.some(function (l) { return l[0] === w[0]; }); });
-  welcome.concat(linked).forEach(function (w) { try { tgSend_(w[0], w[1]); } catch (e) {} });
+  // ربط المجموعة بصمت كذلك (قرار أمين): يظهر في صفحة البوت بالمنصة، ويُؤكَّد ربط محادثة الإدارة الخاصة وحده
+  linked.forEach(function (w) { if (w[2] === 'admin') { try { tgSend_(w[0], w[1]); } catch (e) {} } });
   cbs.forEach(function (cq) { try { tgCallback_(cq); } catch (e) {} });
   return { n: ups.length };
 }
@@ -1690,7 +1690,7 @@ function tg_assign(token, chatId, target) {
     log_(a, target && target !== 'admin' ? target : '', l ? 'ربط مجموعة تليجرام' : 'ألغى ربط مجموعة تليجرام', c.title);
     return l;
   });
-  if (label) { try { tgSend_(chatId, linkedMsg_(label)); } catch (e) {} }
+  if (label === 'الإدارة') { try { tgSend_(chatId, linkedMsg_(label)); } catch (e) {} }   // المجموعات تُربط بصمت
   return tg_status(token);
 }
 function tg_test(token, target) {
