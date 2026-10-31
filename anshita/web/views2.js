@@ -347,7 +347,8 @@ function userMenu() {
 function passDialog() {
   openDialog(`<h3>تغيير كلمة المرور</h3>
     <div class="field"><label for="pw-o">الحالية</label><input class="inp" id="pw-o" type="password" autocomplete="current-password"></div>
-    <div class="field"><label for="pw-n">الجديدة (٦ أحرف على الأقل)</label><input class="inp" id="pw-n" type="password" autocomplete="new-password"></div>
+    <div class="field"><label for="pw-n">الجديدة (ثمانية أحرف على الأقل)</label><input class="inp" id="pw-n" type="password" autocomplete="new-password"></div>
+    ${D && D.me.linked ? `<p class="hint">${svg('check')} تسري على «أثر» أيضًا، فحسابك واحد في المنصتين.</p>` : ''}
     <div class="row"><button class="btn pri" type="button" data-act="pw-save">احفظ</button><button class="btn" type="button" data-act="close">إلغاء</button></div>`);
 }
 
@@ -528,7 +529,7 @@ VIEWS.accounts = {
     if (!AC) { API.me('acc_list').then(l => { AC = l; render(); }).catch(e => toast(e.message, 'err')); return pageHead('', 'الحسابات', '') + `<div class="card empty"><span class="spin"></span></div>`; }
     const ord = t => t ? D.tracks.findIndex(x => x.id === t) : -1;
     const rows = AC.slice().sort((a, b) => ord(a.track) - ord(b.track) || (a.created || 0) - (b.created || 0)).map(a => `<div class="li">${a.role === 'admin' ? adminAv() : T(a.track) && LOGOS[a.track] ? logoImg(a.track) : avatar(a.name, tcol(a.track))}
-      <div class="tx"><div class="tt">${esc(a.name)} ${a.disabled ? '<span class="pill warn">موقوف</span>' : ''}</div><div class="mt"><bdi>${esc(a.user)}</bdi> · ${a.role === 'admin' ? 'الإدارة: كل المسارات' : 'فريق ' + esc((T(a.track) || {}).name || a.track)} · ${a.last ? 'آخر دخول ' + ago(a.last) : 'لم يدخل بعد'}</div></div>
+      <div class="tx"><div class="tt">${esc(a.name)} ${a.disabled ? '<span class="pill warn">موقوف</span>' : ''}</div><div class="mt"><bdi>${esc(a.user)}</bdi> · ${a.role === 'admin' ? 'الإدارة: كل المسارات' : 'فريق ' + esc((T(a.track) || {}).name || a.track)} · ${a.last ? 'آخر دخول ' + ago(a.last) : 'لم يدخل بعد'}</div>${a.atar ? '' : a.linked ? `<div class="mt"><span class="pill ok">${svg('check')}مربوط بأثر</span>${a.atarSup ? ' <span class="pill">مشرف المسار في أثر</span>' : ''}${a.lkPend ? ' <span class="xs faint">· تتوحّد كلمة المرور عند أول دخول</span>' : ''}</div>` : a.lkErr ? `<div class="mt"><span class="pill warn">لم يُربط بأثر</span> <span class="xs faint">${esc(a.lkErr)}</span></div>` : ''}</div>
       <button class="btn sm ghost" type="button" data-act="acc-edit" data-id="${a.uid}">تعديل</button><button class="btn sm" type="button" data-act="acc-reset" data-id="${a.uid}">كلمة مرور جديدة</button></div>`).join('');
     return pageHead('', 'الحسابات', 'نوعان فقط: الإدارة ترى كل المسارات، والفريق يرى مساره. لكل مسار حساب، ويمكن إضافة حسابات أخرى للفريق نفسه.', `<button class="btn pri" type="button" data-act="acc-edit" data-id="">${svg('plus')}حساب</button>`) + `<div class="card"><div class="list">${rows}</div></div>`;
   }
@@ -540,6 +541,7 @@ function accEdit(uid) {
     <div class="field"><label for="ac-u">اسم المستخدم (للدخول)</label><input class="inp ltr" style="display:block;text-align:left" id="ac-u" value="${esc(a.user)}" autocomplete="off" placeholder="judhoor2"></div>
     <div class="field"><label for="ac-r">النوع</label><select class="inp" id="ac-r" data-act="ac-role"><option value="team" ${a.role !== 'admin' ? 'selected' : ''}>فريق مسار</option><option value="admin" ${a.role === 'admin' ? 'selected' : ''}>الإدارة</option></select></div>
     <div class="field" id="ac-tf" ${a.role === 'admin' ? 'hidden' : ''}><label for="ac-t">المسار</label><select class="inp" id="ac-t">${D.tracks.map(t => `<option value="${t.id}" ${a.track === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></div>
+    <div class="opt" id="ac-sf" ${a.role === 'admin' ? 'hidden' : ''}><div class="tx"><b>مشرف المسار في أثر</b><span>كل صلاحيات التصميم والنشر في مساره في أثر. وفي المنصة حسابه كحساب الفريق.</span></div><button class="sw" type="button" role="switch" aria-checked="${!!a.atarSup}" data-act="ac-sup" aria-label="مشرف المسار في أثر"></button></div>
     ${uid && uid !== D.me.uid ? `<div class="opt"><div class="tx"><b>موقوف</b><span>لا يستطيع الدخول</span></div><button class="sw" type="button" role="switch" aria-checked="${!!a.disabled}" data-act="ac-dis"></button></div>` : ''}
     <div class="row"><button class="btn pri" type="button" data-act="ac-save" data-id="${uid || ''}">احفظ</button><button class="btn" type="button" data-act="close">إلغاء</button><span class="sp"></span>${uid && uid !== D.me.uid ? `<button class="btn danger" type="button" data-act="ac-del" data-id="${uid}">حذف</button>` : ''}</div>`);
 }
@@ -757,8 +759,8 @@ const H = {
   'bs-chg': () => { BS.settings.notifyChanges = !BS.settings.notifyChanges; keepTpl(); render(); }, 'bs-adig': () => { BS.settings.adminDigest = !BS.settings.adminDigest; keepTpl(); render(); },
   'bs-ph': el => { const ta = LAST_TA && document.contains(LAST_TA) ? LAST_TA : $('#bs-d3'); const s = ta.selectionStart || ta.value.length; ta.value = ta.value.slice(0, s) + el.dataset.v + ta.value.slice(ta.selectionEnd || s); ta.focus(); ta.selectionStart = ta.selectionEnd = s + el.dataset.v.length; updTgPrev(); },
   'bs-save': botSaveSettings, tgwatch: (el, e) => tgOpen(el, e), tglink: (el, e) => tgOpen(el, e),
-  'acc-edit': el => accEdit(el.dataset.id), 'ac-dis': el => el.setAttribute('aria-checked', el.getAttribute('aria-checked') !== 'true'),
-  'ac-save': async el => { const uid = el.dataset.id, dis = $('[data-act="ac-dis"]'); const body = { uid: uid || undefined, name: $('#ac-n').value, user: $('#ac-u').value, role: $('#ac-r').value, track: $('#ac-t').value, disabled: dis ? dis.getAttribute('aria-checked') === 'true' : false };
+  'acc-edit': el => accEdit(el.dataset.id), 'ac-dis': el => el.setAttribute('aria-checked', el.getAttribute('aria-checked') !== 'true'), 'ac-sup': el => el.setAttribute('aria-checked', el.getAttribute('aria-checked') !== 'true'),
+  'ac-save': async el => { const uid = el.dataset.id, dis = $('[data-act="ac-dis"]'); const body = { uid: uid || undefined, name: $('#ac-n').value, user: $('#ac-u').value, role: $('#ac-r').value, track: $('#ac-t').value, disabled: dis ? dis.getAttribute('aria-checked') === 'true' : false, atarSup: ($('[data-act="ac-sup"]') || {}).getAttribute ? $('[data-act="ac-sup"]').getAttribute('aria-checked') === 'true' : false };
     try { const r = await API.me('acc_save', JSON.stringify(body)); AC = null; if (r.pass) showPass(r.acc.name, r.acc.user, r.pass); else { closeLayer(); toast('حُفظ الحساب'); } render(); } catch (e) { toast(e.message, 'err'); } },
   'ac-del': async el => { if (!armed(el, 'تأكيد الحذف')) return; try { await API.me('acc_del', el.dataset.id); AC = null; closeLayer(); toast('حُذف الحساب'); render(); } catch (e) { toast(e.message, 'err'); } },
   'acc-reset': async el => { if (!armed(el, 'تأكيد: يخرج الفريق من جلساته')) return; const a = AC.find(x => x.uid === el.dataset.id); try { const r = await API.me('acc_reset', a.uid); if (r.token) { TOKEN = r.token; LS.set(NS + 'tok', TOKEN); } showPass(a.name, a.user, r.pass); } catch (e) { toast(e.message, 'err'); } },
@@ -787,7 +789,7 @@ document.addEventListener('click', e => {
   if (k === 'tblq') return;
   runAct(f, el, e);
 });
-document.addEventListener('change', e => { const el = e.target; if (el.id === 'ac-r' && $('#ac-tf')) $('#ac-tf').hidden = el.value === 'admin'; if (el.dataset.act === 'bot-assign' && el.value) API.me('tg_assign', el.dataset.chat, el.value).then(s => { BS = s; toast('رُبطت المجموعة ✓'); boot(true); }).catch(x => toast(x.message, 'err')); if ((el.id === 'f-d' || el.id === 'f-rep-until') && F) { readF(); drawAct(true); } });
+document.addEventListener('change', e => { const el = e.target; if (el.id === 'ac-r' && $('#ac-tf')) { $('#ac-tf').hidden = el.value === 'admin'; if ($('#ac-sf')) $('#ac-sf').hidden = el.value === 'admin'; } if (el.dataset.act === 'bot-assign' && el.value) API.me('tg_assign', el.dataset.chat, el.value).then(s => { BS = s; toast('رُبطت المجموعة ✓'); boot(true); }).catch(x => toast(x.message, 'err')); if ((el.id === 'f-d' || el.id === 'f-rep-until') && F) { readF(); drawAct(true); } });
 document.addEventListener('input', e => {
   const el = e.target;
   if (el.dataset.act === 'tblq') { TB.q = el.value; clearTimeout(TB.t); TB.t = setTimeout(() => { const pos = el.selectionStart; render(); const n = $('[data-act="tblq"]'); if (n) { n.focus(); n.selectionStart = n.selectionEnd = pos; } }, 180); }
@@ -825,7 +827,7 @@ let MQ = isMob(), WQ = innerWidth >= WIDE_Q; addEventListener('resize', () => { 
   applyTheme();
   window.FONTS_READY = loadFonts();
   if (CFG.demo && window.DEMO) await window.DEMO.ready();
-  if (!TOKEN) { render(); return; }
+  if (!TOKEN) { render(); if (await ssoFromAtar()) boot(); return; }   // جلسة أثر على هذا الجهاز تفتح المنصة
   const c = LS.get(NS + 'boot', null);
   if (c) { setBoot(c); render(); }
   else render();

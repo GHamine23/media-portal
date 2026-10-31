@@ -120,7 +120,8 @@ function apiFns_() {
     cm_list: cm_list, cm_add: cm_add, cm_del: cm_del, cm_counts: cm_counts, nt_list: nt_list, nt_seen: nt_seen,
     rv_request: rv_request, rv_list: rv_list, rv_mine: rv_mine, rv_img: rv_img, rv_reply: rv_reply,
     me_week: me_week, wk_admin: wk_admin, ai_skills: ai_skills, ai_skill_save: ai_skill_save, ai_skill_reset: ai_skill_reset, img_requests: img_requests, img_decide: img_decide, quran_find: quran_find, hadith_find: hadith_find,
-    quiz_form: quiz_form, quiz_results: quiz_results, quiz_accept: quiz_accept
+    quiz_form: quiz_form, quiz_results: quiz_results, quiz_accept: quiz_accept,
+    link_op: link_op, link_check: link_check
   };
 }
 function doPost(e) {
@@ -206,7 +207,7 @@ function tempPass_() {
 function publicAcc_(a) {
   return { uid: a.uid, username: a.username, email: a.email || '', name: a.name, role: a.role, programs: a.programs || [], perms: a.perms || {},
     mustChange: !!a.mustChange, disabled: !!a.disabled, created: a.created, last: a.last || 0, legacy: !!a.legacyKey, note: a.note || '',
-    tracks: a.tracks || [], editLevel: a.editLevel || '', hasAvatar: !!a.hasAvatar };
+    tracks: a.tracks || [], editLevel: a.editLevel || '', hasAvatar: !!a.hasAvatar, anshita: !!a.ansUid, trackSup: !!a.linkSup };
 }
 function findAcc_(accs, id) {
   var n = normUser_(id);
@@ -245,25 +246,45 @@ function audit_(a, what, detail) {
 function auth_login(id, pw) {
   id = clip_(id, 120); pw = String(pw || '');
   if (!id || !pw) throw new Error('اكتب اسم المستخدم وكلمة المرور');
-  return withLock_(function () {
+  var st = withLock_(function () {
     var accs = readJson_('accounts.json', {}), a = findAcc_(accs, id), t = now_();
     if (!a) throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة');
     if (a.disabled) throw new Error('هذا الحساب موقوف. راجع مشرف برنامجك.');
     if (a.lockUntil && a.lockUntil > t) throw new Error('محاولات كثيرة. انتظر عشر دقائق ثم حاول مرة أخرى.');
-    if (pwHash_(a.salt, pw) !== a.hash) {
-      a.fails = (a.fails || 0) + 1;
-      if (a.fails >= 8) { a.lockUntil = t + 10 * 60 * 1000; a.fails = 0; }
-      writeJson_('accounts.json', accs);
-      throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة');
-    }
+    if (pwHash_(a.salt, pw) === a.hash && !a.pendPw) return { uid: a.uid, ok: true, push: !!(a.ansUid && a.lkPend) };
+    if (a.ansUid) return { uid: a.uid, ok: false, ask: true };   // حساب مربوط: يُسأل خادم المنصة عن كلمتها
+    linkFail_(accs, a);
+    throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة');
+  });
+  // خارج القفل: التحقق من كلمة مرور منصة الأنشطة، أو توحيد الكلمة عند أول دخول بعد الربط
+  var accs0 = readJson_('accounts.json', {}), a0 = accs0[st.uid];
+  if (st.ask) {
+    var good = false; try { good = !!linkSend_({ op: 'verify', ans: a0.ansUid, pw: pw }).ok; } catch (e) {}
+    if (!good) { withLock_(function () { var accs = readJson_('accounts.json', {}); linkFail_(accs, accs[st.uid]); }); throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة'); }
+  } else if (st.push) {
+    try { linkSend_({ op: 'pass', ans: a0.ansUid, pw: pw }); st.pushed = true; } catch (e) {}
+  }
+  return withLock_(function () {
+    var accs = readJson_('accounts.json', {}), a = accs[st.uid], t = now_();
+    if (st.ask) { a.salt = Utilities.getUuid(); a.hash = pwHash_(a.salt, pw); a.pendPw = false; a.mustChange = false; a.lkPend = false; }
+    if (st.pushed) a.lkPend = false;
     a.fails = 0; a.lockUntil = 0; a.last = t;
     writeJson_('accounts.json', accs);
-    var ss = readJson_('sessions.json', {}), tok = Utilities.getUuid() + Utilities.getUuid().slice(0, 8);
-    Object.keys(ss).forEach(function (k) { if (ss[k].e < t) delete ss[k]; });   // تنظيف المنتهي
-    ss[tok] = { u: a.uid, e: t + SESSION_DAYS * 864e5, l: t };
-    writeJson_('sessions.json', ss);
-    return JSON.stringify({ token: tok, me: meOf_(a) });
+    return JSON.stringify({ token: newSession_(a.uid), me: meOf_(a) });
   });
+}
+function linkFail_(accs, a) {
+  a.fails = (a.fails || 0) + 1;
+  if (a.fails >= 8) { a.lockUntil = now_() + 10 * 60 * 1000; a.fails = 0; }
+  writeJson_('accounts.json', accs);
+}
+// جلسة جديدة لحساب (داخل القفل)
+function newSession_(uid) {
+  var ss = readJson_('sessions.json', {}), tok = Utilities.getUuid() + Utilities.getUuid().slice(0, 8), t = now_();
+  Object.keys(ss).forEach(function (k) { if (ss[k].e < t) delete ss[k]; });   // تنظيف المنتهي
+  ss[tok] = { u: uid, e: t + SESSION_DAYS * 864e5, l: t };
+  writeJson_('sessions.json', ss);
+  return tok;
 }
 function meOf_(a) {
   var progs = progsFor_(a).map(function (p) { return { id: p.id, name: p.name, color: p.color || '', features: p.features || {} }; });
@@ -293,17 +314,28 @@ function auth_logout(token) {
 }
 function auth_password(token, oldPw, newPw) {
   var a0 = auth_(token, { allowMust: true });
-  newPw = String(newPw || '');
+  newPw = String(newPw || ''); oldPw = String(oldPw || '');
   if (newPw.length < 8) throw new Error('كلمة المرور ثمانية أحرف على الأقل');
   if (newPw === oldPw) throw new Error('اختر كلمة مرور جديدة غير المؤقتة');
-  return withLock_(function () {
+  // الحساب المربوط تُقبل فيه كلمة مرور منصة الأنشطة الحالية أيضًا (قبل توحيد الكلمتين)
+  var viaAns = false;
+  if (a0.ansUid && (a0.pendPw || pwHash_(a0.salt, oldPw) !== a0.hash)) { try { viaAns = !!linkSend_({ op: 'verify', ans: a0.ansUid, pw: oldPw }).ok; } catch (e) {} }
+  var res = withLock_(function () {
     var accs = readJson_('accounts.json', {}), a = accs[a0.uid];
-    if (pwHash_(a.salt, oldPw) !== a.hash) throw new Error('كلمة المرور الحالية غير صحيحة');
-    a.salt = Utilities.getUuid(); a.hash = pwHash_(a.salt, newPw); a.mustChange = false;
+    if (!viaAns && (a.pendPw || pwHash_(a.salt, oldPw) !== a.hash)) throw new Error('كلمة المرور الحالية غير صحيحة');
+    a.salt = Utilities.getUuid(); a.hash = pwHash_(a.salt, newPw); a.mustChange = false; a.pendPw = false;
     writeJson_('accounts.json', accs);
     audit_(a, 'غيّر كلمة مروره', a.username);
-    return JSON.stringify(meOf_(a));
+    return meOf_(a);
   });
+  linkPassOut_(a0.uid, newPw);
+  return JSON.stringify(res);
+}
+// تغيّرت كلمة مرور حساب مربوط هنا: تسري على منصة الأنشطة. وإن تعذّر الاتصال تتوحّد عند الدخول التالي
+function linkPassOut_(uid, pw) {
+  var a = readJson_('accounts.json', {})[uid]; if (!a || !a.ansUid) return;
+  var ok = false; try { linkSend_({ op: 'pass', ans: a.ansUid, pw: pw }); ok = true; } catch (e) {}
+  withLock_(function () { var accs = readJson_('accounts.json', {}); if (accs[uid]) { accs[uid].lkPend = !ok; writeJson_('accounts.json', accs); } });
 }
 function prefs_save(token, json) {
   if (String(json).length > 200000) throw new Error('التفضيلات أكبر من المسموح');
@@ -375,15 +407,17 @@ function dropSessions_(uid) { var ss = readJson_('sessions.json', {}); Object.ke
 // كلمة مرور مؤقتة جديدة لمن نسي كلمته
 function acc_reset(token, uid) {
   var me = auth_(token); needAdmin_(me);
-  return withLock_(function () {
+  var r = withLock_(function () {
     var accs = readJson_('accounts.json', {}), a = accs[uid];
     if (!a) throw new Error('الحساب غير موجود');
     if (!isSuper_(me) && (a.role === 'super' || !(a.programs || []).some(function (p) { return adminOf_(me, p); }))) throw new Error('لا تملك صلاحية على هذا الحساب');
-    var temp = tempPass_(); a.salt = Utilities.getUuid(); a.hash = pwHash_(a.salt, temp); a.mustChange = true; a.fails = 0; a.lockUntil = 0;
+    var temp = tempPass_(); a.salt = Utilities.getUuid(); a.hash = pwHash_(a.salt, temp); a.mustChange = true; a.fails = 0; a.lockUntil = 0; a.pendPw = false;
     writeJson_('accounts.json', accs); dropSessions_(uid);
     audit_(me, 'أنشأ كلمة مرور مؤقتة', a.username);
-    return JSON.stringify({ temp: temp, username: a.username });
+    return { temp: temp, username: a.username };
   });
+  linkPassOut_(uid, r.temp);
+  return JSON.stringify(r);
 }
 // نقل حسابات الإصدار الخامس (الاسم والرمز) إلى حسابات جديدة، وتبقى قوالبهم معهم
 function acc_import(token, program) {
@@ -405,6 +439,141 @@ function acc_import(token, program) {
     audit_(me, 'نقل الحسابات القديمة', out.length + ' حساباً');
     return JSON.stringify(out);
   });
+}
+
+/* ================= الحساب الموحّد مع منصة الأنشطة التربوية =================
+   (طلب أمين، ٣١ أكتوبر) كل حساب يُنشأ في منصة الأنشطة يُنشأ معه حسابه هنا بالاسم نفسه وكلمة المرور نفسها وصلاحيات مساره،
+   وتغيير كلمة المرور في أي منهما يسري على الأخرى، ومن دخل إحداهما يجد الأخرى مفتوحة.
+   لا مفتاح مشتركًا بين الخادمين: كل طلب يحمل رمزًا لمرة واحدة، فيسأل مستقبِله مرسِلَه (link_check) هل أصدره هو بهذا المحتوى.
+   في الحساب: ansUid معرّف حسابه في المنصة، pendPw لم تُعرف كلمته بعد (أُنشئ بلا كلمة)، lkPend كلمتاه لم تتوحّدا بعد،
+   linkSup مشرف مساره (وsupPrev صلاحياته قبل الإشراف). */
+var ANSHITA_API = 'https://script.google.com/macros/s/AKfycbzvZx6QWEGYRLxtX8E6BMCIEw53p-N0GBZ6QYDQKgvQsMDU2IV9gwbb4MMyxecY0jEKNw/exec';
+var LINK_PROG = 'academy';
+var LINK_SUP = { editLevel: 'full', perms: ['social', 'ai', 'upload', 'slides', 'send'] };   // مشرف المسار: كل صلاحيات التصميم والنشر في مساره
+function linkHash_(s) { return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s), Utilities.Charset.UTF_8)); }
+function linkIssue_(payload) { var n = Utilities.getUuid() + Utilities.getUuid(); CacheService.getScriptCache().put('lk:' + n, linkHash_(payload), 120); return n; }
+// يسأله خادم المنصة: هل أصدرتَ هذا الرمز لهذا المحتوى؟ يُجاب مرة واحدة فقط
+function link_check(nonce, hash) {
+  var c = CacheService.getScriptCache(), k = 'lk:' + clip_(nonce, 100), v = c.get(k);
+  if (!v || v !== String(hash || '')) return 'no';
+  c.remove(k); return 'ok';
+}
+function linkPost_(fn, args) {
+  var r = UrlFetchApp.fetch(ANSHITA_API, { method: 'post', contentType: 'text/plain', payload: JSON.stringify({ fn: fn, args: args }), followRedirects: true, muteHttpExceptions: true }), j;
+  try { j = JSON.parse(r.getContentText()); } catch (e) { throw new Error('تعذّر الاتصال بمنصة الأنشطة'); }
+  if (j.error) throw new Error(j.error);
+  return j.result;
+}
+function linkSend_(o) {
+  var p = JSON.stringify(o), v = linkPost_('link_in', [linkIssue_(p), p]);
+  try { return JSON.parse(v); } catch (e) { return v; }
+}
+// طلب من خادم المنصة: يُنفَّذ بعد التحقق منه عنده
+function link_op(nonce, json) {
+  json = String(json || '');
+  if (json.length > 20000) throw new Error('طلب ربط كبير');
+  if (linkPost_('link_check', [String(nonce || ''), linkHash_(json)]) !== 'ok') throw new Error('طلب ربط غير موثّق');
+  var o = JSON.parse(json);
+  if (o.op === 'upsert') return JSON.stringify(linkUpsert_(o));
+  if (o.op === 'pass') return JSON.stringify(linkSetPass_(o.atar, o.pw));
+  if (o.op === 'verify') { var a = readJson_('accounts.json', {})[o.atar]; return JSON.stringify({ ok: !!(a && !a.disabled && !a.pendPw && pwHash_(a.salt, String(o.pw || '')) === a.hash) }); }
+  if (o.op === 'session') return JSON.stringify(linkSession_(o.atar));
+  if (o.op === 'unlink') return JSON.stringify(linkUnlink_(o.atar, !!o.disable));
+  if (o.op === 'peek') return JSON.stringify(linkPeek_(o.ids || []));
+  throw new Error('عملية ربط غير معروفة');
+}
+function linkUnique_(accs, base, self) {
+  var u = base, n = 2;
+  while (Object.keys(accs).some(function (k) { var x = accs[k]; return x.uid !== self && (normUser_(x.username) === u || (x.email && normUser_(x.email) === u)); })) u = base + (n++);
+  return u;
+}
+// صلاحيات الحساب الجديد: الأكثر شيوعًا بين مستخدمي المسار نفسه في البرنامج، وإلا بين مستخدمي البرنامج
+function linkPeerPerms_(accs, track) {
+  var pick = function (list) {
+    var cnt = {}, best = null;
+    list.forEach(function (x) { var k = JSON.stringify({ p: x.perms || {}, e: x.editLevel || '' }); cnt[k] = (cnt[k] || 0) + 1; if (!best || cnt[k] > cnt[best]) best = k; });
+    return best ? JSON.parse(best) : null;
+  };
+  var users = Object.keys(accs).map(function (k) { return accs[k]; }).filter(function (x) { return x.role === 'user' && !x.disabled && !x.linkSup && (x.programs || []).indexOf(LINK_PROG) >= 0; });
+  var r = pick(users.filter(function (x) { return (x.tracks || []).indexOf(track) >= 0; })) || pick(users) || { p: {}, e: '' };
+  return r;
+}
+function linkSup_(a, on) {
+  if (on && !a.linkSup) { a.supPrev = { perms: a.perms || {}, editLevel: a.editLevel || '' }; var pp = Object.assign({}, a.perms || {}); LINK_SUP.perms.forEach(function (k) { pp[k] = true; }); a.perms = pp; a.editLevel = LINK_SUP.editLevel; a.linkSup = true; }
+  if (!on && a.linkSup) { var pv = a.supPrev || {}; a.perms = pv.perms || {}; a.editLevel = pv.editLevel || ''; a.linkSup = false; delete a.supPrev; }
+}
+// o = {atar?: حساب أثر يُدمج, ans: {uid, user, name, role: admin|team, track, sup, disabled}, pw?: كلمة المرور}
+function linkUpsert_(o) {
+  var s = o.ans || {};
+  if (!s.uid) throw new Error('حساب المنصة ناقص');
+  var res = withLock_(function () {
+    var accs = readJson_('accounts.json', {}), a = o.atar ? accs[o.atar] : null, isNew = false;
+    if (o.atar && !a) throw new Error('حساب أثر المطلوب دمجه غير موجود');
+    if (!a) a = Object.keys(accs).map(function (k) { return accs[k]; }).filter(function (x) { return x.ansUid === s.uid; })[0] || null;
+    if (a && a.ansUid && a.ansUid !== s.uid) throw new Error('حساب أثر «' + a.username + '» مربوط بحساب آخر في منصة الأنشطة');
+    if (!a) {
+      if (s.role !== 'team' || !s.track) throw new Error('حساب الإدارة يُربط بحساب قائم في أثر');
+      var pp = linkPeerPerms_(accs, s.track), salt = Utilities.getUuid();
+      a = { uid: uid_(), created: now_(), last: 0, fails: 0, prefs: {}, role: 'user', programs: [LINK_PROG], tracks: [s.track], perms: pp.p, editLevel: pp.e,
+        email: '', salt: salt, hash: pwHash_(salt, Utilities.getUuid()), pendPw: true, mustChange: false };
+      accs[a.uid] = a; isNew = true;
+    }
+    a.ansUid = s.uid;
+    if (a.role !== 'super') {
+      var u = normUser_(s.user).replace(/[^؀-ۿa-z0-9._\- ]/g, '');
+      if (u.length >= 3) a.username = linkUnique_(accs, u, a.uid);
+      else if (isNew) a.username = linkUnique_(accs, 'user', a.uid);
+      if (s.name) a.name = clip_(s.name, 80);
+      if (s.role === 'team' && s.track) {
+        a.programs = a.programs || []; if (a.programs.indexOf(LINK_PROG) < 0) a.programs.push(LINK_PROG);
+        if ((a.tracks || []).length && a.tracks.indexOf(s.track) < 0) a.tracks.push(s.track);   // الفارغة = كل هويات البرنامج، فتبقى كما هي
+        if ('sup' in s) linkSup_(a, !!s.sup);
+      }
+      if ('disabled' in s) a.disabled = !!s.disabled;
+    }
+    if (o.pw) { a.salt = Utilities.getUuid(); a.hash = pwHash_(a.salt, String(o.pw)); a.pendPw = false; a.mustChange = false; a.lkPend = false; }
+    else if (!isNew) a.lkPend = true;   // حساب قديم دُمج: تتوحّد كلمتاه عند أول دخول
+    writeJson_('accounts.json', accs);
+    audit_(null, isNew ? 'أنشأ حسابًا من منصة الأنشطة' : 'ربط حسابًا بمنصة الأنشطة', a.username);
+    return { atar: a.uid, username: a.username, isNew: isNew, pend: !!(a.pendPw || a.lkPend), disabled: !!a.disabled };
+  });
+  if (res.disabled) withLock_(function () { dropSessions_(res.atar); });
+  return res;
+}
+function linkSetPass_(uid, pw) {
+  pw = String(pw || '');
+  if (pw.length < 8) throw new Error('كلمة المرور ثمانية أحرف على الأقل');
+  return withLock_(function () {
+    var accs = readJson_('accounts.json', {}), a = accs[uid];
+    if (!a || !a.ansUid) throw new Error('حساب أثر غير مربوط');
+    a.salt = Utilities.getUuid(); a.hash = pwHash_(a.salt, pw); a.pendPw = false; a.mustChange = false; a.lkPend = false; a.fails = 0; a.lockUntil = 0;
+    writeJson_('accounts.json', accs);
+    return { ok: true };
+  });
+}
+// جلسة في أثر لمن دخل منصة الأنشطة (الدخول مرة واحدة)
+function linkSession_(uid) {
+  return withLock_(function () {
+    var accs = readJson_('accounts.json', {}), a = accs[uid];
+    if (!a || !a.ansUid) throw new Error('حساب أثر غير مربوط');
+    if (a.disabled) throw new Error('هذا الحساب موقوف في أثر');
+    a.last = now_(); writeJson_('accounts.json', accs);
+    return { token: newSession_(a.uid), username: a.username };
+  });
+}
+function linkUnlink_(uid, disable) {
+  return withLock_(function () {
+    var accs = readJson_('accounts.json', {}), a = accs[uid]; if (!a) return { ok: false };
+    delete a.ansUid; delete a.lkPend; if (a.linkSup) linkSup_(a, false);
+    if (disable && a.role !== 'super') a.disabled = true;
+    writeJson_('accounts.json', accs); if (a.disabled) dropSessions_(uid);
+    return { ok: true };
+  });
+}
+// لربط الحسابات القائمة: بيانات مختصرة لحسابات بعينها (بلا أي سر)
+function linkPeek_(ids) {
+  var accs = readJson_('accounts.json', {});
+  return ids.slice(0, 100).map(function (id) { var a = accs[id]; return a ? { uid: a.uid, username: a.username, name: a.name, role: a.role, tracks: a.tracks || [], linked: a.ansUid || '' } : { uid: id, missing: true }; });
 }
 
 /* ================= البرامج =================
