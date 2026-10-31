@@ -25,6 +25,7 @@ async def main():
         ok('readex' not in r[1] and 'alyamama' not in r[1], 'design-wide font choice overrides template fonts: ' + str(r[1]))
         ok(r[2] is None, 'TPLF reset after drawing')
         ok(await pg.evaluate("ntClean('كيفية إدارة المشاريعـ ؟') === 'كيفية إدارة المشاريع؟'"), 'clean: no space before ? and no trailing tatweel')
+        ok(await pg.evaluate("ntClean('يوم الأحد 1/6/1448هـ') === 'يوم الأحد 1/6/1448هـ' && ntClean('سنة 1448 هـ.') === 'سنة 1448 هـ.'"), 'clean: keeps the Hijri abbreviation')
         # المحرر: لوحة الخطوط تُظهر خط القالب
         await pg.goto(URL + '#/e/judhoor/nt_ticket'); await pg.wait_for_timeout(3000)
         await pg.evaluate("document.querySelectorAll('.coach,.gintro').forEach(x=>x.remove())")
