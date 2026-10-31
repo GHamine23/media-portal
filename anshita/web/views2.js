@@ -8,7 +8,7 @@ let F = null;   // نموذج النشاط المفتوح
 function openAct(tid, id, preset = {}) {
   const a = id ? planOf(tid).acts.find(x => x.id === id) : null;
   if (id && !a) return toast('النشاط غير موجود (ربما حُذف)', 'err');
-  const ids = isAdmin() ? D.tracks.map(t => t.id) : [myTrack()];
+  const ids = isAll() ? D.tracks.map(t => t.id) : [myTrack()];
   tid = tid || preset.track || (ids.length === 1 ? ids[0] : '');
   if (!a && tid && !canEdit(tid)) return toast('إضافة الأنشطة مغلقة لفريقكم. اطلبوا فتحها من الإدارة.', 'err');
   F = a ? Object.assign({ tid, isNew: false }, JSON.parse(JSON.stringify(a)), { calOn: !!(a.cal && a.cal.id) })
@@ -57,7 +57,7 @@ function fMode() {
 function actParts() {
   const tid = F.tid, t = tid ? T(tid) : null, mode = fMode(), ro = mode === 'ro';
   const day = tid ? (dayOf(tid, semFor(tid, F.d) || curN(tid), F.d)) : null;
-  const tracksSel = F.isNew && isAdmin() && !F.dock && !F.lockTrack ? `<div class="field"><label>المسار</label><div class="row" style="gap:6px;flex-wrap:wrap">${D.tracks.map(x => `<button class="chip" type="button" aria-pressed="${tid === x.id}" data-act="f-track" data-v="${x.id}"><i style="background:${x.color}"></i>${esc(x.name)}</button>`).join('')}</div></div>` : '';
+  const tracksSel = F.isNew && isAll() && !F.dock && !F.lockTrack ? `<div class="field"><label>المسار</label><div class="row" style="gap:6px;flex-wrap:wrap">${D.tracks.map(x => `<button class="chip" type="button" aria-pressed="${tid === x.id}" data-act="f-track" data-v="${x.id}"><i style="background:${x.color}"></i>${esc(x.name)}</button>`).join('')}</div></div>` : '';
   const head = `<div class="row" style="gap:10px">${t && !F.dock ? logoImg(tid) : ''}<div class="col" style="min-width:0"><span class="xs faint">${t ? esc(t.full || t.name) : 'نشاط جديد'}</span><b style="font-family:var(--fd);font-weight:500;font-size:19px;color:var(--ink)">${F.isNew ? 'نشاط جديد' : ro ? esc(F.title) : 'تعديل النشاط'}</b></div></div>`;
   const ctx = day ? `<div class="ctx"><span>${gLong(F.d)} · ${esc(day.h || hijri(F.d))} · الأسبوع ${day.w}</span>${day.c ? `<span>مقرر اليوم: <b>${esc(day.c)}</b>${day.q ? ' — ' + esc(day.q) : ''}</span>` : ''}${isLive(day) ? `<span class="live">${svg('live')}${esc(day.r || 'بث مباشر')}</span>` : ''}${day.ev ? `<span><b>${esc(day.ev)}</b></span>` : ''}${day.p && !day.c ? `<span>${esc(day.p)}</span>` : ''}</div>` : F.d ? `<div class="ctx"><span>${gLong(F.d)} · ${esc(hijri(F.d))}</span><span class="faint">خارج أيام الفصل في الجدول</span></div>` : '';
   // تنبيه اجتماع لقاءين في يوم واحد (بث مباشر أو لقاء آخر)
@@ -336,7 +336,7 @@ function readMB() { $$('[data-mb]').forEach(el => { const m = MB[+el.dataset.i];
 
 /* ---------- قائمة الحساب ---------- */
 function userMenu() {
-  openDialog(`<div class="row">${isAdmin() ? adminAv() : avatar(T(D.me.track).name, tcol(D.me.track))}<div class="col"><b>${esc(D.me.name)}</b><span class="xs faint">اسم المستخدم: <bdi>${esc(D.me.user)}</bdi></span></div></div>
+  openDialog(`<div class="row">${meAv()}<div class="col"><b>${esc(D.me.name)}</b><span class="xs faint">اسم المستخدم: <bdi>${esc(D.me.user)}</bdi></span></div></div>
     <div class="list">
       <button class="li btnish" type="button" data-act="theme">${svg(P.theme === 'dark' ? 'sun' : 'moon')}<div class="tx"><div class="tt">${P.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}</div></div></button>
       <button class="li btnish" type="button" data-act="mypass">${svg('key')}<div class="tx"><div class="tt">تغيير كلمة المرور</div></div></button>
@@ -528,10 +528,10 @@ VIEWS.accounts = {
   render() {
     if (!AC) { API.me('acc_list').then(l => { AC = l; render(); }).catch(e => toast(e.message, 'err')); return pageHead('', 'الحسابات', '') + `<div class="card empty"><span class="spin"></span></div>`; }
     const ord = t => t ? D.tracks.findIndex(x => x.id === t) : -1;
-    const rows = AC.slice().sort((a, b) => ord(a.track) - ord(b.track) || (a.created || 0) - (b.created || 0)).map(a => `<div class="li">${a.role === 'admin' ? adminAv() : T(a.track) && LOGOS[a.track] ? logoImg(a.track) : avatar(a.name, tcol(a.track))}
-      <div class="tx"><div class="tt">${esc(a.name)} ${a.disabled ? '<span class="pill warn">موقوف</span>' : ''}</div><div class="mt"><bdi>${esc(a.user)}</bdi> · ${a.role === 'admin' ? 'الإدارة: كل المسارات' : 'فريق ' + esc((T(a.track) || {}).name || a.track)} · ${a.last ? 'آخر دخول ' + ago(a.last) : 'لم يدخل بعد'}</div>${a.atar ? '' : a.linked ? `<div class="mt"><span class="pill ok">${svg('check')}مربوط بأثر</span>${a.atarSup ? ' <span class="pill">مشرف المسار في أثر</span>' : ''}${a.lkPend ? ' <span class="xs faint">· تتوحّد كلمة المرور عند أول دخول</span>' : ''}</div>` : a.lkErr ? `<div class="mt"><span class="pill warn">لم يُربط بأثر</span> <span class="xs faint">${esc(a.lkErr)}</span></div>` : ''}</div>
+    const rows = AC.slice().sort((a, b) => ord(a.track) - ord(b.track) || (a.created || 0) - (b.created || 0)).map(a => `<div class="li">${a.role === 'admin' || a.role === 'sup' ? adminAv() : T(a.track) && LOGOS[a.track] ? logoImg(a.track) : avatar(a.name, tcol(a.track))}
+      <div class="tx"><div class="tt">${esc(a.name)} ${a.disabled ? '<span class="pill warn">موقوف</span>' : ''}</div><div class="mt"><bdi>${esc(a.user)}</bdi> · ${a.role === 'admin' ? 'الإدارة: كل المسارات' : a.role === 'sup' ? 'مشرف عام: كل المسارات' : 'فريق ' + esc((T(a.track) || {}).name || a.track)} · ${a.last ? 'آخر دخول ' + ago(a.last) : 'لم يدخل بعد'}</div>${a.atar ? '' : a.linked ? `<div class="mt"><span class="pill ok">${svg('check')}مربوط بأثر</span>${a.atarSup ? ' <span class="pill">مشرف المسار في أثر</span>' : a.role === 'sup' ? ' <span class="pill">مشرف برنامج الأكاديمية في أثر</span>' : ''}${a.lkPend ? ' <span class="xs faint">· تتوحّد كلمة المرور عند أول دخول</span>' : ''}</div>` : a.lkErr ? `<div class="mt"><span class="pill warn">لم يُربط بأثر</span> <span class="xs faint">${esc(a.lkErr)}</span></div>` : ''}</div>
       <button class="btn sm ghost" type="button" data-act="acc-edit" data-id="${a.uid}">تعديل</button><button class="btn sm" type="button" data-act="acc-reset" data-id="${a.uid}">كلمة مرور جديدة</button></div>`).join('');
-    return pageHead('', 'الحسابات', 'نوعان فقط: الإدارة ترى كل المسارات، والفريق يرى مساره. لكل مسار حساب، ويمكن إضافة حسابات أخرى للفريق نفسه.', `<button class="btn pri" type="button" data-act="acc-edit" data-id="">${svg('plus')}حساب</button>`) + `<div class="card"><div class="list">${rows}</div></div>`;
+    return pageHead('', 'الحسابات', 'الإدارة ترى كل المسارات وتديرها، والمشرف العام يرى كل المسارات ويعدّل خططها بلا أدوات الإدارة، والفريق يرى مساره. لكل مسار حساب، ويمكن إضافة حسابات أخرى للفريق نفسه.', `<button class="btn pri" type="button" data-act="acc-edit" data-id="">${svg('plus')}حساب</button>`) + `<div class="card"><div class="list">${rows}</div></div>`;
   }
 };
 function accEdit(uid) {
@@ -539,9 +539,9 @@ function accEdit(uid) {
   openDialog(`<h3>${uid ? 'تعديل الحساب' : 'حساب جديد'}</h3>
     <div class="field"><label for="ac-n">الاسم</label><input class="inp" id="ac-n" value="${esc(a.name)}" placeholder="مثل: فريق جذور، أو اسم العضو"></div>
     <div class="field"><label for="ac-u">اسم المستخدم (للدخول)</label><input class="inp ltr" style="display:block;text-align:left" id="ac-u" value="${esc(a.user)}" autocomplete="off" placeholder="judhoor2"></div>
-    <div class="field"><label for="ac-r">النوع</label><select class="inp" id="ac-r" data-act="ac-role"><option value="team" ${a.role !== 'admin' ? 'selected' : ''}>فريق مسار</option><option value="admin" ${a.role === 'admin' ? 'selected' : ''}>الإدارة</option></select></div>
-    <div class="field" id="ac-tf" ${a.role === 'admin' ? 'hidden' : ''}><label for="ac-t">المسار</label><select class="inp" id="ac-t">${D.tracks.map(t => `<option value="${t.id}" ${a.track === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></div>
-    <div class="opt" id="ac-sf" ${a.role === 'admin' ? 'hidden' : ''}><div class="tx"><b>مشرف المسار في أثر</b><span>كل صلاحيات التصميم والنشر في مساره في أثر. وفي المنصة حسابه كحساب الفريق.</span></div><button class="sw" type="button" role="switch" aria-checked="${!!a.atarSup}" data-act="ac-sup" aria-label="مشرف المسار في أثر"></button></div>
+    <div class="field"><label for="ac-r">النوع</label><select class="inp" id="ac-r" data-act="ac-role"><option value="team" ${a.role === 'team' ? 'selected' : ''}>فريق مسار</option><option value="sup" ${a.role === 'sup' ? 'selected' : ''}>مشرف عام: كل المسارات بلا أدوات الإدارة</option><option value="admin" ${a.role === 'admin' ? 'selected' : ''}>الإدارة</option></select><p class="hint" id="ac-rh" ${a.role === 'sup' ? '' : 'hidden'}>وفي أثر: مشرف برنامج الأكاديمية، بكل مساراتها.</p></div>
+    <div class="field" id="ac-tf" ${a.role !== 'team' ? 'hidden' : ''}><label for="ac-t">المسار</label><select class="inp" id="ac-t">${D.tracks.map(t => `<option value="${t.id}" ${a.track === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></div>
+    <div class="opt" id="ac-sf" ${a.role !== 'team' ? 'hidden' : ''}><div class="tx"><b>مشرف المسار في أثر</b><span>كل صلاحيات التصميم والنشر في مساره في أثر. وفي المنصة حسابه كحساب الفريق.</span></div><button class="sw" type="button" role="switch" aria-checked="${!!a.atarSup}" data-act="ac-sup" aria-label="مشرف المسار في أثر"></button></div>
     ${uid && uid !== D.me.uid ? `<div class="opt"><div class="tx"><b>موقوف</b><span>لا يستطيع الدخول</span></div><button class="sw" type="button" role="switch" aria-checked="${!!a.disabled}" data-act="ac-dis"></button></div>` : ''}
     <div class="row"><button class="btn pri" type="button" data-act="ac-save" data-id="${uid || ''}">احفظ</button><button class="btn" type="button" data-act="close">إلغاء</button><span class="sp"></span>${uid && uid !== D.me.uid ? `<button class="btn danger" type="button" data-act="ac-del" data-id="${uid}">حذف</button>` : ''}</div>`);
 }
@@ -626,8 +626,8 @@ function openCmd() {
 }
 function cmdItems(q) {
   const n = normAr(q.trim()), out = [];
-  const pages = [['home', 'الرئيسية', 'home'], ['timeline', 'المنظور الزمني', 'tl']].concat(isAdmin() ? [['calendar', 'تقويم جوجل', 'gcal'], ['bot', 'بوت التذكيرات', 'bot'], ['accounts', 'الحسابات', 'key']] : [['t/' + myTrack(), 'خطة الفصل', 'table']]);
-  const acts = [...(isAdmin() || canEdit(myTrack()) ? [{ g: 'إجراءات', l: 'نشاط جديد', ic: 'plus', run: () => openAct(isAdmin() ? '' : myTrack()) }] : []), { g: 'إجراءات', l: P.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن', ic: P.theme === 'dark' ? 'sun' : 'moon', run: toggleTheme }];
+  const pages = [['home', 'الرئيسية', 'home'], ['timeline', 'المنظور الزمني', 'tl']].concat(isAdmin() ? [['calendar', 'تقويم جوجل', 'gcal'], ['bot', 'بوت التذكيرات', 'bot'], ['accounts', 'الحسابات', 'key']] : isSup() ? [['tracks', 'المسارات', 'table']] : [['t/' + myTrack(), 'خطة الفصل', 'table']]);
+  const acts = [...(isAll() || canEdit(myTrack()) ? [{ g: 'إجراءات', l: 'نشاط جديد', ic: 'plus', run: () => openAct(isAll() ? '' : myTrack()) }] : []), { g: 'إجراءات', l: P.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن', ic: P.theme === 'dark' ? 'sun' : 'moon', run: toggleTheme }];
   const m = s => !n || normAr(s).includes(n);
   acts.filter(a => m(a.l) || (n && 'جديد'.includes(n))).forEach(a => out.push(a));
   pages.filter(p => m(p[1])).forEach(p => out.push({ g: 'الصفحات', l: p[1], ic: p[2], run: () => go(p[0]) }));
@@ -667,7 +667,7 @@ const H = {
   },
   'f-copy': el => { const v = el.dataset.v; const ok = () => toast('نُسخ الرابط'); try { navigator.clipboard.writeText(v).then(ok, () => toast(v)); } catch (e) { toast(v); } },
   go: el => { location.hash = '#' + el.dataset.v; },
-  'tk-new': el => taskDialog(el.dataset.track || (isAdmin() ? D.tracks[0].id : myTrack())),
+  'tk-new': el => taskDialog(el.dataset.track || (isAll() ? D.tracks[0].id : myTrack())),
   'tk-edit': el => taskDialog(el.dataset.track, el.dataset.id),
   'tk-who': el => { readTK(); const w = el.dataset.v; TK.who = (TK.who || []).includes(w) ? TK.who.filter(x => x !== w) : (TK.who || []).concat(w); drawTask(); },
   'tk-tgl': () => { readTK(); TK.done = !TK.done; drawTask(); },
@@ -735,7 +735,7 @@ const H = {
   'ae-send': async () => { const note = $('#ae-n').value; try { await API.me('edit_request', note); closeLayer(); T(myTrack()).editReq = { at: Date.now(), by: D.me.name, note }; render(); toast('أُرسل الطلب إلى الإدارة'); } catch (e) { toast(e.message, 'err'); } },
   hbw: el => { const n = +el.dataset.n; HB.ws = n ? add(HB.ws, n) : focusWeek(); render(); },
   mweek: el => { const k = el.dataset.id + '|' + el.dataset.n; if (el.dataset.v === 'now') delete MW[k]; else MW[k] = +el.dataset.v; render(); const pg = $('.wpager'); if (pg) window.scrollTo(0, pg.getBoundingClientRect().top + scrollY - 70); },
-  tlweek: el => { P.tl.range = 'week'; P.tl.anchor = el.dataset.date; if (isAdmin() && el.dataset.id) { P.tl.tracks = [el.dataset.id]; P.tl.tmp = true; } savePrefs(); go('timeline'); },
+  tlweek: el => { P.tl.range = 'week'; P.tl.anchor = el.dataset.date; if (isAll() && el.dataset.id) { P.tl.tracks = [el.dataset.id]; P.tl.tmp = true; } savePrefs(); go('timeline'); },
   tlrange: el => { P.tl.range = el.dataset.v; savePrefs(); VIEWS.timeline.sc = 0; render(); },
   tlnav: el => { const n = +el.dataset.n, rg = P.tl.range, a = rg !== 'week' && rg !== 'sem' ? tlSpan().from : tlAnchor(); P.tl.anchor = !n ? TODAY : rg === 'week' ? add(a, 7 * n) : addMon(monStart(a), (rg === 'q3' ? 3 : 1) * n); savePrefs(); VIEWS.timeline.sc = 0; render(); },
   tltrack: el => { const v = el.dataset.v; if (!v) P.tl.tracks = []; else { const s = new Set(P.tl.tracks || []); s.has(v) ? s.delete(v) : s.add(v); P.tl.tracks = [...s]; } savePrefs(); render(); },
@@ -789,7 +789,7 @@ document.addEventListener('click', e => {
   if (k === 'tblq') return;
   runAct(f, el, e);
 });
-document.addEventListener('change', e => { const el = e.target; if (el.id === 'ac-r' && $('#ac-tf')) { $('#ac-tf').hidden = el.value === 'admin'; if ($('#ac-sf')) $('#ac-sf').hidden = el.value === 'admin'; } if (el.dataset.act === 'bot-assign' && el.value) API.me('tg_assign', el.dataset.chat, el.value).then(s => { BS = s; toast('رُبطت المجموعة ✓'); boot(true); }).catch(x => toast(x.message, 'err')); if ((el.id === 'f-d' || el.id === 'f-rep-until') && F) { readF(); drawAct(true); } });
+document.addEventListener('change', e => { const el = e.target; if (el.id === 'ac-r' && $('#ac-tf')) { $('#ac-tf').hidden = el.value !== 'team'; if ($('#ac-sf')) $('#ac-sf').hidden = el.value !== 'team'; if ($('#ac-rh')) $('#ac-rh').hidden = el.value !== 'sup'; } if (el.dataset.act === 'bot-assign' && el.value) API.me('tg_assign', el.dataset.chat, el.value).then(s => { BS = s; toast('رُبطت المجموعة ✓'); boot(true); }).catch(x => toast(x.message, 'err')); if ((el.id === 'f-d' || el.id === 'f-rep-until') && F) { readF(); drawAct(true); } });
 document.addEventListener('input', e => {
   const el = e.target;
   if (el.dataset.act === 'tblq') { TB.q = el.value; clearTimeout(TB.t); TB.t = setTimeout(() => { const pos = el.selectionStart; render(); const n = $('[data-act="tblq"]'); if (n) { n.focus(); n.selectionStart = n.selectionEnd = pos; } }, 180); }
@@ -817,7 +817,7 @@ document.addEventListener('keydown', e => {
   if ((e.key === 'Enter' || e.key === ' ') && !typing && e.target.matches('[role="button"][data-act]')) { e.preventDefault(); e.target.click(); return; }
   if (typing || !D || $('#layer').innerHTML || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === '/') { e.preventDefault(); openCmd(); }
-  else if (e.key === 'n' || e.key === 'ى') { const r = route(); const tid = r.name === 't' ? r.a : isAdmin() ? '' : myTrack(); if (!tid || canEdit(tid)) { e.preventDefault(); openAct(tid); } }
+  else if (e.key === 'n' || e.key === 'ى') { const r = route(); const tid = r.name === 't' ? r.a : isAll() ? '' : myTrack(); if (!tid || canEdit(tid)) { e.preventDefault(); openAct(tid); } }
   else if (e.key === 't' || e.key === 'ف') { if (route().name === 'timeline') { P.tl.anchor = ''; savePrefs(); render(); } }
 });
 let MQ = isMob(), WQ = innerWidth >= WIDE_Q; addEventListener('resize', () => { const m = isMob(), w = innerWidth >= WIDE_Q; if (m !== MQ || w !== WQ) { MQ = m; WQ = w; if (F && F.dock) { readF(); F.dock = false; render(); drawAct(); return; } if (D && !$('#layer').innerHTML) render(); } });

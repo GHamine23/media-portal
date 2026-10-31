@@ -12,7 +12,7 @@
      وملخص أسبوعي، وتنبيه عند نقل لقاء قريب أو إلغائه.
    أول تشغيل: شغّل setup() من المحرر مرة، ثم انشر «تطبيق ويب» (يُنفَّذ باسمك، متاح لأي شخص).
    ===================================================================== */
-var VERSION = '1.2.0';
+var VERSION = '1.3.0';
 var SITE_URL = 'https://ghamine23.github.io/media-portal/anshita/';
 var DATA_DIR_NAME = 'منصة الأنشطة التربوية — البيانات';
 var SESSION_DAYS = 60;
@@ -215,7 +215,7 @@ function sendOf_(t) { var o = {}, s = (t && t.send) || {}; SEND_KINDS.forEach(fu
 function gOn_(t, kind) { return !!(t && t.chat && t.chat.id) && t.remind !== false && (!kind || sendOf_(t)[kind]); }
 
 /* ================= الحسابات والجلسات =================
-   accounts.json: { uid: {uid, user, name, role: admin|team, track, salt, hash, tv, fails, lockUntil, created, last, disabled} }
+   accounts.json: { uid: {uid, user, name, role: admin|sup|team, track, salt, hash, tv, fails, lockUntil, created, last, disabled} }
    الجلسة رمز موقَّع (uid|انتهاء|إصدار) فلا تُخزَّن؛ تغيير كلمة المرور يرفع الإصدار فتسقط الجلسات القديمة. */
 function secret_() {
   var s = props_().getProperty('SECRET');
@@ -255,10 +255,12 @@ function auth_(token) {
   return a;
 }
 function needAdmin_(a) { if (a.role !== 'admin') throw new Error('هذا للإدارة'); }
-function canView_(a, tid) { if (a.role !== 'admin' && a.track !== tid) throw new Error('هذا المسار ليس من صلاحيتك'); }
+// المشرف العام (sup): يرى المسارات كلها ويعدّل خططها كالإدارة، بلا الحسابات والبوت والتقويم والإعدادات
+function allT_(a) { return a.role === 'admin' || a.role === 'sup'; }
+function canView_(a, tid) { if (!allT_(a) && a.track !== tid) throw new Error('هذا المسار ليس من صلاحيتك'); }
 function canEdit_(a, tid) {
   canView_(a, tid);
-  if (a.role === 'admin') return;
+  if (allT_(a)) return;
   if (!trackOf_(tid).canEdit) throw new Error('تعديل الخطة مغلق، ويفتحه المدير العام');
 }
 
@@ -381,8 +383,8 @@ function link_in(nonce, json) {
   }));
 }
 function linkedOf_(atarUid) { var all = accs_(); return Object.keys(all).map(function (k) { return all[k]; }).filter(function (x) { return x.atarUid === atarUid && !x.atar; })[0] || null; }
-// حساب يُربط بأثر: حساب فريق في مسار داخل الربط، أو حساب سبق ربطه
-function linkable_(x) { return !!x && !x.atar && (!!x.atarUid || (x.role === 'team' && !!ATAR_TRACK[x.track])); }
+// حساب يُربط بأثر: حساب فريق في مسار داخل الربط، أو مشرف عام، أو حساب سبق ربطه
+function linkable_(x) { return !!x && !x.atar && (!!x.atarUid || x.role === 'sup' || (x.role === 'team' && !!ATAR_TRACK[x.track])); }
 // ينشئ حسابه في أثر أو يحدّثه. pw: كلمة المرور إن عُرفت الآن. merge: حساب أثر قائم يُدمج به
 function linkSync_(uid, pw, merge) {
   var x = accs_()[uid];
@@ -390,7 +392,7 @@ function linkSync_(uid, pw, merge) {
   var r = null, err = '';
   try {
     r = linkSend_({ op: 'upsert', atar: merge || x.atarUid || '', pw: pw || '',
-      ans: { uid: x.uid, user: x.user, name: x.name, role: x.role, track: ATAR_TRACK[x.track] || '', sup: !!x.atarSup, disabled: !!x.disabled } });
+      ans: { uid: x.uid, user: x.user, name: x.name, role: x.role, track: x.role === 'team' ? ATAR_TRACK[x.track] || '' : '', sup: x.role === 'team' && !!x.atarSup, disabled: !!x.disabled } });
   } catch (e) { err = String(e.message || e); }
   withLock_(function () {
     var all = accs_(), y = all[uid]; if (!y) return;
@@ -507,7 +509,7 @@ function acc_save(token, json) {
     var user = norm_(txt_(o.user, 40));
     if (!/^[a-z0-9_.\-؀-ۿ]{2,40}$/.test(user)) throw new Error('اسم المستخدم حروف وأرقام بلا مسافات');
     Object.keys(all).forEach(function (k) { if (k !== (o.uid || '') && norm_(all[k].user) === user) throw new Error('اسم المستخدم مستعمل'); });
-    var role = o.role === 'admin' ? 'admin' : 'team';
+    var role = o.role === 'admin' ? 'admin' : o.role === 'sup' ? 'sup' : 'team';
     var track = role === 'team' ? String(o.track || '') : '';
     if (role === 'team') trackOf_(track);
     if (fresh) { x = { uid: uid_(), created: now_(), tv: 0 }; pw = tempPass_(); setPass_(x, pw); all[x.uid] = x; }
@@ -552,7 +554,7 @@ function memberAccounts_(tid, users) {
     var all = accs_(), taken = {}, made = [], had = [];
     Object.keys(all).forEach(function (k) { taken[norm_(all[k].user)] = 1; });
     (t.members || []).forEach(function (m, i) {
-      var old = Object.keys(all).map(function (k) { return all[k]; }).filter(function (x) { return x.track === tid && x.role === 'team' && norm_(x.name) === norm_(m); })[0];
+      var old = Object.keys(all).map(function (k) { return all[k]; }).filter(function (x) { return (x.role === 'sup' || (x.track === tid && x.role === 'team')) && norm_(x.name) === norm_(m); })[0];
       if (old) { had.push({ name: m, user: old.user }); return; }
       var base = norm_(users[m] || (tid + '.' + (i + 1))).replace(/[^a-z0-9_.\-]/g, '') || (tid + '.' + (i + 1)), u = base, n = 2;
       while (taken[u]) u = base + (n++);
@@ -607,8 +609,8 @@ function pubTrack_(t, admin) {
   return o;
 }
 function boot(token) {
-  var a = auth_(token), admin = a.role === 'admin', s = cfg_();
-  var ts = tracks_().filter(function (t) { return admin || t.id === a.track; });
+  var a = auth_(token), admin = a.role === 'admin', all = allT_(a), s = cfg_();
+  var ts = tracks_().filter(function (t) { return all || t.id === a.track; });
   var plans = {}, revsO = {};
   ts.forEach(function (t) { plans[t.id] = plan_(t.id); revsO[t.id] = plans[t.id].rev; });
   revsO._log = +(props_().getProperty('rev_log') || 0); revsO._meta = +(props_().getProperty('rev_meta') || 0);
@@ -617,10 +619,10 @@ function boot(token) {
     v: VERSION, me: meOf_(a), today: Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd'), tz: tz_(),
     types: TYPES, remindTypes: s.remindTypes, remindHour: s.remindHour,
     tracks: ts.map(function (t) { return pubTrack_(t, admin); }), plans: plans, revs: revsO,
-    log: readJson_('log.json', []).filter(function (x) { return admin || x.t === a.track; }).slice(0, 60)
+    log: readJson_('log.json', []).filter(function (x) { return all || x.t === a.track; }).slice(0, 60)
   };
   var tg0 = readJson_('tg.json', {});
-  if (!admin && tg0.bot && tg0.bot.username) {
+  if (a.role === 'team' && tg0.bot && tg0.bot.username) {
     var mt = trackOf_(a.track);
     out.tg = { bot: tg0.bot.username, linked: !!(mt.chat && mt.chat.id), title: mt.chat ? mt.chat.title : '', link: tgLink_(tg0.bot.username, a.track) };
   }
@@ -636,14 +638,14 @@ function boot(token) {
 // أرقام الإصدارات فقط: تستعملها الواجهة لتعرف هل تغيّر شيء
 function revs(token) {
   var a = auth_(token), all = props_().getProperties(), o = {};   // قراءة واحدة لكل الخصائص بدل قراءة لكل مسار
-  tracks_().forEach(function (t) { if (a.role === 'admin' || t.id === a.track) o[t.id] = +(all['rev_' + t.id] || 0); });
+  tracks_().forEach(function (t) { if (allT_(a) || t.id === a.track) o[t.id] = +(all['rev_' + t.id] || 0); });
   o._log = +(all.rev_log || 0);
   o._meta = +(all.rev_meta || 0);
   if (a.role === 'admin') o._alerts = +(all.rev_alerts || 0);
   return JSON.stringify(o);
 }
 function plan(token, tid) { var a = auth_(token); canView_(a, tid); return JSON.stringify(plan_(tid)); }
-function log_list(token) { var a = auth_(token); return JSON.stringify(readJson_('log.json', []).filter(function (x) { return a.role === 'admin' || x.t === a.track; }).slice(0, 200)); }
+function log_list(token) { var a = auth_(token); return JSON.stringify(readJson_('log.json', []).filter(function (x) { return allT_(a) || x.t === a.track; }).slice(0, 200)); }
 
 /* ================= الأنشطة ================= */
 function padT_(t) { var m = /^(\d{1,2}):(\d{2})$/.exec(String(t || '')); if (!m || +m[1] > 23 || +m[2] > 59) return ''; return ('0' + m[1]).slice(-2) + ':' + m[2]; }
@@ -724,7 +726,7 @@ function alerts_seen(token, ids) {
 function act_save(token, tid, json) {
   var a = auth_(token), o = JSON.parse(json), t = trackOf_(tid), s = cfg_();
   canView_(a, tid);
-  var full = a.role === 'admin' || !!t.canEdit;
+  var full = allT_(a) || !!t.canEdit;
   var res = withLock_(function () {
     var p = plan_(tid), i = -1;
     if (o.id) p.acts.forEach(function (x, k) { if (x.id === o.id) i = k; });
@@ -800,7 +802,7 @@ var SERIES_MAX = 60;
 function act_series(token, tid, json) {
   var a = auth_(token), o = JSON.parse(json), t = trackOf_(tid), s = cfg_();
   canView_(a, tid);
-  if (a.role !== 'admin' && !t.canEdit) throw new Error('إضافة الأنشطة مغلقة، ويفتحها المدير العام');
+  if (!allT_(a) && !t.canEdit) throw new Error('إضافة الأنشطة مغلقة، ويفتحها المدير العام');
   var dates = (o.dates || []).filter(isIso_).filter(function (d, i, arr) { return arr.indexOf(d) === i; }).sort();
   if (!dates.length) throw new Error('لا مواعيد للتكرار');
   if (dates.length > SERIES_MAX) throw new Error('أقصى التكرار ' + SERIES_MAX + ' موعدًا');
@@ -1055,7 +1057,7 @@ function adminTgHtml_(html) { var s = cfg_(); if (s.adminChat && s.adminChat.id 
 // طلب الفريق فتح تعديل الخطة: يظهر للإدارة في المنصة، ويصلها في تليجرام إن رُبطت محادثتها
 function edit_request(token, note) {
   var a = auth_(token);
-  if (a.role === 'admin') throw new Error('هذا للفرق');
+  if (a.role !== 'team') throw new Error('هذا للفرق');
   var t = trackOf_(a.track);
   if (t.canEdit) return JSON.stringify({ ok: true, open: true });
   withLock_(function () {
@@ -1658,6 +1660,7 @@ function tg_check(token) {
   try { tgPoll_(); } catch (e) {}
   JC = {};
   if (a.role === 'admin') return tg_status(token);
+  if (a.role !== 'team') return JSON.stringify({ linked: false, title: '' });
   var t = trackOf_(a.track);
   return JSON.stringify({ linked: !!(t.chat && t.chat.id), title: t.chat ? t.chat.title : '' });
 }
@@ -1813,7 +1816,7 @@ function weekCardData_(t, p, wk, s) {
 function remCardData_(t, x, kind) { return { kind: kind, track: trackCard_(t), act: { d: x.d, time: x.time || '', type: x.type, title: x.title, who: x.who || [] } }; }
 function cardAuth_(auth) {
   if (auth && String(auth) === reportKey_() && reportKey_()) return { all: true };
-  var a = auth_(auth); return a.role === 'admin' ? { all: true } : { track: a.track };
+  var a = auth_(auth); return allT_(a) ? { all: true } : { track: a.track };
 }
 // ما يحتاج رسمًا الآن (ناقص أو تغيّر نشاطه منذ رُسم)
 function cards_todo(auth) {

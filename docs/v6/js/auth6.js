@@ -26,6 +26,7 @@ function showLogin() {
     try {
       const r = await API6.json('auth_login', idI.value, pwI.value);
       V6.token = r.token; V6.me = r.me; ls('token', r.token);
+      try { localStorage.removeItem('mp6.nosso'); localStorage.removeItem('anshita.nosso'); } catch (e) {}   // دخول جديد: يفتح المنصتين
       if (r.me.mustChange) return showChangePw(true);
       await afterLogin();
     } catch (err) { msg.textContent = err.message || String(err); form.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-8px)' }, { transform: 'translateX(6px)' }, { transform: 'translateX(0)' }], { duration: 320 }); }
@@ -153,15 +154,17 @@ function featOff(name) { view(el('div', { class: 'wrap page' }, [el('div', { cla
 function canSocial() { return can('social') && !(V6.prog && V6.prog.features && V6.prog.features.social === false); }
 async function logout() {
   if (typeof ED !== 'undefined' && ED.open) ED.leaveOK = true; flushEv(); try { await API6.call('auth_logout', V6.token); } catch (e) {}
-  if (V6.me && V6.me.anshita) { try { localStorage.removeItem('anshita.tok'); localStorage.removeItem('anshita.boot'); } catch (e) {} }   // والخروج من منصة الأنشطة على هذا الجهاز
+  if (V6.me && V6.me.anshita) { try { localStorage.setItem('mp6.nosso', '1'); } catch (e) {} }   // الخروج من أثر وحده (قرار أمين): لا يعود الدخول من منصة الأنشطة حتى دخول جديد
   V6.token = ''; ls('token', null); V6.me = null; go('#/login'); }
 
 /* ---------- الحساب الموحّد مع منصة الأنشطة التربوية ----------
-   المنصتان على النطاق نفسه: من دخل منصة الأنشطة بحساب مربوط يدخل أثر بحسابه نفسه دون تسجيل دخول جديد. */
+   المنصتان على النطاق نفسه: من دخل منصة الأنشطة بحساب مربوط يدخل أثر بحسابه نفسه دون تسجيل دخول جديد.
+   والخروج من كل منصة وحدها: من خرج من أثر يبقى في منصة الأنشطة، ولا يُفتح له أثر منها حتى يدخل من جديد. */
 const ANSHITA_API = 'https://script.google.com/macros/s/AKfycbzvZx6QWEGYRLxtX8E6BMCIEw53p-N0GBZ6QYDQKgvQsMDU2IV9gwbb4MMyxecY0jEKNw/exec';
 async function ssoFromAnshita() {
   let t = ''; try { t = JSON.parse(localStorage.getItem('anshita.tok') || 'null') || ''; } catch (e) {}
-  if (!t || window.DEMO) return '';
+  let off = ''; try { off = localStorage.getItem('mp6.nosso') || ''; } catch (e) {}
+  if (!t || off || window.DEMO) return '';
   try {
     const r = await fetch(ANSHITA_API, { method: 'POST', body: JSON.stringify({ fn: 'atar_sso', args: [t] }), redirect: 'follow', credentials: 'omit' }).then(function (x) { return x.json(); });
     if (r.error) return '';

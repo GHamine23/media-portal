@@ -487,6 +487,36 @@ ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.te
   ok(rf.sent === 1 && TG.docs.length === 1 && TG.docs[0].chat === adm && TG.docs[0].bytes === 5000 && TG.docs[0].name === 'الملف التعريفي.pdf' && TG.docs[0].caption === '<b>الملف التعريفي</b>' && rf.name === 'الملف التعريفي.pdf', 'يصل الملف محادثة الإدارة وحدها باسمه العربي');
 }
 
+// ٢٠) المشرف العام: يرى المسارات كلها ويعدّل خططها، بلا أدوات الإدارة، وتعديلاته تصل الإدارة كتعديلات الفرق
+{
+  const AT = call('login', 'admin', cred.admin).token;
+  const sv = call('acc_save', AT, JSON.stringify({ user: 'gen.sup', name: 'مشرف عام', role: 'sup', track: 'judhoor' }));
+  ok(sv.acc.role === 'sup' && sv.acc.track === '', 'حساب مشرف عام بلا مسار');
+  const ST = call('login', 'gen.sup', sv.pass).token, b = call('boot', ST);
+  ok(b.me.role === 'sup' && b.tracks.length === ctx.tracks_().length && Object.keys(b.plans).length === b.tracks.length, 'يرى المسارات كلها');
+  ok(!b.settings && !b.alerts && !b.bot && !b.cal && !b.tg, 'بلا بيانات الإدارة');
+  ok(b.tracks.every(t => !('chat' in t) && !('sheet' in t)), 'ولا تفاصيل مجموعات المسارات');
+  ok(Object.keys(call('revs', ST)).filter(k => k[0] !== '_').length === b.tracks.length && !('_alerts' in call('revs', ST)), 'يتابع تحديث المسارات كلها');
+  call('track_save', AT, 'ishraq', JSON.stringify({ canEdit: false }));
+  const n0 = call('alerts', AT).length;
+  const ac = call('act_save', ST, 'ishraq', JSON.stringify({ title: 'لقاء من المشرف', type: 'لقاء', d: '2027-01-12', time: '20:00' }));
+  ok(ac && call('plan', ST, 'ishraq').acts.some(a => a.title === 'لقاء من المشرف'), 'يضيف في مسار أُغلقت إضافته');
+  ok(call('alerts', AT).length === n0 + 1, 'وتصل الإدارةَ تنبيهًا كتعديلات الفرق');
+  throws(() => call('act_save', call('login', 'ishraq', cred.ishraq).token, 'ishraq', JSON.stringify({ title: 'إضافة الفريق', type: 'لقاء', d: '2027-01-13' })), /مغلقة/, 'والفريق نفسه لا يضيف فيه');
+  call('track_save', AT, 'ishraq', JSON.stringify({ canEdit: true }));
+  const jb = ctx.trackOf_('judhoor'), was = [!!jb.canEdit, jb.remind !== false];
+  call('track_save', ST, 'judhoor', JSON.stringify({ members: ['عضو أ', 'عضو ب'], canEdit: !was[0], remind: !was[1] }));
+  ok(ctx.trackOf_('judhoor').members.length === 2 && !!ctx.trackOf_('judhoor').canEdit === was[0] && (ctx.trackOf_('judhoor').remind !== false) === was[1], 'يكتب أعضاء الفريق، ولا يغيّر صلاحيات المسار ولا البوت');
+  ['acc_list', 'alerts', 'report_list', 'tg_status', 'tg_menu', 'atar_links'].forEach(fn => throws(() => call(fn, ST), /للإدارة/, fn + ' للإدارة وحدها'));
+  throws(() => call('settings_save', ST, JSON.stringify({ groupsPaused: true })), /للإدارة/, 'الإعدادات للإدارة وحدها');
+  throws(() => call('acc_save', ST, JSON.stringify({ user: 'x.y', name: 'س', role: 'admin' })), /للإدارة/, 'ولا ينشئ حسابات');
+  throws(() => call('edit_request', ST, 'افتحوا'), /للفرق/, 'طلب فتح التعديل للفرق');
+  ok(call('tg_check', ST).linked === false, 'فحص ربط المجموعة لا يتعطّل له');
+  ok(call('log_list', ST).some(x => x.t === 'ishraq') && call('log_list', ST).some(x => x.t === 'judhoor'), 'سجل المسارات كلها');
+  call('acc_save', AT, JSON.stringify({ uid: sv.acc.uid, user: 'gen.sup', name: 'مشرف عام', role: 'team', track: 'budhoor' }));
+  throws(() => call('plan', call('login', 'gen.sup', sv.pass).token, 'judhoor'), /صلاحيتك/, 'إعادته فريقًا تحصره في مساره');
+}
+
 if (process.env.PREVIEW) {
   const seen = new Set(); ALLSENT.forEach(m => { const k = m.text.split('\n')[0].replace(/«.*»/, ''); if (m.html && !seen.has(k)) { seen.add(k); console.log('\n=== ' + m.chat + '\n' + m.text); } });
   console.log('\n=== ADMIN TASKS\n' + ctx.adminTasksHtml_('2026-11-28', ctx.cfg_()));

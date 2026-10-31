@@ -138,6 +138,11 @@ const API = {
 /* ---------- الحالة ---------- */
 let D = null;          // ما يعيده boot: me، tracks، plans، revs، log، settings…
 const isAdmin = () => D && D.me.role === 'admin';
+// المشرف العام: يرى المسارات كلها ويعدّل خططها، بلا الحسابات والبوت والتقويم والإعدادات
+const isSup = () => D && D.me.role === 'sup';
+const isAll = () => isAdmin() || isSup();
+const meAv = () => isAll() ? adminAv() : avatar(T(D.me.track).name, tcol(D.me.track));
+const meSub = () => isAdmin() ? 'كل المسارات' : isSup() ? 'مشرف عام · كل المسارات' : esc(T(D.me.track).full || T(D.me.track).name);
 const myTrack = () => D && D.me.role === 'team' ? D.me.track : null;
 const T = id => D.tracks.find(t => t.id === id);
 const planOf = id => D.plans[id] || (D.plans[id] = { sems: {}, acts: [], rev: 0 });
@@ -153,8 +158,8 @@ const daysOf = (id, n) => (semOf(id, n || curN(id)) || {}).days || [];
 const dayOf = (id, n, d) => daysOf(id, n).find(x => x.d === d);
 const actsOf = (id, n) => planOf(id).acts.filter(a => n == null || a.sem === String(n));
 const allActs = () => D.tracks.flatMap(t => planOf(t.id).acts.map(a => Object.assign(a, { t: t.id })));
-const canEdit = id => isAdmin() || !!(T(id) && T(id).canEdit);
-const canAdjust = id => isAdmin() || myTrack() === id;   // تعديل نشاط قائم (الموعد، القائم، التفاصيل) — يصل الإدارةَ تنبيه به
+const canEdit = id => isAll() || !!(T(id) && T(id).canEdit);
+const canAdjust = id => isAll() || myTrack() === id;   // تعديل نشاط قائم (الموعد، القائم، التفاصيل) — يصل الإدارةَ تنبيه به
 
 /* ---------- لقاءات اليوم: البث المباشر في الجدول + أنشطة اللقاء ---------- */
 const MEET_T = ['لقاء', 'استضافة'];
@@ -329,6 +334,10 @@ function navItems() {
       <a class="nl" href="#bot"${cur('bot')}>${svg('bot')}بوت التذكيرات${!D.bot ? '<span class="badge soft">!</span>' : unl ? `<span class="badge soft">${unl}</span>` : ''}</a>
       <a class="nl" href="#accounts"${cur('accounts')}>${svg('key')}الحسابات</a>`;
   }
+  if (isSup()) return `<a class="nl" href="#home"${cur('home')}>${svg('home')}الرئيسية</a>
+      <a class="nl" href="#timeline"${cur('timeline')}>${svg('tl')}المنظور الزمني</a>
+      <div class="nav-h">المسارات</div>
+      ${D.tracks.map(t => { const n = weekStat(t.id, ws, we).length; return `<a class="nl" href="#t/${t.id}"${r.name === 't' && r.a === t.id || r.name === 'team' && r.a === t.id ? ' aria-current="page"' : ''}><i class="dot" style="background:${t.color}"></i>${esc(t.name)}<span class="cnt" data-tip="أنشطة هذا الأسبوع">${n || ''}</span></a>`; }).join('')}`;
   const id = myTrack();
   return `<a class="nl" href="#home"${cur('home')}>${svg('home')}الرئيسية</a>
     <a class="nl" href="#t/${id}"${cur('t')}>${svg('table')}خطة الفصل</a>
@@ -341,15 +350,15 @@ const qt = t => /[«»]/.test(t) ? t : '«' + t + '»';
 // زر الإضافة العائم في الجوال
 function fabHtml(r) {
   if (!['home', 't', 'timeline'].includes(r.name)) return '';
-  const tid = r.name === 't' ? r.a : isAdmin() ? '' : myTrack();
-  if (tid ? !canEdit(tid) : !isAdmin()) return '';
+  const tid = r.name === 't' ? r.a : isAll() ? '' : myTrack();
+  if (tid ? !canEdit(tid) : !isAll()) return '';
   return `<button class="fab" type="button" data-act="newact" ${tid ? `data-track="${tid}"` : ''} aria-label="نشاط جديد">${svg('plus', 2.2)}</button>`;
 }
 const MORE_R = ['calendar', 'bot', 'accounts', 'reports', 'alerts'];
 function shell(body) {
   const me = D.me, r = route();
   const tab = (h, ic, label, on) => `<a href="#${h}"${on ? ' aria-current="page"' : ''}>${svg(ic)}<span>${label}</span></a>`;
-  const tabs = isAdmin()
+  const tabs = isAll()
     ? tab('home', 'home', 'الرئيسية', r.name === 'home') + tab('tracks', 'table', 'المسارات', r.name === 't' || r.name === 'tracks' || r.name === 'team') + tab('timeline', 'tl', 'الزمني', r.name === 'timeline') + `<button type="button" data-act="more"${MORE_R.includes(r.name) ? ' aria-current="page"' : ''}>${svg('menu')}<span>المزيد</span></button>`
     : tab('home', 'home', 'الرئيسية', r.name === 'home') + tab('t/' + myTrack(), 'table', 'الخطة', r.name === 't') + tab('timeline', 'tl', 'الزمني', r.name === 'timeline') + `<button type="button" data-act="more">${svg('menu')}<span>المزيد</span></button>`;
   return `<div class="app">
@@ -360,7 +369,7 @@ function shell(body) {
     <div class="foot">
       <div class="sync ${SYNC.st === 'busy' ? 'busy' : SYNC.st === 'off' ? 'off' : ''}"><i></i><span>${syncText()}</span></div>
       <div class="row" style="gap:4px">
-        <button class="who" type="button" data-act="usermenu">${isAdmin() ? adminAv() : avatar(T(me.track).name, tcol(me.track))}<span class="col" style="min-width:0;line-height:1.35"><b style="font-weight:500;color:var(--ink1)" class="ellip">${esc(me.name)}</b><span class="xs faint">${isAdmin() ? 'كل المسارات' : esc(T(me.track).full || T(me.track).name)}</span></span></button>
+        <button class="who" type="button" data-act="usermenu">${meAv()}<span class="col" style="min-width:0;line-height:1.35"><b style="font-weight:500;color:var(--ink1)" class="ellip">${esc(me.name)}</b><span class="xs faint">${meSub()}</span></span></button>
         <button class="btn icon" type="button" data-act="theme" aria-label="${P.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}" data-tip="${P.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}">${svg(P.theme === 'dark' ? 'sun' : 'moon')}</button>
       </div>
     </div>
@@ -371,7 +380,7 @@ function shell(body) {
     ${isAdmin() ? `<a class="btn icon bellb" href="#alerts" aria-label="تغييرات الفرق">${svg('bell')}${D.unseen ? `<span class="badge">${D.unseen}</span>` : ''}</a>` : ''}
     <button class="btn icon" type="button" data-act="cmd" aria-label="بحث">${svg('search')}</button>
     <button class="btn icon" type="button" data-act="theme" aria-label="تبديل الوضع">${svg(P.theme === 'dark' ? 'sun' : 'moon')}</button>
-    <button class="btn icon" type="button" data-act="usermenu" aria-label="الحساب">${isAdmin() ? adminAv() : avatar(T(me.track).name, tcol(me.track))}</button>
+    <button class="btn icon" type="button" data-act="usermenu" aria-label="الحساب">${meAv()}</button>
   </header>
   <main class="main" id="main"><div class="wrap">${CFG.demo ? `<div class="demo-bar">${svg('eye')}<span>نسخة تجربة: البيانات في متصفحك فقط، والبوت والتقويم محاكاة.</span><span class="sp"></span><button type="button" data-act="demo-reset">ابدأ من جديد</button></div>` : ''}${body}</div></main>
   ${fabHtml(r)}<nav class="tabbar" aria-label="التنقل">${tabs}</nav>
@@ -389,7 +398,7 @@ function render() {
   if (!D) { app.innerHTML = TOKEN ? `<div class="login"><div class="col" style="align-items:center;gap:14px">${LOGOS.anshita ? `<img class="brand-img" src="${LOGOS.anshita}" alt="" style="height:56px">` : ''}<span class="spin"></span></div></div>` : vLogin(); afterLogin(); return; }
   const r = route();
   let v = VIEWS[r.name];
-  if (!v || (v.admin && !isAdmin())) { if (r.name !== 'home') { location.replace('#home'); return; } v = VIEWS.home; }
+  if (!v || (v.admin && !isAdmin()) || (v.all && !isAll())) { if (r.name !== 'home') { location.replace('#home'); return; } v = VIEWS.home; }
   const y = scrollY;
   PENDING_RENDER = false;
   let foc = null;
@@ -429,30 +438,31 @@ async function doLogin(user, pass) {
     if (CFG.demo && !pass) pass = window.DEMO.pass(user);
     const r = await API.call('login', user, pass);
     TOKEN = r.token; LS.set(NS + 'tok', TOKEN); LS.set(NS + 'lastWho', LG.other ? '' : LG.who);
+    lsRaw('anshita.nosso', null);   // دخول جديد: يفتح المنصتين
     LG.busy = false; location.hash = '#home'; await boot(); ssoAtar(true);
   } catch (e) { LG.busy = false; LG.err = e.message; render(); }
 }
-function logout(keepAtar) {
-  if (!keepAtar && D && D.me.linked) atarLogout();   // الخروج من المنصة يُخرج من أثر أيضًا على هذا الجهاز
+// expired: انتهت الجلسة (لا خروج من صاحبها). والخروج من كل منصة وحدها (قرار أمين): من خرج من المنصة يبقى في أثر، ولا يُفتح له منها حتى يدخل من جديد
+function logout(expired) {
+  if (!expired && D && D.me.linked) lsRaw('anshita.nosso', '1');
   TOKEN = ''; D = null; LG.other = false; LS.del(NS + 'tok'); LS.del(NS + 'boot'); stopPoll(); closeLayer(); location.hash = ''; render();
 }
 
 /* ---------- الحساب الموحّد مع أثر (النطاق نفسه، فالتخزين المحلي مشترك) ----------
-   من دخل المنصة بحساب مربوط تُفتح له جلسة في أثر، ومن كانت له جلسة في أثر يدخل المنصة بها. */
-const ATAR_TOK = 'mp6.token', ATAR_API = 'https://script.google.com/macros/s/AKfycbzBUiyrhbixemmecyGrcGfhWQhmUq-i7ZGKi9fgpg8OlMBJKLDkQLVbndTk5kZsakl4/exec';
+   من دخل المنصة بحساب مربوط تُفتح له جلسة في أثر، ومن كانت له جلسة في أثر يدخل المنصة بها.
+   ومن خرج من إحداهما بنفسه لا تُفتح له من الأخرى حتى يدخل بكلمة المرور (anshita.nosso وmp6.nosso). */
+const lsRaw = (k, v) => { try { if (v === undefined) return localStorage.getItem(k) || ''; if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} return ''; };
+const ATAR_TOK = 'mp6.token';
 const atarTok = () => { try { return JSON.parse(localStorage.getItem(ATAR_TOK) || 'null') || ''; } catch (e) { return ''; } };
 const setAtarTok = t => { try { if (t) localStorage.setItem(ATAR_TOK, JSON.stringify(t)); else localStorage.removeItem(ATAR_TOK); } catch (e) {} };
 async function ssoAtar(force) {
-  if (CFG.demo || !TOKEN || !D || !D.me.linked || (!force && atarTok())) return;
+  if (CFG.demo || !TOKEN || !D || !D.me.linked) return;
+  if (force) lsRaw('mp6.nosso', null); else if (atarTok() || lsRaw('mp6.nosso')) return;
   try { const r = await API.me('atar_sso'); if (r && r.token) setAtarTok(r.token); } catch (e) {}
 }
 async function ssoFromAtar() {
-  const t = atarTok(); if (CFG.demo || TOKEN || !t) return false;
+  const t = atarTok(); if (CFG.demo || TOKEN || !t || lsRaw('anshita.nosso')) return false;
   try { const r = await API.raw('login_atar', t); TOKEN = r.token; LS.set(NS + 'tok', TOKEN); return true; } catch (e) { return false; }
-}
-function atarLogout() {
-  const t = atarTok(); setAtarTok('');
-  if (t && !CFG.demo) fetch(ATAR_API, { method: 'POST', body: JSON.stringify({ fn: 'auth_logout', args: [t] }), redirect: 'follow', credentials: 'omit' }).catch(() => {});
 }
 
 /* ---------- التحميل والتحديث الدوري ---------- */
