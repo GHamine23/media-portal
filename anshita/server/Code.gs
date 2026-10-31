@@ -62,7 +62,8 @@ function apiFns_() {
     report_key: report_key, report_data: report_data, report_send: report_send, report_file: report_file, report_list: report_list,
     alerts: alerts, alerts_seen: alerts_seen, meet_create: meet_create, meet_unlink: meet_unlink,
     login_atar: login_atar, atar_links: atar_links, atar_link: atar_link, atar_unlink: atar_unlink,
-    task_save: task_save, task_del: task_del, tg_menu: tg_menu
+    task_save: task_save, task_del: task_del, tg_menu: tg_menu,
+    link_in: link_in, link_check: link_check, atar_sso: atar_sso
   };
 }
 function doPost(e) {
@@ -238,8 +239,9 @@ function tempPass_() {
 }
 function norm_(s) { return String(s || '').trim().toLowerCase(); }
 function accs_() { return readJson_('accounts.json', {}); }
-function pubAcc_(a) { return { uid: a.uid, user: a.user, name: a.name, role: a.role, track: a.track || '', created: a.created || 0, last: a.last || 0, disabled: !!a.disabled, atar: a.atar || '' }; }
-function meOf_(a) { return { uid: a.uid, user: a.user, name: a.name, role: a.role, track: a.track || '', atar: !!a.atar }; }
+function pubAcc_(a) { return { uid: a.uid, user: a.user, name: a.name, role: a.role, track: a.track || '', created: a.created || 0, last: a.last || 0, disabled: !!a.disabled, atar: a.atar || '',
+  linked: !!a.atarUid, atarSup: !!a.atarSup, lkPend: !!a.lkPend, lkErr: a.lkErr || '' }; }
+function meOf_(a) { return { uid: a.uid, user: a.user, name: a.name, role: a.role, track: a.track || '', atar: !!a.atar, linked: !!a.atarUid }; }
 function auth_(token) {
   var p = String(token || '').split('|');
   if (p.length !== 4 || sign_(p.slice(0, 3).join('|')) !== p[3]) throw err_('ادخل أولاً', 'auth');
@@ -263,29 +265,45 @@ function canEdit_(a, tid) {
 function login(user, pw) {
   user = norm_(clip_(user, 60)); pw = String(pw || '');
   if (!user || !pw) throw new Error('اكتب اسم المستخدم وكلمة المرور');
-  return withLock_(function () {
+  var st = withLock_(function () {
     var all = accs_(), a = null;
     Object.keys(all).forEach(function (k) { if (norm_(all[k].user) === user) a = all[k]; });
     if (!a || a.atar) throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة');
     if (a.disabled) throw new Error('هذا الحساب موقوف');
     if (a.lockUntil && a.lockUntil > now_()) throw new Error('محاولات كثيرة، حاول بعد دقائق');
-    if (pwHash_(a.salt, pw, a.it) !== a.hash) {
-      a.fails = (a.fails || 0) + 1;
-      if (a.fails >= 8) { a.lockUntil = now_() + 10 * 60e3; a.fails = 0; }
-      writeJson_('accounts.json', all);
-      throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة');
-    }
+    if (pwHash_(a.salt, pw, a.it) === a.hash) return { uid: a.uid, ok: true, push: !!(a.atarUid && a.lkPend) };
+    if (a.atarUid) return { uid: a.uid, ask: true };   // حساب مربوط بأثر: تُقبل كلمة أثر حتى تتوحّد الكلمتان
+    failLogin_(all, a);
+    throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة');
+  });
+  var a0 = accs_()[st.uid];
+  if (st.ask) {
+    var good = false; try { good = !!linkSend_({ op: 'verify', atar: a0.atarUid, pw: pw }).ok; } catch (e) {}
+    if (!good) { withLock_(function () { var all = accs_(); failLogin_(all, all[st.uid]); }); throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة'); }
+  } else if (st.push && pw.length >= 8) {
+    try { linkSend_({ op: 'pass', atar: a0.atarUid, pw: pw }); st.pushed = true; } catch (e) {}
+  }
+  return withLock_(function () {
+    var all = accs_(), a = all[st.uid];
+    if (st.ask) { setPass_(a, pw); a.lkPend = false; }
+    if (st.pushed) a.lkPend = false;
     a.fails = 0; a.lockUntil = 0; a.last = now_();
     if ((a.it || 1200) !== PW_IT) setPass_(a, pw);   // ترقية التجزئة دون تغيير كلمة المرور
     writeJson_('accounts.json', all);
     return JSON.stringify({ token: mkToken_(a), me: meOf_(a) });
   });
 }
+function failLogin_(all, a) {
+  a.fails = (a.fails || 0) + 1;
+  if (a.fails >= 8) { a.lockUntil = now_() + 10 * 60e3; a.fails = 0; }
+  writeJson_('accounts.json', all);
+}
 /* ================= الدخول بحساب أثر =================
    الواجهة تدخل إلى أثر مباشرة (auth_login) ثم ترسل رمز أثر هنا، فنتحقق منه عند خادم أثر (auth_me) ونفتح حساب ظلٍّ:
    المدير العام في أثر = الإدارة، والحساب المربوط بمسار (atar_links.json: {atarUid: {track, name, username, at}}) = فريق ذلك المسار.
    سنابل خارج الربط بأثر، وحسابات المنصة القديمة تبقى تعمل حتى توقفها الإدارة. */
 var ATAR_API = 'https://script.google.com/macros/s/AKfycbzBUiyrhbixemmecyGrcGfhWQhmUq-i7ZGKi9fgpg8OlMBJKLDkQLVbndTk5kZsakl4/exec';
+var ATAR_SITE = 'https://ghamine23.github.io/media-portal/';
 var ATAR_TRACK = { judhoor: 'judhoor', budhoor: 'budhoor', ishraq: 'ishraq', ithmar2: 'ithmar', ithmar3: 'ithmar' };
 function atarCall_(fn, args) {
   var r = UrlFetchApp.fetch(ATAR_API, { method: 'post', contentType: 'text/plain', payload: JSON.stringify({ fn: fn, args: args || [] }), followRedirects: true, muteHttpExceptions: true }), j = null;
@@ -310,6 +328,11 @@ function login_atar(atarToken) {
   if (me.role === 'super') role = 'admin';
   else { track = atarTrackOf_(me, readJson_('atar_links.json', {})); if (track) role = 'team'; }
   if (!role) throw new Error('حسابك في أثر غير مربوط بمسار في منصة الأنشطة. اطلب من الإدارة ربطه.');
+  var lk = linkedOf_(me.uid);
+  if (lk) {   // حساب أثر مربوط بحساب في المنصة: يدخل به نفسه
+    if (lk.disabled) throw new Error('هذا الحساب موقوف في منصة الأنشطة');
+    return withLock_(function () { var all = accs_(), a = all[lk.uid]; a.last = now_(); writeJson_('accounts.json', all); return JSON.stringify({ token: mkToken_(a), me: meOf_(a), atar: { mustChange: !!me.mustChange, username: me.username || '' } }); });
+  }
   return withLock_(function () {
     var all = accs_(), uid = 'atar_' + me.uid, a = all[uid];
     if (a && a.disabled) throw new Error('هذا الحساب موقوف في منصة الأنشطة');
@@ -320,6 +343,118 @@ function login_atar(atarToken) {
     return JSON.stringify({ token: mkToken_(a), me: meOf_(a), atar: { mustChange: !!me.mustChange, username: me.username || '' } });
   });
 }
+/* ================= الحساب الموحّد مع أثر =================
+   (طلب أمين، ٣١ أكتوبر) حساب الفريق هنا يُنشأ معه حسابه في أثر بالاسم نفسه وكلمة المرور نفسها وصلاحيات مساره،
+   وتغيير كلمة المرور في أي منهما يسري على الأخرى، ومن دخل إحداهما يجد الأخرى مفتوحة (atar_sso وlogin_atar).
+   لا مفتاح مشتركًا بين الخادمين: كل طلب يحمل رمزًا لمرة واحدة، فيسأل مستقبِله مرسِلَه (link_check) هل أصدره بهذا المحتوى.
+   في الحساب: atarUid حسابه في أثر، lkPend كلمتاه لم تتوحّدا بعد، atarSup مشرف مساره في أثر، lkErr آخر خطأ ربط. سنابل خارج الربط. */
+function linkHash_(s) { return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s), Utilities.Charset.UTF_8)); }
+function linkIssue_(payload) { var n = Utilities.getUuid() + Utilities.getUuid(); CacheService.getScriptCache().put('lk:' + n, linkHash_(payload), 120); return n; }
+function link_check(nonce, hash) {
+  var c = CacheService.getScriptCache(), k = 'lk:' + clip_(nonce, 100), v = c.get(k);
+  if (!v || v !== String(hash || '')) return 'no';
+  c.remove(k); return 'ok';
+}
+function linkSend_(o) { var p = JSON.stringify(o); return atarCall_('link_op', [linkIssue_(p), p]); }
+// طلب من خادم أثر: يُنفَّذ بعد التحقق منه عنده
+function link_in(nonce, json) {
+  json = String(json || '');
+  if (json.length > 20000) throw new Error('طلب ربط كبير');
+  if (atarCall_('link_check', [String(nonce || ''), linkHash_(json)]) !== 'ok') throw new Error('طلب ربط غير موثّق');
+  var o = JSON.parse(json);
+  return JSON.stringify(withLock_(function () {
+    var all = accs_(), a = all[o.ans];
+    if (!a || !a.atarUid) throw new Error('حساب المنصة غير مربوط');
+    if (o.op === 'verify') {
+      if (a.disabled) return { ok: false };
+      var ok = pwHash_(a.salt, String(o.pw || ''), a.it) === a.hash;
+      if (!ok) failLogin_(all, a);
+      return { ok: ok };
+    }
+    if (o.op === 'pass') {
+      var pw = String(o.pw || ''); if (pw.length < 8) throw new Error('كلمة المرور ثمانية أحرف على الأقل');
+      setPass_(a, pw); a.tv = (a.tv || 0) + 1; a.lkPend = false; a.fails = 0; a.lockUntil = 0;
+      writeJson_('accounts.json', all);
+      return { ok: true };
+    }
+    throw new Error('عملية ربط غير معروفة');
+  }));
+}
+function linkedOf_(atarUid) { var all = accs_(); return Object.keys(all).map(function (k) { return all[k]; }).filter(function (x) { return x.atarUid === atarUid && !x.atar; })[0] || null; }
+// حساب يُربط بأثر: حساب فريق في مسار داخل الربط، أو حساب سبق ربطه
+function linkable_(x) { return !!x && !x.atar && (!!x.atarUid || (x.role === 'team' && !!ATAR_TRACK[x.track])); }
+// ينشئ حسابه في أثر أو يحدّثه. pw: كلمة المرور إن عُرفت الآن. merge: حساب أثر قائم يُدمج به
+function linkSync_(uid, pw, merge) {
+  var x = accs_()[uid];
+  if (!linkable_(x) && !merge) return null;
+  var r = null, err = '';
+  try {
+    r = linkSend_({ op: 'upsert', atar: merge || x.atarUid || '', pw: pw || '',
+      ans: { uid: x.uid, user: x.user, name: x.name, role: x.role, track: ATAR_TRACK[x.track] || '', sup: !!x.atarSup, disabled: !!x.disabled } });
+  } catch (e) { err = String(e.message || e); }
+  withLock_(function () {
+    var all = accs_(), y = all[uid]; if (!y) return;
+    if (r) { y.atarUid = r.atar; y.lkPend = !!r.pend; delete y.lkErr; } else y.lkErr = clip_(err, 200);
+    writeJson_('accounts.json', all);
+  });
+  return r ? { username: r.username, isNew: !!r.isNew } : { err: err };
+}
+// تغيّرت كلمة المرور هنا: تسري على أثر، وإن تعذّر الاتصال تتوحّد عند الدخول التالي
+function linkPassOut_(uid, pw) {
+  var x = accs_()[uid];
+  if (!x || !x.atarUid) { if (linkable_(x)) linkSync_(uid, pw); return; }
+  var ok = false; try { linkSend_({ op: 'pass', atar: x.atarUid, pw: pw }); ok = true; } catch (e) {}
+  withLock_(function () { var all = accs_(); if (all[uid]) { all[uid].lkPend = !ok; writeJson_('accounts.json', all); } });
+}
+// الدخول مرة واحدة: جلسة في أثر لمن دخل المنصة بحساب مربوط
+function atar_sso(token) {
+  var a = auth_(token);
+  if (!a.atarUid) return JSON.stringify({ none: true });
+  var r = linkSend_({ op: 'session', atar: a.atarUid });
+  return JSON.stringify({ token: r.token, username: r.username });
+}
+/* ربط الحسابات الموجودة دفعة واحدة (يُشغَّل من المحرر: linkAllAtar). pairs: {معرّف حساب المنصة: معرّف حساب أثر يُدمج به}.
+   حساب الفريق بلا زوج يُنشأ له حساب في أثر، وتتوحّد كلمة مروره عند أول دخول. يصل الإدارة تقرير بما رُبط. */
+function linkAll_(pairs) {
+  pairs = pairs || {};
+  var all = accs_(), out = [];
+  Object.keys(all).map(function (k) { return all[k]; }).filter(function (x) { return !x.atar && !x.disabled && (linkable_(x) || pairs[x.uid]); })
+    .forEach(function (x) { var r = linkSync_(x.uid, null, pairs[x.uid] || ''); out.push({ name: x.name, user: x.user, track: x.track, res: r }); });
+  var T = function (id) { var t = tracks_().filter(function (y) { return y.id === id; })[0]; return t ? (t.full || t.name) : 'الإدارة'; };
+  var ok = out.filter(function (o) { return o.res && !o.res.err; }), bad = out.filter(function (o) { return !o.res || o.res.err; });
+  adminTgHtml_('<b>رُبطت حسابات منصة الأنشطة بأثر</b>\n' + (ok.length ? ok.map(function (o) { return '• ' + h_(o.name) + ' (' + h_(T(o.track)) + '): ' + (o.res.isNew ? 'حساب جديد في أثر' : 'دُمج بحسابه في أثر') + '، اسم الدخول <code>' + h_(o.res.username) + '</code>'; }).join('\n') : 'لم يُربط حساب.') +
+    (bad.length ? '\n\n<b>تعذّر ربط:</b>\n' + bad.map(function (o) { return '• ' + h_(o.name) + ': ' + h_((o.res && o.res.err) || 'خارج الربط'); }).join('\n') : '') +
+    '\n\nكلمة المرور تتوحّد في المنصتين عند أول دخول لكل حساب، ومن دخل المنصة يجد أثر مفتوحًا بحسابه.');
+  return JSON.stringify(out.map(function (o) { return { name: o.name, track: o.track, res: o.res }; }));
+}
+// أزواج الدمج من سجل ربط أثر (atar_links): عضو المسار نفسه بالاسم نفسه أو بأوله، وحساب الإدارة ↔ المدير العام في أثر
+function linkPairs_() {
+  var all = accs_(), L = readJson_('atar_links.json', {}), pairs = {}, notes = [];
+  var nm = function (v) { return String(v || '').replace(/^أ\.\s*/, '').replace(/[ً-ْـ]/g, '').replace(/\s+/g, ' ').trim(); };
+  var real = Object.keys(all).map(function (k) { return all[k]; }).filter(function (x) { return !x.atar && !x.disabled; });
+  Object.keys(L).forEach(function (au) {
+    var l = L[au], n = nm(l.name);
+    var c = real.filter(function (x) { var m = nm(x.name); return x.role === 'team' && x.track === l.track && n && m && (m === n || m.indexOf(n + ' ') === 0 || n.indexOf(m + ' ') === 0); });
+    if (c.length === 1 && !c[0].atarUid && !Object.keys(pairs).some(function (k) { return pairs[k] === au; })) pairs[c[0].uid] = au;
+    else notes.push((l.name || au) + ': ' + (c.length ? 'أكثر من حساب محتمل' : 'لا حساب له في المنصة') );
+  });
+  var admins = real.filter(function (x) { return x.role === 'admin' && !x.atarUid; });
+  var sh = Object.keys(all).map(function (k) { return all[k]; }).filter(function (x) { return x.atar && x.role === 'admin'; });
+  if (admins.length === 1 && sh.length === 1) pairs[admins[0].uid] = sh[0].atar; else notes.push('حساب الإدارة: يُربط يدويًا (' + admins.length + ' حساب إدارة، ' + sh.length + ' مدير في أثر دخل المنصة)');
+  return { pairs: pairs, notes: notes };
+}
+// تُشغَّل من المحرر. الأولى تعرض الخطة بلا تنفيذ، والثانية تربط
+function linkPlanAtar() {
+  var P = linkPairs_(), all = accs_(), ids = Object.keys(P.pairs).map(function (k) { return P.pairs[k]; }), peek = {};
+  try { atarPeek_(ids).forEach(function (r) { peek[r.uid] = r; }); } catch (e) { P.notes.push('تعذّر سؤال أثر: ' + e.message); }
+  var lines = Object.keys(all).map(function (k) { return all[k]; }).filter(function (x) { return !x.atar && !x.disabled && (linkable_(x) || P.pairs[x.uid]); }).map(function (x) {
+    var au = P.pairs[x.uid], pk = au && peek[au];
+    return x.name + ' [' + (x.track || 'الإدارة') + '] ← ' + (x.atarUid ? 'مربوط من قبل' : au ? 'دمج بحساب أثر «' + (pk ? pk.username + ' / ' + pk.name : au) + '»' + (pk && pk.linked ? ' (مربوط بغيره!)' : '') : 'حساب جديد في أثر باسم ' + x.user);
+  });
+  Logger.log(lines.concat(P.notes.map(function (n) { return 'ملاحظة: ' + n; })).join('\n'));
+}
+function atarPeek_(ids) { return ids.length ? linkSend_({ op: 'peek', ids: ids }) : []; }
+function linkAllAtar() { Logger.log(linkAll_(linkPairs_().pairs)); }
 function atar_links(token) { var a = auth_(token); needAdmin_(a); return JSON.stringify(readJson_('atar_links.json', {})); }
 // o = {uid: معرّف حساب أثر, track, name, username}
 function atar_link(token, json) {
@@ -348,21 +483,26 @@ function atar_unlink(token, uid) {
 function pass(token, oldPw, newPw) {
   var a = auth_(token);
   newPw = String(newPw || '');
-  if (newPw.length < 6) throw new Error('كلمة المرور ستة أحرف على الأقل');
-  return withLock_(function () {
+  if (newPw.length < 8) throw new Error('كلمة المرور ثمانية أحرف على الأقل');
+  // الحساب المربوط تُقبل فيه كلمة أثر الحالية أيضًا (قبل توحيد الكلمتين)
+  var viaAtar = false;
+  if (a.atarUid && pwHash_(a.salt, String(oldPw || ''), a.it) !== a.hash) { try { viaAtar = !!linkSend_({ op: 'verify', atar: a.atarUid, pw: String(oldPw || '') }).ok; } catch (e) {} }
+  var r = withLock_(function () {
     var all = accs_(), x = all[a.uid];
-    if (pwHash_(x.salt, oldPw, x.it) !== x.hash) throw new Error('كلمة المرور الحالية غير صحيحة');
+    if (!viaAtar && pwHash_(x.salt, oldPw, x.it) !== x.hash) throw new Error('كلمة المرور الحالية غير صحيحة');
     setPass_(x, newPw); x.tv = (x.tv || 0) + 1;
     writeJson_('accounts.json', all);
-    return JSON.stringify({ token: mkToken_(x) });
+    return { token: mkToken_(x) };
   });
+  linkPassOut_(a.uid, newPw);
+  return JSON.stringify(r);
 }
 function acc_list(token) { var a = auth_(token); needAdmin_(a); var all = accs_(); return JSON.stringify(Object.keys(all).map(function (k) { return pubAcc_(all[k]); })); }
 // {uid?, user, name, role, track, disabled} — عند الإنشاء تُعاد كلمة مرور مؤقتة
 function acc_save(token, json) {
   var a = auth_(token); needAdmin_(a);
   var o = JSON.parse(json);
-  return withLock_(function () {
+  var res = withLock_(function () {
     var all = accs_(), x = o.uid ? all[o.uid] : null, fresh = !x, pw = '';
     var user = norm_(txt_(o.user, 40));
     if (!/^[a-z0-9_.\-؀-ۿ]{2,40}$/.test(user)) throw new Error('اسم المستخدم حروف وأرقام بلا مسافات');
@@ -373,24 +513,32 @@ function acc_save(token, json) {
     if (fresh) { x = { uid: uid_(), created: now_(), tv: 0 }; pw = tempPass_(); setPass_(x, pw); all[x.uid] = x; }
     if (x.uid === a.uid && (role !== 'admin' || o.disabled)) throw new Error('لا يمكنك تقييد حسابك');
     x.user = user; x.name = txt_(o.name, 60) || user; x.role = role; x.track = track; x.disabled = !!o.disabled;
+    if ('atarSup' in o) x.atarSup = role === 'team' && !!o.atarSup;
     writeJson_('accounts.json', all);
     log_(a, track, fresh ? 'أنشأ حساباً' : 'عدّل حساباً', x.name);
-    return JSON.stringify({ acc: pubAcc_(x), pass: pw });
+    return { acc: x, pass: pw };
   });
+  var lk = linkSync_(res.acc.uid, res.pass || null);
+  return JSON.stringify({ acc: pubAcc_(accs_()[res.acc.uid]), pass: res.pass, atar: lk });
 }
 function acc_reset(token, uid) {
   var a = auth_(token); needAdmin_(a);
-  return withLock_(function () {
+  var r = withLock_(function () {
     var all = accs_(), x = all[uid]; if (!x) throw new Error('الحساب غير موجود');
     var pw = tempPass_(); setPass_(x, pw); x.tv = (x.tv || 0) + 1; x.fails = 0; x.lockUntil = 0;
     writeJson_('accounts.json', all);
-    return JSON.stringify({ pass: pw, token: x.uid === a.uid ? mkToken_(x) : '' });
+    return { pass: pw, token: x.uid === a.uid ? mkToken_(x) : '', uid: x.uid };
   });
+  linkPassOut_(r.uid, r.pass);
+  delete r.uid;
+  return JSON.stringify(r);
 }
 function acc_del(token, uid) {
   var a = auth_(token); needAdmin_(a);
   if (uid === a.uid) throw new Error('لا يمكنك حذف حسابك');
-  return withLock_(function () { var all = accs_(); if (!all[uid]) throw new Error('الحساب غير موجود'); var n = all[uid].name; delete all[uid]; writeJson_('accounts.json', all); log_(a, '', 'حذف حساباً', n); return 'ok'; });
+  var gone = withLock_(function () { var all = accs_(); if (!all[uid]) throw new Error('الحساب غير موجود'); var x = all[uid]; delete all[uid]; writeJson_('accounts.json', all); log_(a, '', 'حذف حساباً', x.name); return x; });
+  if (gone.atarUid) { try { linkSend_({ op: 'unlink', atar: gone.atarUid, disable: true }); } catch (e) {} }   // يوقف حسابه في أثر وتبقى تصاميمه
+  return 'ok';
 }
 
 /* ================= حسابات أعضاء الفريق =================
@@ -410,12 +558,12 @@ function memberAccounts_(tid, users) {
       while (taken[u]) u = base + (n++);
       var x = { uid: uid_(), created: now_(), tv: 0 }, pw = tempPass_(); setPass_(x, pw);
       x.user = u; x.name = m; x.role = 'team'; x.track = tid; x.disabled = false;
-      all[x.uid] = x; taken[u] = 1; made.push({ name: m, user: u, pw: pw });
+      all[x.uid] = x; taken[u] = 1; made.push({ uid: x.uid, name: m, user: u, pw: pw });
     });
     if (made.length) writeJson_('accounts.json', all);
     return { made: made, had: had };
   });
-  res.made.forEach(function (o) { log_(null, tid, 'أنشأ حساباً', o.name); });
+  res.made.forEach(function (o) { log_(null, tid, 'أنشأ حساباً', o.name); o.atar = linkSync_(o.uid, o.pw); });
   var nm = t.full || t.name, chat = s.adminChat.id;
   var head = '<b>حسابات أعضاء ' + h_(nm) + ' في منصة الأنشطة</b>\n' +
     (res.made.length ? 'أُنشئ ' + accText_(res.made.length) + '. كل رسالة تحت هذه لعضو، فحوّلها له كما هي.' : 'لم يُنشأ حساب جديد.') +
@@ -427,7 +575,8 @@ function memberAccounts_(tid, users) {
       'الرابط: ' + SITE_URL + '\n' +
       'اسم المستخدم: <code>' + h_(o.user) + '</code>\n' +
       'كلمة المرور: <code>' + h_(o.pw) + '</code>\n\n' +
-      'اضغط على اسم المستخدم أو كلمة المرور لنسخها. وبعد أول دخول غيّر كلمة المرور من «تغيير كلمة المرور» في قائمة حسابك.', '', true);
+      'اضغط على اسم المستخدم أو كلمة المرور لنسخها. وبعد أول دخول غيّر كلمة المرور من «تغيير كلمة المرور» في قائمة حسابك.' +
+      (o.atar && o.atar.username ? '\n\nوالحساب نفسه يفتح لك «أثر» لتصميم إعلانات مسارك: ' + ATAR_SITE + (o.atar.username !== o.user ? '\nاسم الدخول في أثر: <code>' + h_(o.atar.username) + '</code>' : '') : ''), '', true);
   });
   return JSON.stringify({ made: res.made.map(function (o) { return { name: o.name, user: o.user }; }), had: res.had });
 }

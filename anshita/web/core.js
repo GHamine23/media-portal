@@ -429,10 +429,31 @@ async function doLogin(user, pass) {
     if (CFG.demo && !pass) pass = window.DEMO.pass(user);
     const r = await API.call('login', user, pass);
     TOKEN = r.token; LS.set(NS + 'tok', TOKEN); LS.set(NS + 'lastWho', LG.other ? '' : LG.who);
-    LG.busy = false; location.hash = '#home'; await boot();
+    LG.busy = false; location.hash = '#home'; await boot(); ssoAtar(true);
   } catch (e) { LG.busy = false; LG.err = e.message; render(); }
 }
-function logout() { TOKEN = ''; D = null; LG.other = false; LS.del(NS + 'tok'); LS.del(NS + 'boot'); stopPoll(); closeLayer(); location.hash = ''; render(); }
+function logout(keepAtar) {
+  if (!keepAtar && D && D.me.linked) atarLogout();   // الخروج من المنصة يُخرج من أثر أيضًا على هذا الجهاز
+  TOKEN = ''; D = null; LG.other = false; LS.del(NS + 'tok'); LS.del(NS + 'boot'); stopPoll(); closeLayer(); location.hash = ''; render();
+}
+
+/* ---------- الحساب الموحّد مع أثر (النطاق نفسه، فالتخزين المحلي مشترك) ----------
+   من دخل المنصة بحساب مربوط تُفتح له جلسة في أثر، ومن كانت له جلسة في أثر يدخل المنصة بها. */
+const ATAR_TOK = 'mp6.token', ATAR_API = 'https://script.google.com/macros/s/AKfycbzBUiyrhbixemmecyGrcGfhWQhmUq-i7ZGKi9fgpg8OlMBJKLDkQLVbndTk5kZsakl4/exec';
+const atarTok = () => { try { return JSON.parse(localStorage.getItem(ATAR_TOK) || 'null') || ''; } catch (e) { return ''; } };
+const setAtarTok = t => { try { if (t) localStorage.setItem(ATAR_TOK, JSON.stringify(t)); else localStorage.removeItem(ATAR_TOK); } catch (e) {} };
+async function ssoAtar(force) {
+  if (CFG.demo || !TOKEN || !D || !D.me.linked || (!force && atarTok())) return;
+  try { const r = await API.me('atar_sso'); if (r && r.token) setAtarTok(r.token); } catch (e) {}
+}
+async function ssoFromAtar() {
+  const t = atarTok(); if (CFG.demo || TOKEN || !t) return false;
+  try { const r = await API.raw('login_atar', t); TOKEN = r.token; LS.set(NS + 'tok', TOKEN); return true; } catch (e) { return false; }
+}
+function atarLogout() {
+  const t = atarTok(); setAtarTok('');
+  if (t && !CFG.demo) fetch(ATAR_API, { method: 'POST', body: JSON.stringify({ fn: 'auth_logout', args: [t] }), redirect: 'follow', credentials: 'omit' }).catch(() => {});
+}
 
 /* ---------- التحميل والتحديث الدوري ---------- */
 function setBoot(b) {
@@ -443,9 +464,9 @@ function setBoot(b) {
 }
 async function boot(silent) {
   try {
-    const b = await API.me('boot'); setBoot(b); setSync('ok'); render(); startPoll(); cardSoon(5000);
+    const b = await API.me('boot'); setBoot(b); setSync('ok'); render(); startPoll(); cardSoon(5000); ssoAtar();
   } catch (e) {
-    if (e.code === 'auth') { logout(); LG.err = e.message; render(); return; }
+    if (e.code === 'auth') { logout(true); if (await ssoFromAtar()) return boot(silent); LG.err = e.message; render(); return; }
     setSync('off');
     if (!D) { const c = LS.get(NS + 'boot', null); if (c) { setBoot(c); render(); startPoll(); toast('تعرض آخر نسخة محفوظة: ' + e.message, 'err'); return; } }
     if (!silent) toast(e.message, 'err');

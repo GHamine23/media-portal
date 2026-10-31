@@ -97,10 +97,14 @@ async function afterLogin() {
   loadNews().then(function (shown) { if (!shown) setTimeout(function () { if (document.body.dataset.page === 'home') maybeTour('home'); }, 700); });
 }
 async function restore() {
-  V6.token = ls('token') || '';
+  V6.token = ls('token') || '' || await ssoFromAnshita();
   if (!V6.token) return false;
   try { V6.me = await API6.me('auth_me'); }
-  catch (e) { V6.token = ''; ls('token', null); return false; }
+  catch (e) {
+    V6.token = ''; ls('token', null);
+    V6.token = await ssoFromAnshita(); if (!V6.token) return false;
+    try { V6.me = await API6.me('auth_me'); } catch (e2) { V6.token = ''; ls('token', null); return false; }
+  }
   if (V6.me.mustChange) { showChangePw(true); return 'must'; }
   try { ls('lastName', String(V6.me.name || '').split(' ')[0]); } catch (e) {}
   splash('نجهّز هوية برنامجك…');
@@ -148,7 +152,24 @@ function progFeat(k) { return !(V6.prog && V6.prog.features && V6.prog.features[
 function featOff(name) { view(el('div', { class: 'wrap page' }, [el('div', { class: 'empty' }, [el('h2', { text: name + ' متوقف في هذا البرنامج' }), el('p', { class: 'muted', text: 'أوقفه مدير المنصة لبرنامج ' + (V6.prog ? V6.prog.name : '') + '. اسأل الإشراف إن احتجته.' }), el('a', { class: 'btn dark', href: '#/', text: 'الرئيسية' })])])); }
 function canSocial() { return can('social') && !(V6.prog && V6.prog.features && V6.prog.features.social === false); }
 async function logout() {
-  if (typeof ED !== 'undefined' && ED.open) ED.leaveOK = true; flushEv(); try { await API6.call('auth_logout', V6.token); } catch (e) {} V6.token = ''; ls('token', null); V6.me = null; go('#/login'); }
+  if (typeof ED !== 'undefined' && ED.open) ED.leaveOK = true; flushEv(); try { await API6.call('auth_logout', V6.token); } catch (e) {}
+  if (V6.me && V6.me.anshita) { try { localStorage.removeItem('anshita.tok'); localStorage.removeItem('anshita.boot'); } catch (e) {} }   // والخروج من منصة الأنشطة على هذا الجهاز
+  V6.token = ''; ls('token', null); V6.me = null; go('#/login'); }
+
+/* ---------- الحساب الموحّد مع منصة الأنشطة التربوية ----------
+   المنصتان على النطاق نفسه: من دخل منصة الأنشطة بحساب مربوط يدخل أثر بحسابه نفسه دون تسجيل دخول جديد. */
+const ANSHITA_API = 'https://script.google.com/macros/s/AKfycbzvZx6QWEGYRLxtX8E6BMCIEw53p-N0GBZ6QYDQKgvQsMDU2IV9gwbb4MMyxecY0jEKNw/exec';
+async function ssoFromAnshita() {
+  let t = ''; try { t = JSON.parse(localStorage.getItem('anshita.tok') || 'null') || ''; } catch (e) {}
+  if (!t || window.DEMO) return '';
+  try {
+    const r = await fetch(ANSHITA_API, { method: 'POST', body: JSON.stringify({ fn: 'atar_sso', args: [t] }), redirect: 'follow', credentials: 'omit' }).then(function (x) { return x.json(); });
+    if (r.error) return '';
+    const v = JSON.parse(r.result);
+    if (v && v.token) { ls('token', v.token); return v.token; }
+  } catch (e) {}
+  return '';
+}
 async function savePrefs6(patch) { V6.me.prefs = Object.assign({}, V6.me.prefs || {}, patch); try { await API6.call('prefs_save', V6.token, JSON.stringify(V6.me.prefs)); } catch (e) {} }
 
 /* ---------- الرأس ----------
