@@ -58,6 +58,7 @@ function pContent(b) {
   tpl.fields.forEach(function (f) {
     if (!f.k && f.kind !== 'date') return;
     if (f.kind === 'hidden') return;
+    if (f.only && f.only.indexOf(S.variant) < 0) return;   // حقل يخص نسخة بعينها من القالب
     if (f.kind === 'date') { form.appendChild(dateField6(f)); return; }
     if (f.kind === 'image') { form.appendChild(imageField6(f)); return; }
     if (f.kind === 'toggle') { form.appendChild(el('label', { class: 'tog' }, [el('input', { type: 'checkbox', checked: !!S.d[f.k], onchange: function (e) { S.d[f.k] = e.target.checked; changed6(); } }), el('span', { text: f.label })])); return; }
@@ -326,11 +327,15 @@ function fontChoices() {
   out.ident.sort(function (a, b) { return idf.indexOf(a) - idf.indexOf(b); }); out.general.sort(by); out.mine.sort(by);
   return out;
 }
+// خط القالب نفسه (القوالب التي تحمل خطوطها) ما لم يختر المصمم خطوطاً عامة
+function tplFont(k) { const f = !S.fs && S.tpl && S.tpl.fonts && S.tpl.fonts[k]; return f && FONTS[f] ? f : ''; }
+// أول اختيار عام للخط يبدأ من خطوط القالب لا من خط البرنامج
+function keepTplFonts() { if (S.fs) return; const t = tplFont('title'), b = tplFont('body'); if (t) FS.title = t; if (b) FS.body = b; }
 // أهداف الخط في التصميم الحالي: العناوين كلها، والنصوص كلها، ثم كل عنصر نصي
 function fontTargets() {
   const t = [
-    { id: 'all_title', label: 'كل العناوين', sample: 'لقاء مفتوح', get: function () { return FS.title; }, set: function (v) { FS.title = v; FS.tw = ''; S.fs = { title: FS.title, body: FS.body, tw: '' }; }, base: true },
-    { id: 'all_body', label: 'كل النصوص', sample: 'الخميس ٨ مساءً', get: function () { return FS.body; }, set: function (v) { FS.body = v; S.fs = { title: FS.title, body: FS.body, tw: FS.tw || '' }; }, base: true }
+    { id: 'all_title', label: 'كل العناوين', sample: 'لقاء مفتوح', get: function () { return tplFont('title') || FS.title; }, set: function (v) { keepTplFonts(); FS.title = v; FS.tw = ''; S.fs = { title: FS.title, body: FS.body, tw: '' }; }, base: true },
+    { id: 'all_body', label: 'كل النصوص', sample: 'الخميس ٨ مساءً', get: function () { return tplFont('body') || FS.body; }, set: function (v) { keepTplFonts(); FS.body = v; S.fs = { title: FS.title, body: FS.body, tw: FS.tw || '' }; }, base: true }
   ];
   Object.keys(LASTG).filter(function (g) { return !isLayer(g) && LASTT[g] && LASTT[g].length; }).forEach(function (g) {
     const smp = String(LASTT[g][0] || '').replace(/\*/g, '').split('\n')[0].trim() || gName(g);

@@ -9,6 +9,13 @@ const FONT_REG = {};
 // خط المصحف المدمج: «أميري قرآن» (رخصة OFL مفتوحة) للنصوص القرآنية بالرسم العثماني، من مجلد fonts بجوار ملفات الموقع
 const FONT_BASE = (function () { try { return document.currentScript.src.replace(/js\/[^/]*$/, ''); } catch (e) { return ''; } })();
 const QURAN_FONT = { family: 'quran', label: 'خط المصحف (أميري)', scope: 'builtin', files: [{ id: 'builtin_quran', weight: 400, local: FONT_BASE + 'fonts/amiri-quran-arabic.woff2', local2: FONT_BASE + 'fonts/amiri-quran-latin.woff2' }] };      // العائلة ← {label, scope, files: [...]}
+// خطوط مفتوحة الرخصة (OFL) مدمجة في الموقع: اليمامة ونوتو سانس العربي دائماً، وزين وريدكس إن لم يكونا في مكتبة المنصة. تحتاجها القوالب التي تحمل خطوطها
+const BUILTIN_FONTS = {
+  alyamama: { family: 'alyamama', label: 'اليمامة', scope: 'builtin', files: [{ id: 'builtin_alyamama', wrange: '300 900', local: FONT_BASE + 'fonts/alyamama.woff2', local2: FONT_BASE + 'fonts/readex.woff2', w2: '100 1000' }] },
+  notosans: { family: 'notosans', label: 'نوتو سانس العربي', scope: 'builtin', files: [{ id: 'builtin_notosans', wrange: '100 900', local: FONT_BASE + 'fonts/notosansarabic.woff2' }] },
+  readex: { family: 'readex', label: 'ريدكس', scope: 'builtin', soft: true, files: [{ id: 'builtin_readex', wrange: '160 700', local: FONT_BASE + 'fonts/readex.woff2' }] },
+  zain: { family: 'zain', label: 'زين', scope: 'builtin', soft: true, files: [{ id: 'builtin_zain7', weight: 700, local: FONT_BASE + 'fonts/zain-bold.woff2' }, { id: 'builtin_zain9', weight: 900, local: FONT_BASE + 'fonts/zain-black.woff2' }] }
+};
 const FONT_LOADED = {};   // العائلة|الوزن ← وعد التحميل
 
 async function assetBlob(meta, pub) {
@@ -112,8 +119,15 @@ async function useProgram(id, silent) {
   FS.title = pref; FS.body = (p.fonts && p.fonts.body) || pref; FS.tw = '';
   FS_PROG = { title: FS.title, body: FS.body, tw: '' };   // خط البرنامج؛ والتصميم الذي اختار خطاً لكل عناوينه يحمله في صفحته (fs)
   await ensureFonts([FS.title, FS.body]);
+  await ensureFonts(tplFontFams()).catch(function () {});
   document.body.classList.remove('loading-prog'); const pl = $('#progld'); if (pl) pl.remove();
   applyProgramColor(p);
+}
+// كل الخطوط التي تحملها القوالب، لتُحمَّل مع البرنامج فتُرسم المعاينات بها من أول مرة
+function tplFontFams() {
+  const out = [];
+  (typeof TEMPLATES !== 'undefined' ? TEMPLATES : []).forEach(function (t) { if (t.fonts) Object.keys(t.fonts).forEach(function (k) { const f = t.fonts[k]; if (f && out.indexOf(f) < 0 && FONTS[f]) out.push(f); }); });
+  return out;
 }
 function applyProgramColor(p) {
   document.documentElement.style.setProperty('--prog', p.color || '#000');
@@ -123,6 +137,7 @@ function applyProgramColor(p) {
 function registerFonts() {
   Object.keys(FONTS).forEach(function (k) { delete FONTS[k]; });
   FONT_REG.quran = QURAN_FONT;
+  Object.keys(BUILTIN_FONTS).forEach(function (k) { const b = BUILTIN_FONTS[k]; if (!b.soft || !FONT_REG[k]) FONT_REG[k] = b; });
   Object.keys(FONT_REG).forEach(function (fam) {
     const r = FONT_REG[fam];
     if (r.scope === 'program' && r.program && V6.prog && r.program !== V6.prog.id) return;
@@ -155,7 +170,7 @@ async function ensureFonts(fams) {
         const url = f.local || await assetURL(f, !!f.ui);
         const ff = new FontFace(parts[0], 'url(' + url + ')', { weight: f.wrange || String(f.weight || 400), style: f.style || 'normal' });
         await ff.load(); document.fonts.add(ff);
-        if (f.local2) { const f2 = new FontFace(parts[0], 'url(' + f.local2 + ')', { weight: '400', unicodeRange: 'U+0000-00FF, U+2000-206F' }); await f2.load().catch(function () {}); if (f2.status === 'loaded') document.fonts.add(f2); }
+        if (f.local2) { const f2 = new FontFace(f.w2 ? parts[0] + '-lat' : parts[0], 'url(' + f.local2 + ')', { weight: f.w2 || '400', unicodeRange: 'U+0000-00FF, U+2000-206F' }); await f2.load().catch(function () {}); if (f2.status === 'loaded') { document.fonts.add(f2); if (f.w2) LATF[parts[0]] = 1; } }
       })().catch(function (e) { console.warn('font', fam, e); delete FONT_LOADED[key]; });
       jobs.push(FONT_LOADED[key]);
     });

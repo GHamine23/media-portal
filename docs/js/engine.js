@@ -49,19 +49,25 @@ function gStyle() { if (!CUR_G) return null; return GST[CUR_G] || (/^info\d+$/.t
 const FONT_NONE = { name: 'خط النظام', w: { l: 'sans-serif', r: 'sans-serif', m: 'sans-serif|500', b: 'sans-serif|700', k: 'sans-serif|900' }, fake: false };
 function wkOf(bold) { return !bold ? 'r' : bold <= 0.45 ? 'm' : bold <= 0.92 ? 'b' : 'k'; }
 // الخط والوزن والحدّ لنص معيّن
-function fontOf(role, bold) {
+// TPLF: خطوط القالب نفسه {title, body, و«أدوار» أخرى مثل name}، تسري ما لم يختر المصمم خطاً للعنصر أو لكل العناوين والنصوص
+let TPLF = null;
+function fontOf(role, bold, isTitle) {
   const gs = gStyle();
+  const fb = role === 'title' || (isTitle && role !== 'body') ? 'title' : 'body';
+  const tk = TPLF && TPLF[role] && FONTS[TPLF[role]];
   // برنامج بلا خطوط بعد: أي خط مسجّل، وإلا خط النظام، فلا يتعطل الرسم
-  const set = (gs && gs.f && FONTS[gs.f]) || FONTS[FS[role === 'title' ? 'title' : 'body']] || FONTS.tajarib || FONTS[Object.keys(FONTS)[0]] || FONT_NONE;
+  const set = (gs && gs.f && FONTS[gs.f]) || tk || FONTS[FS[fb]] || FONTS.tajarib || FONTS[Object.keys(FONTS)[0]] || FONT_NONE;
   let wk = wkOf(bold);
-  if (role === 'title' && FS.tw) wk = FS.tw;
+  if (fb === 'title' && FS.tw && !tk) wk = FS.tw;
   const fake = set.fake ? ({ l: 0, r: 0, m: 0.25, b: 0.6, k: 1 }[wk]) : 0;
   return { fam: set.w[wk] || set.w.r, stroke: fake };
 }
 // fam اسم الخط، أو «الاسم|الوزن» للخطوط المتغيرة والعائلات متعددة الأوزان
+// LATF: عائلات لها وجه لاتيني مرافق باسم «العائلة-lat» (حروف وأرقام لاتينية من خط آخر)، يُقدَّم في سلسلة الخطوط
+const LATF = {};
 function F(size, fam) {
-  fam = fam || 'tj_r'; const i = fam.indexOf('|');
-  return (i > 0 ? fam.slice(i + 1) + ' ' : '') + Math.round(size * 10) / 10 + 'px "' + (i > 0 ? fam.slice(0, i) : fam) + '", ' + FALLBACK;
+  fam = fam || 'tj_r'; const i = fam.indexOf('|'), nm = i > 0 ? fam.slice(0, i) : fam;
+  return (i > 0 ? fam.slice(i + 1) + ' ' : '') + Math.round(size * 10) / 10 + 'px ' + (LATF[nm] ? '"' + nm + '-lat", ' : '') + '"' + nm + '", ' + FALLBACK;
 }
 
 function loadImg(src) {
@@ -323,7 +329,7 @@ function needLh(ctx, lines, size, lh) {
 /* يقيس نصاً ويصغّره حتى يتسع: o = {maxW, maxH, size, min, lh, maxLines, balance, bold, title} */
 function fit(ctx, str, o) {
   const paras = tokens(str);
-  const fo = fontOf(o.title ? 'title' : 'body', o.bold || 0);
+  const fo = fontOf(o.role || (o.title ? 'title' : 'body'), o.bold || 0, o.title);
   const lh0 = o.lh || 1.3, min = o.min || o.size * 0.4, maxLines = o.maxLines || 99;
   let size = o.size, lines, lh = lh0;
   for (let guard = 0; guard < 60; guard++) {
@@ -352,7 +358,7 @@ function fit(ctx, str, o) {
 function drawFit(ctx, f, x, y, o) {
   if (f.empty) return y;
   // قوالب كثيرة تقيس النص قبل أن تعلن مجموعته؛ فإن اختار المستخدم خطاً لهذه المجموعة نعيد القياس بخطها
-  if (f.src && f.src.g !== CUR_G && CUR_G) { const fo = fontOf(f.src.o.title ? 'title' : 'body', f.src.o.bold || 0); if (fo.fam !== f.fam) { const nf = fit(ctx, f.src.str, f.src.o); nf.src.g = CUR_G; Object.assign(f, nf); } }
+  if (f.src && f.src.g !== CUR_G && CUR_G) { const fo = fontOf(f.src.o.role || (f.src.o.title ? 'title' : 'body'), f.src.o.bold || 0, f.src.o.title); if (fo.fam !== f.fam) { const nf = fit(ctx, f.src.str, f.src.o); nf.src.g = CUR_G; Object.assign(f, nf); } }
   o = o || {};
   setF(ctx, f.size, f.fam);
   const sp = ctx.measureText(' ').width;
@@ -385,21 +391,21 @@ function drawFit(ctx, f, x, y, o) {
 
 // نص في سطر واحد يُصغَّر إن طال
 function line(ctx, str, x, y, o) {
-  const f = fit(ctx, str, { maxW: o.maxW || 4000, size: o.size, min: o.min || o.size * 0.5, lh: o.lh || 1.25, maxLines: 1, bold: o.bold, title: o.title });
+  const f = fit(ctx, str, { maxW: o.maxW || 4000, size: o.size, min: o.min || o.size * 0.5, lh: o.lh || 1.25, maxLines: 1, bold: o.bold, title: o.title, role: o.role });
   drawFit(ctx, f, x, y - f.pt - f.size * f.lh / 2, o);
   return f;
 }
-function textW(ctx, str, size, bold, title) {
+function textW(ctx, str, size, bold, title, role) {
   if (!has(str)) return 0;
-  const fo = fontOf(title ? 'title' : 'body', bold || 0);
+  const fo = fontOf(role || (title ? 'title' : 'body'), bold || 0, title);
   setF(ctx, size, fo.fam);
   return lineWidth(ctx, tokens(str)[0] || []);
 }
 
 /* نص على قوس دائرة، مع حفظ اتصال الحروف العربية: يُرسم النص كاملاً ثم يُوزَّع شرائح على القوس */
-function arcText(ctx, str, cx, cy, r, ang, size, color, flip) {
+function arcText(ctx, str, cx, cy, r, ang, size, color, flip, role, bold) {
   str = String(str || '').replace(/\*/g, '').trim(); if (!str) return;
-  const fam = fontOf('body', 0).fam;
+  const fam = fontOf(role || 'body', bold || 0).fam;
   const c = document.createElement('canvas'), g = c.getContext('2d');
   const sc = 2; setF(g, size * sc, fam);
   const w = Math.ceil(g.measureText(str).width) + 8, h = Math.ceil(size * sc * 1.8);
@@ -416,7 +422,7 @@ function arcText(ctx, str, cx, cy, r, ang, size, color, flip) {
     ctx.restore();
   }
 }
-function arcSpan(ctx, str, size, r) { return has(str) ? textW(ctx, str, size) / r : 0; }
+function arcSpan(ctx, str, size, r, role, bold) { return has(str) ? textW(ctx, str, size, bold, false, role) / r : 0; }
 
 /* ---------- أشكال ---------- */
 function rrect(ctx, x, y, w, h, r) {
@@ -554,13 +560,13 @@ function infoItem(ctx, ic, str, x, y, o) {
   const s = o.size, gap = s * 0.45, isz = s * (o.iconScale || 1.15);
   let xr = x;
   if (ic && ic !== 'none') { icon(ctx, ic, xr - isz / 2, y, isz, o.iconColor || o.color); xr -= isz + gap; }
-  const f = line(ctx, str, xr, y, { size: s, color: o.color, hl: o.hl, align: 'right', bold: o.bold, maxW: o.maxW ? o.maxW - (x - xr) : 4000 });
+  const f = line(ctx, str, xr, y, { size: s, color: o.color, hl: o.hl, align: 'right', bold: o.bold, role: o.role, maxW: o.maxW ? o.maxW - (x - xr) : 4000 });
   return x - xr + f.w;
 }
 function infoW(ctx, ic, str, o) {
   if (!String(str || '').trim()) return 0;
   const s = o.size, isz = s * (o.iconScale || 1.15);
-  return (ic && ic !== 'none' ? isz + s * 0.45 : 0) + textW(ctx, str, s, o.bold);
+  return (ic && ic !== 'none' ? isz + s * 0.45 : 0) + textW(ctx, str, s, o.bold, false, o.role);
 }
 
 /* ---------- الصور التي يرفعها المستخدم ---------- */

@@ -44,7 +44,7 @@ function clockDeco(ctx, W, cx, cy, R, u, col) {
 
 function pill(ctx, str, xr, yc, size, fill, color, o) {
   o = o || {};
-  const tw = textW(ctx, str, size, o.bold), padX = size * 0.75, dot = o.icon ? size * 1.15 : 0;
+  const tw = textW(ctx, str, size, o.bold, false, o.role), padX = size * 0.75, dot = o.icon ? size * 1.15 : 0;
   const dl = o.dot ? size * 0.7 : 0;
   const w = tw + padX * 2 + dot + dl, h = size * 1.75;
   const x = o.align === 'left' ? xr : xr - w;
@@ -56,7 +56,7 @@ function pill(ctx, str, xr, yc, size, fill, color, o) {
   }
   if (o.dot) { ctx.beginPath(); ctx.arc(x + padX * 0.9, yc, size * 0.2, 0, Math.PI * 2); ctx.fillStyle = o.dot; ctx.fill(); }
   const save = BOXES; BOXES = null;
-  line(ctx, str, x + w - padX - dot, yc, { size: size, color: color, align: 'right', bold: o.bold });
+  line(ctx, str, x + w - padX - dot, yc, { size: size, color: color, align: 'right', bold: o.bold, role: o.role });
   BOXES = save;
   return { x: x, w: w, h: h };
 }
