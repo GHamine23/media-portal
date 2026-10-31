@@ -15,6 +15,7 @@ call(A, 'auth_password', call(A, 'auth_login', 'admin', t0).token, t0, 'AtarBoss
 const cred = {}; N.setup().split('\n').forEach(l => { const m = /المستخدم: (\S+) — كلمة المرور: (\S+)/.exec(l); if (m) cred[m[1]] = m[2]; });
 const AD = call(N, 'login', 'admin', cred.admin).token;
 const s1 = call(N, 'acc_save', AD, JSON.stringify({ user: 'salem', name: 'سالم', role: 'team', track: 'judhoor' }));
+const gs = call(N, 'acc_save', AD, JSON.stringify({ user: 'gen.sup', name: 'مشرف عام', role: 'sup' }));
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.otf': 'font/otf', '.webmanifest': 'application/manifest+json' };
 (async () => {
@@ -46,22 +47,55 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.
   await p.goto(ATAR); await p.waitForFunction(() => typeof V6 !== 'undefined' && V6.me, null, { timeout: 30000 }).catch(() => {});
   ok(await p.evaluate(() => !!(typeof V6 !== 'undefined' && V6.me && V6.me.username === 'salem' && V6.me.anshita)), 'أثر مفتوح بحسابه نفسه');
   if (OUT) { await p.waitForTimeout(1500); await p.screenshot({ path: path.join(OUT, 'e2e-2-atar.png') }); }
-  // ٣) الخروج من أثر يُخرج من المنصة على هذا الجهاز
+  // ٣) الخروج من أثر وحده (قرار أمين): يبقى في المنصة، ولا يُفتح له أثر منها تلقائيًا
   await p.evaluate(() => logout()); await p.waitForTimeout(800);
-  ok(await p.evaluate(() => !localStorage.getItem('anshita.tok') && !localStorage.getItem('mp6.token')), 'الخروج من أثر يُخرج من المنصة');
-  // ٤) الدخول إلى أثر بكلمة المرور، ثم فتح المنصة: تفتح بالحساب نفسه
+  ok(await p.evaluate(() => !localStorage.getItem('mp6.token') && !!localStorage.getItem('anshita.tok')), 'الخروج من أثر لا يُخرج من المنصة');
+  await p.goto(ATAR); await p.waitForTimeout(3000);
+  ok(await p.evaluate(() => !(typeof V6 !== 'undefined' && V6.me)), 'وأثر يطلب الدخول بعدها');
+  await p.goto(ANS); await p.waitForFunction(() => typeof D !== 'undefined' && D && D.me, null, { timeout: 20000 }).catch(() => {}); await p.waitForTimeout(1500);
+  ok(await p.evaluate(() => !!(typeof D !== 'undefined' && D && D.me.user === 'salem') && !localStorage.getItem('mp6.token')), 'والمنصة مفتوحة، ولا تعيد فتح أثر من نفسها');
+  // ٤) الدخول إلى أثر بكلمة المرور
   await p.goto(ATAR + '#/login'); await p.waitForSelector('#lg_id', { timeout: 20000 });
   for (let i = 0; i < 3; i++) { if (await p.$('.modal')) { await p.keyboard.press('Escape'); await p.waitForTimeout(300); } }
   await p.evaluate(() => document.querySelectorAll('.modal,.coach').forEach(x => x.remove()));
   await p.fill('#lg_id', 'salem'); await p.fill('#lg_pw', s1.pass); await p.click('.lgform button[type=submit]');
   await p.waitForFunction(() => typeof V6 !== 'undefined' && V6.me && localStorage.getItem('mp6.token'), null, { timeout: 30000 }).catch(() => {});
+  ok(await p.evaluate(() => !!(typeof V6 !== 'undefined' && V6.me && V6.me.username === 'salem')), 'يدخل أثر من جديد بكلمته');
+  // ٥) الخروج من المنصة وحدها: يبقى في أثر، ولا تُفتح له المنصة منه تلقائيًا
   await p.goto(ANS); await p.waitForFunction(() => typeof D !== 'undefined' && D && D.me, null, { timeout: 20000 }).catch(() => {});
-  ok(await p.evaluate(() => !!(typeof D !== 'undefined' && D && D.me.user === 'salem')), 'من دخل أثر يجد المنصة مفتوحة بحسابه');
-  // ٥) الخروج من المنصة يُخرج من أثر
   await p.evaluate(() => logout()); await p.waitForTimeout(800);
-  ok(await p.evaluate(() => !localStorage.getItem('mp6.token') && !localStorage.getItem('anshita.tok')), 'الخروج من المنصة يُخرج من أثر');
-  await p.goto(ATAR); await p.waitForTimeout(3000);
-  ok(await p.evaluate(() => !(typeof V6 !== 'undefined' && V6.me)), 'وأثر يطلب الدخول بعدها');
+  ok(await p.evaluate(() => !localStorage.getItem('anshita.tok') && !!localStorage.getItem('mp6.token')), 'الخروج من المنصة لا يُخرج من أثر');
+  await p.goto(ANS); await p.waitForTimeout(3000);
+  ok(await p.evaluate(() => !(typeof D !== 'undefined' && D) && !!document.querySelector('#lg-u, [data-act="lgother"]')), 'والمنصة تطلب الدخول بعدها');
+  await p.goto(ATAR); await p.waitForFunction(() => typeof V6 !== 'undefined' && V6.me, null, { timeout: 30000 }).catch(() => {});
+  ok(await p.evaluate(() => !!(typeof V6 !== 'undefined' && V6.me && V6.me.username === 'salem')), 'وأثر ما زال مفتوحًا');
+  // ٦) دخول جديد في أثر بكلمة المرور يفتح المنصة من جديد
+  await p.evaluate(() => logout()); await p.waitForTimeout(800);
+  await p.goto(ATAR + '#/login'); await p.waitForSelector('#lg_id', { timeout: 20000 });
+  await p.evaluate(() => document.querySelectorAll('.modal,.coach').forEach(x => x.remove()));
+  await p.fill('#lg_id', 'salem'); await p.fill('#lg_pw', s1.pass); await p.click('.lgform button[type=submit]');
+  await p.waitForFunction(() => typeof V6 !== 'undefined' && V6.me && localStorage.getItem('mp6.token'), null, { timeout: 30000 }).catch(() => {});
+  await p.goto(ANS); await p.waitForFunction(() => typeof D !== 'undefined' && D && D.me, null, { timeout: 20000 }).catch(() => {});
+  ok(await p.evaluate(() => !!(typeof D !== 'undefined' && D && D.me.user === 'salem')), 'دخول جديد في أثر يفتح المنصة بحسابه');
+  // ٧) دخول جديد في المنصة يفتح أثر من جديد
+  await p.evaluate(() => logout()); await p.goto(ATAR); await p.waitForFunction(() => typeof V6 !== 'undefined' && V6.me, null, { timeout: 30000 }).catch(() => {});
+  await p.evaluate(() => logout()); await p.waitForTimeout(800);
+  await p.goto(ANS); await p.waitForTimeout(1500);
+  await p.click('[data-act="lgother"]'); await p.fill('#lg-u', 'salem'); await p.fill('#lg-p', s1.pass); await p.click('#lgf button[type=submit]');
+  await p.waitForFunction(() => typeof D !== 'undefined' && D && D.me && localStorage.getItem('mp6.token'), null, { timeout: 20000 }).catch(() => {});
+  ok(await p.evaluate(() => !!localStorage.getItem('mp6.token') && !localStorage.getItem('mp6.nosso')), 'دخول جديد في المنصة يفتح أثر');
+  // ٨) المشرف العام في المنصة: كل المسارات بلا صفحات الإدارة
+  await p.evaluate(() => logout()); await p.waitForTimeout(500);
+  await p.goto(ANS); await p.waitForTimeout(1200);
+  await p.click('[data-act="lgother"]'); await p.fill('#lg-u', 'gen.sup'); await p.fill('#lg-p', gs.pass); await p.click('#lgf button[type=submit]');
+  await p.waitForFunction(() => typeof D !== 'undefined' && D && D.me, null, { timeout: 20000 }).catch(() => {}); await p.waitForTimeout(800);
+  ok(await p.evaluate(() => D.me.role === 'sup' && document.querySelectorAll('.side .nl[href^="#t/"]').length === D.tracks.length && !document.querySelector('.side a[href="#accounts"], .side a[href="#bot"], .side a[href="#alerts"]')), 'المشرف العام: المسارات كلها في القائمة، بلا صفحات الإدارة');
+  if (OUT) await p.screenshot({ path: path.join(OUT, 'e2e-3-sup-home.png') });
+  await p.goto(ANS + '#accounts'); await p.waitForTimeout(800);
+  ok(await p.evaluate(() => location.hash === '#home'), 'وصفحة الحسابات تعيده إلى الرئيسية');
+  await p.goto(ANS + '#t/' + (await p.evaluate(() => D.tracks[1].id))); await p.waitForTimeout(800);
+  ok(await p.evaluate(() => !!document.querySelector('.thead') && !document.querySelector('[data-act="toggleedit"]')), 'يفتح خطة أي مسار، بلا مفتاح صلاحيات المسار');
+  if (OUT) await p.screenshot({ path: path.join(OUT, 'e2e-4-sup-track.png') });
   ok(!errs.length, 'بلا أخطاء في الصفحتين' + (errs.length ? ': ' + errs.slice(0, 3).join(' | ') : ''));
   await b.close();
   console.log((fail ? '✗' : '✓') + ' ' + pass + ' فحصًا ناجحًا في المتصفح' + (fail ? '، و' + fail + ' فاشلة' : ''));
