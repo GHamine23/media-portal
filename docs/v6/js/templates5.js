@@ -82,7 +82,7 @@ function ntStamp(ctx, str, cx, cy, w, h, rot, fill, ink, u) {
   ntCut(ctx, -w / 2, -h / 2, w, h, function (g, ww, hh) { g.fillStyle = fill; g.fillRect(0, 0, ww, hh); }, holes, 'rgba(0,0,0,0.18)');
   ctx.setLineDash([6 * u, 5 * u]); ctx.strokeStyle = alpha(ink, 0.55); ctx.lineWidth = 2 * u;
   ctx.strokeRect(-w / 2 + h * 0.13, -h / 2 + h * 0.13, w - h * 0.26, h - h * 0.26); ctx.setLineDash([]);
-  const ls = str.split('\n').slice(0, 2), fs = Math.min(h * (ls.length > 1 ? 0.25 : 0.32), (w - h * 0.4) / Math.max(3, Math.max.apply(null, ls.map(function (s) { return s.length; }))) * 1.7);
+  const ls = str.split('\n').slice(0, 2), fs = Math.min(h * (ls.length > 1 ? 0.27 : 0.4), (w - h * 0.3) / Math.max(3, Math.max.apply(null, ls.map(function (s) { return s.length; }))) * 2.3);
   // النص مائل مع الختم، فلا تُسجَّل صناديقه المائلة؛ يُسجَّل بدلها مستطيل الختم كاملاً
   quiet(function () { ls.forEach(function (s, i) { line(ctx, s, 0, (i - (ls.length - 1) / 2) * fs * 1.15, { size: fs, color: ink, align: 'center', bold: 0.9, role: 'name', maxW: w - h * 0.36 }); }); });
   if (D()) sparkle(ctx, w / 2 - h * 0.06, -h / 2 + h * 0.04, h * 0.22, '#ffffff');
@@ -531,3 +531,299 @@ TEMPLATES.push(
   }
 }
 );
+
+/* ================= المرحلة الثالثة: جدول الأسبوع، وبطاقات اللقاءات، وخط السير، وتوضيحات المادة ================= */
+
+// سطور «أ | ب | ج» إلى مصفوفات، مع إبقاء عناوين المجموعات (# …)
+function ntRows(str, max) {
+  const out = []; String(str || '').split('\n').forEach(function (l) { l = l.trim(); if (!l) return; if (l[0] === '#') out.push({ head: ntClean(l.replace(/^#+\s*/, '')) }); else out.push({ c: l.split('|').map(function (x) { return ntClean(x.trim()); }) }); });
+  return max ? out.slice(0, max) : out;
+}
+// رأس الجداول: عنوان كبير ممدود بخط العناوين، ثم سطر رملي بخط ونجمة
+function ntSchedHead(ctx, W, d, y, u, k, o) {
+  const tf = fit(ctx, ntClean(d.title), { maxW: W - 200 * u, maxH: 170 * u, size: 92 * u * k, lh: 1.2, balance: true, bold: 1, title: true, role: 'head' });
+  G(ctx, 'title'); drawFit(ctx, tf, W / 2, y, { align: 'center', color: OV.title || o.fg }); y += tf.h + 6 * u;
+  G(ctx, 'sub');
+  if (has(d.sub)) {
+    const f = line(ctx, ntClean(d.sub), W / 2 + 60 * u, y + 30 * u, { size: 44 * u, color: o.sub, align: 'center', bold: 1, role: 'head', maxW: W - 360 * u });
+    if (D()) { hline(ctx, W / 2 + 60 * u - f.w / 2 - 30 * u, W / 2 + 60 * u - f.w / 2 - 210 * u, y + 32 * u, alpha(o.fg, 0.6), 3 * u); ntStar4(ctx, W / 2 + 60 * u - f.w / 2 - 250 * u, y + 32 * u, 26 * u, o.sub); }
+    y += 76 * u;
+  }
+  return y;
+}
+
+TEMPLATES.push(
+
+/* ---------- ت٦. جدول الأسبوع ---------- */
+{
+  id: 'nt_week', type: 'cover', name: 'جدول الأسبوع', tags: 'جدول أسبوع أيام لقاءات محاضرة ديوانية راحة مواد إثرائية اقتباس', isNew: 1, fonts: NT_FONTS,
+  sizes: ['post', 'story'],
+  variants: [{ id: 'night', name: 'كحلي', sw: ['#2d4d24', '#f8f8f8', '#fbb03b'] }, { id: 'paper', name: 'ورقي', sw: ['#f8f8f8', '#2d4d24', '#fbb03b'] }],
+  colorLabels: { bg: 'لون الخلفية', title: 'لون العنوان', accent: 'لون الرملي' },
+  fields: [
+    { k: 'title', label: 'العنوان', def: 'جدول البرنامج', max: 30 },
+    { k: 'rows', label: 'الأيام: اليوم | العنوان | الهجري | الميلادي | ختم (اختياري)؛ و# قبل اسم الأسبوع', kind: 'area', def: '# الأسبوع العاشر\nالسبت | محاضرة: مركزة المركزيات | 16 ربيع الأول | 29 أغسطس\nالأحد | سؤالات الإصلاح | 17 ربيع الأول | 30 أغسطس\nالاثنين | راحة واستدراك | 18 ربيع الأول | 31 أغسطس | مواد إثرائية\nالثلاثاء | راحة واستدراك | 19 ربيع الأول | 1 سبتمبر | مواد إثرائية\nالأربعاء | راحة واستدراك | 20 ربيع الأول | 2 سبتمبر | مواد إثرائية\nالخميس | راحة واستدراك | 21 ربيع الأول | 3 سبتمبر\nالجمعة | ديوانية | 22 ربيع الأول | 4 سبتمبر', max: 900, hint: 'حتى أربعة عشر يوماً؛ وتُقسَّم على عمودين' },
+    { k: 'quote', label: 'اقتباس في آخر الجدول (اختياري)', kind: 'area', def: 'قال ابن القيم رحمه الله: «من أعظم الأشياء ضررًا على العبد بطالته وفراغه».', max: 140 }
+  ],
+  draw: function (ctx, W, H, d, T, v, k) {
+    const p = ntPal(T), C = p.C, u = W / 1080, paper = v === 'paper';
+    const base = OV.bg || (paper ? C.paper : p.night), dark = isDark(base), fg = dark ? '#ffffff' : C.pd;
+    ntGround(ctx, W, H, base, { ink: C.ink, gy: H * 0.3 });
+    let y = ntSchedHead(ctx, W, d, 80 * u, u, k, { fg: fg, sub: dark ? p.sand : p.sandInk });
+    G(ctx, 'logo'); const lg = drawLogo(ctx, T, W / 2, y + 6 * u, 240 * u, dark ? '#ffffff' : 'color', 'tc'); y += Math.max(110 * u, lg.h || 0) + 40 * u;
+    const rows = ntRows(d.rows, 18), foot = 70 * u;
+    // الكتل: عنوان أسبوع ثم أيامه على عمودين (الأيمن أولاً)
+    const blocks = []; rows.forEach(function (r) { if (r.head != null || !blocks.length) blocks.push({ head: r.head || '', items: [] }); if (r.c) blocks[blocks.length - 1].items.push(r.c); });
+    const hasQ = has(d.quote);
+    let nRowLines = 0; blocks.forEach(function (b, i) { const n = b.items.length + (hasQ && i === blocks.length - 1 ? 1 : 0); nRowLines += Math.ceil(n / 2); });
+    const gap = 22 * u, headH = 84 * u, padB = 34 * u;
+    const rh = Math.max(70 * u, Math.min((H > W * 1.5 ? 210 : 165) * u, (H - y - foot - blocks.length * (headH + padB) - nRowLines * gap) / Math.max(1, nRowLines)));
+    const m = 70 * u, colW = (W - m * 2 - 30 * u) / 2, sand = OV.accent || p.sand, fz = Math.min(1.25, rh / (118 * u));
+    // ما بقي من الارتفاع يوزَّع فوق الكتل وتحتها
+    const used = blocks.reduce(function (a, b, i) { const n = b.items.length + (hasQ && i === blocks.length - 1 ? 1 : 0); return a + headH + Math.ceil(n / 2) * (rh + gap) + padB - gap + padB; }, 0);
+    y += Math.max(0, (H - y - foot - used) / 2);
+    let ri = 0;
+    blocks.forEach(function (b, bi) {
+      const items = b.items.slice(); if (hasQ && bi === blocks.length - 1) items.push(null);
+      const nr = Math.ceil(items.length / 2), bh = headH + nr * (rh + gap) + padB - gap;
+      // إطار الأسبوع
+      G(ctx, 'head' + bi);
+      const hw = has(b.head) ? textW(ctx, b.head, 46 * u, 1, true, 'head') : 0;
+      if (D()) {
+        ctx.save(); rrect(ctx, m - 20 * u, y + 30 * u, W - (m - 20 * u) * 2, bh - 30 * u, 36 * u); ctx.fillStyle = dark ? 'rgba(255,255,255,0.035)' : alpha(C.pd, 0.03); ctx.fill();
+        // فتحة في الإطار خلف عنوان الأسبوع
+        if (hw) { ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.rect(W - m - 40 * u - hw - 22 * u, y, hw + 44 * u, 60 * u); ctx.clip('evenodd'); }
+        rrect(ctx, m - 20 * u, y + 30 * u, W - (m - 20 * u) * 2, bh - 30 * u, 36 * u); ctx.strokeStyle = dark ? 'rgba(255,255,255,0.22)' : alpha(C.pd, 0.2); ctx.lineWidth = 2 * u; ctx.stroke(); ctx.restore();
+      }
+      if (hw) line(ctx, b.head, W - m - 40 * u, y + 30 * u, { size: 46 * u, color: dark ? p.sand : p.sandInk, align: 'right', bold: 1, title: true, role: 'head', maxW: W * 0.6 });
+      const y0 = y + headH;
+      items.forEach(function (it, i) {
+        const col = i < nr ? 0 : 1, row = col ? i - nr : i, x1 = W - m - col * (colW + 30 * u), x0 = x1 - colW, yy = y0 + row * (rh + gap);
+        G(ctx, 'row' + (ri++));
+        if (it === null) {   // الاقتباس
+          G(ctx, 'quote');
+          ctx.save(); rrect(ctx, x0, yy, colW, rh, 18 * u); ctx.fillStyle = dark ? 'rgba(255,255,255,0.08)' : alpha(C.pd, 0.06); ctx.fill(); ctx.restore();
+          const qf = fit(ctx, ntClean(d.quote), { maxW: colW - 50 * u, maxH: rh - 20 * u, size: 30 * u * fz, lh: 1.45, role: 'body', balance: true });
+          drawFit(ctx, qf, x0 + colW / 2, yy + (rh - qf.h) / 2, { align: 'center', color: dark ? mixC(p.sand, '#ffffff', 0.35) : p.sandInk });
+          return;
+        }
+        // اليوم (أفقي) ← العنوان على لون داكن ← التاريخان مع سهم
+        const dayW = colW * 0.24, dateW = colW * 0.27, midW = colW - dayW - dateW;
+        ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.18)'; ctx.shadowBlur = 14 * u; ctx.shadowOffsetY = 4 * u;
+        fillRR(ctx, x0, yy, colW, rh, 16 * u, p.cream); ctx.restore();
+        const g = ctx.createLinearGradient(x1 - dayW, 0, x0 + dateW, 0); g.addColorStop(0, C.pd); g.addColorStop(1, mixC(C.pd, C.p, 0.55));
+        ctx.save(); rrect(ctx, x0 + dateW, yy, midW, rh, 16 * u); ctx.fillStyle = g; ctx.fill(); ctx.restore();
+        ctx.fillStyle = mixC(C.pd, C.p, 0.55); ctx.beginPath(); ctx.moveTo(x0 + dateW + 1, yy + rh / 2 - 14 * u); ctx.lineTo(x0 + dateW - 16 * u, yy + rh / 2); ctx.lineTo(x0 + dateW + 1, yy + rh / 2 + 14 * u); ctx.closePath(); ctx.fill();
+        line(ctx, it[0], x1 - dayW / 2, yy + rh / 2, { size: 30 * u * fz, color: C.pd, align: 'center', bold: 1, role: 'head', maxW: dayW - 16 * u });
+        const tt = String(it[1] || '').replace(/^(محاضرة|درس|لقاء|سلسلة)\s*:\s*/, '*$1* '), tf = fit(ctx, tt, { maxW: midW - 34 * u, maxH: rh - 18 * u, size: 30 * u * fz, lh: 1.3, bold: 0.9, role: 'name', balance: true });
+        drawFit(ctx, tf, x0 + dateW + midW / 2, yy + (rh - tf.h) / 2, { align: 'center', color: '#ffffff', hl: sand });
+        const ds = [it[2], it[3]].filter(has);
+        ds.forEach(function (t, j) { line(ctx, t, x0 + dateW / 2 + 4 * u, yy + rh / 2 + (j - (ds.length - 1) / 2) * 34 * u * fz, { size: 25 * u * fz, color: C.pd, align: 'center', bold: j ? 0.5 : 0.9, role: 'name', maxW: dateW - 26 * u }); });
+        if (has(it[4])) { G(ctx, 'stamp'); ntStamp(ctx, it[4], x0 + dateW + midW * 0.26, yy + rh - 4 * u, Math.min(midW * 0.55, 190 * u * fz), 50 * u * fz, -0.08, sand, C.pd, u); }
+      });
+      y += bh + padB;
+    });
+    G(ctx, 'footer');
+    if (D()) { quiet(function () { ctx.fillStyle = paper ? C.pd : p.cream; ctx.fillRect(0, H - 54 * u, W, 54 * u); }); ntStar4(ctx, 46 * u, H - 27 * u, 16 * u, paper ? p.cream : C.pd); }
+  }
+},
+
+/* ---------- ت٧. بطاقات اللقاءات ---------- */
+{
+  id: 'nt_cards', type: 'cover', name: 'بطاقات اللقاءات', tags: 'جدول لقاءات بطاقات مقدم مرحلة مهارية عدد شبكة', isNew: 1, fonts: NT_FONTS,
+  sizes: ['post', 'story'],
+  variants: [{ id: 'night', name: 'كحلي بشبكة', sw: ['#2d4d24', '#f8f8f8', '#fbb03b'] }, { id: 'paper', name: 'ورقي', sw: ['#f8f8f8', '#2d4d24', '#fbb03b'] }],
+  colorLabels: { bg: 'لون الخلفية', title: 'لون العنوان', accent: 'لون الرملي' },
+  fields: [
+    { k: 'title', label: 'العنوان', def: 'جدول البرنامج', max: 30 },
+    { k: 'sub', label: 'تحت العنوان', def: 'لقاءات المرحلة المهارية', max: 40 },
+    { k: 'lbl', label: 'قبل الاسم', def: 'المقدّم:', max: 18, half: 1 },
+    { k: 'total', label: 'العدد الكلي (اختياري)', def: 'عدد اللقاءات: *21*', max: 30, half: 1 },
+    { k: 'rows', label: 'اللقاءات: العنوان | المقدّم | ختم (اختياري)', kind: 'area', def: 'كيف تدرّب قلمك على الكتابة | أ. إسماعيل عرفة | مسار تدريبي\nأدوات قوقل | أ. محمد بخاري | لقاءان\nمفاتيح في إعداد الدروس والمواد | أ. محمد بادنجكي\nمهارات البيان للمصلحين المؤثرين | أ. سالم عقاد\nبناء ثقافة التعاون وتعزيز روح الفريق | أ. عبدالله أشرف\nكيف أختار ثغري؟ | أ. محمد عبدالوهاب', max: 600, hint: 'حتى ست بطاقات في الصفحة؛ أضف صفحة للباقي' }
+  ],
+  draw: function (ctx, W, H, d, T, v, k) {
+    const p = ntPal(T), C = p.C, u = W / 1080, paper = v === 'paper', tall = H > W * 1.5;
+    const base = OV.bg || (paper ? C.paper : p.night), dark = isDark(base), fg = dark ? '#ffffff' : C.pd, sand = OV.accent || p.sand;
+    ntGround(ctx, W, H, base, { ink: C.ink, gy: H * 0.4 });
+    let y = ntSchedHead(ctx, W, d, (tall ? 140 : 80) * u, u, k, { fg: fg, sub: dark ? mixC(C.pl, '#ffffff', 0.45) : C.p });
+    const rows = ntRows(d.rows, 6).filter(function (r) { return r.c; }), n = rows.length;
+    const hasT = has(d.total), footH = 150 * u + (hasT ? 110 * u : 0);
+    const m = 90 * u, gx = 70 * u, cw = (W - m * 2 - gx) / 2, nr = Math.ceil(n / 2), gy = 46 * u;
+    const ch = Math.min(260 * u * (tall ? 1.25 : 1), (H - y - 40 * u - footH - (nr - 1) * gy) / Math.max(1, nr));
+    y += 40 * u + Math.max(0, (H - y - 40 * u - footH - nr * ch - (nr - 1) * gy) / 2);
+    rows.forEach(function (r, i) {
+      const col = i % 2, row = Math.floor(i / 2), x1 = W - m - col * (cw + gx), x0 = x1 - cw, yy = y + row * (ch + gy), it = r.c;
+      G(ctx, 'card' + i);
+      const nr0 = ch * 0.17;
+      ntCut(ctx, x0, yy, cw, ch, function (g, w, h) { g.fillStyle = p.cream; g.fillRect(0, 0, w, h); const gr = g.createLinearGradient(0, 0, w, h); gr.addColorStop(0, 'rgba(0,0,0,0.05)'); gr.addColorStop(0.5, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.04)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); },
+        [[0, 0, nr0], [cw, 0, nr0], [0, ch, nr0], [cw, ch, nr0]], dark ? 'rgba(0,0,0,0.25)' : alpha(C.ink, 0.14));
+      area(x0, yy, x1, yy + ch);
+      const tw = cw * 0.78, cx = x0 + cw / 2;
+      const tf = fit(ctx, it[0], { maxW: tw, maxH: ch * 0.42, size: 46 * u * (tall ? 1.15 : 1), lh: 1.25, balance: true, bold: 0.95, title: true });
+      const ls = 30 * u * (tall ? 1.15 : 1), ns = 34 * u * (tall ? 1.15 : 1);
+      const blk = tf.h + 20 * u + (has(d.lbl) ? ls * 1.3 : 0) + (has(it[1]) ? ns * 1.3 : 0);
+      let ty = yy + (ch - blk) / 2;
+      drawFit(ctx, tf, cx, ty, { align: 'center', color: C.pd }); ty += tf.h + 20 * u;
+      if (has(d.lbl)) { line(ctx, ntClean(d.lbl), cx, ty + ls * 0.5, { size: ls, color: p.sandInk, align: 'center', bold: 0.9, role: 'name' }); ty += ls * 1.3; }
+      if (has(it[1])) line(ctx, it[1], cx, ty + ns * 0.55, { size: ns, color: C.pd, align: 'center', bold: 0.9, role: 'name', maxW: tw });
+      if (D()) ntWheat(ctx, x0 - 2 * u, yy + ch * 0.6, 40 * u, sand);
+      if (has(it[2])) ntStamp(ctx, it[2], x0 + cw * 0.06, yy + ch * 0.56, cw * 0.27, ch * 0.21, -0.35, i % 2 ? sand : p.stamp, C.pd, u);
+    });
+    G(ctx, 'total');
+    if (hasT) {
+      const ty = H - footH + 30 * u, tw = Math.min(W * 0.5, textW(ctx, d.total.replace(/\*/g, ''), 46 * u, 1, true) + 140 * u);
+      ntCut(ctx, (W - tw) / 2, ty, tw, 84 * u, function (g, w, h) { g.fillStyle = p.cream; g.fillRect(0, 0, w, h); }, [[0, 0, 14 * u], [tw, 0, 14 * u], [0, 84 * u, 14 * u], [tw, 84 * u, 14 * u]], 'rgba(0,0,0,0.2)');
+      line(ctx, ntClean(d.total), W / 2, ty + 42 * u, { size: 42 * u, color: C.pd, align: 'center', bold: 0.95, title: true, hl: p.sandInk });
+      if (D()) ntWheat(ctx, (W - tw) / 2 - 2 * u, ty + 42 * u, 30 * u, sand);
+    }
+    G(ctx, 'logo'); drawLogo(ctx, T, W / 2, H - 80 * u, 210 * u, dark ? '#ffffff' : 'color', 'c');
+  }
+},
+
+/* ---------- ت٨. خط السير ---------- */
+{
+  id: 'nt_route', type: 'cover', name: 'خط السير', tags: 'خط سير رحلة طريق محطات مراحل سلاسل محاضرات خريطة', isNew: 1, fonts: NT_FONTS,
+  sizes: ['post', 'story'],
+  variants: [{ id: 'paper', name: 'ورقي', sw: ['#f8f8f8', '#2d4d24', '#fbb03b'] }, { id: 'night', name: 'كحلي', sw: ['#2d4d24', '#f8f8f8', '#fbb03b'] }],
+  colorLabels: { bg: 'لون الخلفية', title: 'لون العنوان', accent: 'لون النوع' },
+  fields: [
+    { k: 'title', label: 'العنوان', kind: 'area', def: 'الرحلة إلى\nسدّ الثغور', max: 40 },
+    { k: 'items', label: 'المحطات: النوع | العنوان (من أول الطريق)', kind: 'area', def: 'محاضرة | من أين يبدأ التغيير للأمة\nمحاضرة | من جيل الأمناء إلى جيل التجديد\nسلسلة | إحياء منهاج النبوة\nسلسلة | خارطة الثغور\nسلسلة | التجارب الإصلاحية\nمحاضرة | كيف أحافظ على حضور القلب وخشوعه\nمحاضرة | هل يمكن توحيد الصف الإسلامي\nسلسلة | زاد المصلحين\nسلسلة | تجربة تربية المصلحين', max: 600, hint: 'حتى عشر محطات' },
+    { k: 'end', label: 'المحطة الأخيرة', def: 'المرحلة الثانية', max: 30 }
+  ],
+  draw: function (ctx, W, H, d, T, v, k) {
+    const p = ntPal(T), C = p.C, u = W / 1080, night = v === 'night', tall = H > W * 1.5;
+    const base = OV.bg || (night ? p.night : C.paper), dark = isDark(base), fg = dark ? '#ffffff' : C.pd, kind = OV.accent || (dark ? p.sand : p.sandInk), ink = dark ? alpha('#ffffff', 0.92) : mixC(C.pd, C.ink, 0.3);
+    ntGround(ctx, W, H, base, { ink: C.ink, grid: false, gx: W * 0.2, gy: H * 0.1 });
+    if (D() && !BGFX) quiet(function () { const R = rng(23); ctx.fillStyle = dark ? 'rgba(255,255,255,0.05)' : alpha(C.pd, 0.05); for (let i = 0; i < 900; i++) { const x = R() * W, y = R() * H * 0.5; ctx.beginPath(); ctx.arc(x, y, 2.2 * u, 0, Math.PI * 2); ctx.fill(); } });
+    G(ctx, 'deco'); if (D()) ntStar4(ctx, W * 0.56, 150 * u, 100 * u, alpha(OV.accent || p.sand, 0.55));
+    const tf = fit(ctx, ntClean(d.title), { maxW: W * 0.52, maxH: 260 * u, size: 116 * u * k, lh: 1.2, bold: 1, title: true, role: 'head' });
+    G(ctx, 'title'); drawFit(ctx, tf, W * 0.46, 80 * u, { align: 'center', color: OV.title || fg });
+    G(ctx, 'logo'); drawLogo(ctx, T, W - 80 * u, 90 * u, 170 * u, dark ? '#ffffff' : 'color', 'tr');
+    // الطريق: صفوف متعرجة، محطتان في كل صف، ينعطف عند الحافتين بنصف دائرة
+    const items = ntRows(d.items, 10).filter(function (r) { return r.c; }), n = items.length;
+    const top = 80 * u + tf.h + 150 * u, endH = has(d.end) ? 200 * u : 60 * u, bot = H - endH;
+    const R = Math.max(1, Math.ceil(n / 2)), rh = Math.min(220 * u * (tall ? 1.25 : 1), (bot - top) / R), rad = Math.min(rh / 2, 100 * u);
+    const xl = 160 * u, xr = W - 160 * u, lineC = dark ? 'rgba(255,255,255,0.55)' : alpha(C.pd, 0.5), node = dark ? p.cream : mixC(C.pd, C.p, 0.3);
+    const dash = function () { ctx.strokeStyle = lineC; ctx.lineWidth = 4 * u; ctx.setLineDash([2 * u, 11 * u]); ctx.lineCap = 'round'; };
+    G(ctx, 'route');
+    ctx.save(); dash(); ctx.beginPath(); ctx.moveTo(xr, top);
+    for (let r = 0; r < R; r++) {
+      const y = top + r * rh, toLeft = r % 2 === 0;
+      ctx.lineTo(toLeft ? xl : xr, y);
+      if (r < R - 1) ctx.arc(toLeft ? xl : xr, y + rh / 2, rh / 2, -Math.PI / 2, Math.PI / 2, toLeft);
+    }
+    const lastY = top + (R - 1) * rh, lastSide = (R - 1) % 2 === 0 ? xl : xr, ey = H - 110 * u;
+    if (has(d.end)) { ctx.lineTo(lastSide, lastY); ctx.arc(lastSide, (lastY + ey) / 2, (ey - lastY) / 2, -Math.PI / 2, Math.PI / 2, lastSide === xl); ctx.lineTo(W / 2, ey); }
+    ctx.stroke(); ctx.restore();
+    area(xl - rh / 2, top - 10 * u, xr + rh / 2, lastY + 20 * u);
+    // الدبوس في أول الطريق
+    G(ctx, 'deco'); if (D()) { const py = top - 56 * u; ctx.save(); dash(); ctx.beginPath(); ctx.moveTo(xr, top); ctx.lineTo(xr, py + 30 * u); ctx.stroke(); ctx.restore(); ctx.beginPath(); ctx.arc(xr, py, 32 * u, 0, Math.PI * 2); ctx.fillStyle = OV.accent || p.sand; ctx.fill(); icon(ctx, 'pin', xr, py, 36 * u, dark ? p.night : '#ffffff'); }
+    // المحطات وعناوينها فوقها
+    const lw = (xr - xl) * 0.42, ts = 30 * u * (tall ? 1.12 : 1), ks = 27 * u * (tall ? 1.12 : 1);
+    items.forEach(function (it, i) {
+      const r = Math.floor(i / 2), j = i % 2, toLeft = r % 2 === 0, t = j ? 0.76 : 0.27, x = toLeft ? xr - t * (xr - xl) : xl + t * (xr - xl), y = top + r * rh;
+      G(ctx, 'item' + i);
+      ctx.beginPath(); ctx.arc(x, y, 18 * u, 0, Math.PI * 2); ctx.fillStyle = node; ctx.fill();
+      const tt = fit(ctx, it.c[1] || '', { maxW: lw, maxLines: 2, size: ts, lh: 1.32, bold: 0.9, role: 'name', balance: true });
+      const by = y - 34 * u - tt.h;
+      drawFit(ctx, tt, x, by, { align: 'center', color: ink });
+      if (has(it.c[0])) line(ctx, it.c[0], x, by - ks * 0.75, { size: ks, color: kind, align: 'center', bold: 0.9, role: 'name' });
+    });
+    // المحطة الأخيرة
+    G(ctx, 'end');
+    if (has(d.end)) {
+      ctx.beginPath(); ctx.arc(W / 2, ey, 26 * u, 0, Math.PI * 2); ctx.fillStyle = node; ctx.fill();
+      line(ctx, ntClean(d.end), W / 2, ey - 72 * u, { size: 40 * u, color: fg, align: 'center', bold: 1, title: true, role: 'head' });
+      if (D()) { ctx.save(); dash(); ctx.beginPath(); ctx.moveTo(W / 2 - 40 * u, ey); ctx.lineTo(150 * u, ey); ctx.stroke(); ctx.restore(); ntStar4(ctx, 110 * u, ey, 34 * u, node); }
+    }
+  }
+}
+);
+
+/* ---------- ت٩. توضيحات المادة (ورقة، وشريحة في العروض: sl_brief في slides.js) ---------- */
+// قسم: السطر الأول عنوانه، و«## » عنوان فرعي، و«> » تمهيد، و«- » بند
+function ntSecParse(str) {
+  const L = String(str || '').split('\n').map(function (x) { return x.trim(); }).filter(Boolean); if (!L.length) return null;
+  // سطر أول طويل ليس عنواناً: يصير فقرة، ويبقى القسم بلا كبسولة
+  const head = L[0].length <= 60 ? ntClean(L[0].replace(/^#+\s*/, '')) : '';
+  return { head: head, lines: (head ? L.slice(1) : L).map(function (l) {
+    if (/^##/.test(l)) return { t: 'h', s: ntClean(l.replace(/^#+\s*/, '')) };
+    if (/^>/.test(l)) return { t: 'p', s: ntClean(l.replace(/^>\s*/, '')) };
+    return { t: 'b', s: ntClean(l.replace(/^[-•·]\s*/, '')) };
+  }) };
+}
+// يقيس قسماً أو يرسمه داخل صندوق عرضه w، ويعيد ارتفاعه
+function ntSecBox(ctx, sec, x0, y, w, s, o, draw) {
+  const pad = 30 * s, ph = 58 * s, inner = w - pad * 2, xr = x0 + w - pad;
+  const items = [];
+  let h = ph * 0.6 + 18 * s;
+  sec.lines.forEach(function (l) {
+    if (l.t === 'h') { if (items.length) h += 14 * s; items.push({ l: l, y: h }); h += 62 * s; return; }
+    const f = fit(ctx, l.s, { maxW: l.t === 'b' ? inner - 34 * s : inner, size: (l.t === 'p' ? 27 : 26) * s, lh: 1.6, bold: l.t === 'p' ? 0.9 : 0, role: 'body' });
+    items.push({ l: l, y: h, f: f }); h += f.h + 6 * s;
+  });
+  h += 24 * s;
+  if (!draw) return h;
+  // الصندوق وحده ثم كبسولة العنوان على حافته العليا
+  ctx.save(); rrect(ctx, x0, y, w, h, 34 * s); ctx.fillStyle = o.box; ctx.fill(); ctx.strokeStyle = o.line; ctx.lineWidth = 2.5 * s; ctx.stroke(); ctx.restore();
+  if (!has(sec.head)) { drawItems(); return h; }
+  const hw = Math.min(w * 0.86, textW(ctx, sec.head, 32 * s, 1, true, 'head') + 140 * s);
+  ntCut(ctx, xr + pad - hw - 10 * s, y - ph / 2, hw, ph, function (g, ww, hh) { g.fillStyle = o.pill; rrect(g, 0, 0, ww, hh, hh * 0.3); g.fill(); }, [], 'rgba(0,0,0,0.15)');
+  ctx.beginPath(); ctx.arc(xr + pad - hw - 10 * s - 34 * s, y, 22 * s, 0, Math.PI * 2); ctx.strokeStyle = o.pill; ctx.lineWidth = 3 * s; ctx.stroke();
+  icon(ctx, o.ic || 'star', xr + pad - hw - 10 * s - 34 * s, y, 22 * s, o.pill);
+  line(ctx, sec.head, xr + pad - 10 * s - 34 * s, y, { size: 32 * s, color: o.pillInk, align: 'right', bold: 1, title: true, role: 'head', maxW: hw - 60 * s });
+  drawItems();
+  return h;
+  function drawItems() { items.forEach(function (it) {
+    const yy = y + it.y;
+    if (it.l.t === 'h') { const ww = textW(ctx, it.l.s, 28 * s, 1, true, 'head') + 70 * s; fillRR(ctx, xr - ww, yy, ww, 46 * s, 23 * s, o.sub); line(ctx, it.l.s, xr - 35 * s, yy + 23 * s, { size: 28 * s, color: o.subInk, align: 'right', bold: 1, title: true, role: 'head' }); return; }
+    const isB = it.l.t === 'b';
+    if (isB) { const ty = yy + it.f.pt + it.f.size * it.f.lh / 2; ctx.fillStyle = o.bullet; ctx.beginPath(); ctx.moveTo(xr, ty - 8 * s); ctx.lineTo(xr - 14 * s, ty); ctx.lineTo(xr, ty + 8 * s); ctx.closePath(); ctx.fill(); }
+    drawFit(ctx, it.f, isB ? xr - 30 * s : xr, yy, { align: 'right', color: o.ink, hl: o.hl });
+  }); }
+}
+function ntBriefDraw(ctx, W, H, d, T, v, k, slide) {
+  const p = ntPal(T), C = p.C, land = W > H, s = slide ? W / 1920 : land ? W / 1754 : W / 1240;
+  const dark = v !== 'paper' && !OV.bg ? true : isDark(OV.bg || C.paper);
+  if (v === 'paper' || (OV.bg && !isDark(OV.bg))) paintBg(ctx, W, H, OV.bg || '#ffffff');
+  else {
+    const g = ctx.createLinearGradient(W, 0, 0, H); g.addColorStop(0, OV.bg || mixC(C.p, C.pd, 0.25)); g.addColorStop(1, OV.bg || mixC(C.pd, '#000000', 0.2)); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    if (D() && !BGFX) quiet(function () { xmark(ctx, W * 0.3, H * 0.6, Math.min(W, H) * 0.8, 'rgba(255,255,255,0.04)', 0.3); });
+  }
+  const fg = dark ? '#ffffff' : C.pd, sand = OV.accent || p.sand;
+  const o = { box: dark ? 'rgba(255,255,255,0.93)' : mixC(C.paper, '#ffffff', 0.5), line: dark ? alpha(sand, 0.9) : alpha(C.pd, 0.25), pill: sand, pillInk: C.pd, sub: dark ? mixC(C.pl, '#ffffff', 0.6) : alpha(C.p, 0.14), subInk: C.pd, bullet: p.sandInk, ink: C.ink, hl: mixC(C.p, C.ink, 0.15) };
+  const m = 80 * s, xr = W - m;
+  let y = 70 * s;
+  G(ctx, 'kicker'); if (has(d.kicker)) { line(ctx, ntClean(d.kicker), xr, y + 24 * s, { size: 34 * s, color: dark ? alpha('#ffffff', 0.9) : C.ink, align: 'right', role: 'body' }); y += 60 * s; }
+  const tt = has(d.title) ? '«' + ntClean(d.title).replace(/^[«"'']+|[»"'']+$/g, '') + '»' : '';
+  const tf = fit(ctx, tt, { maxW: W - m * 2 - 260 * s, maxH: 180 * s, size: 96 * s * k, lh: 1.2, bold: 1, title: true, role: 'head', maxLines: 1 });
+  G(ctx, 'title'); drawFit(ctx, tf, xr, y, { align: 'right', color: OV.title || (dark ? sand : C.pd) }); y += tf.h + 70 * s;
+  G(ctx, 'logo'); drawLogo(ctx, T, m, 60 * s, 200 * s, dark ? '#ffffff' : 'color', 'tl');
+  const secs = [d.s1, d.s2, d.s3, d.s4].map(ntSecParse).filter(Boolean), ics = ['star', 'book', 'ring', 'link'];
+  const cols = land ? 2 : 1, gapX = 50 * s, cw = (W - m * 2 - gapX * (cols - 1)) / cols;
+  // حجم النص: أكبر ما يتسع (الشرائح تُقرأ من بعيد فتبدأ أكبر)
+  const plan = function (f) { const cy = [0, 0], at = []; secs.forEach(function (sec) { const h = ntSecBox(ctx, sec, 0, 0, cw, s * f, o, false); const c = cols === 1 ? 0 : (cy[0] <= cy[1] ? 0 : 1); at.push([c, cy[c]]); cy[c] += h + 80 * s * f; }); return { at: at, h: Math.max(cy[0], cy[1]) }; };
+  let f = slide ? 2 : 1.45, P = plan(f);
+  for (let i = 0; i < 12 && P.h > H - y - 30 * s; i++) { f *= 0.93; P = plan(f); }
+  secs.forEach(function (sec, i) {
+    const c = P.at[i][0], x0 = W - m - cw - c * (cw + gapX);
+    G(ctx, 'sec' + i); ntSecBox(ctx, sec, x0, y + P.at[i][1] + 30 * s * f, cw, s * f, Object.assign({ ic: ics[i] }, o), true);
+  });
+}
+
+TEMPLATES.push({
+  id: 'nt_brief', type: 'study', name: 'توضيحات المادة', tags: 'توضيحات مادة مقاصد مطلوب واجب مستحب خلاصة توجيهات طالب', isNew: 1, fonts: NT_FONTS,
+  sizes: ['a4', 'card', 'post'],
+  variants: [{ id: 'tint', name: 'ملوّن', sw: ['#467839', '#ffffff', '#fbb03b'] }, { id: 'paper', name: 'أبيض', sw: ['#ffffff', '#2d4d24', '#fbb03b'] }],
+  colorLabels: { bg: 'لون الخلفية', title: 'لون اسم المادة', accent: 'لون الكبسولات' },
+  fields: [
+    { k: 'kicker', label: 'السطر الأول', def: 'توضيحات متعلقة بمادة:', max: 50 },
+    { k: 'title', label: 'اسم المادة', def: 'مركزيات الإصلاح', max: 40 },
+    { k: 's1', label: 'القسم الأول (السطر الأول عنوانه، و- قبل كل بند)', kind: 'area', def: 'مقاصد تقرير هذه المادة\n- ضبط بوصلة الإصلاح، وبيان أهم مركزياته.\n- معرفة أهم الأدلة والشواهد على مركزيات الإصلاح.\n- تعزيز اليقين بكفاية الوحي في الجانب الإصلاحي.\n- تكوين الثقافة المعيارية التي تجمع المصلحين على اختلاف مجالاتهم.', max: 700 },
+    { k: 's2', label: 'القسم الثاني (## عنوان فرعي، و> تمهيد)', kind: 'area', def: 'المطلوب من الطالب تجاه المادة\n## قسم واجب\n> لا يُسمح بالتنازل عنه، ويدخل تحته:\n- *متابعة* المادة بتركيز.\n- *تدوين* أهم الفوائد والشواهد والأدلة.\n- *استخراج* تطبيقات عملية.\n## قسم مستحب\n> يزيد به الطالب على المطلوب منه، ويدخل تحته:\n- *تشجير* المادة.\n- *استخراج* أهم الاقتباسات والفوائد ونشرها.', max: 900 },
+    { k: 's3', label: 'القسم الثالث', kind: 'area', def: 'نخرج مما سبق بأمور\n- أن المقصود الأكبر هو الاطلاع على المادة بتركيز والتفاعل معها.\n- أن تدوين أهم الفوائد أمر أساسي لا يُستغنى عنه.\n- أن الوحي هو المرجع ومصدر الاستمداد الأول.', max: 700 },
+    { k: 's4', label: 'القسم الرابع (اختياري)', kind: 'area', def: '', max: 700 }
+  ],
+  draw: function (ctx, W, H, d, T, v, k) { ntBriefDraw(ctx, W, H, d, T, v, k, false); }
+});

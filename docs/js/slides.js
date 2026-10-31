@@ -1,8 +1,9 @@
 /* ================= الشرائح: قوالب العروض ومحررها وتحميلها PDF ================= */
 /* كل شريحة قالب عادي بمقاس slide، ونمط العرض (فاتح، ملوّن، داكن) مشترك بين الشرائح كلها */
-const SL_VARS = [{ id: 'light', name: 'فاتح', sw: ['#f8f8f8', '#2b2b2b', '#467839'] }, { id: 'brand', name: 'ملوّن', sw: ['#2d4d24', '#ffffff', '#fbb03b'] }, { id: 'dark', name: 'داكن', sw: ['#33251c', '#ffffff', '#fbb03b'] }];
+const SL_VARS = [{ id: 'light', name: 'فاتح', sw: ['#f8f8f8', '#2b2b2b', '#467839'] }, { id: 'brand', name: 'ملوّن', sw: ['#2d4d24', '#ffffff', '#fbb03b'] }, { id: 'dark', name: 'داكن', sw: ['#33251c', '#ffffff', '#fbb03b'] }, { id: 'grid', name: 'الشبكة والتذاكر', sw: ['#2d4d24', '#f8f8f8', '#fbb03b'] }];
 function slideBase(ctx, W, H, T, v, deco) {
   const C = T.c, u = W / 1920;
+  if (v === 'grid') return slideGridBase(ctx, W, H, T, deco);
   const base = OV.bg || (v === 'brand' ? C.pd : v === 'dark' ? C.sdd : C.paper);
   const dark = isDark(base), fg = OV.title || (dark ? '#ffffff' : C.ink), body = dark ? alpha('#ffffff', 0.88) : '#3d3d3d';
   const ac = OV.accent || (dark ? C.a : C.p);
@@ -13,18 +14,68 @@ function slideBase(ctx, W, H, T, v, deco) {
   });
   return { C: C, u: u, base: base, dark: dark, fg: fg, body: body, ac: ac, mut: dark ? alpha('#ffffff', 0.6) : '#8a8a8a' };
 }
+// نمط «الشبكة والتذاكر» (من قوالب ٣١ أكتوبر): أرضية داكنة بشبكة وهالة؛ وشرائح المحتوى على ورقة كريمية بحافتين مسنّنتين
+function slideGridBase(ctx, W, H, T, deco) {
+  const C = T.c, u = W / 1920, p = ntPal(T), base = OV.bg || p.night;
+  ntGround(ctx, W, H, base, { ink: C.ink, step: 80 });
+  const night = { C: C, u: u, base: base, dark: isDark(base), fg: OV.title || '#ffffff', body: alpha('#ffffff', 0.88), ac: OV.accent || p.sand, mut: alpha('#ffffff', 0.6) };
+  if (deco !== undefined) { if (D() && deco === 'x') { ntStar4(ctx, W * 0.08, H * 0.82, 60 * u, alpha(p.sand, 0.7)); ntStar4(ctx, W * 0.92, H * 0.16, 36 * u, alpha(p.sand, 0.5)); } return night; }
+  const mx = 70 * u, my = 54 * u, sh = H - my - 128 * u, r = 11 * u;
+  G(ctx, 'panel');
+  ntCut(ctx, mx, my, W - mx * 2, sh, function (g, w, h) { g.fillStyle = p.cream; g.fillRect(0, 0, w, h); }, [].concat(ntBites(W - mx * 2, 0, r), ntBites(W - mx * 2, sh, r)), 'rgba(0,0,0,0.3)');
+  area(mx, my, W - mx, my + sh);
+  return { C: C, u: u, base: p.cream, dark: false, fg: OV.title || C.pd, body: '#3d3d3d', ac: OV.accent || p.sandInk, mut: '#8a8a8a', foot: night };
+}
 function slideFoot(ctx, W, H, T, b, d) {
-  const u = b.u;
-  G(ctx, 'logo'); const lg = drawLogo(ctx, T, W - 80 * u, H - 54 * u, 120 * u, b.dark ? '#ffffff' : 'color', 'br');
-  G(ctx, 'footer'); academy(ctx, b.mut, 80 * u, H - 58 * u, 120 * u, 'bl');
-  if (d.__n) line(ctx, String(d.__n), W / 2, H - 70 * u, { size: 26 * u, color: b.mut, align: 'center' });
+  const u = b.u, fb = b.foot || b;
+  G(ctx, 'logo'); const lg = drawLogo(ctx, T, W - 80 * u, H - 54 * u, 120 * u, fb.dark ? '#ffffff' : 'color', 'br');
+  G(ctx, 'footer'); academy(ctx, fb.mut, 80 * u, H - 58 * u, 120 * u, 'bl');
+  if (d.__n) line(ctx, String(d.__n), W / 2, H - 70 * u, { size: 26 * u, color: fb.mut, align: 'center' });
   return lg;
+}
+// غلاف النمط: تذكرة كريمية في الوسط، فيها السطر الصغير كبسولة، والعنوان، وما تحته
+function slideGridCover(ctx, W, H, d, T, k) {
+  const p = ntPal(T), C = p.C, u = W / 1920, base = OV.bg || p.night;
+  ntGround(ctx, W, H, base, { ink: C.ink, step: 80, gy: H * 0.45 });
+  const cw = W * 0.56, tw = cw * 0.82;
+  const tf = fit(ctx, d.title, { maxW: tw, maxH: H * 0.34, size: 120 * u * k, lh: 1.2, balance: true, bold: 1, title: true });
+  const ch = 70 * u + (has(d.kicker) ? 90 * u : 0) + tf.h + (has(d.sub) ? 90 * u : 0) + 80 * u, x0 = (W - cw) / 2, y0 = (H - ch) / 2 - 30 * u, r = 13 * u;
+  G(ctx, 'card');
+  ntCut(ctx, x0, y0, cw, ch, function (g, w, h) { g.fillStyle = p.cream; g.fillRect(0, 0, w, h); }, [].concat(ntBites(cw, 0, r, 2.4), ntBites(cw, ch, r, 2.4), [[0, ch / 2, 46 * u], [cw, ch / 2, 46 * u]]), 'rgba(0,0,0,0.3)');
+  area(x0, y0, x0 + cw, y0 + ch);
+  if (D()) { hline(ctx, x0 + cw * 0.1, x0 + cw * 0.9, y0 + 40 * u, p.sandInk, 3 * u); hline(ctx, x0 + cw * 0.1, x0 + cw * 0.9, y0 + ch - 40 * u, p.sandInk, 3 * u); }
+  let y = y0 + 70 * u;
+  G(ctx, 'kicker'); if (has(d.kicker)) { const kw = textW(ctx, d.kicker, 36 * u, 0.6, false, 'name') + 100 * u; ntLive(ctx, d.kicker, W / 2 + kw / 2, y + 32 * u, 36 * u, p.live, '#ffffff'); y += 90 * u; }
+  G(ctx, 'title'); drawFit(ctx, tf, W / 2, y, { align: 'center', color: OV.title || C.pd }); y += tf.h;
+  G(ctx, 'sub'); if (has(d.sub)) line(ctx, d.sub, W / 2, y + 50 * u, { size: 44 * u, color: p.sandInk, align: 'center', bold: 0.9, role: 'name', maxW: tw });
+  G(ctx, 'deco'); if (D()) ntWheat(ctx, x0 - 4 * u, y0 + ch * 0.5, 70 * u, p.sand);
+  G(ctx, 'logo'); drawLogo(ctx, T, W / 2, y0 + ch + (H - y0 - ch) / 2, 210 * u, '#ffffff', 'c');
+}
+// فاصل القسم في النمط: بطاقة ملف كريمية فيها الرقم والعنوان
+function slideGridSection(ctx, W, H, d, T, k) {
+  const p = ntPal(T), C = p.C, u = W / 1920, base = OV.bg || p.night;
+  ntGround(ctx, W, H, base, { ink: C.ink, step: 80, glow: false });
+  const x0 = W * 0.24, x1 = W + 20 * u, y0 = H * 0.26, yb = H * 0.82, tabH = 70 * u, rad = 60 * u, cwid = W - x0;
+  G(ctx, 'card');
+  ctx.fillStyle = OV.accent || p.sand; ctx.beginPath(); const bx = x0 + cwid * 0.45;
+  ctx.moveTo(bx - 70 * u, y0); ctx.bezierCurveTo(bx - 20 * u, y0, bx - 10 * u, y0 - tabH, bx + 50 * u, y0 - tabH); ctx.lineTo(x1, y0 - tabH); ctx.lineTo(x1, y0 + rad); ctx.lineTo(bx - 70 * u, y0 + rad); ctx.closePath(); ctx.fill();
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 40 * u; ctx.fillStyle = p.cream; ctx.beginPath(); const tx = x0 + cwid * 0.34;
+  ctx.moveTo(x0, yb - rad); ctx.lineTo(x0, y0 - tabH + rad); ctx.quadraticCurveTo(x0, y0 - tabH, x0 + rad, y0 - tabH); ctx.lineTo(tx - 90 * u, y0 - tabH); ctx.bezierCurveTo(tx - 30 * u, y0 - tabH, tx - 20 * u, y0, tx + 50 * u, y0); ctx.lineTo(x1, y0); ctx.lineTo(x1, yb); ctx.lineTo(x0 + rad, yb); ctx.quadraticCurveTo(x0, yb, x0, yb - rad); ctx.closePath(); ctx.fill(); ctx.restore();
+  area(x0, y0 - tabH, W, yb);
+  const xr = W - 170 * u; let y = y0 + 60 * u;
+  G(ctx, 'num'); if (has(d.num)) { line(ctx, d.num, xr, y + 60 * u, { size: 140 * u, color: p.sandInk, align: 'right', bold: 1, title: true, role: 'head' }); y += 150 * u; }
+  const tf = fit(ctx, d.title, { maxW: cwid * 0.7, maxH: (yb - y) * 0.6, size: 110 * u * k, lh: 1.2, balance: true, bold: 1, title: true });
+  G(ctx, 'title'); drawFit(ctx, tf, xr, y, { align: 'right', color: OV.title || C.pd }); y += tf.h;
+  G(ctx, 'sub'); if (has(d.sub)) line(ctx, d.sub, xr, y + 54 * u, { size: 42 * u, color: '#555555', align: 'right', maxW: cwid * 0.7 });
+  G(ctx, 'deco'); if (D()) xmark(ctx, x0 + 70 * u, y0 - tabH + 70 * u, 60 * u, C.pd, 0);
+  G(ctx, 'logo'); drawLogo(ctx, T, 90 * u, H - 60 * u, 150 * u, '#ffffff', 'bl');
 }
 const SLIDE_TPLS = [
 {
   id: 'sl_cover', type: 'slide', hidden: true, name: 'الغلاف', sizes: ['slide'], variants: SL_VARS,
   fields: [{ k: 'kicker', label: 'السطر الصغير', def: 'لقاء تعريفي', max: 40 }, { k: 'title', label: 'العنوان', kind: 'area', def: 'عنوان العرض\nفي سطرين', max: 60 }, { k: 'sub', label: 'تحت العنوان', def: 'اسم المقدّم · التاريخ', max: 60 }],
   draw: function (ctx, W, H, d, T, v, k) {
+    if (v === 'grid') return slideGridCover(ctx, W, H, d, T, k);
     const b = slideBase(ctx, W, H, T, v, false), C = b.C, u = b.u;
     G(ctx, 'deco'); if (D()) { quiet(function () { const cols = [ACADEMY.orange, ACADEMY.red, ACADEMY.purple, ACADEMY.teal].map(function (c, i) { return [C.a2, C.a, C.p, C.pd][i] || c; }); cols.forEach(function (c, i) { fillRR(ctx, -60 * u, H * 0.18 + i * 120 * u, W * 0.36 - i * 40 * u, 92 * u, 46 * u, b.dark ? alpha(c, 0.85) : c); }); xmark(ctx, W * 0.2, H * 0.78, 150 * u, b.dark ? '#ffffff' : C.pd, 0.1); }); area(0, H * 0.18, W * 0.36, H * 0.86); }
     const xr = W - 150 * u;
@@ -42,6 +93,7 @@ const SLIDE_TPLS = [
   id: 'sl_section', type: 'slide', hidden: true, name: 'فاصل قسم', sizes: ['slide'], variants: SL_VARS,
   fields: [{ k: 'num', label: 'الرقم', def: '01', max: 4 }, { k: 'title', label: 'عنوان القسم', kind: 'area', def: 'المحور الأول', max: 50 }, { k: 'sub', label: 'سطر تحته', def: 'وصف قصير للمحور', max: 70 }],
   draw: function (ctx, W, H, d, T, v, k) {
+    if (v === 'grid') return slideGridSection(ctx, W, H, d, T, k);
     const C = T.c, u = W / 1920;
     const base = OV.bg || (v === 'light' ? C.p : v === 'dark' ? C.sdd : C.pd), fg = OV.title || onBg(base), ac = OV.accent || C.a;
     paintBg(ctx, W, H, base);
@@ -179,9 +231,9 @@ const SLIDE_TPLS = [
   fields: [{ k: 'title', label: 'العنوان', kind: 'area', def: 'شكراً لحضوركم', max: 40 }, { k: 'sub', label: 'تحته', def: 'نلتقي في اللقاء القادم بإذن الله', max: 70 }],
   draw: function (ctx, W, H, d, T, v, k) {
     const C = T.c, u = W / 1920;
-    const base = OV.bg || (v === 'light' ? C.paper : v === 'dark' ? C.sdd : C.pd), dark = isDark(base), fg = OV.title || (dark ? '#ffffff' : C.pd);
-    paintBg(ctx, W, H, base);
-    G(ctx, 'deco'); if (D()) { quiet(function () { petal(ctx, W * 0.1, H * 0.85, H * 0.4, 0.3, alpha(dark ? '#ffffff' : C.p, 0.08)); petal(ctx, W * 0.9, H * 0.15, H * 0.25, 0.1, alpha(dark ? '#ffffff' : C.p, 0.08)); }); }
+    const base = OV.bg || (v === 'light' ? C.paper : v === 'dark' ? C.sdd : v === 'grid' ? ntPal(T).night : C.pd), dark = isDark(base), fg = OV.title || (dark ? '#ffffff' : C.pd);
+    if (v === 'grid') ntGround(ctx, W, H, base, { ink: C.ink, step: 80 }); else paintBg(ctx, W, H, base);
+    G(ctx, 'deco'); if (D() && v !== 'grid') { quiet(function () { petal(ctx, W * 0.1, H * 0.85, H * 0.4, 0.3, alpha(dark ? '#ffffff' : C.p, 0.08)); petal(ctx, W * 0.9, H * 0.15, H * 0.25, 0.1, alpha(dark ? '#ffffff' : C.p, 0.08)); }); }
     G(ctx, 'logo'); const lg = drawLogo(ctx, T, W / 2, H * 0.16, 260 * u, dark ? '#ffffff' : 'color', 'tc');
     const tf = fit(ctx, d.title, { maxW: W * 0.7, maxH: H * 0.3, size: 140 * u * k, lh: 1.2, balance: true, bold: 1, title: true });
     const y = Math.max(H * 0.16 + (lg.h || 0) + 70 * u, H * 0.48 - tf.h / 2);
@@ -189,6 +241,13 @@ const SLIDE_TPLS = [
     G(ctx, 'sub'); if (has(d.sub)) line(ctx, d.sub, W / 2, y + tf.h + 60 * u, { size: 46 * u, color: dark ? alpha('#ffffff', 0.8) : '#555555', align: 'center', maxW: W * 0.7 });
     G(ctx, 'footer'); academy(ctx, dark ? alpha('#ffffff', 0.7) : '#8a8a8a', W / 2 + 65 * u, H - 70 * u, 130 * u, 'br'); social(ctx, dark ? alpha('#ffffff', 0.7) : '#8a8a8a', W / 2 - 65 * u, H - 70 * u, 130 * u, 'bl');
   }
+}
+,
+{
+  id: 'sl_brief', type: 'slide', hidden: true, name: 'توضيحات المادة', sizes: ['slide'], variants: SL_VARS,
+  fonts: NT_FONTS,
+  fields: (TEMPLATES.find(function (t) { return t.id === 'nt_brief'; }) || { fields: [] }).fields,
+  draw: function (ctx, W, H, d, T, v, k) { ntBriefDraw(ctx, W, H, d, T, v === 'light' ? 'paper' : 'tint', k, true); }
 }
 ];
 SLIDE_TPLS.forEach(function (t) { TEMPLATES.push(t); });
