@@ -99,5 +99,28 @@ throws(() => a('auth_login', jud.res.username, 'wrong-password'), /غير صحي
 n('acc_del', AD, s1.acc.uid);
 throws(() => a('auth_login', 'salem', rs.pass), /موقوف/, 'حذف حساب المنصة يوقف حسابه في أثر');
 
+// ١١) المشرف العام في المنصة = مشرف برنامج الأكاديمية في أثر، وإلغاؤه يعيد حسابه كما كان
+const mm = n('acc_save', AD, JSON.stringify({ user: 'm.almahmoud', name: 'محمد محمود', role: 'team', track: 'judhoor' }));
+let mmA = a('auth_login', 'm.almahmoud', mm.pass).me;
+ok(mmA.role === 'user' && mmA.tracks.join() === 'judhoor', 'قبل الإشراف: حساب مسار في أثر');
+n('acc_save', AD, JSON.stringify({ uid: mm.acc.uid, user: 'm.almahmoud', name: 'محمد محمود', role: 'sup' }));
+mmA = a('auth_login', 'm.almahmoud', mm.pass).me;
+ok(mmA.role === 'sup' && mmA.programs.indexOf('academy') >= 0 && !mmA.tracks.length, 'المشرف العام: مشرف برنامج الأكاديمية بكل مساراتها');
+const mmN = n('login', 'm.almahmoud', mm.pass);
+ok(mmN.me.role === 'sup' && mmN.me.linked && Object.keys(n('boot', mmN.token).plans).length > 1, 'وفي المنصة يرى المسارات كلها');
+const mmT = a('auth_login', 'm.almahmoud', mm.pass).token;
+ok(a('acc_list', mmT).some(x => x.username === 'ali.sh'), 'يرى حسابات الأكاديمية في أثر');
+throws(() => a('acc_reset', mmT, aliA.me.uid), /مشتركة مع منصة الأنشطة/, 'ولا يعيد كلمة مرور حساب مربوط من أثر');
+const rsA = a('acc_reset', at, aliA.me.uid);
+ok(n('login', 'ali.sh', rsA.temp).token, 'والمدير العام يعيدها فتسري على المنصة');
+throws(() => a('acc_save', at, JSON.stringify({ uid: aliA.me.uid, username: 'ali.other', name: 'علي', role: 'user' })), /من منصة الأنشطة/, 'اسم دخول الحساب المربوط لا يُغيَّر من أثر');
+n('acc_save', AD, JSON.stringify({ uid: mm.acc.uid, user: 'm.almahmoud', name: 'محمد محمود', role: 'team', track: 'judhoor' }));
+mmA = a('auth_login', 'm.almahmoud', mm.pass).me;
+ok(mmA.role === 'user' && mmA.tracks.join() === 'judhoor', 'إلغاء الإشراف العام يعيد حسابه في أثر كما كان');
+const gs = n('acc_save', AD, JSON.stringify({ user: 'gen2', name: 'مشرف ثان', role: 'sup' }));
+ok(gs.atar && gs.atar.isNew && a('auth_login', 'gen2', gs.pass).me.role === 'sup', 'مشرف عام جديد يُنشأ له حساب مشرف برنامج في أثر');
+n('acc_save', AD, JSON.stringify({ uid: gs.acc.uid, user: 'gen2', name: 'مشرف ثان', role: 'team', track: 'ishraq' }));
+ok(a('auth_login', 'gen2', gs.pass).me.tracks.join() === 'ishraq', 'وإن صار فريقًا فله مساره وحده');
+
 console.log((fail ? '✗' : '✓') + ' ' + pass + ' فحصًا ناجحًا في الربط' + (fail ? '، و' + fail + ' فاشلة' : '') + ' (' + ctl.calls + ' طلبًا بين الخادمين)');
 process.exit(fail ? 1 : 0);

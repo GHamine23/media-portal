@@ -1118,6 +1118,11 @@ const API = {
 /* ---------- الحالة ---------- */
 let D = null;          // ما يعيده boot: me، tracks، plans، revs، log، settings…
 const isAdmin = () => D && D.me.role === 'admin';
+// المشرف العام: يرى المسارات كلها ويعدّل خططها، بلا الحسابات والبوت والتقويم والإعدادات
+const isSup = () => D && D.me.role === 'sup';
+const isAll = () => isAdmin() || isSup();
+const meAv = () => isAll() ? adminAv() : avatar(T(D.me.track).name, tcol(D.me.track));
+const meSub = () => isAdmin() ? 'كل المسارات' : isSup() ? 'مشرف عام · كل المسارات' : esc(T(D.me.track).full || T(D.me.track).name);
 const myTrack = () => D && D.me.role === 'team' ? D.me.track : null;
 const T = id => D.tracks.find(t => t.id === id);
 const planOf = id => D.plans[id] || (D.plans[id] = { sems: {}, acts: [], rev: 0 });
@@ -1133,8 +1138,8 @@ const daysOf = (id, n) => (semOf(id, n || curN(id)) || {}).days || [];
 const dayOf = (id, n, d) => daysOf(id, n).find(x => x.d === d);
 const actsOf = (id, n) => planOf(id).acts.filter(a => n == null || a.sem === String(n));
 const allActs = () => D.tracks.flatMap(t => planOf(t.id).acts.map(a => Object.assign(a, { t: t.id })));
-const canEdit = id => isAdmin() || !!(T(id) && T(id).canEdit);
-const canAdjust = id => isAdmin() || myTrack() === id;   // تعديل نشاط قائم (الموعد، القائم، التفاصيل) — يصل الإدارةَ تنبيه به
+const canEdit = id => isAll() || !!(T(id) && T(id).canEdit);
+const canAdjust = id => isAll() || myTrack() === id;   // تعديل نشاط قائم (الموعد، القائم، التفاصيل) — يصل الإدارةَ تنبيه به
 
 /* ---------- لقاءات اليوم: البث المباشر في الجدول + أنشطة اللقاء ---------- */
 const MEET_T = ['لقاء', 'استضافة'];
@@ -1309,6 +1314,10 @@ function navItems() {
       <a class="nl" href="#bot"${cur('bot')}>${svg('bot')}بوت التذكيرات${!D.bot ? '<span class="badge soft">!</span>' : unl ? `<span class="badge soft">${unl}</span>` : ''}</a>
       <a class="nl" href="#accounts"${cur('accounts')}>${svg('key')}الحسابات</a>`;
   }
+  if (isSup()) return `<a class="nl" href="#home"${cur('home')}>${svg('home')}الرئيسية</a>
+      <a class="nl" href="#timeline"${cur('timeline')}>${svg('tl')}المنظور الزمني</a>
+      <div class="nav-h">المسارات</div>
+      ${D.tracks.map(t => { const n = weekStat(t.id, ws, we).length; return `<a class="nl" href="#t/${t.id}"${r.name === 't' && r.a === t.id || r.name === 'team' && r.a === t.id ? ' aria-current="page"' : ''}><i class="dot" style="background:${t.color}"></i>${esc(t.name)}<span class="cnt" data-tip="أنشطة هذا الأسبوع">${n || ''}</span></a>`; }).join('')}`;
   const id = myTrack();
   return `<a class="nl" href="#home"${cur('home')}>${svg('home')}الرئيسية</a>
     <a class="nl" href="#t/${id}"${cur('t')}>${svg('table')}خطة الفصل</a>
@@ -1321,15 +1330,15 @@ const qt = t => /[«»]/.test(t) ? t : '«' + t + '»';
 // زر الإضافة العائم في الجوال
 function fabHtml(r) {
   if (!['home', 't', 'timeline'].includes(r.name)) return '';
-  const tid = r.name === 't' ? r.a : isAdmin() ? '' : myTrack();
-  if (tid ? !canEdit(tid) : !isAdmin()) return '';
+  const tid = r.name === 't' ? r.a : isAll() ? '' : myTrack();
+  if (tid ? !canEdit(tid) : !isAll()) return '';
   return `<button class="fab" type="button" data-act="newact" ${tid ? `data-track="${tid}"` : ''} aria-label="نشاط جديد">${svg('plus', 2.2)}</button>`;
 }
 const MORE_R = ['calendar', 'bot', 'accounts', 'reports', 'alerts'];
 function shell(body) {
   const me = D.me, r = route();
   const tab = (h, ic, label, on) => `<a href="#${h}"${on ? ' aria-current="page"' : ''}>${svg(ic)}<span>${label}</span></a>`;
-  const tabs = isAdmin()
+  const tabs = isAll()
     ? tab('home', 'home', 'الرئيسية', r.name === 'home') + tab('tracks', 'table', 'المسارات', r.name === 't' || r.name === 'tracks' || r.name === 'team') + tab('timeline', 'tl', 'الزمني', r.name === 'timeline') + `<button type="button" data-act="more"${MORE_R.includes(r.name) ? ' aria-current="page"' : ''}>${svg('menu')}<span>المزيد</span></button>`
     : tab('home', 'home', 'الرئيسية', r.name === 'home') + tab('t/' + myTrack(), 'table', 'الخطة', r.name === 't') + tab('timeline', 'tl', 'الزمني', r.name === 'timeline') + `<button type="button" data-act="more">${svg('menu')}<span>المزيد</span></button>`;
   return `<div class="app">
@@ -1340,7 +1349,7 @@ function shell(body) {
     <div class="foot">
       <div class="sync ${SYNC.st === 'busy' ? 'busy' : SYNC.st === 'off' ? 'off' : ''}"><i></i><span>${syncText()}</span></div>
       <div class="row" style="gap:4px">
-        <button class="who" type="button" data-act="usermenu">${isAdmin() ? adminAv() : avatar(T(me.track).name, tcol(me.track))}<span class="col" style="min-width:0;line-height:1.35"><b style="font-weight:500;color:var(--ink1)" class="ellip">${esc(me.name)}</b><span class="xs faint">${isAdmin() ? 'كل المسارات' : esc(T(me.track).full || T(me.track).name)}</span></span></button>
+        <button class="who" type="button" data-act="usermenu">${meAv()}<span class="col" style="min-width:0;line-height:1.35"><b style="font-weight:500;color:var(--ink1)" class="ellip">${esc(me.name)}</b><span class="xs faint">${meSub()}</span></span></button>
         <button class="btn icon" type="button" data-act="theme" aria-label="${P.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}" data-tip="${P.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}">${svg(P.theme === 'dark' ? 'sun' : 'moon')}</button>
       </div>
     </div>
@@ -1351,7 +1360,7 @@ function shell(body) {
     ${isAdmin() ? `<a class="btn icon bellb" href="#alerts" aria-label="تغييرات الفرق">${svg('bell')}${D.unseen ? `<span class="badge">${D.unseen}</span>` : ''}</a>` : ''}
     <button class="btn icon" type="button" data-act="cmd" aria-label="بحث">${svg('search')}</button>
     <button class="btn icon" type="button" data-act="theme" aria-label="تبديل الوضع">${svg(P.theme === 'dark' ? 'sun' : 'moon')}</button>
-    <button class="btn icon" type="button" data-act="usermenu" aria-label="الحساب">${isAdmin() ? adminAv() : avatar(T(me.track).name, tcol(me.track))}</button>
+    <button class="btn icon" type="button" data-act="usermenu" aria-label="الحساب">${meAv()}</button>
   </header>
   <main class="main" id="main"><div class="wrap">${CFG.demo ? `<div class="demo-bar">${svg('eye')}<span>نسخة تجربة: البيانات في متصفحك فقط، والبوت والتقويم محاكاة.</span><span class="sp"></span><button type="button" data-act="demo-reset">ابدأ من جديد</button></div>` : ''}${body}</div></main>
   ${fabHtml(r)}<nav class="tabbar" aria-label="التنقل">${tabs}</nav>
@@ -1369,7 +1378,7 @@ function render() {
   if (!D) { app.innerHTML = TOKEN ? `<div class="login"><div class="col" style="align-items:center;gap:14px">${LOGOS.anshita ? `<img class="brand-img" src="${LOGOS.anshita}" alt="" style="height:56px">` : ''}<span class="spin"></span></div></div>` : vLogin(); afterLogin(); return; }
   const r = route();
   let v = VIEWS[r.name];
-  if (!v || (v.admin && !isAdmin())) { if (r.name !== 'home') { location.replace('#home'); return; } v = VIEWS.home; }
+  if (!v || (v.admin && !isAdmin()) || (v.all && !isAll())) { if (r.name !== 'home') { location.replace('#home'); return; } v = VIEWS.home; }
   const y = scrollY;
   PENDING_RENDER = false;
   let foc = null;
@@ -1409,30 +1418,31 @@ async function doLogin(user, pass) {
     if (CFG.demo && !pass) pass = window.DEMO.pass(user);
     const r = await API.call('login', user, pass);
     TOKEN = r.token; LS.set(NS + 'tok', TOKEN); LS.set(NS + 'lastWho', LG.other ? '' : LG.who);
+    lsRaw('anshita.nosso', null);   // دخول جديد: يفتح المنصتين
     LG.busy = false; location.hash = '#home'; await boot(); ssoAtar(true);
   } catch (e) { LG.busy = false; LG.err = e.message; render(); }
 }
-function logout(keepAtar) {
-  if (!keepAtar && D && D.me.linked) atarLogout();   // الخروج من المنصة يُخرج من أثر أيضًا على هذا الجهاز
+// expired: انتهت الجلسة (لا خروج من صاحبها). والخروج من كل منصة وحدها (قرار أمين): من خرج من المنصة يبقى في أثر، ولا يُفتح له منها حتى يدخل من جديد
+function logout(expired) {
+  if (!expired && D && D.me.linked) lsRaw('anshita.nosso', '1');
   TOKEN = ''; D = null; LG.other = false; LS.del(NS + 'tok'); LS.del(NS + 'boot'); stopPoll(); closeLayer(); location.hash = ''; render();
 }
 
 /* ---------- الحساب الموحّد مع أثر (النطاق نفسه، فالتخزين المحلي مشترك) ----------
-   من دخل المنصة بحساب مربوط تُفتح له جلسة في أثر، ومن كانت له جلسة في أثر يدخل المنصة بها. */
-const ATAR_TOK = 'mp6.token', ATAR_API = 'https://script.google.com/macros/s/AKfycbzBUiyrhbixemmecyGrcGfhWQhmUq-i7ZGKi9fgpg8OlMBJKLDkQLVbndTk5kZsakl4/exec';
+   من دخل المنصة بحساب مربوط تُفتح له جلسة في أثر، ومن كانت له جلسة في أثر يدخل المنصة بها.
+   ومن خرج من إحداهما بنفسه لا تُفتح له من الأخرى حتى يدخل بكلمة المرور (anshita.nosso وmp6.nosso). */
+const lsRaw = (k, v) => { try { if (v === undefined) return localStorage.getItem(k) || ''; if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} return ''; };
+const ATAR_TOK = 'mp6.token';
 const atarTok = () => { try { return JSON.parse(localStorage.getItem(ATAR_TOK) || 'null') || ''; } catch (e) { return ''; } };
 const setAtarTok = t => { try { if (t) localStorage.setItem(ATAR_TOK, JSON.stringify(t)); else localStorage.removeItem(ATAR_TOK); } catch (e) {} };
 async function ssoAtar(force) {
-  if (CFG.demo || !TOKEN || !D || !D.me.linked || (!force && atarTok())) return;
+  if (CFG.demo || !TOKEN || !D || !D.me.linked) return;
+  if (force) lsRaw('mp6.nosso', null); else if (atarTok() || lsRaw('mp6.nosso')) return;
   try { const r = await API.me('atar_sso'); if (r && r.token) setAtarTok(r.token); } catch (e) {}
 }
 async function ssoFromAtar() {
-  const t = atarTok(); if (CFG.demo || TOKEN || !t) return false;
+  const t = atarTok(); if (CFG.demo || TOKEN || !t || lsRaw('anshita.nosso')) return false;
   try { const r = await API.raw('login_atar', t); TOKEN = r.token; LS.set(NS + 'tok', TOKEN); return true; } catch (e) { return false; }
-}
-function atarLogout() {
-  const t = atarTok(); setAtarTok('');
-  if (t && !CFG.demo) fetch(ATAR_API, { method: 'POST', body: JSON.stringify({ fn: 'auth_logout', args: [t] }), redirect: 'follow', credentials: 'omit' }).catch(() => {});
 }
 
 /* ---------- التحميل والتحديث الدوري ---------- */
@@ -1858,7 +1868,7 @@ function mobWeek(id, sem) {
 /* ---------- ما يحتاج انتباه الإدارة ---------- */
 function attention(ws) {
   const L = [];
-  D.tracks.filter(t => t.editReq).forEach(t => L.push({ ic: 'unlock', k: 'brand', html: `<b>${esc(t.name)}</b> طلب فتح تعديل الخطة${t.editReq.note ? `: «${esc(t.editReq.note)}»` : ''} <span class="faint">${ago(t.editReq.at)}</span>`, act: `<button class="btn sm pri" type="button" data-act="grant" data-id="${t.id}">افتح التعديل</button>` }));
+  if (isAdmin()) D.tracks.filter(t => t.editReq).forEach(t => L.push({ ic: 'unlock', k: 'brand', html: `<b>${esc(t.name)}</b> طلب فتح تعديل الخطة${t.editReq.note ? `: «${esc(t.editReq.note)}»` : ''} <span class="faint">${ago(t.editReq.at)}</span>`, act: `<button class="btn sm pri" type="button" data-act="grant" data-id="${t.id}">افتح التعديل</button>` }));
   if (D.settings && D.settings.groupsPaused) L.push({ ic: 'bot', k: 'warn', html: 'إرسال البوت في المجموعات موقوف مؤقتًا. أعده حين تستقر المنصة.', act: `<a class="btn sm" href="#bot">صفحة البوت</a>` });
   if (D.unseen) L.push({ ic: 'bell', k: 'brand', html: `${D.unseen === 1 ? 'تغيير جديد' : D.unseen === 2 ? 'تغييران جديدان' : D.unseen + ' تغييرات جديدة'} من الفرق على خططها`, act: `<a class="btn sm pri" href="#alerts">اعرضها</a>` });
   const acts = allActs(), seenC = {};
@@ -1869,19 +1879,19 @@ function attention(ws) {
   const late = acts.filter(a => isLate(a) && diffD(TODAY, a.d) <= 14);
   if (late.length) L.push({ ic: 'clock', k: 'warn', html: `${nActs(late.length)} مضى موعدها ولم تُعلَّم «تم» (${[...new Set(late.map(a => T(a.t).name))].join('، ')})`, act: `<a class="btn sm" href="#timeline">راجعها</a>` });
   const calErr = acts.filter(a => a.cal && a.cal.err);
-  if (calErr.length) L.push({ ic: 'gcal', k: 'warn', html: `${nActs(calErr.length)} تعذّر تحديثها في تقويم جوجل`, act: `<a class="btn sm" href="#calendar">أعد المحاولة</a>` });
-  if (!D.bot) L.push({ ic: 'bot', k: 'brand', html: 'بوت التذكيرات لم يُربط بعد', act: `<a class="btn sm" href="#bot">اربط البوت</a>` });
-  else { const un = D.tracks.filter(t => !t.linked); if (un.length) L.push({ ic: 'bot', k: 'none', html: `مسارات لم تُربط مجموعتها بالبوت: ${un.map(t => esc(t.name)).join('، ')}`, act: `<a class="btn sm" href="#bot">اربطها</a>` }); }
+  if (calErr.length && isAdmin()) L.push({ ic: 'gcal', k: 'warn', html: `${nActs(calErr.length)} تعذّر تحديثها في تقويم جوجل`, act: `<a class="btn sm" href="#calendar">أعد المحاولة</a>` });
+  if (isAdmin() && !D.bot) L.push({ ic: 'bot', k: 'brand', html: 'بوت التذكيرات لم يُربط بعد', act: `<a class="btn sm" href="#bot">اربط البوت</a>` });
+  else if (isAdmin()) { const un = D.tracks.filter(t => !t.linked); if (un.length) L.push({ ic: 'bot', k: 'none', html: `مسارات لم تُربط مجموعتها بالبوت: ${un.map(t => esc(t.name)).join('، ')}`, act: `<a class="btn sm" href="#bot">اربطها</a>` }); }
   return L;
 }
 function feed(list, n = 8) {
   if (!list || !list.length) return `<p class="muted sm">لا تحديثات بعد. ستظهر هنا تعديلات الفرق على خططها.</p>`;
-  return `<div class="list feed">${list.slice(0, n).map(x => { const t = x.t && T(x.t); return `<div class="li">${x.role === 'admin' ? adminAv() : !x.role ? `<span class="tile sm" style="--tc:var(--ink3);border-radius:50%;width:28px;height:28px">${svg('bot')}</span>` : avatar(x.by, t ? t.color : 'var(--ink3)')}<div class="tx"><div class="tt sm"><b style="font-weight:500">${esc(x.by)}</b> ${esc(x.what)}${x.d ? ` «<bdi>${esc(x.d)}</bdi>»` : ''}</div><div class="mt">${t && isAdmin() ? esc(t.name) + ' · ' : ''}${ago(x.at)}</div></div></div>`; }).join('')}</div>`;
+  return `<div class="list feed">${list.slice(0, n).map(x => { const t = x.t && T(x.t); return `<div class="li">${x.role === 'admin' ? adminAv() : !x.role ? `<span class="tile sm" style="--tc:var(--ink3);border-radius:50%;width:28px;height:28px">${svg('bot')}</span>` : avatar(x.by, t ? t.color : 'var(--ink3)')}<div class="tx"><div class="tt sm"><b style="font-weight:500">${esc(x.by)}</b> ${esc(x.what)}${x.d ? ` «<bdi>${esc(x.d)}</bdi>»` : ''}</div><div class="mt">${t && isAll() ? esc(t.name) + ' · ' : ''}${ago(x.at)}</div></div></div>`; }).join('')}</div>`;
 }
 
 /* ---------- الرئيسية ---------- */
 VIEWS.home = {
-  render() { return isAdmin() ? adminHome() : teamHome(myTrack(), false); },
+  render() { return isAll() ? adminHome() : teamHome(myTrack(), false); },
   after() { $$('.draw').forEach(el => setTimeout(() => el.classList.remove('draw'), 1600)); }
 };
 VIEWS.tracks = { render() { return tracksIndex(); } };
@@ -1970,7 +1980,7 @@ function teamHome(id, preview) {
     <aside class="stack">
       <div class="card"><div class="card-h"><h3>مقرر الطلاب اليوم</h3></div>${today && today.c ? `<div class="ctx" style="background:none;padding:0"><b>${esc(today.c)}</b>${today.q ? `<span>${esc(today.q)}</span>` : ''}${today.r ? `<span class="faint">${esc(today.r)}</span>` : ''}</div>` : `<p class="muted sm">${today && today.p ? esc(today.p) : today && today.ev ? esc(today.ev) : 'لا مقرر اليوم.'}</p>`}</div>
       ${botCardTeam(id, preview)}
-      ${!t.canEdit && !preview && !isAdmin() ? `<div class="card"><div class="card-h"><h3>تحتاجون إضافة أنشطة؟</h3></div><p class="muted sm" style="margin-bottom:12px">تستطيعون تغيير مواعيد الأنشطة والمسؤولين عنها وتفاصيلها، ويصل الإدارةَ تنبيه بذلك. لإضافة أنشطة جديدة أو حذفها اطلبوا فتح الإضافة.</p>${t.editReq ? `<span class="pill brand">${svg('check')}أُرسل الطلب ${ago(t.editReq.at)}</span>` : `<button class="btn" type="button" data-act="askedit">اطلب فتح الإضافة</button>`}</div>` : ''}
+      ${!t.canEdit && !preview && !isAll() ? `<div class="card"><div class="card-h"><h3>تحتاجون إضافة أنشطة؟</h3></div><p class="muted sm" style="margin-bottom:12px">تستطيعون تغيير مواعيد الأنشطة والمسؤولين عنها وتفاصيلها، ويصل الإدارةَ تنبيه بذلك. لإضافة أنشطة جديدة أو حذفها اطلبوا فتح الإضافة.</p>${t.editReq ? `<span class="pill brand">${svg('check')}أُرسل الطلب ${ago(t.editReq.at)}</span>` : `<button class="btn" type="button" data-act="askedit">اطلب فتح الإضافة</button>`}</div>` : ''}
       <div class="card"><div class="card-h"><h3>الفريق</h3>${canAdjust(id) ? `<button class="btn sm ghost" type="button" data-act="members" data-id="${id}">تعديل</button>` : ''}</div>${members(id).length ? `<div class="whos">${members(id).map(x => `<span class="chip">${esc(x)}</span>`).join('')}</div>` : `<p class="muted sm">لم تُكتب أسماء الفريق بعد.</p>`}</div>
     </aside>
   </div>
@@ -2041,7 +2051,7 @@ function semStats(id, n) {
     </div>
   </div>`;
 }
-VIEWS.team = { admin: true, render(r) { return T(r.a) ? teamHome(r.a, true) : ''; } };
+VIEWS.team = { all: true, render(r) { return T(r.a) ? teamHome(r.a, true) : ''; } };
 
 /* ---------- صفحة المسار: الرأس، الفصول، جدول الفصل ---------- */
 const AXC = [['تزكو', 'var(--ty-chal)'], ['سلوك', 'var(--ty-chal)'], ['شرع', 'var(--ty-meet)'], ['فكر', 'var(--ty-write)'], ['إصلاح', 'var(--ty-group)'], ['اصلاح', 'var(--ty-group)'], ['مهار', 'var(--ty-host)'], ['شخص', 'var(--ty-host)']];
@@ -2068,9 +2078,11 @@ function trackHead(id) {
   if (isAdmin()) ctl = `<div class="perm"><span class="row" style="gap:7px">${svg(t.canEdit ? 'unlock' : 'lock')}${t.canEdit ? 'الفريق يعدّل الخطة' : 'الفريق يعدّل المواعيد والمسؤولين فقط'}</span><button class="sw" type="button" role="switch" aria-checked="${!!t.canEdit}" data-act="toggleedit" data-id="${id}" aria-label="السماح للفريق بتعديل الخطة"></button></div>
     ${t.editReq ? `<span class="pill brand">${svg('unlock')}طلب الفريق فتح التعديل ${ago(t.editReq.at)}</span>` : ''}
     <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-end"><a class="btn sm ghost" href="#team/${id}">${svg('eye')}كما يراها الفريق</a><button class="btn sm ghost" type="button" data-act="members" data-id="${id}">${svg('users')}الفريق</button></div>`;
+  else if (isSup()) ctl = `<div class="perm"><span class="row" style="gap:7px">${svg(t.canEdit ? 'unlock' : 'lock')}${t.canEdit ? 'الفريق يعدّل الخطة' : 'الفريق يعدّل المواعيد والمسؤولين فقط'}</span></div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-end"><a class="btn sm ghost" href="#team/${id}">${svg('eye')}كما يراها الفريق</a><button class="btn sm ghost" type="button" data-act="members" data-id="${id}">${svg('users')}الفريق</button></div>`;
   else ctl = t.canEdit ? `<span class="pill ok">${svg('unlock')}التعديل مفتوح لكم</span>` : `<span class="pill">${svg('lock')}إضافة الأنشطة مغلقة</span><span class="xs faint">وتعدّلون المواعيد والمسؤولين</span>${t.editReq ? `<span class="xs faint">أُرسل طلب الفتح ${ago(t.editReq.at)}</span>` : `<button class="btn sm" type="button" data-act="askedit">اطلب فتح الإضافة</button>`}`;
   return `<div class="thead" style="--tc:${t.color}"><div class="logo">${logoImg(id)}</div>
-    <div class="t"><div class="eyebrow sm faint">${isAdmin() ? '<a class="lk" href="#tracks">المسارات</a> · ' : ''}${esc(t.cohort || '')}</div><h1>${esc(t.full || t.name)}</h1>
+    <div class="t"><div class="eyebrow sm faint">${isAll() ? '<a class="lk" href="#tracks">المسارات</a> · ' : ''}${esc(t.cohort || '')}</div><h1>${esc(t.full || t.name)}</h1>
       <div class="meta">${t.age ? `<span class="pill">${esc(t.age)}</span>` : ''}<span class="pill">${svg('users')}${members(id).length ? members(id).length + ' في الفريق' : 'الفريق لم يُكتب'}</span><span class="pill">${nActs(acts.length)} في ${semLabel(n)}</span>${t.linked ? `<span class="pill brand">${svg('bot')}مجموعة مربوطة بالبوت</span>` : ''}</div></div>
     <div class="ctl">${ctl}</div></div>`;
 }
@@ -2407,7 +2419,7 @@ function repExcerpt(t) {
 
 /* ---------- المنظور الزمني ---------- */
 function tlTracks() {
-  if (!isAdmin()) return [myTrack()];
+  if (!isAll()) return [myTrack()];
   const sel = (P.tl.tracks || []).filter(id => T(id));
   return sel.length ? sel : D.tracks.map(t => t.id);
 }
@@ -2429,8 +2441,8 @@ VIEWS.timeline = {
     const bar = `<div class="tlbar"><div class="seg" role="group" aria-label="المدى">${rgBtn('week', 'أسبوع')}${rgBtn('month', 'شهر')}${rgBtn('q3', '٣ أشهر')}${rgBtn('sem', 'الفصل')}</div>
       ${rg !== 'sem' ? `<div class="row" style="gap:2px"><button class="btn icon" type="button" data-act="tlnav" data-n="-1" aria-label="السابق">${svg('back')}</button><button class="btn sm ghost" type="button" data-act="tlnav" data-n="0">اليوم</button><button class="btn icon" type="button" data-act="tlnav" data-n="1" aria-label="التالي">${svg('fwd')}</button></div>` : ''}
       <span class="title">${esc(sp.title)}</span><span class="sp"></span>
-      ${canEdit(ids[0]) || isAdmin() ? `<span class="hint">اسحب النشاط لتغيير يومه</span>` : ''}</div>`;
-    const sel = isAdmin() ? `<div class="tracksel"><button class="chip" type="button" aria-pressed="${!(P.tl.tracks || []).length}" data-act="tltrack" data-v="">كل المسارات</button>${D.tracks.map(t => `<button class="chip" type="button" aria-pressed="${(P.tl.tracks || []).includes(t.id)}" data-act="tltrack" data-v="${t.id}"><i style="background:${t.color}"></i>${esc(t.name)}</button>`).join('')}</div>` : '';
+      ${canEdit(ids[0]) || isAll() ? `<span class="hint">اسحب النشاط لتغيير يومه</span>` : ''}</div>`;
+    const sel = isAll() ? `<div class="tracksel"><button class="chip" type="button" aria-pressed="${!(P.tl.tracks || []).length}" data-act="tltrack" data-v="">كل المسارات</button>${D.tracks.map(t => `<button class="chip" type="button" aria-pressed="${(P.tl.tracks || []).includes(t.id)}" data-act="tltrack" data-v="${t.id}"><i style="background:${t.color}"></i>${esc(t.name)}</button>`).join('')}</div>` : '';
     let body;
     if (rg === 'week') body = isMob() ? agenda(sp.from, ids) : ids.length === 1 ? weekBoard(sp.from, ids) : weekLanes(sp.from, ids);
     else if (rg === 'month') body = monthGrid(sp.from, ids);
@@ -2615,7 +2627,7 @@ let F = null;   // نموذج النشاط المفتوح
 function openAct(tid, id, preset = {}) {
   const a = id ? planOf(tid).acts.find(x => x.id === id) : null;
   if (id && !a) return toast('النشاط غير موجود (ربما حُذف)', 'err');
-  const ids = isAdmin() ? D.tracks.map(t => t.id) : [myTrack()];
+  const ids = isAll() ? D.tracks.map(t => t.id) : [myTrack()];
   tid = tid || preset.track || (ids.length === 1 ? ids[0] : '');
   if (!a && tid && !canEdit(tid)) return toast('إضافة الأنشطة مغلقة لفريقكم. اطلبوا فتحها من الإدارة.', 'err');
   F = a ? Object.assign({ tid, isNew: false }, JSON.parse(JSON.stringify(a)), { calOn: !!(a.cal && a.cal.id) })
@@ -2664,7 +2676,7 @@ function fMode() {
 function actParts() {
   const tid = F.tid, t = tid ? T(tid) : null, mode = fMode(), ro = mode === 'ro';
   const day = tid ? (dayOf(tid, semFor(tid, F.d) || curN(tid), F.d)) : null;
-  const tracksSel = F.isNew && isAdmin() && !F.dock && !F.lockTrack ? `<div class="field"><label>المسار</label><div class="row" style="gap:6px;flex-wrap:wrap">${D.tracks.map(x => `<button class="chip" type="button" aria-pressed="${tid === x.id}" data-act="f-track" data-v="${x.id}"><i style="background:${x.color}"></i>${esc(x.name)}</button>`).join('')}</div></div>` : '';
+  const tracksSel = F.isNew && isAll() && !F.dock && !F.lockTrack ? `<div class="field"><label>المسار</label><div class="row" style="gap:6px;flex-wrap:wrap">${D.tracks.map(x => `<button class="chip" type="button" aria-pressed="${tid === x.id}" data-act="f-track" data-v="${x.id}"><i style="background:${x.color}"></i>${esc(x.name)}</button>`).join('')}</div></div>` : '';
   const head = `<div class="row" style="gap:10px">${t && !F.dock ? logoImg(tid) : ''}<div class="col" style="min-width:0"><span class="xs faint">${t ? esc(t.full || t.name) : 'نشاط جديد'}</span><b style="font-family:var(--fd);font-weight:500;font-size:19px;color:var(--ink)">${F.isNew ? 'نشاط جديد' : ro ? esc(F.title) : 'تعديل النشاط'}</b></div></div>`;
   const ctx = day ? `<div class="ctx"><span>${gLong(F.d)} · ${esc(day.h || hijri(F.d))} · الأسبوع ${day.w}</span>${day.c ? `<span>مقرر اليوم: <b>${esc(day.c)}</b>${day.q ? ' — ' + esc(day.q) : ''}</span>` : ''}${isLive(day) ? `<span class="live">${svg('live')}${esc(day.r || 'بث مباشر')}</span>` : ''}${day.ev ? `<span><b>${esc(day.ev)}</b></span>` : ''}${day.p && !day.c ? `<span>${esc(day.p)}</span>` : ''}</div>` : F.d ? `<div class="ctx"><span>${gLong(F.d)} · ${esc(hijri(F.d))}</span><span class="faint">خارج أيام الفصل في الجدول</span></div>` : '';
   // تنبيه اجتماع لقاءين في يوم واحد (بث مباشر أو لقاء آخر)
@@ -2943,7 +2955,7 @@ function readMB() { $$('[data-mb]').forEach(el => { const m = MB[+el.dataset.i];
 
 /* ---------- قائمة الحساب ---------- */
 function userMenu() {
-  openDialog(`<div class="row">${isAdmin() ? adminAv() : avatar(T(D.me.track).name, tcol(D.me.track))}<div class="col"><b>${esc(D.me.name)}</b><span class="xs faint">اسم المستخدم: <bdi>${esc(D.me.user)}</bdi></span></div></div>
+  openDialog(`<div class="row">${meAv()}<div class="col"><b>${esc(D.me.name)}</b><span class="xs faint">اسم المستخدم: <bdi>${esc(D.me.user)}</bdi></span></div></div>
     <div class="list">
       <button class="li btnish" type="button" data-act="theme">${svg(P.theme === 'dark' ? 'sun' : 'moon')}<div class="tx"><div class="tt">${P.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}</div></div></button>
       <button class="li btnish" type="button" data-act="mypass">${svg('key')}<div class="tx"><div class="tt">تغيير كلمة المرور</div></div></button>
@@ -3135,10 +3147,10 @@ VIEWS.accounts = {
   render() {
     if (!AC) { API.me('acc_list').then(l => { AC = l; render(); }).catch(e => toast(e.message, 'err')); return pageHead('', 'الحسابات', '') + `<div class="card empty"><span class="spin"></span></div>`; }
     const ord = t => t ? D.tracks.findIndex(x => x.id === t) : -1;
-    const rows = AC.slice().sort((a, b) => ord(a.track) - ord(b.track) || (a.created || 0) - (b.created || 0)).map(a => `<div class="li">${a.role === 'admin' ? adminAv() : T(a.track) && LOGOS[a.track] ? logoImg(a.track) : avatar(a.name, tcol(a.track))}
-      <div class="tx"><div class="tt">${esc(a.name)} ${a.disabled ? '<span class="pill warn">موقوف</span>' : ''}</div><div class="mt"><bdi>${esc(a.user)}</bdi> · ${a.role === 'admin' ? 'الإدارة: كل المسارات' : 'فريق ' + esc((T(a.track) || {}).name || a.track)} · ${a.last ? 'آخر دخول ' + ago(a.last) : 'لم يدخل بعد'}</div>${a.atar ? '' : a.linked ? `<div class="mt"><span class="pill ok">${svg('check')}مربوط بأثر</span>${a.atarSup ? ' <span class="pill">مشرف المسار في أثر</span>' : ''}${a.lkPend ? ' <span class="xs faint">· تتوحّد كلمة المرور عند أول دخول</span>' : ''}</div>` : a.lkErr ? `<div class="mt"><span class="pill warn">لم يُربط بأثر</span> <span class="xs faint">${esc(a.lkErr)}</span></div>` : ''}</div>
+    const rows = AC.slice().sort((a, b) => ord(a.track) - ord(b.track) || (a.created || 0) - (b.created || 0)).map(a => `<div class="li">${a.role === 'admin' || a.role === 'sup' ? adminAv() : T(a.track) && LOGOS[a.track] ? logoImg(a.track) : avatar(a.name, tcol(a.track))}
+      <div class="tx"><div class="tt">${esc(a.name)} ${a.disabled ? '<span class="pill warn">موقوف</span>' : ''}</div><div class="mt"><bdi>${esc(a.user)}</bdi> · ${a.role === 'admin' ? 'الإدارة: كل المسارات' : a.role === 'sup' ? 'مشرف عام: كل المسارات' : 'فريق ' + esc((T(a.track) || {}).name || a.track)} · ${a.last ? 'آخر دخول ' + ago(a.last) : 'لم يدخل بعد'}</div>${a.atar ? '' : a.linked ? `<div class="mt"><span class="pill ok">${svg('check')}مربوط بأثر</span>${a.atarSup ? ' <span class="pill">مشرف المسار في أثر</span>' : a.role === 'sup' ? ' <span class="pill">مشرف برنامج الأكاديمية في أثر</span>' : ''}${a.lkPend ? ' <span class="xs faint">· تتوحّد كلمة المرور عند أول دخول</span>' : ''}</div>` : a.lkErr ? `<div class="mt"><span class="pill warn">لم يُربط بأثر</span> <span class="xs faint">${esc(a.lkErr)}</span></div>` : ''}</div>
       <button class="btn sm ghost" type="button" data-act="acc-edit" data-id="${a.uid}">تعديل</button><button class="btn sm" type="button" data-act="acc-reset" data-id="${a.uid}">كلمة مرور جديدة</button></div>`).join('');
-    return pageHead('', 'الحسابات', 'نوعان فقط: الإدارة ترى كل المسارات، والفريق يرى مساره. لكل مسار حساب، ويمكن إضافة حسابات أخرى للفريق نفسه.', `<button class="btn pri" type="button" data-act="acc-edit" data-id="">${svg('plus')}حساب</button>`) + `<div class="card"><div class="list">${rows}</div></div>`;
+    return pageHead('', 'الحسابات', 'الإدارة ترى كل المسارات وتديرها، والمشرف العام يرى كل المسارات ويعدّل خططها بلا أدوات الإدارة، والفريق يرى مساره. لكل مسار حساب، ويمكن إضافة حسابات أخرى للفريق نفسه.', `<button class="btn pri" type="button" data-act="acc-edit" data-id="">${svg('plus')}حساب</button>`) + `<div class="card"><div class="list">${rows}</div></div>`;
   }
 };
 function accEdit(uid) {
@@ -3146,9 +3158,9 @@ function accEdit(uid) {
   openDialog(`<h3>${uid ? 'تعديل الحساب' : 'حساب جديد'}</h3>
     <div class="field"><label for="ac-n">الاسم</label><input class="inp" id="ac-n" value="${esc(a.name)}" placeholder="مثل: فريق جذور، أو اسم العضو"></div>
     <div class="field"><label for="ac-u">اسم المستخدم (للدخول)</label><input class="inp ltr" style="display:block;text-align:left" id="ac-u" value="${esc(a.user)}" autocomplete="off" placeholder="judhoor2"></div>
-    <div class="field"><label for="ac-r">النوع</label><select class="inp" id="ac-r" data-act="ac-role"><option value="team" ${a.role !== 'admin' ? 'selected' : ''}>فريق مسار</option><option value="admin" ${a.role === 'admin' ? 'selected' : ''}>الإدارة</option></select></div>
-    <div class="field" id="ac-tf" ${a.role === 'admin' ? 'hidden' : ''}><label for="ac-t">المسار</label><select class="inp" id="ac-t">${D.tracks.map(t => `<option value="${t.id}" ${a.track === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></div>
-    <div class="opt" id="ac-sf" ${a.role === 'admin' ? 'hidden' : ''}><div class="tx"><b>مشرف المسار في أثر</b><span>كل صلاحيات التصميم والنشر في مساره في أثر. وفي المنصة حسابه كحساب الفريق.</span></div><button class="sw" type="button" role="switch" aria-checked="${!!a.atarSup}" data-act="ac-sup" aria-label="مشرف المسار في أثر"></button></div>
+    <div class="field"><label for="ac-r">النوع</label><select class="inp" id="ac-r" data-act="ac-role"><option value="team" ${a.role === 'team' ? 'selected' : ''}>فريق مسار</option><option value="sup" ${a.role === 'sup' ? 'selected' : ''}>مشرف عام: كل المسارات بلا أدوات الإدارة</option><option value="admin" ${a.role === 'admin' ? 'selected' : ''}>الإدارة</option></select><p class="hint" id="ac-rh" ${a.role === 'sup' ? '' : 'hidden'}>وفي أثر: مشرف برنامج الأكاديمية، بكل مساراتها.</p></div>
+    <div class="field" id="ac-tf" ${a.role !== 'team' ? 'hidden' : ''}><label for="ac-t">المسار</label><select class="inp" id="ac-t">${D.tracks.map(t => `<option value="${t.id}" ${a.track === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></div>
+    <div class="opt" id="ac-sf" ${a.role !== 'team' ? 'hidden' : ''}><div class="tx"><b>مشرف المسار في أثر</b><span>كل صلاحيات التصميم والنشر في مساره في أثر. وفي المنصة حسابه كحساب الفريق.</span></div><button class="sw" type="button" role="switch" aria-checked="${!!a.atarSup}" data-act="ac-sup" aria-label="مشرف المسار في أثر"></button></div>
     ${uid && uid !== D.me.uid ? `<div class="opt"><div class="tx"><b>موقوف</b><span>لا يستطيع الدخول</span></div><button class="sw" type="button" role="switch" aria-checked="${!!a.disabled}" data-act="ac-dis"></button></div>` : ''}
     <div class="row"><button class="btn pri" type="button" data-act="ac-save" data-id="${uid || ''}">احفظ</button><button class="btn" type="button" data-act="close">إلغاء</button><span class="sp"></span>${uid && uid !== D.me.uid ? `<button class="btn danger" type="button" data-act="ac-del" data-id="${uid}">حذف</button>` : ''}</div>`);
 }
@@ -3233,8 +3245,8 @@ function openCmd() {
 }
 function cmdItems(q) {
   const n = normAr(q.trim()), out = [];
-  const pages = [['home', 'الرئيسية', 'home'], ['timeline', 'المنظور الزمني', 'tl']].concat(isAdmin() ? [['calendar', 'تقويم جوجل', 'gcal'], ['bot', 'بوت التذكيرات', 'bot'], ['accounts', 'الحسابات', 'key']] : [['t/' + myTrack(), 'خطة الفصل', 'table']]);
-  const acts = [...(isAdmin() || canEdit(myTrack()) ? [{ g: 'إجراءات', l: 'نشاط جديد', ic: 'plus', run: () => openAct(isAdmin() ? '' : myTrack()) }] : []), { g: 'إجراءات', l: P.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن', ic: P.theme === 'dark' ? 'sun' : 'moon', run: toggleTheme }];
+  const pages = [['home', 'الرئيسية', 'home'], ['timeline', 'المنظور الزمني', 'tl']].concat(isAdmin() ? [['calendar', 'تقويم جوجل', 'gcal'], ['bot', 'بوت التذكيرات', 'bot'], ['accounts', 'الحسابات', 'key']] : isSup() ? [['tracks', 'المسارات', 'table']] : [['t/' + myTrack(), 'خطة الفصل', 'table']]);
+  const acts = [...(isAll() || canEdit(myTrack()) ? [{ g: 'إجراءات', l: 'نشاط جديد', ic: 'plus', run: () => openAct(isAll() ? '' : myTrack()) }] : []), { g: 'إجراءات', l: P.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن', ic: P.theme === 'dark' ? 'sun' : 'moon', run: toggleTheme }];
   const m = s => !n || normAr(s).includes(n);
   acts.filter(a => m(a.l) || (n && 'جديد'.includes(n))).forEach(a => out.push(a));
   pages.filter(p => m(p[1])).forEach(p => out.push({ g: 'الصفحات', l: p[1], ic: p[2], run: () => go(p[0]) }));
@@ -3274,7 +3286,7 @@ const H = {
   },
   'f-copy': el => { const v = el.dataset.v; const ok = () => toast('نُسخ الرابط'); try { navigator.clipboard.writeText(v).then(ok, () => toast(v)); } catch (e) { toast(v); } },
   go: el => { location.hash = '#' + el.dataset.v; },
-  'tk-new': el => taskDialog(el.dataset.track || (isAdmin() ? D.tracks[0].id : myTrack())),
+  'tk-new': el => taskDialog(el.dataset.track || (isAll() ? D.tracks[0].id : myTrack())),
   'tk-edit': el => taskDialog(el.dataset.track, el.dataset.id),
   'tk-who': el => { readTK(); const w = el.dataset.v; TK.who = (TK.who || []).includes(w) ? TK.who.filter(x => x !== w) : (TK.who || []).concat(w); drawTask(); },
   'tk-tgl': () => { readTK(); TK.done = !TK.done; drawTask(); },
@@ -3342,7 +3354,7 @@ const H = {
   'ae-send': async () => { const note = $('#ae-n').value; try { await API.me('edit_request', note); closeLayer(); T(myTrack()).editReq = { at: Date.now(), by: D.me.name, note }; render(); toast('أُرسل الطلب إلى الإدارة'); } catch (e) { toast(e.message, 'err'); } },
   hbw: el => { const n = +el.dataset.n; HB.ws = n ? add(HB.ws, n) : focusWeek(); render(); },
   mweek: el => { const k = el.dataset.id + '|' + el.dataset.n; if (el.dataset.v === 'now') delete MW[k]; else MW[k] = +el.dataset.v; render(); const pg = $('.wpager'); if (pg) window.scrollTo(0, pg.getBoundingClientRect().top + scrollY - 70); },
-  tlweek: el => { P.tl.range = 'week'; P.tl.anchor = el.dataset.date; if (isAdmin() && el.dataset.id) { P.tl.tracks = [el.dataset.id]; P.tl.tmp = true; } savePrefs(); go('timeline'); },
+  tlweek: el => { P.tl.range = 'week'; P.tl.anchor = el.dataset.date; if (isAll() && el.dataset.id) { P.tl.tracks = [el.dataset.id]; P.tl.tmp = true; } savePrefs(); go('timeline'); },
   tlrange: el => { P.tl.range = el.dataset.v; savePrefs(); VIEWS.timeline.sc = 0; render(); },
   tlnav: el => { const n = +el.dataset.n, rg = P.tl.range, a = rg !== 'week' && rg !== 'sem' ? tlSpan().from : tlAnchor(); P.tl.anchor = !n ? TODAY : rg === 'week' ? add(a, 7 * n) : addMon(monStart(a), (rg === 'q3' ? 3 : 1) * n); savePrefs(); VIEWS.timeline.sc = 0; render(); },
   tltrack: el => { const v = el.dataset.v; if (!v) P.tl.tracks = []; else { const s = new Set(P.tl.tracks || []); s.has(v) ? s.delete(v) : s.add(v); P.tl.tracks = [...s]; } savePrefs(); render(); },
@@ -3396,7 +3408,7 @@ document.addEventListener('click', e => {
   if (k === 'tblq') return;
   runAct(f, el, e);
 });
-document.addEventListener('change', e => { const el = e.target; if (el.id === 'ac-r' && $('#ac-tf')) { $('#ac-tf').hidden = el.value === 'admin'; if ($('#ac-sf')) $('#ac-sf').hidden = el.value === 'admin'; } if (el.dataset.act === 'bot-assign' && el.value) API.me('tg_assign', el.dataset.chat, el.value).then(s => { BS = s; toast('رُبطت المجموعة ✓'); boot(true); }).catch(x => toast(x.message, 'err')); if ((el.id === 'f-d' || el.id === 'f-rep-until') && F) { readF(); drawAct(true); } });
+document.addEventListener('change', e => { const el = e.target; if (el.id === 'ac-r' && $('#ac-tf')) { $('#ac-tf').hidden = el.value !== 'team'; if ($('#ac-sf')) $('#ac-sf').hidden = el.value !== 'team'; if ($('#ac-rh')) $('#ac-rh').hidden = el.value !== 'sup'; } if (el.dataset.act === 'bot-assign' && el.value) API.me('tg_assign', el.dataset.chat, el.value).then(s => { BS = s; toast('رُبطت المجموعة ✓'); boot(true); }).catch(x => toast(x.message, 'err')); if ((el.id === 'f-d' || el.id === 'f-rep-until') && F) { readF(); drawAct(true); } });
 document.addEventListener('input', e => {
   const el = e.target;
   if (el.dataset.act === 'tblq') { TB.q = el.value; clearTimeout(TB.t); TB.t = setTimeout(() => { const pos = el.selectionStart; render(); const n = $('[data-act="tblq"]'); if (n) { n.focus(); n.selectionStart = n.selectionEnd = pos; } }, 180); }
@@ -3424,7 +3436,7 @@ document.addEventListener('keydown', e => {
   if ((e.key === 'Enter' || e.key === ' ') && !typing && e.target.matches('[role="button"][data-act]')) { e.preventDefault(); e.target.click(); return; }
   if (typing || !D || $('#layer').innerHTML || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === '/') { e.preventDefault(); openCmd(); }
-  else if (e.key === 'n' || e.key === 'ى') { const r = route(); const tid = r.name === 't' ? r.a : isAdmin() ? '' : myTrack(); if (!tid || canEdit(tid)) { e.preventDefault(); openAct(tid); } }
+  else if (e.key === 'n' || e.key === 'ى') { const r = route(); const tid = r.name === 't' ? r.a : isAll() ? '' : myTrack(); if (!tid || canEdit(tid)) { e.preventDefault(); openAct(tid); } }
   else if (e.key === 't' || e.key === 'ف') { if (route().name === 'timeline') { P.tl.anchor = ''; savePrefs(); render(); } }
 });
 let MQ = isMob(), WQ = innerWidth >= WIDE_Q; addEventListener('resize', () => { const m = isMob(), w = innerWidth >= WIDE_Q; if (m !== MQ || w !== WQ) { MQ = m; WQ = w; if (F && F.dock) { readF(); F.dock = false; render(); drawAct(); return; } if (D && !$('#layer').innerHTML) render(); } });

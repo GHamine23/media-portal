@@ -373,6 +373,7 @@ function acc_save(token, json) {
     }
     var username = normUser_(o.username != null ? o.username : (a ? a.username : ''));
     if (!/^[؀-ۿa-z0-9._\- ]{3,40}$/.test(username)) throw new Error('اسم المستخدم من ٣ إلى ٤٠ حرفاً: حروف وأرقام ونقطة وشرطة');
+    if (a && a.ansUid && normUser_(a.username) !== username) throw new Error('اسم دخول هذا الحساب يُغيَّر من منصة الأنشطة، لأنه مربوط بها');
     var email = normUser_(o.email != null ? o.email : (a ? a.email : ''));
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('البريد غير صحيح');
     Object.keys(accs).forEach(function (k) {
@@ -411,6 +412,7 @@ function acc_reset(token, uid) {
     var accs = readJson_('accounts.json', {}), a = accs[uid];
     if (!a) throw new Error('الحساب غير موجود');
     if (!isSuper_(me) && (a.role === 'super' || !(a.programs || []).some(function (p) { return adminOf_(me, p); }))) throw new Error('لا تملك صلاحية على هذا الحساب');
+    if (!isSuper_(me) && a.ansUid) throw new Error('كلمة مرور هذا الحساب مشتركة مع منصة الأنشطة، وتُعاد من إدارتها');
     var temp = tempPass_(); a.salt = Utilities.getUuid(); a.hash = pwHash_(a.salt, temp); a.mustChange = true; a.fails = 0; a.lockUntil = 0; a.pendPw = false;
     writeJson_('accounts.json', accs); dropSessions_(uid);
     audit_(me, 'أنشأ كلمة مرور مؤقتة', a.username);
@@ -502,7 +504,22 @@ function linkSup_(a, on) {
   if (on && !a.linkSup) { a.supPrev = { perms: a.perms || {}, editLevel: a.editLevel || '' }; var pp = Object.assign({}, a.perms || {}); LINK_SUP.perms.forEach(function (k) { pp[k] = true; }); a.perms = pp; a.editLevel = LINK_SUP.editLevel; a.linkSup = true; }
   if (!on && a.linkSup) { var pv = a.supPrev || {}; a.perms = pv.perms || {}; a.editLevel = pv.editLevel || ''; a.linkSup = false; delete a.supPrev; }
 }
-// o = {atar?: حساب أثر يُدمج, ans: {uid, user, name, role: admin|team, track, sup, disabled}, pw?: كلمة المرور}
+// المشرف العام في منصة الأنشطة = مشرف برنامج الأكاديمية في أثر (كل مساراتها، وإدارة حساباتها). وعند إلغائه يعود حسابه كما كان
+function linkGen_(a, on, isNew, accs, track) {
+  if (on) {
+    if (a.linkGen) return;
+    linkSup_(a, false);
+    a.genPrev = isNew ? null : { role: a.role, programs: (a.programs || []).slice(), tracks: (a.tracks || []).slice(), perms: a.perms || {}, editLevel: a.editLevel || '' };
+    a.role = 'sup'; a.programs = a.programs || []; if (a.programs.indexOf(LINK_PROG) < 0) a.programs.push(LINK_PROG);
+    a.tracks = []; a.editLevel = ''; a.linkGen = true;
+    return;
+  }
+  var g = a.genPrev;
+  if (g && g.role !== 'super') { a.role = g.role; a.programs = g.programs; a.tracks = g.tracks; a.perms = g.perms; a.editLevel = g.editLevel; }
+  else { var pp = linkPeerPerms_(accs, track); a.role = 'user'; a.tracks = [track]; a.perms = pp.p; a.editLevel = pp.e; }
+  a.linkGen = false; delete a.genPrev;
+}
+// o = {atar?: حساب أثر يُدمج, ans: {uid, user, name, role: admin|sup|team, track, sup, disabled}, pw?: كلمة المرور}
 function linkUpsert_(o) {
   var s = o.ans || {};
   if (!s.uid) throw new Error('حساب المنصة ناقص');
@@ -512,9 +529,9 @@ function linkUpsert_(o) {
     if (!a) a = Object.keys(accs).map(function (k) { return accs[k]; }).filter(function (x) { return x.ansUid === s.uid; })[0] || null;
     if (a && a.ansUid && a.ansUid !== s.uid) throw new Error('حساب أثر «' + a.username + '» مربوط بحساب آخر في منصة الأنشطة');
     if (!a) {
-      if (s.role !== 'team' || !s.track) throw new Error('حساب الإدارة يُربط بحساب قائم في أثر');
-      var pp = linkPeerPerms_(accs, s.track), salt = Utilities.getUuid();
-      a = { uid: uid_(), created: now_(), last: 0, fails: 0, prefs: {}, role: 'user', programs: [LINK_PROG], tracks: [s.track], perms: pp.p, editLevel: pp.e,
+      if (s.role !== 'sup' && (s.role !== 'team' || !s.track)) throw new Error('حساب الإدارة يُربط بحساب قائم في أثر');
+      var pp = s.role === 'sup' ? { p: {}, e: '' } : linkPeerPerms_(accs, s.track), salt = Utilities.getUuid();
+      a = { uid: uid_(), created: now_(), last: 0, fails: 0, prefs: {}, role: 'user', programs: [LINK_PROG], tracks: s.role === 'sup' ? [] : [s.track], perms: pp.p, editLevel: pp.e,
         email: '', salt: salt, hash: pwHash_(salt, Utilities.getUuid()), pendPw: true, mustChange: false };
       accs[a.uid] = a; isNew = true;
     }
@@ -524,6 +541,8 @@ function linkUpsert_(o) {
       if (u.length >= 3) a.username = linkUnique_(accs, u, a.uid);
       else if (isNew) a.username = linkUnique_(accs, 'user', a.uid);
       if (s.name) a.name = clip_(s.name, 80);
+      if (s.role === 'sup') linkGen_(a, true, isNew);
+      else if (s.role === 'team' && s.track && a.linkGen) linkGen_(a, false, false, accs, s.track);
       if (s.role === 'team' && s.track) {
         a.programs = a.programs || []; if (a.programs.indexOf(LINK_PROG) < 0) a.programs.push(LINK_PROG);
         if ((a.tracks || []).length && a.tracks.indexOf(s.track) < 0) a.tracks.push(s.track);   // الفارغة = كل هويات البرنامج، فتبقى كما هي

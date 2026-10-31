@@ -145,7 +145,7 @@ function mobWeek(id, sem) {
 /* ---------- ما يحتاج انتباه الإدارة ---------- */
 function attention(ws) {
   const L = [];
-  D.tracks.filter(t => t.editReq).forEach(t => L.push({ ic: 'unlock', k: 'brand', html: `<b>${esc(t.name)}</b> طلب فتح تعديل الخطة${t.editReq.note ? `: «${esc(t.editReq.note)}»` : ''} <span class="faint">${ago(t.editReq.at)}</span>`, act: `<button class="btn sm pri" type="button" data-act="grant" data-id="${t.id}">افتح التعديل</button>` }));
+  if (isAdmin()) D.tracks.filter(t => t.editReq).forEach(t => L.push({ ic: 'unlock', k: 'brand', html: `<b>${esc(t.name)}</b> طلب فتح تعديل الخطة${t.editReq.note ? `: «${esc(t.editReq.note)}»` : ''} <span class="faint">${ago(t.editReq.at)}</span>`, act: `<button class="btn sm pri" type="button" data-act="grant" data-id="${t.id}">افتح التعديل</button>` }));
   if (D.settings && D.settings.groupsPaused) L.push({ ic: 'bot', k: 'warn', html: 'إرسال البوت في المجموعات موقوف مؤقتًا. أعده حين تستقر المنصة.', act: `<a class="btn sm" href="#bot">صفحة البوت</a>` });
   if (D.unseen) L.push({ ic: 'bell', k: 'brand', html: `${D.unseen === 1 ? 'تغيير جديد' : D.unseen === 2 ? 'تغييران جديدان' : D.unseen + ' تغييرات جديدة'} من الفرق على خططها`, act: `<a class="btn sm pri" href="#alerts">اعرضها</a>` });
   const acts = allActs(), seenC = {};
@@ -156,19 +156,19 @@ function attention(ws) {
   const late = acts.filter(a => isLate(a) && diffD(TODAY, a.d) <= 14);
   if (late.length) L.push({ ic: 'clock', k: 'warn', html: `${nActs(late.length)} مضى موعدها ولم تُعلَّم «تم» (${[...new Set(late.map(a => T(a.t).name))].join('، ')})`, act: `<a class="btn sm" href="#timeline">راجعها</a>` });
   const calErr = acts.filter(a => a.cal && a.cal.err);
-  if (calErr.length) L.push({ ic: 'gcal', k: 'warn', html: `${nActs(calErr.length)} تعذّر تحديثها في تقويم جوجل`, act: `<a class="btn sm" href="#calendar">أعد المحاولة</a>` });
-  if (!D.bot) L.push({ ic: 'bot', k: 'brand', html: 'بوت التذكيرات لم يُربط بعد', act: `<a class="btn sm" href="#bot">اربط البوت</a>` });
-  else { const un = D.tracks.filter(t => !t.linked); if (un.length) L.push({ ic: 'bot', k: 'none', html: `مسارات لم تُربط مجموعتها بالبوت: ${un.map(t => esc(t.name)).join('، ')}`, act: `<a class="btn sm" href="#bot">اربطها</a>` }); }
+  if (calErr.length && isAdmin()) L.push({ ic: 'gcal', k: 'warn', html: `${nActs(calErr.length)} تعذّر تحديثها في تقويم جوجل`, act: `<a class="btn sm" href="#calendar">أعد المحاولة</a>` });
+  if (isAdmin() && !D.bot) L.push({ ic: 'bot', k: 'brand', html: 'بوت التذكيرات لم يُربط بعد', act: `<a class="btn sm" href="#bot">اربط البوت</a>` });
+  else if (isAdmin()) { const un = D.tracks.filter(t => !t.linked); if (un.length) L.push({ ic: 'bot', k: 'none', html: `مسارات لم تُربط مجموعتها بالبوت: ${un.map(t => esc(t.name)).join('، ')}`, act: `<a class="btn sm" href="#bot">اربطها</a>` }); }
   return L;
 }
 function feed(list, n = 8) {
   if (!list || !list.length) return `<p class="muted sm">لا تحديثات بعد. ستظهر هنا تعديلات الفرق على خططها.</p>`;
-  return `<div class="list feed">${list.slice(0, n).map(x => { const t = x.t && T(x.t); return `<div class="li">${x.role === 'admin' ? adminAv() : !x.role ? `<span class="tile sm" style="--tc:var(--ink3);border-radius:50%;width:28px;height:28px">${svg('bot')}</span>` : avatar(x.by, t ? t.color : 'var(--ink3)')}<div class="tx"><div class="tt sm"><b style="font-weight:500">${esc(x.by)}</b> ${esc(x.what)}${x.d ? ` «<bdi>${esc(x.d)}</bdi>»` : ''}</div><div class="mt">${t && isAdmin() ? esc(t.name) + ' · ' : ''}${ago(x.at)}</div></div></div>`; }).join('')}</div>`;
+  return `<div class="list feed">${list.slice(0, n).map(x => { const t = x.t && T(x.t); return `<div class="li">${x.role === 'admin' ? adminAv() : !x.role ? `<span class="tile sm" style="--tc:var(--ink3);border-radius:50%;width:28px;height:28px">${svg('bot')}</span>` : avatar(x.by, t ? t.color : 'var(--ink3)')}<div class="tx"><div class="tt sm"><b style="font-weight:500">${esc(x.by)}</b> ${esc(x.what)}${x.d ? ` «<bdi>${esc(x.d)}</bdi>»` : ''}</div><div class="mt">${t && isAll() ? esc(t.name) + ' · ' : ''}${ago(x.at)}</div></div></div>`; }).join('')}</div>`;
 }
 
 /* ---------- الرئيسية ---------- */
 VIEWS.home = {
-  render() { return isAdmin() ? adminHome() : teamHome(myTrack(), false); },
+  render() { return isAll() ? adminHome() : teamHome(myTrack(), false); },
   after() { $$('.draw').forEach(el => setTimeout(() => el.classList.remove('draw'), 1600)); }
 };
 VIEWS.tracks = { render() { return tracksIndex(); } };
@@ -257,7 +257,7 @@ function teamHome(id, preview) {
     <aside class="stack">
       <div class="card"><div class="card-h"><h3>مقرر الطلاب اليوم</h3></div>${today && today.c ? `<div class="ctx" style="background:none;padding:0"><b>${esc(today.c)}</b>${today.q ? `<span>${esc(today.q)}</span>` : ''}${today.r ? `<span class="faint">${esc(today.r)}</span>` : ''}</div>` : `<p class="muted sm">${today && today.p ? esc(today.p) : today && today.ev ? esc(today.ev) : 'لا مقرر اليوم.'}</p>`}</div>
       ${botCardTeam(id, preview)}
-      ${!t.canEdit && !preview && !isAdmin() ? `<div class="card"><div class="card-h"><h3>تحتاجون إضافة أنشطة؟</h3></div><p class="muted sm" style="margin-bottom:12px">تستطيعون تغيير مواعيد الأنشطة والمسؤولين عنها وتفاصيلها، ويصل الإدارةَ تنبيه بذلك. لإضافة أنشطة جديدة أو حذفها اطلبوا فتح الإضافة.</p>${t.editReq ? `<span class="pill brand">${svg('check')}أُرسل الطلب ${ago(t.editReq.at)}</span>` : `<button class="btn" type="button" data-act="askedit">اطلب فتح الإضافة</button>`}</div>` : ''}
+      ${!t.canEdit && !preview && !isAll() ? `<div class="card"><div class="card-h"><h3>تحتاجون إضافة أنشطة؟</h3></div><p class="muted sm" style="margin-bottom:12px">تستطيعون تغيير مواعيد الأنشطة والمسؤولين عنها وتفاصيلها، ويصل الإدارةَ تنبيه بذلك. لإضافة أنشطة جديدة أو حذفها اطلبوا فتح الإضافة.</p>${t.editReq ? `<span class="pill brand">${svg('check')}أُرسل الطلب ${ago(t.editReq.at)}</span>` : `<button class="btn" type="button" data-act="askedit">اطلب فتح الإضافة</button>`}</div>` : ''}
       <div class="card"><div class="card-h"><h3>الفريق</h3>${canAdjust(id) ? `<button class="btn sm ghost" type="button" data-act="members" data-id="${id}">تعديل</button>` : ''}</div>${members(id).length ? `<div class="whos">${members(id).map(x => `<span class="chip">${esc(x)}</span>`).join('')}</div>` : `<p class="muted sm">لم تُكتب أسماء الفريق بعد.</p>`}</div>
     </aside>
   </div>
@@ -328,7 +328,7 @@ function semStats(id, n) {
     </div>
   </div>`;
 }
-VIEWS.team = { admin: true, render(r) { return T(r.a) ? teamHome(r.a, true) : ''; } };
+VIEWS.team = { all: true, render(r) { return T(r.a) ? teamHome(r.a, true) : ''; } };
 
 /* ---------- صفحة المسار: الرأس، الفصول، جدول الفصل ---------- */
 const AXC = [['تزكو', 'var(--ty-chal)'], ['سلوك', 'var(--ty-chal)'], ['شرع', 'var(--ty-meet)'], ['فكر', 'var(--ty-write)'], ['إصلاح', 'var(--ty-group)'], ['اصلاح', 'var(--ty-group)'], ['مهار', 'var(--ty-host)'], ['شخص', 'var(--ty-host)']];
@@ -355,9 +355,11 @@ function trackHead(id) {
   if (isAdmin()) ctl = `<div class="perm"><span class="row" style="gap:7px">${svg(t.canEdit ? 'unlock' : 'lock')}${t.canEdit ? 'الفريق يعدّل الخطة' : 'الفريق يعدّل المواعيد والمسؤولين فقط'}</span><button class="sw" type="button" role="switch" aria-checked="${!!t.canEdit}" data-act="toggleedit" data-id="${id}" aria-label="السماح للفريق بتعديل الخطة"></button></div>
     ${t.editReq ? `<span class="pill brand">${svg('unlock')}طلب الفريق فتح التعديل ${ago(t.editReq.at)}</span>` : ''}
     <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-end"><a class="btn sm ghost" href="#team/${id}">${svg('eye')}كما يراها الفريق</a><button class="btn sm ghost" type="button" data-act="members" data-id="${id}">${svg('users')}الفريق</button></div>`;
+  else if (isSup()) ctl = `<div class="perm"><span class="row" style="gap:7px">${svg(t.canEdit ? 'unlock' : 'lock')}${t.canEdit ? 'الفريق يعدّل الخطة' : 'الفريق يعدّل المواعيد والمسؤولين فقط'}</span></div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-end"><a class="btn sm ghost" href="#team/${id}">${svg('eye')}كما يراها الفريق</a><button class="btn sm ghost" type="button" data-act="members" data-id="${id}">${svg('users')}الفريق</button></div>`;
   else ctl = t.canEdit ? `<span class="pill ok">${svg('unlock')}التعديل مفتوح لكم</span>` : `<span class="pill">${svg('lock')}إضافة الأنشطة مغلقة</span><span class="xs faint">وتعدّلون المواعيد والمسؤولين</span>${t.editReq ? `<span class="xs faint">أُرسل طلب الفتح ${ago(t.editReq.at)}</span>` : `<button class="btn sm" type="button" data-act="askedit">اطلب فتح الإضافة</button>`}`;
   return `<div class="thead" style="--tc:${t.color}"><div class="logo">${logoImg(id)}</div>
-    <div class="t"><div class="eyebrow sm faint">${isAdmin() ? '<a class="lk" href="#tracks">المسارات</a> · ' : ''}${esc(t.cohort || '')}</div><h1>${esc(t.full || t.name)}</h1>
+    <div class="t"><div class="eyebrow sm faint">${isAll() ? '<a class="lk" href="#tracks">المسارات</a> · ' : ''}${esc(t.cohort || '')}</div><h1>${esc(t.full || t.name)}</h1>
       <div class="meta">${t.age ? `<span class="pill">${esc(t.age)}</span>` : ''}<span class="pill">${svg('users')}${members(id).length ? members(id).length + ' في الفريق' : 'الفريق لم يُكتب'}</span><span class="pill">${nActs(acts.length)} في ${semLabel(n)}</span>${t.linked ? `<span class="pill brand">${svg('bot')}مجموعة مربوطة بالبوت</span>` : ''}</div></div>
     <div class="ctl">${ctl}</div></div>`;
 }
@@ -694,7 +696,7 @@ function repExcerpt(t) {
 
 /* ---------- المنظور الزمني ---------- */
 function tlTracks() {
-  if (!isAdmin()) return [myTrack()];
+  if (!isAll()) return [myTrack()];
   const sel = (P.tl.tracks || []).filter(id => T(id));
   return sel.length ? sel : D.tracks.map(t => t.id);
 }
@@ -716,8 +718,8 @@ VIEWS.timeline = {
     const bar = `<div class="tlbar"><div class="seg" role="group" aria-label="المدى">${rgBtn('week', 'أسبوع')}${rgBtn('month', 'شهر')}${rgBtn('q3', '٣ أشهر')}${rgBtn('sem', 'الفصل')}</div>
       ${rg !== 'sem' ? `<div class="row" style="gap:2px"><button class="btn icon" type="button" data-act="tlnav" data-n="-1" aria-label="السابق">${svg('back')}</button><button class="btn sm ghost" type="button" data-act="tlnav" data-n="0">اليوم</button><button class="btn icon" type="button" data-act="tlnav" data-n="1" aria-label="التالي">${svg('fwd')}</button></div>` : ''}
       <span class="title">${esc(sp.title)}</span><span class="sp"></span>
-      ${canEdit(ids[0]) || isAdmin() ? `<span class="hint">اسحب النشاط لتغيير يومه</span>` : ''}</div>`;
-    const sel = isAdmin() ? `<div class="tracksel"><button class="chip" type="button" aria-pressed="${!(P.tl.tracks || []).length}" data-act="tltrack" data-v="">كل المسارات</button>${D.tracks.map(t => `<button class="chip" type="button" aria-pressed="${(P.tl.tracks || []).includes(t.id)}" data-act="tltrack" data-v="${t.id}"><i style="background:${t.color}"></i>${esc(t.name)}</button>`).join('')}</div>` : '';
+      ${canEdit(ids[0]) || isAll() ? `<span class="hint">اسحب النشاط لتغيير يومه</span>` : ''}</div>`;
+    const sel = isAll() ? `<div class="tracksel"><button class="chip" type="button" aria-pressed="${!(P.tl.tracks || []).length}" data-act="tltrack" data-v="">كل المسارات</button>${D.tracks.map(t => `<button class="chip" type="button" aria-pressed="${(P.tl.tracks || []).includes(t.id)}" data-act="tltrack" data-v="${t.id}"><i style="background:${t.color}"></i>${esc(t.name)}</button>`).join('')}</div>` : '';
     let body;
     if (rg === 'week') body = isMob() ? agenda(sp.from, ids) : ids.length === 1 ? weekBoard(sp.from, ids) : weekLanes(sp.from, ids);
     else if (rg === 'month') body = monthGrid(sp.from, ids);
