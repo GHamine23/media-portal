@@ -12,7 +12,7 @@
      وملخص أسبوعي، وتنبيه عند نقل لقاء قريب أو إلغائه.
    أول تشغيل: شغّل setup() من المحرر مرة، ثم انشر «تطبيق ويب» (يُنفَّذ باسمك، متاح لأي شخص).
    ===================================================================== */
-var VERSION = '1.3.0';
+var VERSION = '1.3.1';
 var SITE_URL = 'https://ghamine23.github.io/media-portal/anshita/';
 var DATA_DIR_NAME = 'منصة الأنشطة التربوية — البيانات';
 var SESSION_DAYS = 60;
@@ -600,6 +600,29 @@ function groupsOnly_(ids) {
 // تُشغَّل من المحرر (اختر الدالة ثم «تشغيل»)، ولا تصل إليها الواجهة لأنها ليست في apiFns_
 function makeIthmar2Accounts() { Logger.log(memberAccounts_('ithmar2', { 'صهيب وليد': 'suhaib', 'محمد حسين': 'm.hussein', 'يوسف عبدالبديع': 'yousef', 'محمد عبدالفتاح': 'm.abdelfattah' })); }
 function onlyIthmar2Group() { Logger.log(groupsOnly_(['ithmar2'])); }
+// كلمة مرور جديدة لحساب الإدارة تصل محادثة الإدارة على تليجرام وحدها (لا تظهر في السجل ولا في الرد)، وتسري على أثر.
+// تُشغَّل من المحرر حين تضيع كلمة الإدارة أو تحتاجها محادثة الربط
+function adminPassToChat() { Logger.log(adminPassToChat_()); }
+function adminPassToChat_() {
+  var s = cfg_();
+  if (!s.adminChat || !s.adminChat.id || !props_().getProperty('TG_TOKEN')) throw new Error('محادثة الإدارة غير مربوطة بالبوت');
+  var r = withLock_(function () {
+    var all = accs_(), x = Object.keys(all).map(function (k) { return all[k]; }).filter(function (a) { return a.role === 'admin' && !a.atar && !a.disabled && norm_(a.user) === 'admin'; })[0];
+    if (!x) throw new Error('حساب الإدارة غير موجود');
+    var pw = tempPass_(); setPass_(x, pw); x.tv = (x.tv || 0) + 1; x.fails = 0; x.lockUntil = 0;
+    writeJson_('accounts.json', all);
+    return { uid: x.uid, user: x.user, pw: pw, linked: !!x.atarUid };
+  });
+  linkPassOut_(r.uid, r.pw);
+  var lk = accs_()[r.uid] || {};
+  tgSend_(s.adminChat.id, '<b>كلمة مرور جديدة لحساب الإدارة</b>\n\n' +
+    'اسم المستخدم: <code>' + h_(r.user) + '</code>\n' +
+    'كلمة المرور: <code>' + h_(r.pw) + '</code>\n\n' +
+    (r.linked ? (lk.lkPend ? 'تعذّر الوصول إلى أثر الآن، فتصير كلمة أثر أيضًا عند أول دخول بها.' : 'وهي كلمة حسابك في أثر أيضًا.') + ' ' : '') +
+    'خرجت الجلسات المفتوحة بالكلمة القديمة. وتغيّرها متى شئت من «تغيير كلمة المرور» في قائمة حسابك.', '', true);
+  log_(null, '', 'أعاد كلمة مرور الإدارة', 'وصلت محادثة الإدارة');
+  return 'أُرسلت كلمة مرور الإدارة الجديدة إلى محادثة الإدارة على تليجرام';
+}
 
 /* ================= القراءة ================= */
 function pubTrack_(t, admin) {

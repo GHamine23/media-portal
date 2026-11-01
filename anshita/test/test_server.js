@@ -517,6 +517,19 @@ ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.te
   throws(() => call('plan', call('login', 'gen.sup', sv.pass).token, 'judhoor'), /صلاحيتك/, 'إعادته فريقًا تحصره في مساره');
 }
 
+// ٢١) كلمة مرور جديدة لحساب الإدارة تصل محادثة الإدارة وحدها
+{
+  const adm = ctx.cfg_().adminChat.id, AT0 = call('login', 'admin', cred.admin).token;
+  TG.sent.length = 0;
+  const msg = ctx.adminPassToChat_();
+  const m = TG.sent.filter(x => x.chat === adm), pw = m.length && /كلمة المرور: <code>([^<]+)<\/code>/.exec(m[0].text);
+  ok(m.length === 1 && pw && TG.sent.length === 1, 'تصل محادثة الإدارة وحدها');
+  ok(!new RegExp(pw[1]).test(msg) && !JSON.stringify(call('log_list', call('login', 'admin', pw[1]).token)).includes(pw[1]), 'ولا تظهر في الرد ولا في السجل');
+  throws(() => call('boot', AT0), /تغيّرت كلمة المرور/, 'والجلسات القديمة خرجت');
+  throws(() => call('login', 'admin', cred.admin), /غير صحيحة/, 'والكلمة القديمة لا تعمل');
+  cred.admin = pw[1];
+}
+
 if (process.env.PREVIEW) {
   const seen = new Set(); ALLSENT.forEach(m => { const k = m.text.split('\n')[0].replace(/«.*»/, ''); if (m.html && !seen.has(k)) { seen.add(k); console.log('\n=== ' + m.chat + '\n' + m.text); } });
   console.log('\n=== ADMIN TASKS\n' + ctx.adminTasksHtml_('2026-11-28', ctx.cfg_()));
