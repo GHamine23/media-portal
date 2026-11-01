@@ -114,7 +114,7 @@ function apiFns_() {
     bc_list: bc_list, bc_all: bc_all, bc_save: bc_save, bc_del: bc_del,
     cl_list: cl_list, cl_save: cl_save, set_get: set_get, set_save: set_save, audit_list: audit_list,
     ai_make: ai_make, ai_test: ai_test, ai_status: ai_status, ai_log: ai_log,
-    tg_test: tg_test, tg_send: tg_send, tg_queue: tg_queue, tg_cancel: tg_cancel, tg_update: tg_update, tg_requeue: tg_requeue, tg_thumbs: tg_thumbs, tg_discover: tg_discover, tg_chat_check: tg_chat_check, tg_known: tg_known,
+    tg_test: tg_test, tg_send: tg_send, tg_queue: tg_queue, tg_cancel: tg_cancel, tg_update: tg_update, tg_requeue: tg_requeue, tg_thumbs: tg_thumbs, tg_discover: tg_discover, tg_chat_check: tg_chat_check, tg_known: tg_known, tg_bot_set: tg_bot_set, tg_bot_info: tg_bot_info,
     task_list: task_list, task_save: task_save, task_done: task_done, task_del: task_del, me_profile: me_profile, font_family: font_family,
     img_search: img_search, img_test: img_test, img_pick: img_pick,
     cm_list: cm_list, cm_add: cm_add, cm_del: cm_del, cm_counts: cm_counts, nt_list: nt_list, nt_seen: nt_seen,
@@ -1275,18 +1275,45 @@ function ai_log(token, m, program) {
    بوت واحد للمنصة (رمزه في خصائص السكربت TG_TOKEN)، يُضاف مشرفاً في قناة كل برنامج، ولكل برنامج قناته في programs.json (tg.chat).
    المجدول يُحفظ في tgq.json وملفاته في المجلد الفرعي tg، ويرسله المؤقّت tgTick كل عشر دقائق (والمؤقّت نفسه يرسل تذكيرات المهام).
    بعد نجاح النشر، وإن لم يبق موعد قادم يحتاج الملف نفسه، تُنقل الصورة إلى سلة درايف (تُستعاد خلال ٣٠ يوماً) ويُمحى مرجعها. */
-function tgToken_() { var t = props_().getProperty('TG_TOKEN'); if (!t) throw new Error('لم يُضبط بوت تليجرام بعد (الإعدادات)'); return t; }
-function tgCall_(method, payload) {
-  var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + tgToken_() + '/' + method, { method: 'post', payload: payload, muteHttpExceptions: true });
+// لبرنامج أن يكون له بوت خاص (خاصية السكربت TG_TOKEN_<معرّف البرنامج>)، وإلا فبوت المنصة العام TG_TOKEN
+function tgPropKey_(pid) { return 'TG_TOKEN_' + String(pid || '').replace(/[^\w-]/g, '_'); }
+function tgOwnBot_(pid) { return !!(pid && props_().getProperty(tgPropKey_(pid))); }
+function tgToken_(pid) { var P = props_(), t = (pid && P.getProperty(tgPropKey_(pid))) || P.getProperty('TG_TOKEN'); if (!t) throw new Error('لم يُضبط بوت تليجرام بعد (الإعدادات)'); return t; }
+// أخطاء تليجرام الشائعة بعبارة تدل على العلاج
+function tgErr_(j, code) {
+  var d = String(j.description || code || ''), mig = j.parameters && j.parameters.migrate_to_chat_id;
+  if (mig) return 'تحوّلت هذه المجموعة إلى «مجموعة خارقة» فتغيّر معرّفها؛ معرّفها الجديد: ' + mig + ' . اختره أو اكتبه بدل القديم';
+  if (/webhook is active/i.test(d)) return 'هذا البوت مربوط بخدمة أخرى (Webhook) فلا يستطيع الخادم قراءة تحديثاته. لا يمنع ذلك النشر: اكتب معرّف المجموعة واضغط «افحص»';
+  if (/terminated by other getUpdates/i.test(d)) return 'خدمة أخرى تقرأ تحديثات هذا البوت الآن فتسبق الخادم إليها. اكتب معرّف المجموعة واضغط «افحص»';
+  if (/chat not found/i.test(d)) return 'لم يجد البوت هذه القناة أو المجموعة: تأكد أن البوت نفسه عضو فيها، واكتب معرّفها الرقمي (يبدأ بـ -100) إن لم يكن لها اسم يبدأ بـ @';
+  if (/unauthorized/i.test(d) || code === 401) return 'رمز البوت غير صالح أو أُلغي من BotFather';
+  if (/bot is not a member|bot was kicked|have no rights to send|not enough rights/i.test(d)) return 'البوت ليس عضواً في هذه المجموعة أو لا يملك صلاحية الكتابة فيها (' + d + ')';
+  return 'تليجرام: ' + d;
+}
+function tgCall_(method, payload, pid) {
+  var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + tgToken_(pid) + '/' + method, { method: 'post', payload: payload, muteHttpExceptions: true });
   var j; try { j = JSON.parse(res.getContentText()); } catch (e) { j = { ok: false, description: 'رد غير مفهوم (' + res.getResponseCode() + ')' }; }
-  if (!j.ok) throw new Error('تليجرام: ' + (j.description || res.getResponseCode()));
+  if (!j.ok) throw new Error(tgErr_(j, res.getResponseCode()));
   return j.result;
 }
-function tg_test(token) {
-  var a = auth_(token); needAdmin_(a);
-  var me = tgCall_('getMe', {});
-  return JSON.stringify({ username: me.username, name: me.first_name });
+// من يدير قنوات برنامج: المدير العام أو مشرف ذلك البرنامج؛ وبلا برنامج: المشرفون عامة (البوت العام)
+function tgAdmin_(a, pid) { if (pid) { if (!adminOf_(a, pid)) throw new Error('لمشرف البرنامج'); } else needAdmin_(a); }
+function tg_test(token, pid) {
+  var a = auth_(token); pid = clip_(pid || '', 40); tgAdmin_(a, pid);
+  var me = tgCall_('getMe', {}, pid);
+  return JSON.stringify({ username: me.username, name: me.first_name, own: tgOwnBot_(pid) });
 }
+// بوت خاص لبرنامج: يلصق المدير العام رمزه، ويُحفظ في خصائص السكربت ولا يُعرض أبداً. الفارغ يعيد البرنامج إلى بوت المنصة
+function tg_bot_set(token, pid, bot) {
+  var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
+  pid = clip_(pid || '', 40); if (!progs_().some(function (x) { return x.id === pid; })) throw new Error('برنامج غير موجود');
+  var tk = String(bot || '').trim();
+  if (tk) { if (!/^\d+:[\w-]{30,}$/.test(tk)) throw new Error('رمز البوت غير صحيح'); props_().setProperty(tgPropKey_(pid), tk); }
+  else props_().deleteProperty(tgPropKey_(pid));
+  audit_(a, tk ? 'ضبط بوتاً خاصاً لبرنامج' : 'أعاد برنامجاً إلى بوت المنصة', pid);
+  return JSON.stringify({ own: !!tk });
+}
+function tg_bot_info(token, pid) { var a = auth_(token); pid = clip_(pid || '', 40); tgAdmin_(a, pid); return JSON.stringify({ own: tgOwnBot_(pid), main: !!props_().getProperty('TG_TOKEN') }); }
 function tgChatOf_(pid, track) { var p = progs_().filter(function (x) { return x.id === pid; })[0]; var ch = (p && p.tg && p.tg.chats && track && p.tg.chats[track]) || (p && p.tg && p.tg.chat); if (!ch) throw new Error('لم يحدد مشرف البرنامج قناة تليجرام بعد'); return ch; }
 function canSend_(a, pid) { return adminOf_(a, pid) || (inProg_(a, pid) && perm_(a, 'send')); }
 // payload: {program, caption, png (base64 بلا رأس), file (base64 الملف الأصلي، اختياري), fileName, fileMime, mode: photo|doc|both, when (ms، اختياري للجدولة), name}
@@ -1320,7 +1347,7 @@ function tg_send(token, json) {
     audit_(a, 'جدول منشوراً', rec.title + ' · ' + pid + (repeat ? ' · متكرر' : ''));
     return JSON.stringify({ id: rec.id, queued: true, when: when, repeat: repeat });
   }
-  var sent = tgDeliver_(chat, cap, mode, o.png ? Utilities.newBlob(Utilities.base64Decode(o.png), 'image/png', 'design.png') : null, o.file ? Utilities.newBlob(Utilities.base64Decode(o.file), clip_(o.fileMime || 'image/png', 60), clip_(o.fileName || 'design.png', 100)) : null);
+  var sent = tgDeliver_(chat, cap, mode, o.png ? Utilities.newBlob(Utilities.base64Decode(o.png), 'image/png', 'design.png') : null, o.file ? Utilities.newBlob(Utilities.base64Decode(o.file), clip_(o.fileMime || 'image/png', 60), clip_(o.fileName || 'design.png', 100)) : null, pid);
   rec.status = 'sent'; rec.msg = sent.msg; rec.link = sent.link; rec.sentAt = now_();
   var nextRec = repeat ? tgNextOf_(rec) : null;
   var trash = [];
@@ -1341,12 +1368,12 @@ function tgNextOf_(x) {
 }
 // طول نص تليجرام يُحسب بلا الوسوم. حدّ الوصف تحت الصورة ١٠٢٤، وحدّ الرسالة ٤٠٩٦
 function tgLen_(cap) { return String(cap || '').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').length; }
-function tgDeliver_(chat, cap, mode, pngBlob, fileBlob) {
+function tgDeliver_(chat, cap, mode, pngBlob, fileBlob, pid) {
   var out = { msg: 0 }, longCap = tgLen_(cap) > 1000, capOnMedia = longCap ? '' : cap;
-  if (mode !== 'doc' && pngBlob) { var r1 = tgCall_('sendPhoto', { chat_id: chat, photo: pngBlob, caption: capOnMedia, parse_mode: 'HTML' }); out.msg = r1.message_id; }
-  if (mode !== 'photo') { var fb = fileBlob || pngBlob; var r2 = tgCall_('sendDocument', { chat_id: chat, document: fb, caption: mode === 'doc' ? capOnMedia : 'الملف بجودته الكاملة', parse_mode: 'HTML' }); if (!out.msg) out.msg = r2.message_id; }
+  if (mode !== 'doc' && pngBlob) { var r1 = tgCall_('sendPhoto', { chat_id: chat, photo: pngBlob, caption: capOnMedia, parse_mode: 'HTML' }, pid); out.msg = r1.message_id; }
+  if (mode !== 'photo') { var fb = fileBlob || pngBlob; var r2 = tgCall_('sendDocument', { chat_id: chat, document: fb, caption: mode === 'doc' ? capOnMedia : 'الملف بجودته الكاملة', parse_mode: 'HTML' }, pid); if (!out.msg) out.msg = r2.message_id; }
   // النص الطويل يُرسل رسالةً تالية تردّ على الصورة فلا يُقصّ
-  if (longCap && cap) { var p3 = { chat_id: chat, text: clip_(cap, 4096), parse_mode: 'HTML', link_preview_options: JSON.stringify({ is_disabled: true }) }; if (out.msg) p3.reply_to_message_id = out.msg; var r3 = tgCall_('sendMessage', p3); out.textMsg = r3.message_id; out.split = true; }
+  if (longCap && cap) { var p3 = { chat_id: chat, text: clip_(cap, 4096), parse_mode: 'HTML', link_preview_options: JSON.stringify({ is_disabled: true }) }; if (out.msg) p3.reply_to_message_id = out.msg; var r3 = tgCall_('sendMessage', p3, pid); out.textMsg = r3.message_id; out.split = true; }
   if (/^@/.test(chat) && out.msg) out.link = 'https://t.me/' + chat.slice(1) + '/' + out.msg;
   return out;
 }
@@ -1410,7 +1437,7 @@ function tgSendDue_() {
   var due = readJson_('tgq.json', []).filter(function (x) { return x.status === 'queued' && x.when <= now_(); });
   due.forEach(function (x) {
     var res = null, err = '';
-    try { res = tgDeliver_(x.chat, x.caption, x.mode, x.pngId ? DriveApp.getFileById(x.pngId).getBlob() : null, x.fileId ? DriveApp.getFileById(x.fileId).getBlob() : null); } catch (e) { err = String(e && e.message || e); }
+    try { res = tgDeliver_(x.chat, x.caption, x.mode, x.pngId ? DriveApp.getFileById(x.pngId).getBlob() : null, x.fileId ? DriveApp.getFileById(x.fileId).getBlob() : null, x.program); } catch (e) { err = String(e && e.message || e); }
     var nextRec = null, trash = [];
     withLock_(function () {
       var q = readJson_('tgq.json', []), cur = null;
@@ -1437,36 +1464,51 @@ function tgReleaseFiles_(q, cur) {
 }
 /* ---------- اكتشاف القنوات والمجموعات التي أُضيف إليها البوت ---------- */
 // getUpdates يعيد آخر ما وصل البوت خلال ٢٤ ساعة: إضافته لقناة أو مجموعة، ومنشورات القنوات التي هو مشرف فيها. يُجمع ما نجده في settings.tgKnown
-function tg_discover(token) {
-  var a = auth_(token); needAdmin_(a);
-  var ups = tgCall_('getUpdates', { limit: 100, timeout: 0, allowed_updates: JSON.stringify(['my_chat_member', 'channel_post', 'message', 'chat_member', 'edited_channel_post']) }) || [];
+// لكل بوت قائمته: بوت المنصة في settings.tgKnown، وبوت برنامج خاص في settings.tgKnownBy[معرّف البرنامج]
+function tgKnownGet_(s, pid) { return tgOwnBot_(pid) ? ((s.tgKnownBy || {})[pid] || []) : (s.tgKnown || []); }
+function tgKnownPut_(s, pid, list) { if (tgOwnBot_(pid)) { s.tgKnownBy = s.tgKnownBy || {}; s.tgKnownBy[pid] = list; } else s.tgKnown = list; }
+function tg_discover(token, pid) {
+  var a = auth_(token); pid = clip_(pid || '', 40); tgAdmin_(a, pid);
+  var ups = tgCall_('getUpdates', { limit: 100, timeout: 0, allowed_updates: JSON.stringify(['my_chat_member', 'channel_post', 'message', 'chat_member', 'edited_channel_post']) }, pid) || [];
   var found = {};
   ups.forEach(function (u) {
     var m = u.my_chat_member || u.chat_member || u.channel_post || u.edited_channel_post || u.message, ch = m && m.chat; if (!ch || ch.type === 'private') return;
     var st = u.my_chat_member && u.my_chat_member.new_chat_member ? u.my_chat_member.new_chat_member.status : '';
     var k = String(ch.id), prev = found[k] || {};
+    // مجموعة رُقّيت إلى مجموعة خارقة: القديمة تُنسى، والجديدة تُسجَّل
+    if (m.migrate_to_chat_id) { found[k] = { id: ch.id, status: 'left' }; return; }
     found[k] = { id: ch.id, title: clip_(ch.title || '', 80), type: ch.type, username: ch.username ? '@' + ch.username : '', status: st || prev.status || '', seen: Math.max(prev.seen || 0, (m.date || 0) * 1000) };
   });
   return withLock_(function () {
-    var s = readJson_('settings.json', {}), known = s.tgKnown || [], map = {};
+    var s = readJson_('settings.json', {}), known = tgKnownGet_(s, pid), map = {};
     known.forEach(function (c) { map[String(c.id)] = c; });
     Object.keys(found).forEach(function (k) { var c = found[k]; if (c.status === 'left' || c.status === 'kicked') { delete map[k]; return; } map[k] = Object.assign({}, map[k] || {}, c); });
     var list = Object.keys(map).map(function (k) { return map[k]; }).sort(function (x, y) { return (y.seen || 0) - (x.seen || 0); }).slice(0, 60);
-    s.tgKnown = list; writeJson_('settings.json', s);
+    tgKnownPut_(s, pid, list); writeJson_('settings.json', s);
     return JSON.stringify({ found: Object.keys(found).length, list: list });
   });
 }
 // فحص قناة: هل يصل إليها البوت، وهل هو مشرف بصلاحية النشر؟
-function tg_chat_check(token, chat) {
-  var a = auth_(token); needAdmin_(a); chat = clip_(String(chat || '').trim(), 80); if (!chat) throw new Error('اكتب اسم القناة أو معرّفها');
-  var info = tgCall_('getChat', { chat_id: chat }), me = tgCall_('getMe', {});
-  var mem = null; try { mem = tgCall_('getChatMember', { chat_id: chat, user_id: me.id }); } catch (e) {}
-  var st = mem ? mem.status : 'unknown', canPost = !!(mem && (st === 'creator' || (st === 'administrator' && (info.type !== 'channel' || mem.can_post_messages !== false))));
-  // نسجّلها في المعروفة أيضاً
-  try { withLock_(function () { var s = readJson_('settings.json', {}), known = s.tgKnown || []; if (!known.some(function (c) { return String(c.id) === String(info.id); })) { known.unshift({ id: info.id, title: clip_(info.title || '', 80), type: info.type, username: info.username ? '@' + info.username : '', status: st, seen: now_() }); s.tgKnown = known.slice(0, 60); writeJson_('settings.json', s); } }); } catch (e) {}
-  return JSON.stringify({ id: info.id, title: info.title || '', type: info.type, username: info.username ? '@' + info.username : '', status: st, canPost: canPost, members: info.members_count || 0 });
+// فحص قناة أو مجموعة بالبوت الذي سيرسل إليها فعلاً (بوت البرنامج إن كان له بوت): هل يصل إليها، وهل يستطيع الكتابة؟
+// لا يرسل شيئاً: getChat وgetChatMember قراءة فقط.
+function tg_chat_check(token, chat, pid) {
+  var a = auth_(token); pid = clip_(pid || '', 40); tgAdmin_(a, pid); chat = clip_(String(chat || '').trim(), 80); if (!chat) throw new Error('اكتب اسم القناة أو معرّفها');
+  var m1 = chat.match(/^(?:https?:\/\/)?t(?:elegram)?\.me\/([A-Za-z]\w{3,})\/?$/);
+  if (m1) chat = '@' + m1[1];
+  else if (/t(?:elegram)?\.me\/(\+|joinchat)/.test(chat)) throw new Error('رابط الدعوة لا يصلح هنا: البوت لا يستطيع الدخول به. أضف البوت إلى المجموعة من «إضافة أعضاء»، ثم اضغط «ابحث» أو اكتب معرّفها الرقمي');
+  else if (/^[A-Za-z]\w{3,}$/.test(chat)) chat = '@' + chat;
+  var info = tgCall_('getChat', { chat_id: chat }, pid), me = tgCall_('getMe', {}, pid);
+  var mem = null; try { mem = tgCall_('getChatMember', { chat_id: chat, user_id: me.id }, pid); } catch (e) {}
+  var st = mem ? mem.status : 'unknown', isCh = info.type === 'channel';
+  // في القناة لا ينشر إلا المشرف بصلاحية النشر. وفي المجموعة يكتب العضو العادي ما لم تُقيَّد الكتابة للأعضاء
+  var membersMayWrite = !(info.permissions && info.permissions.can_send_messages === false);
+  var canPost = !!(mem && (st === 'creator' || (st === 'administrator' && (!isCh || mem.can_post_messages !== false)) ||
+    (!isCh && st === 'member' && membersMayWrite) || (!isCh && st === 'restricted' && mem.is_member !== false && mem.can_send_messages !== false)));
+  var why = canPost ? '' : !mem ? 'لم نعرف حال البوت فيها' : (st === 'left' || st === 'kicked') ? 'البوت ليس عضواً فيها' : isCh ? 'البوت في القناة ليس مشرفاً بصلاحية «نشر الرسائل»' : 'الكتابة في المجموعة مقيّدة للأعضاء؛ اجعل البوت مشرفاً فيها';
+  try { withLock_(function () { var s = readJson_('settings.json', {}), known = tgKnownGet_(s, pid); if (!known.some(function (c) { return String(c.id) === String(info.id); })) { known.unshift({ id: info.id, title: clip_(info.title || '', 80), type: info.type, username: info.username ? '@' + info.username : '', status: st, seen: now_() }); tgKnownPut_(s, pid, known.slice(0, 60)); writeJson_('settings.json', s); } }); } catch (e) {}
+  return JSON.stringify({ id: info.id, chat: info.username ? '@' + info.username : String(info.id), title: info.title || '', type: info.type, username: info.username ? '@' + info.username : '', status: st, canPost: canPost, why: why, bot: me.username, members: info.members_count || 0 });
 }
-function tg_known(token) { var a = auth_(token); needAdmin_(a); return JSON.stringify(settings_().tgKnown || []); }
+function tg_known(token, pid) { var a = auth_(token); pid = clip_(pid || '', 40); tgAdmin_(a, pid); return JSON.stringify(tgKnownGet_(settings_(), pid)); }
 
 /* ================= التقويم والمهام =================
    tasks.json: [{id, program, title, note, due, allDay, from, fromName, to, toName, status: open|done, prio, link, at, upd, doneAt,

@@ -114,14 +114,13 @@ function apiFns_() {
     bc_list: bc_list, bc_all: bc_all, bc_save: bc_save, bc_del: bc_del,
     cl_list: cl_list, cl_save: cl_save, set_get: set_get, set_save: set_save, audit_list: audit_list,
     ai_make: ai_make, ai_test: ai_test, ai_status: ai_status, ai_log: ai_log,
-    tg_test: tg_test, tg_send: tg_send, tg_queue: tg_queue, tg_cancel: tg_cancel, tg_update: tg_update, tg_requeue: tg_requeue, tg_thumbs: tg_thumbs, tg_discover: tg_discover, tg_chat_check: tg_chat_check, tg_known: tg_known,
+    tg_test: tg_test, tg_send: tg_send, tg_queue: tg_queue, tg_cancel: tg_cancel, tg_update: tg_update, tg_requeue: tg_requeue, tg_thumbs: tg_thumbs, tg_discover: tg_discover, tg_chat_check: tg_chat_check, tg_known: tg_known, tg_bot_set: tg_bot_set, tg_bot_info: tg_bot_info,
     task_list: task_list, task_save: task_save, task_done: task_done, task_del: task_del, me_profile: me_profile, font_family: font_family,
     img_search: img_search, img_test: img_test, img_pick: img_pick,
     cm_list: cm_list, cm_add: cm_add, cm_del: cm_del, cm_counts: cm_counts, nt_list: nt_list, nt_seen: nt_seen,
     rv_request: rv_request, rv_list: rv_list, rv_mine: rv_mine, rv_img: rv_img, rv_reply: rv_reply,
     me_week: me_week, wk_admin: wk_admin, ai_skills: ai_skills, ai_skill_save: ai_skill_save, ai_skill_reset: ai_skill_reset, img_requests: img_requests, img_decide: img_decide, quran_find: quran_find, hadith_find: hadith_find,
-    quiz_form: quiz_form, quiz_results: quiz_results, quiz_accept: quiz_accept,
-    link_op: link_op, link_check: link_check
+    quiz_form: quiz_form, quiz_results: quiz_results, quiz_accept: quiz_accept
   };
 }
 function doPost(e) {
@@ -207,7 +206,7 @@ function tempPass_() {
 function publicAcc_(a) {
   return { uid: a.uid, username: a.username, email: a.email || '', name: a.name, role: a.role, programs: a.programs || [], perms: a.perms || {},
     mustChange: !!a.mustChange, disabled: !!a.disabled, created: a.created, last: a.last || 0, legacy: !!a.legacyKey, note: a.note || '',
-    tracks: a.tracks || [], editLevel: a.editLevel || '', hasAvatar: !!a.hasAvatar, anshita: !!a.ansUid, trackSup: !!a.linkSup };
+    tracks: a.tracks || [], editLevel: a.editLevel || '', hasAvatar: !!a.hasAvatar };
 }
 function findAcc_(accs, id) {
   var n = normUser_(id);
@@ -246,45 +245,25 @@ function audit_(a, what, detail) {
 function auth_login(id, pw) {
   id = clip_(id, 120); pw = String(pw || '');
   if (!id || !pw) throw new Error('اكتب اسم المستخدم وكلمة المرور');
-  var st = withLock_(function () {
+  return withLock_(function () {
     var accs = readJson_('accounts.json', {}), a = findAcc_(accs, id), t = now_();
     if (!a) throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة');
     if (a.disabled) throw new Error('هذا الحساب موقوف. راجع مشرف برنامجك.');
     if (a.lockUntil && a.lockUntil > t) throw new Error('محاولات كثيرة. انتظر عشر دقائق ثم حاول مرة أخرى.');
-    if (pwHash_(a.salt, pw) === a.hash && !a.pendPw) return { uid: a.uid, ok: true, push: !!(a.ansUid && a.lkPend) };
-    if (a.ansUid) return { uid: a.uid, ok: false, ask: true };   // حساب مربوط: يُسأل خادم المنصة عن كلمتها
-    linkFail_(accs, a);
-    throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة');
-  });
-  // خارج القفل: التحقق من كلمة مرور منصة الأنشطة، أو توحيد الكلمة عند أول دخول بعد الربط
-  var accs0 = readJson_('accounts.json', {}), a0 = accs0[st.uid];
-  if (st.ask) {
-    var good = false; try { good = !!linkSend_({ op: 'verify', ans: a0.ansUid, pw: pw }).ok; } catch (e) {}
-    if (!good) { withLock_(function () { var accs = readJson_('accounts.json', {}); linkFail_(accs, accs[st.uid]); }); throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة'); }
-  } else if (st.push) {
-    try { linkSend_({ op: 'pass', ans: a0.ansUid, pw: pw }); st.pushed = true; } catch (e) {}
-  }
-  return withLock_(function () {
-    var accs = readJson_('accounts.json', {}), a = accs[st.uid], t = now_();
-    if (st.ask) { a.salt = Utilities.getUuid(); a.hash = pwHash_(a.salt, pw); a.pendPw = false; a.mustChange = false; a.lkPend = false; }
-    if (st.pushed) a.lkPend = false;
+    if (pwHash_(a.salt, pw) !== a.hash) {
+      a.fails = (a.fails || 0) + 1;
+      if (a.fails >= 8) { a.lockUntil = t + 10 * 60 * 1000; a.fails = 0; }
+      writeJson_('accounts.json', accs);
+      throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة');
+    }
     a.fails = 0; a.lockUntil = 0; a.last = t;
     writeJson_('accounts.json', accs);
-    return JSON.stringify({ token: newSession_(a.uid), me: meOf_(a) });
+    var ss = readJson_('sessions.json', {}), tok = Utilities.getUuid() + Utilities.getUuid().slice(0, 8);
+    Object.keys(ss).forEach(function (k) { if (ss[k].e < t) delete ss[k]; });   // تنظيف المنتهي
+    ss[tok] = { u: a.uid, e: t + SESSION_DAYS * 864e5, l: t };
+    writeJson_('sessions.json', ss);
+    return JSON.stringify({ token: tok, me: meOf_(a) });
   });
-}
-function linkFail_(accs, a) {
-  a.fails = (a.fails || 0) + 1;
-  if (a.fails >= 8) { a.lockUntil = now_() + 10 * 60 * 1000; a.fails = 0; }
-  writeJson_('accounts.json', accs);
-}
-// جلسة جديدة لحساب (داخل القفل)
-function newSession_(uid) {
-  var ss = readJson_('sessions.json', {}), tok = Utilities.getUuid() + Utilities.getUuid().slice(0, 8), t = now_();
-  Object.keys(ss).forEach(function (k) { if (ss[k].e < t) delete ss[k]; });   // تنظيف المنتهي
-  ss[tok] = { u: uid, e: t + SESSION_DAYS * 864e5, l: t };
-  writeJson_('sessions.json', ss);
-  return tok;
 }
 function meOf_(a) {
   var progs = progsFor_(a).map(function (p) { return { id: p.id, name: p.name, color: p.color || '', features: p.features || {} }; });
@@ -314,28 +293,17 @@ function auth_logout(token) {
 }
 function auth_password(token, oldPw, newPw) {
   var a0 = auth_(token, { allowMust: true });
-  newPw = String(newPw || ''); oldPw = String(oldPw || '');
+  newPw = String(newPw || '');
   if (newPw.length < 8) throw new Error('كلمة المرور ثمانية أحرف على الأقل');
   if (newPw === oldPw) throw new Error('اختر كلمة مرور جديدة غير المؤقتة');
-  // الحساب المربوط تُقبل فيه كلمة مرور منصة الأنشطة الحالية أيضًا (قبل توحيد الكلمتين)
-  var viaAns = false;
-  if (a0.ansUid && (a0.pendPw || pwHash_(a0.salt, oldPw) !== a0.hash)) { try { viaAns = !!linkSend_({ op: 'verify', ans: a0.ansUid, pw: oldPw }).ok; } catch (e) {} }
-  var res = withLock_(function () {
+  return withLock_(function () {
     var accs = readJson_('accounts.json', {}), a = accs[a0.uid];
-    if (!viaAns && (a.pendPw || pwHash_(a.salt, oldPw) !== a.hash)) throw new Error('كلمة المرور الحالية غير صحيحة');
-    a.salt = Utilities.getUuid(); a.hash = pwHash_(a.salt, newPw); a.mustChange = false; a.pendPw = false;
+    if (pwHash_(a.salt, oldPw) !== a.hash) throw new Error('كلمة المرور الحالية غير صحيحة');
+    a.salt = Utilities.getUuid(); a.hash = pwHash_(a.salt, newPw); a.mustChange = false;
     writeJson_('accounts.json', accs);
     audit_(a, 'غيّر كلمة مروره', a.username);
-    return meOf_(a);
+    return JSON.stringify(meOf_(a));
   });
-  linkPassOut_(a0.uid, newPw);
-  return JSON.stringify(res);
-}
-// تغيّرت كلمة مرور حساب مربوط هنا: تسري على منصة الأنشطة. وإن تعذّر الاتصال تتوحّد عند الدخول التالي
-function linkPassOut_(uid, pw) {
-  var a = readJson_('accounts.json', {})[uid]; if (!a || !a.ansUid) return;
-  var ok = false; try { linkSend_({ op: 'pass', ans: a.ansUid, pw: pw }); ok = true; } catch (e) {}
-  withLock_(function () { var accs = readJson_('accounts.json', {}); if (accs[uid]) { accs[uid].lkPend = !ok; writeJson_('accounts.json', accs); } });
 }
 function prefs_save(token, json) {
   if (String(json).length > 200000) throw new Error('التفضيلات أكبر من المسموح');
@@ -373,7 +341,6 @@ function acc_save(token, json) {
     }
     var username = normUser_(o.username != null ? o.username : (a ? a.username : ''));
     if (!/^[؀-ۿa-z0-9._\- ]{3,40}$/.test(username)) throw new Error('اسم المستخدم من ٣ إلى ٤٠ حرفاً: حروف وأرقام ونقطة وشرطة');
-    if (a && a.ansUid && normUser_(a.username) !== username) throw new Error('اسم دخول هذا الحساب يُغيَّر من منصة الأنشطة، لأنه مربوط بها');
     var email = normUser_(o.email != null ? o.email : (a ? a.email : ''));
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('البريد غير صحيح');
     Object.keys(accs).forEach(function (k) {
@@ -408,18 +375,15 @@ function dropSessions_(uid) { var ss = readJson_('sessions.json', {}); Object.ke
 // كلمة مرور مؤقتة جديدة لمن نسي كلمته
 function acc_reset(token, uid) {
   var me = auth_(token); needAdmin_(me);
-  var r = withLock_(function () {
+  return withLock_(function () {
     var accs = readJson_('accounts.json', {}), a = accs[uid];
     if (!a) throw new Error('الحساب غير موجود');
     if (!isSuper_(me) && (a.role === 'super' || !(a.programs || []).some(function (p) { return adminOf_(me, p); }))) throw new Error('لا تملك صلاحية على هذا الحساب');
-    if (!isSuper_(me) && a.ansUid) throw new Error('كلمة مرور هذا الحساب مشتركة مع منصة الأنشطة، وتُعاد من إدارتها');
-    var temp = tempPass_(); a.salt = Utilities.getUuid(); a.hash = pwHash_(a.salt, temp); a.mustChange = true; a.fails = 0; a.lockUntil = 0; a.pendPw = false;
+    var temp = tempPass_(); a.salt = Utilities.getUuid(); a.hash = pwHash_(a.salt, temp); a.mustChange = true; a.fails = 0; a.lockUntil = 0;
     writeJson_('accounts.json', accs); dropSessions_(uid);
     audit_(me, 'أنشأ كلمة مرور مؤقتة', a.username);
-    return { temp: temp, username: a.username };
+    return JSON.stringify({ temp: temp, username: a.username });
   });
-  linkPassOut_(uid, r.temp);
-  return JSON.stringify(r);
 }
 // نقل حسابات الإصدار الخامس (الاسم والرمز) إلى حسابات جديدة، وتبقى قوالبهم معهم
 function acc_import(token, program) {
@@ -441,158 +405,6 @@ function acc_import(token, program) {
     audit_(me, 'نقل الحسابات القديمة', out.length + ' حساباً');
     return JSON.stringify(out);
   });
-}
-
-/* ================= الحساب الموحّد مع منصة الأنشطة التربوية =================
-   (طلب أمين، ٣١ أكتوبر) كل حساب يُنشأ في منصة الأنشطة يُنشأ معه حسابه هنا بالاسم نفسه وكلمة المرور نفسها وصلاحيات مساره،
-   وتغيير كلمة المرور في أي منهما يسري على الأخرى، ومن دخل إحداهما يجد الأخرى مفتوحة.
-   لا مفتاح مشتركًا بين الخادمين: كل طلب يحمل رمزًا لمرة واحدة، فيسأل مستقبِله مرسِلَه (link_check) هل أصدره هو بهذا المحتوى.
-   في الحساب: ansUid معرّف حسابه في المنصة، pendPw لم تُعرف كلمته بعد (أُنشئ بلا كلمة)، lkPend كلمتاه لم تتوحّدا بعد،
-   linkSup مشرف مساره (وsupPrev صلاحياته قبل الإشراف). */
-var ANSHITA_API = 'https://script.google.com/macros/s/AKfycbzvZx6QWEGYRLxtX8E6BMCIEw53p-N0GBZ6QYDQKgvQsMDU2IV9gwbb4MMyxecY0jEKNw/exec';
-var LINK_PROG = 'academy';
-var LINK_SUP = { editLevel: 'full', perms: ['social', 'ai', 'upload', 'slides', 'send'] };   // مشرف المسار: كل صلاحيات التصميم والنشر في مساره
-function linkHash_(s) { return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s), Utilities.Charset.UTF_8)); }
-function linkIssue_(payload) { var n = Utilities.getUuid() + Utilities.getUuid(); CacheService.getScriptCache().put('lk:' + n, linkHash_(payload), 120); return n; }
-// يسأله خادم المنصة: هل أصدرتَ هذا الرمز لهذا المحتوى؟ يُجاب مرة واحدة فقط
-function link_check(nonce, hash) {
-  var c = CacheService.getScriptCache(), k = 'lk:' + clip_(nonce, 100), v = c.get(k);
-  if (!v || v !== String(hash || '')) return 'no';
-  c.remove(k); return 'ok';
-}
-function linkPost_(fn, args) {
-  var r = UrlFetchApp.fetch(ANSHITA_API, { method: 'post', contentType: 'text/plain', payload: JSON.stringify({ fn: fn, args: args }), followRedirects: true, muteHttpExceptions: true }), j;
-  try { j = JSON.parse(r.getContentText()); } catch (e) { throw new Error('تعذّر الاتصال بمنصة الأنشطة'); }
-  if (j.error) throw new Error(j.error);
-  return j.result;
-}
-function linkSend_(o) {
-  var p = JSON.stringify(o), v = linkPost_('link_in', [linkIssue_(p), p]);
-  try { return JSON.parse(v); } catch (e) { return v; }
-}
-// طلب من خادم المنصة: يُنفَّذ بعد التحقق منه عنده
-function link_op(nonce, json) {
-  json = String(json || '');
-  if (json.length > 20000) throw new Error('طلب ربط كبير');
-  if (linkPost_('link_check', [String(nonce || ''), linkHash_(json)]) !== 'ok') throw new Error('طلب ربط غير موثّق');
-  var o = JSON.parse(json);
-  if (o.op === 'upsert') return JSON.stringify(linkUpsert_(o));
-  if (o.op === 'pass') return JSON.stringify(linkSetPass_(o.atar, o.pw));
-  if (o.op === 'verify') { var a = readJson_('accounts.json', {})[o.atar]; return JSON.stringify({ ok: !!(a && !a.disabled && !a.pendPw && pwHash_(a.salt, String(o.pw || '')) === a.hash) }); }
-  if (o.op === 'session') return JSON.stringify(linkSession_(o.atar));
-  if (o.op === 'unlink') return JSON.stringify(linkUnlink_(o.atar, !!o.disable));
-  if (o.op === 'peek') return JSON.stringify(linkPeek_(o.ids || []));
-  throw new Error('عملية ربط غير معروفة');
-}
-function linkUnique_(accs, base, self) {
-  var u = base, n = 2;
-  while (Object.keys(accs).some(function (k) { var x = accs[k]; return x.uid !== self && (normUser_(x.username) === u || (x.email && normUser_(x.email) === u)); })) u = base + (n++);
-  return u;
-}
-// صلاحيات الحساب الجديد: الأكثر شيوعًا بين مستخدمي المسار نفسه في البرنامج، وإلا بين مستخدمي البرنامج
-function linkPeerPerms_(accs, track) {
-  var pick = function (list) {
-    var cnt = {}, best = null;
-    list.forEach(function (x) { var k = JSON.stringify({ p: x.perms || {}, e: x.editLevel || '' }); cnt[k] = (cnt[k] || 0) + 1; if (!best || cnt[k] > cnt[best]) best = k; });
-    return best ? JSON.parse(best) : null;
-  };
-  var users = Object.keys(accs).map(function (k) { return accs[k]; }).filter(function (x) { return x.role === 'user' && !x.disabled && !x.linkSup && (x.programs || []).indexOf(LINK_PROG) >= 0; });
-  var r = pick(users.filter(function (x) { return (x.tracks || []).indexOf(track) >= 0; })) || pick(users) || { p: {}, e: '' };
-  return r;
-}
-function linkSup_(a, on) {
-  if (on && !a.linkSup) { a.supPrev = { perms: a.perms || {}, editLevel: a.editLevel || '' }; var pp = Object.assign({}, a.perms || {}); LINK_SUP.perms.forEach(function (k) { pp[k] = true; }); a.perms = pp; a.editLevel = LINK_SUP.editLevel; a.linkSup = true; }
-  if (!on && a.linkSup) { var pv = a.supPrev || {}; a.perms = pv.perms || {}; a.editLevel = pv.editLevel || ''; a.linkSup = false; delete a.supPrev; }
-}
-// المشرف العام في منصة الأنشطة = مشرف برنامج الأكاديمية في أثر (كل مساراتها، وإدارة حساباتها). وعند إلغائه يعود حسابه كما كان
-function linkGen_(a, on, isNew, accs, track) {
-  if (on) {
-    if (a.linkGen) return;
-    linkSup_(a, false);
-    a.genPrev = isNew ? null : { role: a.role, programs: (a.programs || []).slice(), tracks: (a.tracks || []).slice(), perms: a.perms || {}, editLevel: a.editLevel || '' };
-    a.role = 'sup'; a.programs = a.programs || []; if (a.programs.indexOf(LINK_PROG) < 0) a.programs.push(LINK_PROG);
-    a.tracks = []; a.editLevel = ''; a.linkGen = true;
-    return;
-  }
-  var g = a.genPrev;
-  if (g && g.role !== 'super') { a.role = g.role; a.programs = g.programs; a.tracks = g.tracks; a.perms = g.perms; a.editLevel = g.editLevel; }
-  else { var pp = linkPeerPerms_(accs, track); a.role = 'user'; a.tracks = [track]; a.perms = pp.p; a.editLevel = pp.e; }
-  a.linkGen = false; delete a.genPrev;
-}
-// o = {atar?: حساب أثر يُدمج, ans: {uid, user, name, role: admin|sup|team, track, sup, disabled}, pw?: كلمة المرور}
-function linkUpsert_(o) {
-  var s = o.ans || {};
-  if (!s.uid) throw new Error('حساب المنصة ناقص');
-  var res = withLock_(function () {
-    var accs = readJson_('accounts.json', {}), a = o.atar ? accs[o.atar] : null, isNew = false;
-    if (o.atar && !a) throw new Error('حساب أثر المطلوب دمجه غير موجود');
-    if (!a) a = Object.keys(accs).map(function (k) { return accs[k]; }).filter(function (x) { return x.ansUid === s.uid; })[0] || null;
-    if (a && a.ansUid && a.ansUid !== s.uid) throw new Error('حساب أثر «' + a.username + '» مربوط بحساب آخر في منصة الأنشطة');
-    if (!a) {
-      if (s.role !== 'sup' && (s.role !== 'team' || !s.track)) throw new Error('حساب الإدارة يُربط بحساب قائم في أثر');
-      var pp = s.role === 'sup' ? { p: {}, e: '' } : linkPeerPerms_(accs, s.track), salt = Utilities.getUuid();
-      a = { uid: uid_(), created: now_(), last: 0, fails: 0, prefs: {}, role: 'user', programs: [LINK_PROG], tracks: s.role === 'sup' ? [] : [s.track], perms: pp.p, editLevel: pp.e,
-        email: '', salt: salt, hash: pwHash_(salt, Utilities.getUuid()), pendPw: true, mustChange: false };
-      accs[a.uid] = a; isNew = true;
-    }
-    a.ansUid = s.uid;
-    if (a.role !== 'super') {
-      var u = normUser_(s.user).replace(/[^؀-ۿa-z0-9._\- ]/g, '');
-      if (u.length >= 3) a.username = linkUnique_(accs, u, a.uid);
-      else if (isNew) a.username = linkUnique_(accs, 'user', a.uid);
-      if (s.name) a.name = clip_(s.name, 80);
-      if (s.role === 'sup') linkGen_(a, true, isNew);
-      else if (s.role === 'team' && s.track && a.linkGen) linkGen_(a, false, false, accs, s.track);
-      if (s.role === 'team' && s.track) {
-        a.programs = a.programs || []; if (a.programs.indexOf(LINK_PROG) < 0) a.programs.push(LINK_PROG);
-        if ((a.tracks || []).length && a.tracks.indexOf(s.track) < 0) a.tracks.push(s.track);   // الفارغة = كل هويات البرنامج، فتبقى كما هي
-        if ('sup' in s) linkSup_(a, !!s.sup);
-      }
-      if ('disabled' in s) a.disabled = !!s.disabled;
-    }
-    if (o.pw) { a.salt = Utilities.getUuid(); a.hash = pwHash_(a.salt, String(o.pw)); a.pendPw = false; a.mustChange = false; a.lkPend = false; }
-    else if (!isNew) a.lkPend = true;   // حساب قديم دُمج: تتوحّد كلمتاه عند أول دخول
-    writeJson_('accounts.json', accs);
-    audit_(null, isNew ? 'أنشأ حسابًا من منصة الأنشطة' : 'ربط حسابًا بمنصة الأنشطة', a.username);
-    return { atar: a.uid, username: a.username, isNew: isNew, pend: !!(a.pendPw || a.lkPend), disabled: !!a.disabled };
-  });
-  if (res.disabled) withLock_(function () { dropSessions_(res.atar); });
-  return res;
-}
-function linkSetPass_(uid, pw) {
-  pw = String(pw || '');
-  if (pw.length < 8) throw new Error('كلمة المرور ثمانية أحرف على الأقل');
-  return withLock_(function () {
-    var accs = readJson_('accounts.json', {}), a = accs[uid];
-    if (!a || !a.ansUid) throw new Error('حساب أثر غير مربوط');
-    a.salt = Utilities.getUuid(); a.hash = pwHash_(a.salt, pw); a.pendPw = false; a.mustChange = false; a.lkPend = false; a.fails = 0; a.lockUntil = 0;
-    writeJson_('accounts.json', accs);
-    return { ok: true };
-  });
-}
-// جلسة في أثر لمن دخل منصة الأنشطة (الدخول مرة واحدة)
-function linkSession_(uid) {
-  return withLock_(function () {
-    var accs = readJson_('accounts.json', {}), a = accs[uid];
-    if (!a || !a.ansUid) throw new Error('حساب أثر غير مربوط');
-    if (a.disabled) throw new Error('هذا الحساب موقوف في أثر');
-    a.last = now_(); writeJson_('accounts.json', accs);
-    return { token: newSession_(a.uid), username: a.username };
-  });
-}
-function linkUnlink_(uid, disable) {
-  return withLock_(function () {
-    var accs = readJson_('accounts.json', {}), a = accs[uid]; if (!a) return { ok: false };
-    delete a.ansUid; delete a.lkPend; if (a.linkSup) linkSup_(a, false);
-    if (disable && a.role !== 'super') a.disabled = true;
-    writeJson_('accounts.json', accs); if (a.disabled) dropSessions_(uid);
-    return { ok: true };
-  });
-}
-// لربط الحسابات القائمة: بيانات مختصرة لحسابات بعينها (بلا أي سر)
-function linkPeek_(ids) {
-  var accs = readJson_('accounts.json', {});
-  return ids.slice(0, 100).map(function (id) { var a = accs[id]; return a ? { uid: a.uid, username: a.username, name: a.name, role: a.role, tracks: a.tracks || [], linked: a.ansUid || '' } : { uid: id, missing: true }; });
 }
 
 /* ================= البرامج =================
@@ -1161,7 +973,7 @@ function hasGemini_() { return geminiKeys_().length > 0; }
 function aiAny_(s) { var h = aiHave_(); return !!(h.gemini || h.groq || h.cf || (s.ai && s.ai.pollFallback !== false)); }
 function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: aiAny_(s), vision: hasGemini_(), capPrompt: (s.ai && s.ai.capPrompt) || '' }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN'), pexels: true, imgKeys: { pixabay: !!props_().getProperty('PIXABAY_KEY'), pexels: !!props_().getProperty('PEXELS_KEY') }, tgKnown: (s.tgKnown || []).length }; }
 // بصمة نسخة الخادم: يضعها البناء، ويقارنها الموقع ليخبر المدير إن كان الخادم المنشور أقدم
-var SRV_VER = '9db4f905';
+var SRV_VER = '429631fe';
 function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.srvVer = SRV_VER; s.aiKey = hasGemini_(); s.aiKeys = geminiKeys_().length; s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); s.pixabayOn = !!props_().getProperty('PIXABAY_KEY'); s.groqOn = !!props_().getProperty('GROQ_KEY'); s.cfOn = !!(props_().getProperty('CF_ACCOUNT') && props_().getProperty('CF_TOKEN')); s.routeDefault = AI_ROUTE_DEFAULT; return JSON.stringify(s); }
 function set_save(token, json) {
   var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
@@ -1463,18 +1275,45 @@ function ai_log(token, m, program) {
    بوت واحد للمنصة (رمزه في خصائص السكربت TG_TOKEN)، يُضاف مشرفاً في قناة كل برنامج، ولكل برنامج قناته في programs.json (tg.chat).
    المجدول يُحفظ في tgq.json وملفاته في المجلد الفرعي tg، ويرسله المؤقّت tgTick كل عشر دقائق (والمؤقّت نفسه يرسل تذكيرات المهام).
    بعد نجاح النشر، وإن لم يبق موعد قادم يحتاج الملف نفسه، تُنقل الصورة إلى سلة درايف (تُستعاد خلال ٣٠ يوماً) ويُمحى مرجعها. */
-function tgToken_() { var t = props_().getProperty('TG_TOKEN'); if (!t) throw new Error('لم يُضبط بوت تليجرام بعد (الإعدادات)'); return t; }
-function tgCall_(method, payload) {
-  var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + tgToken_() + '/' + method, { method: 'post', payload: payload, muteHttpExceptions: true });
+// لبرنامج أن يكون له بوت خاص (خاصية السكربت TG_TOKEN_<معرّف البرنامج>)، وإلا فبوت المنصة العام TG_TOKEN
+function tgPropKey_(pid) { return 'TG_TOKEN_' + String(pid || '').replace(/[^\w-]/g, '_'); }
+function tgOwnBot_(pid) { return !!(pid && props_().getProperty(tgPropKey_(pid))); }
+function tgToken_(pid) { var P = props_(), t = (pid && P.getProperty(tgPropKey_(pid))) || P.getProperty('TG_TOKEN'); if (!t) throw new Error('لم يُضبط بوت تليجرام بعد (الإعدادات)'); return t; }
+// أخطاء تليجرام الشائعة بعبارة تدل على العلاج
+function tgErr_(j, code) {
+  var d = String(j.description || code || ''), mig = j.parameters && j.parameters.migrate_to_chat_id;
+  if (mig) return 'تحوّلت هذه المجموعة إلى «مجموعة خارقة» فتغيّر معرّفها؛ معرّفها الجديد: ' + mig + ' . اختره أو اكتبه بدل القديم';
+  if (/webhook is active/i.test(d)) return 'هذا البوت مربوط بخدمة أخرى (Webhook) فلا يستطيع الخادم قراءة تحديثاته. لا يمنع ذلك النشر: اكتب معرّف المجموعة واضغط «افحص»';
+  if (/terminated by other getUpdates/i.test(d)) return 'خدمة أخرى تقرأ تحديثات هذا البوت الآن فتسبق الخادم إليها. اكتب معرّف المجموعة واضغط «افحص»';
+  if (/chat not found/i.test(d)) return 'لم يجد البوت هذه القناة أو المجموعة: تأكد أن البوت نفسه عضو فيها، واكتب معرّفها الرقمي (يبدأ بـ -100) إن لم يكن لها اسم يبدأ بـ @';
+  if (/unauthorized/i.test(d) || code === 401) return 'رمز البوت غير صالح أو أُلغي من BotFather';
+  if (/bot is not a member|bot was kicked|have no rights to send|not enough rights/i.test(d)) return 'البوت ليس عضواً في هذه المجموعة أو لا يملك صلاحية الكتابة فيها (' + d + ')';
+  return 'تليجرام: ' + d;
+}
+function tgCall_(method, payload, pid) {
+  var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + tgToken_(pid) + '/' + method, { method: 'post', payload: payload, muteHttpExceptions: true });
   var j; try { j = JSON.parse(res.getContentText()); } catch (e) { j = { ok: false, description: 'رد غير مفهوم (' + res.getResponseCode() + ')' }; }
-  if (!j.ok) throw new Error('تليجرام: ' + (j.description || res.getResponseCode()));
+  if (!j.ok) throw new Error(tgErr_(j, res.getResponseCode()));
   return j.result;
 }
-function tg_test(token) {
-  var a = auth_(token); needAdmin_(a);
-  var me = tgCall_('getMe', {});
-  return JSON.stringify({ username: me.username, name: me.first_name });
+// من يدير قنوات برنامج: المدير العام أو مشرف ذلك البرنامج؛ وبلا برنامج: المشرفون عامة (البوت العام)
+function tgAdmin_(a, pid) { if (pid) { if (!adminOf_(a, pid)) throw new Error('لمشرف البرنامج'); } else needAdmin_(a); }
+function tg_test(token, pid) {
+  var a = auth_(token); pid = clip_(pid || '', 40); tgAdmin_(a, pid);
+  var me = tgCall_('getMe', {}, pid);
+  return JSON.stringify({ username: me.username, name: me.first_name, own: tgOwnBot_(pid) });
 }
+// بوت خاص لبرنامج: يلصق المدير العام رمزه، ويُحفظ في خصائص السكربت ولا يُعرض أبداً. الفارغ يعيد البرنامج إلى بوت المنصة
+function tg_bot_set(token, pid, bot) {
+  var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
+  pid = clip_(pid || '', 40); if (!progs_().some(function (x) { return x.id === pid; })) throw new Error('برنامج غير موجود');
+  var tk = String(bot || '').trim();
+  if (tk) { if (!/^\d+:[\w-]{30,}$/.test(tk)) throw new Error('رمز البوت غير صحيح'); props_().setProperty(tgPropKey_(pid), tk); }
+  else props_().deleteProperty(tgPropKey_(pid));
+  audit_(a, tk ? 'ضبط بوتاً خاصاً لبرنامج' : 'أعاد برنامجاً إلى بوت المنصة', pid);
+  return JSON.stringify({ own: !!tk });
+}
+function tg_bot_info(token, pid) { var a = auth_(token); pid = clip_(pid || '', 40); tgAdmin_(a, pid); return JSON.stringify({ own: tgOwnBot_(pid), main: !!props_().getProperty('TG_TOKEN') }); }
 function tgChatOf_(pid, track) { var p = progs_().filter(function (x) { return x.id === pid; })[0]; var ch = (p && p.tg && p.tg.chats && track && p.tg.chats[track]) || (p && p.tg && p.tg.chat); if (!ch) throw new Error('لم يحدد مشرف البرنامج قناة تليجرام بعد'); return ch; }
 function canSend_(a, pid) { return adminOf_(a, pid) || (inProg_(a, pid) && perm_(a, 'send')); }
 // payload: {program, caption, png (base64 بلا رأس), file (base64 الملف الأصلي، اختياري), fileName, fileMime, mode: photo|doc|both, when (ms، اختياري للجدولة), name}
@@ -1508,7 +1347,7 @@ function tg_send(token, json) {
     audit_(a, 'جدول منشوراً', rec.title + ' · ' + pid + (repeat ? ' · متكرر' : ''));
     return JSON.stringify({ id: rec.id, queued: true, when: when, repeat: repeat });
   }
-  var sent = tgDeliver_(chat, cap, mode, o.png ? Utilities.newBlob(Utilities.base64Decode(o.png), 'image/png', 'design.png') : null, o.file ? Utilities.newBlob(Utilities.base64Decode(o.file), clip_(o.fileMime || 'image/png', 60), clip_(o.fileName || 'design.png', 100)) : null);
+  var sent = tgDeliver_(chat, cap, mode, o.png ? Utilities.newBlob(Utilities.base64Decode(o.png), 'image/png', 'design.png') : null, o.file ? Utilities.newBlob(Utilities.base64Decode(o.file), clip_(o.fileMime || 'image/png', 60), clip_(o.fileName || 'design.png', 100)) : null, pid);
   rec.status = 'sent'; rec.msg = sent.msg; rec.link = sent.link; rec.sentAt = now_();
   var nextRec = repeat ? tgNextOf_(rec) : null;
   var trash = [];
@@ -1529,12 +1368,12 @@ function tgNextOf_(x) {
 }
 // طول نص تليجرام يُحسب بلا الوسوم. حدّ الوصف تحت الصورة ١٠٢٤، وحدّ الرسالة ٤٠٩٦
 function tgLen_(cap) { return String(cap || '').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').length; }
-function tgDeliver_(chat, cap, mode, pngBlob, fileBlob) {
+function tgDeliver_(chat, cap, mode, pngBlob, fileBlob, pid) {
   var out = { msg: 0 }, longCap = tgLen_(cap) > 1000, capOnMedia = longCap ? '' : cap;
-  if (mode !== 'doc' && pngBlob) { var r1 = tgCall_('sendPhoto', { chat_id: chat, photo: pngBlob, caption: capOnMedia, parse_mode: 'HTML' }); out.msg = r1.message_id; }
-  if (mode !== 'photo') { var fb = fileBlob || pngBlob; var r2 = tgCall_('sendDocument', { chat_id: chat, document: fb, caption: mode === 'doc' ? capOnMedia : 'الملف بجودته الكاملة', parse_mode: 'HTML' }); if (!out.msg) out.msg = r2.message_id; }
+  if (mode !== 'doc' && pngBlob) { var r1 = tgCall_('sendPhoto', { chat_id: chat, photo: pngBlob, caption: capOnMedia, parse_mode: 'HTML' }, pid); out.msg = r1.message_id; }
+  if (mode !== 'photo') { var fb = fileBlob || pngBlob; var r2 = tgCall_('sendDocument', { chat_id: chat, document: fb, caption: mode === 'doc' ? capOnMedia : 'الملف بجودته الكاملة', parse_mode: 'HTML' }, pid); if (!out.msg) out.msg = r2.message_id; }
   // النص الطويل يُرسل رسالةً تالية تردّ على الصورة فلا يُقصّ
-  if (longCap && cap) { var p3 = { chat_id: chat, text: clip_(cap, 4096), parse_mode: 'HTML', link_preview_options: JSON.stringify({ is_disabled: true }) }; if (out.msg) p3.reply_to_message_id = out.msg; var r3 = tgCall_('sendMessage', p3); out.textMsg = r3.message_id; out.split = true; }
+  if (longCap && cap) { var p3 = { chat_id: chat, text: clip_(cap, 4096), parse_mode: 'HTML', link_preview_options: JSON.stringify({ is_disabled: true }) }; if (out.msg) p3.reply_to_message_id = out.msg; var r3 = tgCall_('sendMessage', p3, pid); out.textMsg = r3.message_id; out.split = true; }
   if (/^@/.test(chat) && out.msg) out.link = 'https://t.me/' + chat.slice(1) + '/' + out.msg;
   return out;
 }
@@ -1598,7 +1437,7 @@ function tgSendDue_() {
   var due = readJson_('tgq.json', []).filter(function (x) { return x.status === 'queued' && x.when <= now_(); });
   due.forEach(function (x) {
     var res = null, err = '';
-    try { res = tgDeliver_(x.chat, x.caption, x.mode, x.pngId ? DriveApp.getFileById(x.pngId).getBlob() : null, x.fileId ? DriveApp.getFileById(x.fileId).getBlob() : null); } catch (e) { err = String(e && e.message || e); }
+    try { res = tgDeliver_(x.chat, x.caption, x.mode, x.pngId ? DriveApp.getFileById(x.pngId).getBlob() : null, x.fileId ? DriveApp.getFileById(x.fileId).getBlob() : null, x.program); } catch (e) { err = String(e && e.message || e); }
     var nextRec = null, trash = [];
     withLock_(function () {
       var q = readJson_('tgq.json', []), cur = null;
@@ -1625,36 +1464,51 @@ function tgReleaseFiles_(q, cur) {
 }
 /* ---------- اكتشاف القنوات والمجموعات التي أُضيف إليها البوت ---------- */
 // getUpdates يعيد آخر ما وصل البوت خلال ٢٤ ساعة: إضافته لقناة أو مجموعة، ومنشورات القنوات التي هو مشرف فيها. يُجمع ما نجده في settings.tgKnown
-function tg_discover(token) {
-  var a = auth_(token); needAdmin_(a);
-  var ups = tgCall_('getUpdates', { limit: 100, timeout: 0, allowed_updates: JSON.stringify(['my_chat_member', 'channel_post', 'message', 'chat_member', 'edited_channel_post']) }) || [];
+// لكل بوت قائمته: بوت المنصة في settings.tgKnown، وبوت برنامج خاص في settings.tgKnownBy[معرّف البرنامج]
+function tgKnownGet_(s, pid) { return tgOwnBot_(pid) ? ((s.tgKnownBy || {})[pid] || []) : (s.tgKnown || []); }
+function tgKnownPut_(s, pid, list) { if (tgOwnBot_(pid)) { s.tgKnownBy = s.tgKnownBy || {}; s.tgKnownBy[pid] = list; } else s.tgKnown = list; }
+function tg_discover(token, pid) {
+  var a = auth_(token); pid = clip_(pid || '', 40); tgAdmin_(a, pid);
+  var ups = tgCall_('getUpdates', { limit: 100, timeout: 0, allowed_updates: JSON.stringify(['my_chat_member', 'channel_post', 'message', 'chat_member', 'edited_channel_post']) }, pid) || [];
   var found = {};
   ups.forEach(function (u) {
     var m = u.my_chat_member || u.chat_member || u.channel_post || u.edited_channel_post || u.message, ch = m && m.chat; if (!ch || ch.type === 'private') return;
     var st = u.my_chat_member && u.my_chat_member.new_chat_member ? u.my_chat_member.new_chat_member.status : '';
     var k = String(ch.id), prev = found[k] || {};
+    // مجموعة رُقّيت إلى مجموعة خارقة: القديمة تُنسى، والجديدة تُسجَّل
+    if (m.migrate_to_chat_id) { found[k] = { id: ch.id, status: 'left' }; return; }
     found[k] = { id: ch.id, title: clip_(ch.title || '', 80), type: ch.type, username: ch.username ? '@' + ch.username : '', status: st || prev.status || '', seen: Math.max(prev.seen || 0, (m.date || 0) * 1000) };
   });
   return withLock_(function () {
-    var s = readJson_('settings.json', {}), known = s.tgKnown || [], map = {};
+    var s = readJson_('settings.json', {}), known = tgKnownGet_(s, pid), map = {};
     known.forEach(function (c) { map[String(c.id)] = c; });
     Object.keys(found).forEach(function (k) { var c = found[k]; if (c.status === 'left' || c.status === 'kicked') { delete map[k]; return; } map[k] = Object.assign({}, map[k] || {}, c); });
     var list = Object.keys(map).map(function (k) { return map[k]; }).sort(function (x, y) { return (y.seen || 0) - (x.seen || 0); }).slice(0, 60);
-    s.tgKnown = list; writeJson_('settings.json', s);
+    tgKnownPut_(s, pid, list); writeJson_('settings.json', s);
     return JSON.stringify({ found: Object.keys(found).length, list: list });
   });
 }
 // فحص قناة: هل يصل إليها البوت، وهل هو مشرف بصلاحية النشر؟
-function tg_chat_check(token, chat) {
-  var a = auth_(token); needAdmin_(a); chat = clip_(String(chat || '').trim(), 80); if (!chat) throw new Error('اكتب اسم القناة أو معرّفها');
-  var info = tgCall_('getChat', { chat_id: chat }), me = tgCall_('getMe', {});
-  var mem = null; try { mem = tgCall_('getChatMember', { chat_id: chat, user_id: me.id }); } catch (e) {}
-  var st = mem ? mem.status : 'unknown', canPost = !!(mem && (st === 'creator' || (st === 'administrator' && (info.type !== 'channel' || mem.can_post_messages !== false))));
-  // نسجّلها في المعروفة أيضاً
-  try { withLock_(function () { var s = readJson_('settings.json', {}), known = s.tgKnown || []; if (!known.some(function (c) { return String(c.id) === String(info.id); })) { known.unshift({ id: info.id, title: clip_(info.title || '', 80), type: info.type, username: info.username ? '@' + info.username : '', status: st, seen: now_() }); s.tgKnown = known.slice(0, 60); writeJson_('settings.json', s); } }); } catch (e) {}
-  return JSON.stringify({ id: info.id, title: info.title || '', type: info.type, username: info.username ? '@' + info.username : '', status: st, canPost: canPost, members: info.members_count || 0 });
+// فحص قناة أو مجموعة بالبوت الذي سيرسل إليها فعلاً (بوت البرنامج إن كان له بوت): هل يصل إليها، وهل يستطيع الكتابة؟
+// لا يرسل شيئاً: getChat وgetChatMember قراءة فقط.
+function tg_chat_check(token, chat, pid) {
+  var a = auth_(token); pid = clip_(pid || '', 40); tgAdmin_(a, pid); chat = clip_(String(chat || '').trim(), 80); if (!chat) throw new Error('اكتب اسم القناة أو معرّفها');
+  var m1 = chat.match(/^(?:https?:\/\/)?t(?:elegram)?\.me\/([A-Za-z]\w{3,})\/?$/);
+  if (m1) chat = '@' + m1[1];
+  else if (/t(?:elegram)?\.me\/(\+|joinchat)/.test(chat)) throw new Error('رابط الدعوة لا يصلح هنا: البوت لا يستطيع الدخول به. أضف البوت إلى المجموعة من «إضافة أعضاء»، ثم اضغط «ابحث» أو اكتب معرّفها الرقمي');
+  else if (/^[A-Za-z]\w{3,}$/.test(chat)) chat = '@' + chat;
+  var info = tgCall_('getChat', { chat_id: chat }, pid), me = tgCall_('getMe', {}, pid);
+  var mem = null; try { mem = tgCall_('getChatMember', { chat_id: chat, user_id: me.id }, pid); } catch (e) {}
+  var st = mem ? mem.status : 'unknown', isCh = info.type === 'channel';
+  // في القناة لا ينشر إلا المشرف بصلاحية النشر. وفي المجموعة يكتب العضو العادي ما لم تُقيَّد الكتابة للأعضاء
+  var membersMayWrite = !(info.permissions && info.permissions.can_send_messages === false);
+  var canPost = !!(mem && (st === 'creator' || (st === 'administrator' && (!isCh || mem.can_post_messages !== false)) ||
+    (!isCh && st === 'member' && membersMayWrite) || (!isCh && st === 'restricted' && mem.is_member !== false && mem.can_send_messages !== false)));
+  var why = canPost ? '' : !mem ? 'لم نعرف حال البوت فيها' : (st === 'left' || st === 'kicked') ? 'البوت ليس عضواً فيها' : isCh ? 'البوت في القناة ليس مشرفاً بصلاحية «نشر الرسائل»' : 'الكتابة في المجموعة مقيّدة للأعضاء؛ اجعل البوت مشرفاً فيها';
+  try { withLock_(function () { var s = readJson_('settings.json', {}), known = tgKnownGet_(s, pid); if (!known.some(function (c) { return String(c.id) === String(info.id); })) { known.unshift({ id: info.id, title: clip_(info.title || '', 80), type: info.type, username: info.username ? '@' + info.username : '', status: st, seen: now_() }); tgKnownPut_(s, pid, known.slice(0, 60)); writeJson_('settings.json', s); } }); } catch (e) {}
+  return JSON.stringify({ id: info.id, chat: info.username ? '@' + info.username : String(info.id), title: info.title || '', type: info.type, username: info.username ? '@' + info.username : '', status: st, canPost: canPost, why: why, bot: me.username, members: info.members_count || 0 });
 }
-function tg_known(token) { var a = auth_(token); needAdmin_(a); return JSON.stringify(settings_().tgKnown || []); }
+function tg_known(token, pid) { var a = auth_(token); pid = clip_(pid || '', 40); tgAdmin_(a, pid); return JSON.stringify(tgKnownGet_(settings_(), pid)); }
 
 /* ================= التقويم والمهام =================
    tasks.json: [{id, program, title, note, due, allDay, from, fromName, to, toName, status: open|done, prio, link, at, upd, doneAt,

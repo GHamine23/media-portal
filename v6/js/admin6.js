@@ -776,7 +776,7 @@ function tgForm(p) {
   function chatLabel(c) { return (c.title || c.username || c.id) + (c.username ? ' · ' + c.username : '') + (c.type === 'channel' ? ' · قناة' : ' · مجموعة'); }
   function drawKnown(list) {
     known.innerHTML = '';
-    if (!list.length) { known.appendChild(el('p', { class: 'tiny', text: 'لم يُعثر على قنوات بعد. أضف البوت مشرفاً في القناة (أو عضواً في المجموعة) ثم اضغط «ابحث عن القنوات».' })); return; }
+    if (!list.length) { known.appendChild(el('p', { class: 'tiny', text: 'لم يُعثر على قنوات بعد. أضف البوت مشرفاً في القناة (أو عضواً في المجموعة) ثم اضغط «ابحث عن القنوات والمجموعات».' })); return; }
     list.forEach(function (c) {
       const id = c.username || String(c.id);
       known.appendChild(el('div', { class: 'kchat' }, [el('div', { class: 'grow' }, [el('b', { text: c.title || c.username || c.id }), el('span', { class: 'tiny', dir: 'ltr', text: (c.username ? c.username + ' · ' : '') + c.id + (c.status ? ' · ' + ({ administrator: 'البوت مشرف', member: 'البوت عضو', creator: 'البوت مالك' }[c.status] || c.status) : '') })]),
@@ -784,9 +784,23 @@ function tgForm(p) {
         trackRows.length ? el('button', { type: 'button', class: 'ib sm', title: 'لمسار معيّن', 'aria-label': 'لمسار معيّن', onclick: function (e) { popMenu(e.currentTarget, (p.identities || []).map(function (t) { return { t: t.name, fn: function () { trackInputs[t.id].value = id; chats[t.id] = id; titles[id] = c.title || ''; flashOk(trackInputs[t.id]); } }; })); } }, [ico('more')]) : null]));
     });
   }
-  API6.me('tg_known').then(drawKnown).catch(function () { drawKnown([]); });
-  const discover = el('button', { type: 'button', class: 'btn sm dark', onclick: function (e) { return withBusy(e.currentTarget, async function () { const r = await API6.me('tg_discover'); drawKnown(r.list); if (!r.found) throw new Error('لا جديد في تحديثات البوت: أضفه إلى القناة الآن ثم أعد المحاولة (تليجرام يحتفظ بالتحديثات ٢٤ ساعة)'); }, { busy: 'نبحث…', done: 'وُجدت قنوات' }); } }, [ico('search'), 'ابحث عن القنوات']);
-  const check = el('button', { type: 'button', class: 'btn sm line', onclick: function (e) { const v = chatI.value.trim(); if (!v) { chatI.focus(); return; } return withBusy(e.currentTarget, async function () { const r = await API6.me('tg_chat_check', v); titles[v] = r.title || ''; if (!r.canPost) throw new Error('البوت يصل إلى «' + (r.title || v) + '» لكنه ليس مشرفاً بصلاحية النشر' + (r.status ? ' (حاله: ' + r.status + ')' : '')); toast('«' + (r.title || v) + '»: البوت مشرف ويستطيع النشر' + (r.members ? ' · ' + r.members + ' عضواً' : '')); }, { busy: 'نفحص…', done: 'يستطيع النشر' }); } }, [ico('shield'), 'افحص القناة']);
+  function loadKnown() { API6.me('tg_known', p.id).then(drawKnown).catch(function () { drawKnown([]); }); }
+  loadKnown();
+  // البوت الذي يرسل لهذا البرنامج: بوته الخاص إن ضُبط، وإلا بوت المنصة. كل بحث وفحص يجري به
+  const botLine = el('p', { class: 'tiny', text: 'نتحقق من البوت…' });
+  function showBot() { API6.me('tg_test', p.id).then(function (r) { botLine.textContent = 'يرسل لهذا البرنامج: @' + r.username + (r.own ? ' (بوته الخاص)' : ' (بوت المنصة)') + '. أضف هذا البوت نفسه إلى القنوات والمجموعات.'; }).catch(function (e) { botLine.textContent = 'تعذّر الوصول إلى البوت: ' + e.message; }); }
+  showBot();
+  let botBox = null;
+  if (isSuper()) {
+    const botI = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: '123456789:AAF…', 'aria-label': 'رمز بوت البرنامج' });
+    const saveBot = el('button', { type: 'button', class: 'btn sm dark', onclick: function (e) { const v = botI.value.trim(); if (!v) { botI.focus(); return; } return withBusy(e.currentTarget, async function () { await API6.me('tg_bot_set', p.id, v); botI.value = ''; showBot(); loadKnown(); }, { busy: 'نحفظ…', done: 'حُفظ' }); } }, ['احفظ بوت البرنامج']);
+    const dropBot = el('button', { type: 'button', class: 'btn sm ghost', onclick: function (e) { return withBusy(e.currentTarget, async function () { await API6.me('tg_bot_set', p.id, ''); showBot(); loadKnown(); }, { busy: 'نعيد…', done: 'عاد إلى بوت المنصة' }); } }, ['أعده إلى بوت المنصة']);
+    botBox = el('details', { class: 'capdet' }, [el('summary', { text: 'بوت خاص بهذا البرنامج (اختياري، للمدير العام)' }),
+      el('p', { class: 'tiny', text: 'إن ضبطته يرسل هذا البرنامج ببوته، وتبقى البرامج الأخرى على بوت المنصة. الرمز يُحفظ في الخادم ولا يُعرض بعد الحفظ.' }),
+      el('div', { class: 'fld' }, [el('label', { text: 'رمز البوت من BotFather' }), botI]), el('div', { class: 'row wrapr' }, [saveBot, dropBot])]);
+  }
+  const discover = el('button', { type: 'button', class: 'btn sm dark', onclick: function (e) { return withBusy(e.currentTarget, async function () { const r = await API6.me('tg_discover', p.id); drawKnown(r.list); if (!r.found) throw new Error('لا جديد في تحديثات البوت. إن كان البوت في المجموعة منذ أكثر من يوم فأخرجه منها ثم أضفه من جديد، ثم اضغط هنا (تليجرام يحتفظ بالتحديثات ٢٤ ساعة فقط)'); }, { busy: 'نبحث…', done: 'وُجدت قنوات' }); } }, [ico('search'), 'ابحث عن القنوات والمجموعات']);
+  const check = el('button', { type: 'button', class: 'btn sm line', onclick: function (e) { const v = chatI.value.trim(); if (!v) { chatI.focus(); return; } return withBusy(e.currentTarget, async function () { const r = await API6.me('tg_chat_check', v, p.id); if (r.chat && r.chat !== v) chatI.value = r.chat; titles[r.chat || v] = r.title || ''; loadKnown(); if (!r.canPost) throw new Error('البوت @' + r.bot + ' يصل إلى «' + (r.title || v) + '» لكنه لا يستطيع النشر فيها: ' + (r.why || r.status)); toast('«' + (r.title || v) + '»: يستطيع @' + r.bot + ' النشر فيها' + (r.members ? ' · ' + r.members + ' عضواً' : '')); }, { busy: 'نفحص…', done: 'يستطيع النشر' }); } }, [ico('shield'), 'افحص']);
   const capPromptI = el('textarea', { rows: '3', dir: 'auto', placeholder: 'مثال: ابدأ بالبسملة، واذكر رابط التسجيل في سطر مستقل، واختم بـ«ننتظركم»، ولا تزد على ثلاثة رموز تعبيرية.' }); capPromptI.value = tg.capPrompt || '';
   const linkI = el('input', { type: 'url', class: 'inp', dir: 'ltr', value: tg.link, placeholder: 'https://…' });
   const hashI = el('input', { type: 'text', class: 'inp', dir: 'auto', value: tg.hashtag, placeholder: 'الأنشطة_التربوية' });
@@ -810,8 +824,8 @@ function tgForm(p) {
   }
   drawCaps();
   modal({ title: 'قناة ' + p.name + ' والنصوص المصاحبة', wide: true, body: [
-    el('p', { class: 'tiny', text: 'أضف بوت المنصة مشرفاً في القناة (بصلاحية النشر)، ثم اكتب اسم القناة هنا. كل من له صلاحية «الإرسال» في هذا البرنامج يرسل إليها من المحرر.' }),
-    el('div', { class: 'fld' }, [el('label', { text: 'القنوات والمجموعات التي فيها البوت' }), known, el('div', { class: 'row wrapr' }, [discover, check]), el('small', { text: 'يكتشف الخادم ما أُضيف إليه البوت خلال آخر ٢٤ ساعة. وإن كانت القناة قديمة اكتب اسمها واضغط «افحص».' })]),
+    el('p', { class: 'tiny', text: 'أضف البوت مشرفاً في القناة (بصلاحية النشر) أو عضواً في المجموعة، ثم اختر القناة هنا. كل من له صلاحية «الإرسال» في هذا البرنامج يرسل إليها من المحرر.' }), botLine, botBox,
+    el('div', { class: 'fld' }, [el('label', { text: 'القنوات والمجموعات التي فيها البوت' }), known, el('div', { class: 'row wrapr' }, [discover, check]), el('small', {}, ['البحث يجد ما أُضيف إليه البوت خلال آخر ٢٤ ساعة. وللأقدم: اكتب اسم القناة أو معرّف المجموعة الرقمي (', el('bdi', { dir: 'ltr', text: '-100…' }), ') واضغط «افحص»، أو أخرج البوت وأعد إضافته ثم ابحث. البحث والفحص لا يرسلان شيئاً.'])]),
     el('div', { class: 'grid two' }, [el('div', { class: 'fld' }, [el('label', { text: 'القناة أو المجموعة' }), chatI]), el('div', { class: 'fld' }, [el('label', { text: 'رابط الحضور أو التسجيل المعتاد {link}' }), linkI]), el('div', { class: 'fld' }, [el('label', { text: 'الوسم المعتاد {hashtag}' }), hashI]), el('div', { class: 'fld' }, [el('label', { text: 'توقيع ختامي {sign}' }), withEmoji(signI)])]),
     trackRows.length ? el('details', { class: 'capdet' }, [el('summary', { text: 'قناة مختلفة لكل مسار (اختياري)' }), el('p', { class: 'tiny', text: 'إن كان لكل مسار قناته، اكتبها هنا؛ يُرسل المحرر تلقائياً إلى قناة المسار الذي صُمّم له الإعلان، وإلا إلى قناة البرنامج.' }), el('div', { class: 'grid two' }, trackRows)]) : null,
     el('h4', { class: 'psh', text: 'القوالب الكتابية الخاصة بالبرنامج' }), el('p', { class: 'tiny', text: 'اكتب القالب كما تكتب في تليجرام، وضع الحقول بين قوسين معقوفين فتُملأ من التصميم: ' + CAP_VARS.map(function (v) { return '{' + v[0] + '} ' + v[1]; }).join(' · ') + '. للتنسيق تُقبل وسوم <b> غامق و<u> خط و<blockquote> اقتباس.' }), capBox,

@@ -15,8 +15,10 @@ GAS._fetch.handler = function (url, opt) {
     GAS._tg = GAS._tg || []; GAS._tg.push({ url: url, opt: opt });
     if (/getMe$/.test(url)) return { code: 200, body: JSON.stringify({ ok: true, result: { id: 777, username: 'athar_bot', first_name: 'أثر' } }) };
     if (/getUpdates$/.test(url)) return { code: 200, body: JSON.stringify({ ok: true, result: [{ update_id: 1, my_chat_member: { chat: { id: -1001, title: 'قناة الجيل', type: 'channel', username: 'jeel_new' }, date: 1700000000, new_chat_member: { status: 'administrator' } } }, { update_id: 2, message: { chat: { id: -2002, title: 'مجموعة المشرفين', type: 'supergroup' }, date: 1700000100, text: 'hi' } }, { update_id: 3, message: { chat: { id: 5, type: 'private' }, date: 1, text: 'x' } }] }) };
+    if (/getChat$/.test(url) && GAS._tgChat) return { code: 200, body: JSON.stringify({ ok: true, result: GAS._tgChat }) };
+    if (/getChat$/.test(url) && /^-4/.test(String(opt.payload.chat_id))) return { code: 400, body: JSON.stringify({ ok: false, description: 'Bad Request: group chat was upgraded to a supergroup chat', parameters: { migrate_to_chat_id: -1009998887776 } }) };
     if (/getChat$/.test(url)) return { code: 200, body: JSON.stringify({ ok: true, result: { id: -1001, title: 'قناة الجيل', type: 'channel', username: 'jeel_new', members_count: 120 } }) };
-    if (/getChatMember$/.test(url)) return { code: 200, body: JSON.stringify({ ok: true, result: { status: 'administrator', can_post_messages: true } }) };
+    if (/getChatMember$/.test(url)) return { code: 200, body: JSON.stringify({ ok: true, result: GAS._tgMember || { status: 'administrator', can_post_messages: true } }) };
     if (!opt.payload.chat_id) return { code: 400, body: JSON.stringify({ ok: false, description: 'chat not found' }) };
     return { code: 200, body: JSON.stringify({ ok: true, result: { message_id: 40 + GAS._tg.length } }) };
   }
@@ -273,6 +275,32 @@ const disc = J('tg_discover', adm);
 ok(disc.found === 2 && disc.list.length === 2 && disc.list.some(function (c) { return c.username === '@jeel_new' && c.type === 'channel' && c.status === 'administrator'; }), 'discovered chats from getUpdates');
 const chk = J('tg_chat_check', adm, '@jeel_new'); ok(chk.canPost && chk.title === 'قناة الجيل', 'chat check reports admin with posting rights');
 ok(J('tg_known', adm).length === 2 && J('bundle', adm).settings.tgKnown === 2, 'known chats persisted');
+// بوت خاص لبرنامج: يحفظه المدير العام وحده، ويرسل به ذلك البرنامج وحده، ولا يُعاد رمزه أبداً
+const PBOT = '987654321:ProgBotTokenProgBotTokenProgBotTok';
+fails('tg_bot_set', /للمدير العام/, at, 'academy', PBOT);
+fails('tg_bot_set', /غير صحيح/, adm, 'academy', 'bad');
+J('tg_bot_set', adm, 'academy', PBOT);
+ok(call('tg_bot_info', adm, 'academy').indexOf(PBOT) < 0 && J('tg_bot_info', adm, 'academy').own && J('tg_test', adm, 'academy').own && !J('tg_test', adm, '').own, 'program bot stored, never returned');
+GAS._tg = [];
+J('tg_send', ut, JSON.stringify({ program: 'academy', name: 'ببوت الأكاديمية', caption: 'x', png: Buffer.from([1]).toString('base64'), mode: 'photo' }));
+ok(GAS._tg.length && GAS._tg.every(function (r) { return r.url.indexOf('/bot' + PBOT + '/') > 0; }), 'academy posts go through its own bot');
+GAS._tg = []; J('tg_test', adm); ok(GAS._tg[0].url.indexOf(PBOT) < 0, 'platform bot unchanged for the rest');
+ok(J('tg_known', adm, 'academy').length === 0 && J('tg_known', adm).length === 2, 'each bot has its own known chats');
+J('tg_discover', adm, 'academy'); ok(J('tg_known', adm, 'academy').length === 2 && GAS._tg.some(function (r) { return /getUpdates$/.test(r.url) && r.url.indexOf(PBOT) > 0; }), 'discover uses the program bot');
+// مجموعة البوت فيها عضو عادي: يستطيع الكتابة (كان الفحص يرفضها لأنه ليس مشرفاً)
+GAS._tgChat = { id: -1005550001, title: 'مجموعة الطلاب', type: 'supergroup' }; GAS._tgMember = { status: 'member' };
+const gchk = J('tg_chat_check', adm, '-1005550001', 'academy'); ok(gchk.canPost && gchk.chat === '-1005550001', 'bot as plain member can post in a group');
+GAS._tgChat = { id: -1005550001, title: 'مجموعة الطلاب', type: 'supergroup', permissions: { can_send_messages: false } };
+ok(!J('tg_chat_check', adm, '-1005550001', 'academy').canPost, 'group with members muted needs the bot as admin');
+GAS._tgChat = { id: -1001, title: 'قناة', type: 'channel' };
+const cchk = J('tg_chat_check', adm, '-1001', 'academy'); ok(!cchk.canPost && /نشر الرسائل/.test(cchk.why), 'channel member cannot post');
+GAS._tgChat = null; GAS._tgMember = null;
+fails('tg_chat_check', /معرّفها الجديد: -1009998887776/, adm, '-4001', 'academy');
+fails('tg_chat_check', /رابط الدعوة/, adm, 'https://t.me/+AbCdEf', 'academy');
+ok(J('tg_chat_check', adm, 'https://t.me/jeel_new', 'academy').chat === '@jeel_new', 'public t.me link becomes @name');
+fails('tg_discover', /لمشرف البرنامج/, at, 'alim');
+ok(!GAS._tg.some(function (r) { return /send(Message|Photo|Document)$/.test(r.url) && /check|discover/.test(r.url); }), 'checks send nothing');
+J('tg_bot_set', adm, 'academy', ''); ok(!J('tg_bot_info', adm, 'academy').own, 'program back on the platform bot');
 // الأحاديث: الدرر ثم الاحتياط
 GAS._dorarDown = true;
 const hdf = JSON.parse(call('hadith_find', ut, 'الأعمال بالنيات'));
