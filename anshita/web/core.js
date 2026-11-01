@@ -587,8 +587,8 @@ function repDates(tid, F) {
   for (let k = 0; add(w0, 7 * k) <= end && out.length < 80; k += R.every) {
     R.wd.slice().sort((a, b) => a - b).forEach(i => {
       const d = add(w0, 7 * k + i); if (d < start || d > end) return;
-      const sn = semFor(tid, d) || curN(tid), day = dayOf(tid, sn, d), k = spanKind(day);
-      const reason = k === 'hol' ? 'إجازة' : k === 'exam' ? (day.ev || 'اختبار') : examWeeks(tid, sn).has(wkStart(d)) ? 'أسبوع الاختبار' : '';
+      const sn = semFor(tid, d) || curN(tid), day = dayOf(tid, sn, d), kind = spanKind(day);
+      const reason = kind === 'hol' ? 'إجازة' : kind === 'exam' ? (day.ev || 'اختبار') : examWeeks(tid, sn).has(wkStart(d)) ? 'أسبوع الاختبار' : '';
       const clash = MEET_T.includes(F.type) && d !== start ? dayMeets(tid, d, F.id).length > 0 : false;
       const first = !F.isNew && d === start;
       out.push({ d, reason, clash, first, on: first || (R.tog[d] ? !!reason : !reason) });
