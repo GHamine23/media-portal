@@ -12,7 +12,7 @@
      وملخص أسبوعي، وتنبيه عند نقل لقاء قريب أو إلغائه.
    أول تشغيل: شغّل setup() من المحرر مرة، ثم انشر «تطبيق ويب» (يُنفَّذ باسمك، متاح لأي شخص).
    ===================================================================== */
-var VERSION = '1.5.0';
+var VERSION = '1.5.1';
 var SITE_URL = 'https://ghamine23.github.io/media-portal/anshita/';
 var DATA_DIR_NAME = 'منصة الأنشطة التربوية — البيانات';
 var SESSION_DAYS = 60;
@@ -609,9 +609,9 @@ function byMigrate() { Logger.log(byMigrate_(true)); }
 function byMigrate_(apply) {
   return withLock_(function () {
     var A = accs_(), list = Object.keys(A).map(function (k) { return A[k]; }), L = readJson_('log.json', []);
-    var byName = {}, made = {}, used = {}, st = { linked: 0, renamed: 0, toTrack: 0, tg: 0, left: 0, doneBy: 0 }, files = {}, unknown = {};
+    var byName = {}, made = {}, used = {}, st = { linked: 0, renamed: 0, toTrack: 0, tg: 0, left: 0, doneBy: 0, anon: 0 }, files = {}, unknown = {};
     var add = function (n, uid) { n = norm_(n); if (!n) return; byName[n] = byName[n] || []; if (byName[n].indexOf(uid) < 0) byName[n].push(uid); };
-    list.forEach(function (x) { add(x.name, x.uid); });
+    var curName = {}; list.forEach(function (x) { add(x.name, x.uid); curName[norm_(x.name)] = 1; });
     // اسم وقت الإنشاء: الحساب الذي أُنشئ قبل سطر السجل بدقائق ولم يُطابَق بعد، الأقدم أولًا
     L.filter(function (e) { return e.what === 'أنشأ حساباً'; }).sort(function (a, b) { return a.at - b.at; }).forEach(function (e) {
       var c = list.filter(function (x) { return !used[x.uid] && !x.atar && x.role !== 'admin' && x.created && x.created <= e.at && e.at - x.created < 15 * 60e3; })
@@ -649,16 +649,21 @@ function byMigrate_(apply) {
     var lgCh = false, det = 0;
     L.forEach(function (e) {
       if (fix(e, e.t, 'log')) lgCh = true;
-      if (e.what === 'أنشأ حساباً' || e.what === 'عدّل حساباً') {
-        var u = made[e.at + '|' + e.d] || find(e.d, e.t);
+      if (e.what === 'أنشأ حساباً' || e.what === 'عدّل حساباً' || e.what === 'حذف حساباً') {
+        var u = e.what === 'حذف حساباً' ? '' : made[e.at + '|' + e.d] || find(e.d, e.t);
         if (u && A[u].name !== e.d) { e.d = A[u].name; det++; lgCh = true; }
+        // اسم لا يُعرف صاحبه (اسم مؤقت بين تعديلين، أو حساب محذوف): وصف عام بدل الاسم
+        else if (!u && !curName[norm_(e.d)] && !/^حساب( في |$)/.test(e.d)) {
+          var tt = ts.filter(function (t) { return t.id === e.t; })[0];
+          e.d = 'حساب' + (tt ? ' في ' + tt.name : ''); st.anon++; lgCh = true;
+        }
       }
     });
     if (lgCh && apply) { writeJson_('log.json', L); props_().setProperty('rev_log', String(now_())); }
     var un = Object.keys(unknown);
     return (apply ? 'حُفظ الترحيل.' : 'تجربة بلا حفظ.') +
       '\nرُبط باسمه الحالي: ' + st.linked + '، وصار اسمه الحالي بعد اسم قديم: ' + st.renamed + '، ونُسب إلى حساب المسار: ' + st.toTrack +
-      '\nتفاصيل سجل الحسابات المستبدلة: ' + det + '، وضغطات تليجرام (بلا حساب، لم تُمس): ' + st.tg + '، وبقي بلا صاحب: ' + st.left + '\nأنشطة علّمها أحد من تليجرام باسمه (doneBy، لم تُمس): ' + st.doneBy +
+      '\nتفاصيل سجل الحسابات المستبدلة: ' + det + '، وصار وصفًا عامًا لأنه لا يُعرف صاحبه: ' + st.anon + '، وضغطات تليجرام (بلا حساب، لم تُمس): ' + st.tg + '، وبقي بلا صاحب: ' + st.left + '\nأنشطة علّمها أحد من تليجرام باسمه (doneBy، لم تُمس): ' + st.doneBy +
       '\nفي الملفات: ' + Object.keys(files).map(function (k) { return k + ' ' + files[k]; }).join('، ') +
       (un.length ? '\nأسماء لم يُعرف صاحبها: ' + un.map(function (k) { return k + ' (' + unknown[k] + ')'; }).join('، ') : '');
   });
