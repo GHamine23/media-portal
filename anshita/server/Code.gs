@@ -12,7 +12,7 @@
      وملخص أسبوعي، وتنبيه عند نقل لقاء قريب أو إلغائه.
    أول تشغيل: شغّل setup() من المحرر مرة، ثم انشر «تطبيق ويب» (يُنفَّذ باسمك، متاح لأي شخص).
    ===================================================================== */
-var VERSION = '1.3.1';
+var VERSION = '1.4.0';
 var SITE_URL = 'https://ghamine23.github.io/media-portal/anshita/';
 var DATA_DIR_NAME = 'منصة الأنشطة التربوية — البيانات';
 var SESSION_DAYS = 60;
@@ -603,6 +603,16 @@ function onlyIthmar2Group() { Logger.log(groupsOnly_(['ithmar2'])); }
 // كلمة مرور جديدة لحساب الإدارة تصل محادثة الإدارة على تليجرام وحدها (لا تظهر في السجل ولا في الرد)، وتسري على أثر.
 // تُشغَّل من المحرر حين تضيع كلمة الإدارة أو تحتاجها محادثة الربط
 function adminPassToChat() { Logger.log(adminPassToChat_()); }
+// تُشغَّل من المحرر بعد تغيير إعداد الغرف: يطبّقه على كل لقاء قادم له غرفة، ويجدّد مشرفيه
+function meetApplyAll() { Logger.log(meetApplyAll_()); }
+function meetApplyAll_() {
+  var today = today_(), n = 0, bad = [];
+  tracks_().forEach(function (t) {
+    meetResyncTrack_(t);
+    plan_(t.id).acts.forEach(function (x) { if (x.meet && x.meet.space && x.d >= today) { n++; if (x.meet.cfgV !== MEET_CFG_V || x.meet.err) bad.push((t.name) + ': ' + x.title + (x.meet.err ? ' — ' + x.meet.err : '')); } });
+  });
+  return 'لقاءات قادمة لها غرفة: ' + n + (bad.length ? '\nلم يكتمل فيها: \n' + bad.join('\n') : '\nطُبّق الإعداد عليها كلها');
+}
 function adminPassToChat_() {
   var s = cfg_();
   if (!s.adminChat || !s.adminChat.id || !props_().getProperty('TG_TOKEN')) throw new Error('محادثة الإدارة غير مربوطة بالبوت');
@@ -1210,8 +1220,17 @@ function tg_menu(token) { var a = auth_(token); needAdmin_(a); var n = tgMenu_()
 /* ================= لقاءات ميت =================
    الغرفة تُنشأ من حساب المنصة بواجهة ميت البرمجية، والمسؤولون عن اللقاء (ببريدهم في «الفريق») وبريد الإدارة مشرفون مشاركون فيها.
    يحتاج مشروع المنصة: واجهة ميت مفعّلة في مشروع Google Cloud المرتبط، والنطاق meetings.space.created في appsscript.json.
-   x.meet: {space, uri, code, at, by, hosts:{email: memberName}, miss:[أسماء بلا بريد], err} */
+   x.meet: {space, uri, code, at, by, hosts:{email: memberName}, miss:[أسماء بلا بريد], err, cfgV: إصدار إعداد الغرفة} */
 var MEET_API = 'https://meet.googleapis.com/v2/';
+// إعداد الغرف (قرار أمين، ٣ نوفمبر): «إدارة المضيف» مفعّلة، والحضور يدخلون مشاهدين (لا ميكروفون ولا كاميرا ولا مشاركة شاشة ولا دردشة)،
+// والمسؤولون وبريد الإدارة مضيفون مشاركون يفتحون لمن يشاؤون أثناء اللقاء. المشاركة والدردشة للمضيفين. الإصدار يتغيّر كلما تغيّر الإعداد فتُحدَّث الغرف القادمة
+var MEET_CFG_V = 2;
+var MEET_MOD = { chatRestriction: 'HOSTS_ONLY', reactionRestriction: 'NO_RESTRICTION', presentRestriction: 'HOSTS_ONLY', defaultJoinAsViewerType: 'ON' };
+function meetConfig_(x) {
+  if (!x.meet || !x.meet.space || x.meet.cfgV === MEET_CFG_V) return;
+  meetCall_('patch', x.meet.space + '?updateMask=config.moderation,config.moderationRestrictions', { config: { moderation: 'ON', moderationRestrictions: MEET_MOD } });
+  x.meet.cfgV = MEET_CFG_V;
+}
 function isEmail_(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || '')); }
 function meetCall_(method, path, body) {
   var opt = { method: method, headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, muteHttpExceptions: true };
@@ -1237,6 +1256,7 @@ function meetHosts_(t, x, s) {
 function meetSync_(t, x, s) {
   if (!x.meet || !x.meet.space) return;
   var want = meetHosts_(t, x, s || cfg_()), cur = x.meet.hosts || {}, errs = [];
+  try { meetConfig_(x); } catch (er) { errs.push('إعداد الغرفة: ' + er.message); }
   want.emails.forEach(function (e) {
     if (cur[e]) return;
     try { var m = meetCall_('post', x.meet.space + '/members', { email: e, role: 'COHOST' }); cur[e] = m.name || '1'; }
@@ -1266,8 +1286,8 @@ function meet_create(token, tid, id) {
   var x0 = plan_(tid).acts.filter(function (y) { return y.id === id; })[0];
   if (!x0) throw new Error('النشاط غير موجود (ربما حُذف)');
   if (x0.meet && x0.meet.uri) return JSON.stringify({ act: x0, rev: plan_(tid).rev });
-  var sp = meetCall_('post', 'spaces', { config: { accessType: 'OPEN', entryPointAccess: 'ALL' } });
-  var meet = { space: sp.name, uri: sp.meetingUri, code: sp.meetingCode, at: now_(), by: a.name, hosts: {} };
+  var sp = meetCall_('post', 'spaces', { config: { accessType: 'OPEN', entryPointAccess: 'ALL', moderation: 'ON', moderationRestrictions: MEET_MOD } });
+  var meet = { space: sp.name, uri: sp.meetingUri, code: sp.meetingCode, at: now_(), by: a.name, hosts: {}, cfgV: MEET_CFG_V };
   var tmp = JSON.parse(JSON.stringify(x0)); tmp.meet = meet; meetSync_(t, tmp, s);
   return JSON.stringify(withLock_(function () {
     var p = plan_(tid), i = -1;

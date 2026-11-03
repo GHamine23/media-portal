@@ -2735,12 +2735,13 @@ function actParts() {
 // رابط ميت للنشاط: يُنشأ من حساب الأنشطة، والمسؤولون عنه (ببريدهم في «الفريق») وبريد الإدارة مشرفون فيه
 function meetBlock() {
   const m = F.meet, t = T(F.tid), em = (t && t.emails) || {};
-  if (!m || !m.uri) return `<div class="opt meetopt"><span class="tile sm" style="--tc:var(--ty-meet)">${svg('video')}</span><div class="tx"><b>رابط ميت</b><span>يُنشأ من حساب الأنشطة، والمسؤولون عن النشاط مشرفون فيه بحساباتهم.</span></div><button class="btn sm" type="button" data-act="f-meet" ${F.meetBusy ? 'disabled' : ''}>${F.meetBusy ? '<span class="spin"></span>' : ''}أنشئ الرابط</button></div>`;
+  if (!m || !m.uri) return `<div class="opt meetopt"><span class="tile sm" style="--tc:var(--ty-meet)">${svg('video')}</span><div class="tx"><b>رابط ميت</b><span>يُنشأ من حساب الأنشطة، والمسؤولون عن النشاط مشرفون فيه بحساباتهم، والحضور يدخلون مشاهدين.</span></div><button class="btn sm" type="button" data-act="f-meet" ${F.meetBusy ? 'disabled' : ''}>${F.meetBusy ? '<span class="spin"></span>' : ''}أنشئ الرابط</button></div>`;
   const hostsN = (F.who || []).filter(w => em[w]), miss = (F.who || []).filter(w => !em[w]);
   return `<div class="opt meetopt on"><span class="tile sm" style="--tc:var(--ty-meet)">${svg('video')}</span><div class="tx"><b>رابط ميت</b>
     <span class="mlink"><bdi dir="ltr">${esc(m.uri.replace('https://', ''))}</bdi></span>
     <span>${hostsN.length ? 'المشرفون: ' + esc(hostsN.join('، ')) + ((D.settings && (D.settings.meetAdmins || []).length) || isAdmin() ? ' والإدارة' : '') : 'لا مشرف من الفريق بعد'}</span>
-    ${miss.length ? `<span class="warnt">${svg('alert')}بلا بريد: ${esc(miss.join('، '))}. يُضاف في «الفريق» فيصيرون مشرفين.</span>` : ''}
+    <span class="xs faint">الحضور يدخلون مشاهدين بلا صوت ولا كاميرا، والمشرفون يفتحون لمن يشاؤون.</span>
+    ${miss.length ? `<span class="warnt">${svg('alert')}بلا بريد: ${esc(miss.join('، '))}، فيدخلون مشاهدين كغيرهم. يُضاف بريدهم في «الفريق» فيصيرون مشرفين.</span>` : ''}
     ${m.err ? `<span class="warnt">${svg('alert')}تعذّر جزء من الإشراف: ${esc(m.err)}</span>` : ''}</div>
     <div class="col" style="gap:6px;align-items:stretch"><a class="btn sm pri" href="${esc(m.uri)}" target="_blank" rel="noopener">${svg('ext')}افتح</a><button class="btn sm" type="button" data-act="f-copy" data-v="${esc(m.uri)}">${svg('copy')}انسخ</button></div></div>
     <div class="row" style="justify-content:flex-end;margin-top:-8px"><button class="lk xs" type="button" data-act="f-meet-del">إزالة الرابط من النشاط</button></div>`;

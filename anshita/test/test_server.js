@@ -23,6 +23,7 @@ GAS._fetch.handler = function (url, opt) {
     if (!/^Bearer /.test((opt.headers || {}).Authorization || '')) return { code: 401, body: '{"error":{"message":"no token"}}' };
     if (MEET.off) return { code: 403, body: JSON.stringify({ error: { message: 'Google Meet REST API has not been used in project 123 before or it is disabled.' } }) };
     if (m === 'post' && p === 'spaces') { const c = 'abc-defg-' + (++MEET.n); return { code: 200, body: JSON.stringify({ name: 'spaces/S' + MEET.n, meetingUri: 'https://meet.google.com/' + c, meetingCode: c, config: body.config }) }; }
+    if (m === 'patch' && /^spaces\/[^/?]+\?updateMask=/.test(p)) { if (MEET.patchFail) return { code: 400, body: '{"error":{"message":"bad mask"}}' }; return { code: 200, body: JSON.stringify({ name: p.split('?')[0], config: body.config }) }; }
     if (m === 'post' && /\/members$/.test(p)) return { code: 200, body: JSON.stringify({ name: p + '/M' + (++MEET.n), email: body.email, role: body.role }) };
     if (m === 'delete') return { code: 200, body: '{}' };
     return { code: 404, body: '{"error":{"message":"not found"}}' };
@@ -267,6 +268,24 @@ throws(() => call('report_data', rk), /مفتاح/, 'المفتاح القديم
   call('track_save', JM, 'judhoor', JSON.stringify({ members: ['أنس', 'معاذ', 'أبو عبد الله'], emails: { 'أنس': 'anas@gmail.com', 'معاذ': 'muadh@jeelacademy.app' } }));
   const r3 = call('plan', AM, 'judhoor').acts.find(a => a.id === mm.id);
   ok(r3.meet.hosts['muadh@jeelacademy.app'] && !r3.meet.miss.length, 'إضافة بريد عضو تجعله مشرفًا في لقاءاته القادمة');
+  // إعداد الغرفة (قرار أمين ٣ نوفمبر): إدارة المضيف، والحضور مشاهدون، والمشاركة والدردشة للمضيفين
+  const cf = sp[2].config, mr = cf.moderationRestrictions || {};
+  ok(cf.moderation === 'ON' && mr.defaultJoinAsViewerType === 'ON' && mr.chatRestriction === 'HOSTS_ONLY' && mr.presentRestriction === 'HOSTS_ONLY' && mr.reactionRestriction === 'NO_RESTRICTION', 'الغرفة الجديدة: إدارة المضيف، والحضور مشاهدون، والمشاركة والدردشة للمضيفين');
+  ok(r1.meet.cfgV === ctx.MEET_CFG_V, 'وتُعلَّم بإصدار الإعداد');
+  {
+    const p0 = ctx.plan_('judhoor'), old = p0.acts.find(a => a.id === mm.id);
+    old.meet = { space: 'spaces/OLD1', uri: 'https://meet.google.com/old-room-one', code: 'old', hosts: {} }; ctx.savePlan_('judhoor', p0);
+    MEET.calls.length = 0; MEET.patchFail = true;
+    ctx.meetApplyAll_();
+    ok(/إعداد الغرفة/.test(call('plan', AM, 'judhoor').acts.find(a => a.id === mm.id).meet.err || ''), 'تعذّر تحديث الإعداد يُسجَّل في الغرفة');
+    MEET.patchFail = false; MEET.calls.length = 0;
+    const msg = ctx.meetApplyAll_(), up = MEET.calls.find(c => c[0] === 'patch');
+    const nx = call('plan', AM, 'judhoor').acts.find(a => a.id === mm.id);
+    ok(up && /^spaces\/OLD1\?updateMask=config\.moderation,config\.moderationRestrictions$/.test(up[1]) && up[2].config.moderation === 'ON' && up[2].config.moderationRestrictions.defaultJoinAsViewerType === 'ON', 'الغرف القادمة القديمة يُطبَّق عليها الإعداد');
+    ok(nx.meet.cfgV === ctx.MEET_CFG_V && !nx.meet.err && /طُبّق الإعداد عليها كلها/.test(msg), 'وتُعلَّم بعده، ويُخبَر بالنتيجة');
+    MEET.calls.length = 0; ctx.meetApplyAll_();
+    ok(!MEET.calls.some(c => c[0] === 'patch'), 'ولا يتكرر التحديث للغرفة نفسها');
+  }
   ok(/رابط اللقاء: https:\/\/meet\.google\.com\//.test(ctx.remindText_('تذكير: {العنوان}', r3, { name: 'جذور' }, 3)), 'التذكير يحمل رابط اللقاء');
   MEET.off = true;
   const mm2 = call('act_save', AM, 'judhoor', JSON.stringify({ title: 'لقاء آخر', type: 'لقاء', d: '2026-12-21' })).act;
