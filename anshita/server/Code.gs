@@ -12,7 +12,7 @@
      وملخص أسبوعي، وتنبيه عند نقل لقاء قريب أو إلغائه.
    أول تشغيل: شغّل setup() من المحرر مرة، ثم انشر «تطبيق ويب» (يُنفَّذ باسمك، متاح لأي شخص).
    ===================================================================== */
-var VERSION = '1.4.0';
+var VERSION = '1.4.1';
 var SITE_URL = 'https://ghamine23.github.io/media-portal/anshita/';
 var DATA_DIR_NAME = 'منصة الأنشطة التربوية — البيانات';
 var SESSION_DAYS = 60;
@@ -1226,9 +1226,11 @@ var MEET_API = 'https://meet.googleapis.com/v2/';
 // والمسؤولون وبريد الإدارة مضيفون مشاركون يفتحون لمن يشاؤون أثناء اللقاء. المشاركة والدردشة للمضيفين. الإصدار يتغيّر كلما تغيّر الإعداد فتُحدَّث الغرف القادمة
 var MEET_CFG_V = 2;
 var MEET_MOD = { chatRestriction: 'HOSTS_ONLY', reactionRestriction: 'NO_RESTRICTION', presentRestriction: 'HOSTS_ONLY', defaultJoinAsViewerType: 'ON' };
+// ميت يرفض المسار config.moderationRestrictions جملةً ويقبل كل حقل منه مسمًّى (جُرّب على غرفة حقيقية)
+var MEET_MASK = ['config.moderation'].concat(Object.keys(MEET_MOD).map(function (k) { return 'config.moderationRestrictions.' + k; })).join(',');
 function meetConfig_(x) {
   if (!x.meet || !x.meet.space || x.meet.cfgV === MEET_CFG_V) return;
-  meetCall_('patch', x.meet.space + '?updateMask=config.moderation,config.moderationRestrictions', { config: { moderation: 'ON', moderationRestrictions: MEET_MOD } });
+  meetCall_('patch', x.meet.space + '?updateMask=' + MEET_MASK, { config: { moderation: 'ON', moderationRestrictions: MEET_MOD } });
   x.meet.cfgV = MEET_CFG_V;
 }
 function isEmail_(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || '')); }

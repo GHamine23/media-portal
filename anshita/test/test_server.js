@@ -23,7 +23,7 @@ GAS._fetch.handler = function (url, opt) {
     if (!/^Bearer /.test((opt.headers || {}).Authorization || '')) return { code: 401, body: '{"error":{"message":"no token"}}' };
     if (MEET.off) return { code: 403, body: JSON.stringify({ error: { message: 'Google Meet REST API has not been used in project 123 before or it is disabled.' } }) };
     if (m === 'post' && p === 'spaces') { const c = 'abc-defg-' + (++MEET.n); return { code: 200, body: JSON.stringify({ name: 'spaces/S' + MEET.n, meetingUri: 'https://meet.google.com/' + c, meetingCode: c, config: body.config }) }; }
-    if (m === 'patch' && /^spaces\/[^/?]+\?updateMask=/.test(p)) { if (MEET.patchFail) return { code: 400, body: '{"error":{"message":"bad mask"}}' }; return { code: 200, body: JSON.stringify({ name: p.split('?')[0], config: body.config }) }; }
+    if (m === 'patch' && /^spaces\/[^/?]+\?updateMask=/.test(p)) { if (MEET.patchFail || p.split('updateMask=')[1].split(',').indexOf('config.moderationRestrictions') >= 0) return { code: 400, body: '{"error":{"message":"Invalid update mask provided"}}' }; return { code: 200, body: JSON.stringify({ name: p.split('?')[0], config: body.config }) }; }
     if (m === 'post' && /\/members$/.test(p)) return { code: 200, body: JSON.stringify({ name: p + '/M' + (++MEET.n), email: body.email, role: body.role }) };
     if (m === 'delete') return { code: 200, body: '{}' };
     return { code: 404, body: '{"error":{"message":"not found"}}' };
@@ -281,7 +281,7 @@ throws(() => call('report_data', rk), /مفتاح/, 'المفتاح القديم
     MEET.patchFail = false; MEET.calls.length = 0;
     const msg = ctx.meetApplyAll_(), up = MEET.calls.find(c => c[0] === 'patch');
     const nx = call('plan', AM, 'judhoor').acts.find(a => a.id === mm.id);
-    ok(up && /^spaces\/OLD1\?updateMask=config\.moderation,config\.moderationRestrictions$/.test(up[1]) && up[2].config.moderation === 'ON' && up[2].config.moderationRestrictions.defaultJoinAsViewerType === 'ON', 'الغرف القادمة القديمة يُطبَّق عليها الإعداد');
+    ok(up && up[1] === 'spaces/OLD1?updateMask=config.moderation,config.moderationRestrictions.chatRestriction,config.moderationRestrictions.reactionRestriction,config.moderationRestrictions.presentRestriction,config.moderationRestrictions.defaultJoinAsViewerType' && up[2].config.moderation === 'ON' && up[2].config.moderationRestrictions.defaultJoinAsViewerType === 'ON', 'الغرف القادمة القديمة يُطبَّق عليها الإعداد');
     ok(nx.meet.cfgV === ctx.MEET_CFG_V && !nx.meet.err && /طُبّق الإعداد عليها كلها/.test(msg), 'وتُعلَّم بعده، ويُخبَر بالنتيجة');
     MEET.calls.length = 0; ctx.meetApplyAll_();
     ok(!MEET.calls.some(c => c[0] === 'patch'), 'ولا يتكرر التحديث للغرفة نفسها');
