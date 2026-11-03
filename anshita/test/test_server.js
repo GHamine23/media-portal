@@ -44,6 +44,7 @@ GAS._fetch.handler = function (url, opt) {
     if (m === 'deleteWebhook' || m === 'setMyCommands') return { code: 200, body: '{"ok":true,"result":true}' };
     if (m === 'getUpdates') { if (p.offset) TG.offsetUsed = true; const off = +p.offset || 0; return { code: 200, body: JSON.stringify({ ok: true, result: TG.updates.filter(u => u.update_id >= off) }) }; }
     if (m === 'sendMessage') {
+      if (TG.blocked && TG.blocked.includes(String(p.chat_id))) return { code: 403, body: JSON.stringify({ ok: false, description: 'Forbidden: bot can\'t initiate conversation with a user' }) };
       if (TG.migrate && String(p.chat_id) === TG.migrate[0]) return { code: 400, body: JSON.stringify({ ok: false, description: 'Bad Request: group chat was upgraded to a supergroup chat', parameters: { migrate_to_chat_id: +TG.migrate[1] } }) };
       TG.sent.push({ chat: String(p.chat_id), text: p.text, html: p.parse_mode === 'HTML', kb: p.reply_markup || '' }); ALLSENT.push(TG.sent[TG.sent.length - 1]); return { code: 200, body: JSON.stringify({ ok: true, result: { message_id: TG.sent.length } }) };
     }
@@ -618,6 +619,53 @@ ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.te
   throws(() => call('boot', T0), /تغيّرت كلمة المرور/, 'والجلسات القديمة خرجت');
   throws(() => ctx.memberPassToChat_('admin'), /adminPassToChat/, 'حساب الإدارة له دالته');
   throws(() => ctx.memberPassToChat_('nobody.x'), /لا حساب/, 'اسم غير موجود يُرفض');
+}
+
+// ٢٤) إنشاء حسابات الأعضاء تلقائيًا حين يُكتب بريدهم في «الفريق»، وتسليمها في خاص العضو
+{
+  NOW = Date.UTC(2027, 1, 3, 7, 0);
+  const adm = ctx.cfg_().adminChat.id, AT = call('login', 'admin', cred.admin).token, BT = call('login', 'budhoor', cred.budhoor).token;
+  ok(ctx.cfg_().autoAcc === true, 'مفعّل افتراضيًا');
+  const acc = u => Object.values(ctx.accs_()).find(x => x.user === u);
+  TG.sent.length = 0; TG.blocked = [];
+  const r = call('track_save', BT, 'budhoor', JSON.stringify({ members: ['مشرف بذور ٢', 'مشرف بذور ٣', 'مشرف بذور ٤'], emails: { 'مشرف بذور ٢': 'b2@example.com', 'مشرف بذور ٣': 'b3@example.com' }, tgs: { 'مشرف بذور ٢': '7001002003', 'مشرف بذور ٤': 'not-an-id' } }));
+  ok(r.auto && r.auto.made.length === 2 && r.auto.made[0].user === 'budhoor2' && r.auto.made[0].sent === 'dm' && r.auto.made[1].user === 'budhoor3' && r.auto.made[1].sent === 'admin', 'حسابان بالنمط العام: الأول في الخاص، والثاني إلى الإدارة');
+  ok(!acc('budhoor4'), 'ولا حساب لمن لا بريد له');
+  ok(!/[a-z2-9]{4}-[a-z2-9]{5}/.test(JSON.stringify(r)), 'كلمة المرور ليست في الرد');
+  const dm = TG.sent.filter(m => m.chat === '7001002003'), pw2 = dm.length === 1 && /كلمة المرور: <code>([^<]+)<\/code>/.exec(dm[0].text);
+  ok(pw2 && /مشرف بذور ٢/.test(dm[0].text) && call('login', 'budhoor2', pw2[1]).me.track === 'budhoor', 'بيانات الأول في خاصه، ويدخل بها مساره');
+  const ad = TG.sent.filter(m => m.chat === adm);
+  ok(ad.length === 3 && /budhoor2.*وأُرسل له في الخاص/.test(ad[0].text) && !/كلمة المرور/.test(ad[0].text) && /حوّلها/.test(ad[1].text) && /budhoor3/.test(ad[2].text), 'والإدارة يصلها سطر للأول، ورسالة جاهزة للتحويل للثاني');
+  ok(TG.sent.length === 4, 'ولا يصل شيء لغيرهما');
+  ok(acc('budhoor2').tg === '7001002003' && !acc('budhoor3').tg, 'معرّف تليجرام يُحفظ في الحساب');
+  ok(!JSON.stringify(call('log_list', AT)).includes(pw2[1]), 'ولا الكلمة في السجل');
+  ok(!('tgs' in call('boot', BT).tracks.find(t => t.id === 'budhoor')) && call('boot', AT).tracks.find(t => t.id === 'budhoor').tgs['مشرف بذور ٢'] === '7001002003', 'المعرّفات تراها الإدارة وحدها');
+  TG.sent.length = 0;
+  const r2 = call('track_save', BT, 'budhoor', JSON.stringify({ members: ['مشرف بذور ٢', 'مشرف بذور ٣', 'مشرف بذور ٤'], emails: { 'مشرف بذور ٢': 'b2@example.com', 'مشرف بذور ٣': 'b3@example.com' } }));
+  ok(!r2.auto && !TG.sent.length && ctx.trackOf_('budhoor').tgs['مشرف بذور ٢'] === '7001002003', 'إعادة الحفظ لا تنشئ شيئًا وتحفظ المعرّف');
+  // خاص لم يُفتح مع البوت: تصل الإدارةَ لتحوّلها
+  TG.blocked = ['7009'];
+  const r3 = call('track_save', BT, 'budhoor', JSON.stringify({ emails: { 'مشرف بذور ٢': 'b2@example.com', 'مشرف بذور ٣': 'b3@example.com', 'مشرف بذور ٤': 'b4@example.com' }, tgs: { 'مشرف بذور ٤': '700900' } }));
+  TG.blocked = ['700900'];
+  ok(r3.auto.made.length === 1 && r3.auto.made[0].user === 'budhoor4', 'كتابة البريد تنشئ الحساب');
+  TG.blocked = [];
+  call('track_save', BT, 'budhoor', JSON.stringify({ members: ['مشرف بذور ٢', 'مشرف بذور ٣', 'مشرف بذور ٤', 'مشرف بذور ٥'] }));
+  TG.blocked = ['7005005005']; TG.sent.length = 0;
+  const r4 = call('track_save', BT, 'budhoor', JSON.stringify({ emails: { 'مشرف بذور ٢': 'b2@example.com', 'مشرف بذور ٣': 'b3@example.com', 'مشرف بذور ٤': 'b4@example.com', 'مشرف بذور ٥': 'b5@example.com' }, tgs: { 'مشرف بذور ٥': '7005005005' } }));
+  ok(r4.auto.made[0].sent === 'admin' && TG.sent.some(m => m.chat === adm && /تعذّر إرساله له في الخاص/.test(m.text)) && TG.sent.some(m => m.chat === adm && /كلمة المرور/.test(m.text)), 'تعذّر الخاص: تصل الإدارةَ لتحوّلها');
+  TG.blocked = [];
+  // اسم دخول مستعمل، والإيقاف، والتشغيل من المحرر
+  call('acc_save', AT, JSON.stringify({ user: 'budhoor6', name: 'حساب آخر', role: 'team', track: 'budhoor' }));
+  call('track_save', BT, 'budhoor', JSON.stringify({ members: ['مشرف بذور ٢', 'مشرف بذور ٣', 'مشرف بذور ٤', 'مشرف بذور ٥', 'مشرف بذور ٦', 'مشرف بذور ٧'] }));
+  const r5 = call('track_save', BT, 'budhoor', JSON.stringify({ emails: { 'مشرف بذور ٦': 'b6@example.com' } }));
+  ok(!r5.auto.made.length && r5.auto.skip[0].why === 'اسم الدخول مستعمل', 'اسم دخول مستعمل: لا يُنشأ ويُذكر السبب');
+  call('settings_save', AT, JSON.stringify({ autoAcc: false }));
+  const r6 = call('track_save', BT, 'budhoor', JSON.stringify({ emails: { 'مشرف بذور ٦': 'b6@example.com', 'مشرف بذور ٧': 'b7@example.com' } }));
+  ok(r6.auto.off && !acc('budhoor7'), 'المفتاح مطفأ: لا إنشاء');
+  const f = ctx.autoAccounts_('budhoor', ['مشرف بذور ٧'], true);
+  ok(f.made.length === 1 && f.made[0].user === 'budhoor7', 'والإدارة تنشئه من المحرر ولو كان المفتاح مطفأ');
+  call('settings_save', AT, JSON.stringify({ autoAcc: true }));
+  ok(ctx.autoUser_('ithmar2', 'مشرف إثمار ٢ - ٦', 0) === 'ithmar2.6' && ctx.autoUser_('judhoor', 'مشرف جذور ٥', 0) === 'judhoor5', 'اسم الدخول العام من رقم الاسم');
 }
 
 if (process.env.PREVIEW) {

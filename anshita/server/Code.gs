@@ -12,7 +12,7 @@
      وملخص أسبوعي، وتنبيه عند نقل لقاء قريب أو إلغائه.
    أول تشغيل: شغّل setup() من المحرر مرة، ثم انشر «تطبيق ويب» (يُنفَّذ باسمك، متاح لأي شخص).
    ===================================================================== */
-var VERSION = '1.5.2';
+var VERSION = '1.6.0';
 var SITE_URL = 'https://ghamine23.github.io/media-portal/anshita/';
 var DATA_DIR_NAME = 'منصة الأنشطة التربوية — البيانات';
 var SESSION_DAYS = 60;
@@ -41,7 +41,8 @@ var DEFAULTS = {
   calId: '',                           // فارغ = التقويم الأساسي لصاحب السكربت
   tpl: { d3: '', d1: '' },             // فارغ = الرسائل الغنية المتنوعة؛ ويُكتب نص مخصّص عند الحاجة
   adminTasks: true,                    // مهام الأسبوع للإدارة على الخاص يوم الملخص
-  checkins: true                       // سؤال «هل أُقيم؟» بعد النشاط بساعتين
+  checkins: true,                      // سؤال «هل أُقيم؟» بعد النشاط بساعتين
+  autoAcc: true                        // إنشاء حساب العضو تلقائيًا حين يُكتب بريده في «الفريق»
 };
 var OLD_TPL = ['تذكير: {العنوان}\nموعده {الموعد} ({متى}).\nحان وقت تصميم إعلان اللقاء وإعداد نصّه.\nالمسؤول: {المسؤول}', 'تذكير: {العنوان}\nموعده {الموعد} ({متى}).\nاليوم موعد نشر إعلان اللقاء.\nالمسؤول: {المسؤول}'];   // نصوص قديمة تُعامل كأنها فارغة
 function customTpl_(s, k) { var v = (s.tpl || {})[k]; return v && OLD_TPL.indexOf(v) < 0 ? v : ''; }
@@ -588,16 +589,64 @@ function memberAccounts_(tid, users, only) {
     (res.made.length ? 'أُنشئ ' + accText_(res.made.length) + '. كل رسالة تحت هذه لعضو، فحوّلها له كما هي.' : 'لم يُنشأ حساب جديد.') +
     (res.had.length ? '\nلهم حسابات من قبل: ' + res.had.map(function (o) { return h_(o.name) + ' (<code>' + h_(o.user) + '</code>)'; }).join('، ') + '.' : '');
   tgSend_(chat, head, '', true);
-  res.made.forEach(function (o) {
-    tgSend_(chat, 'السلام عليكم أ. ' + h_(o.name) + ' 🌿\n' +
+  res.made.forEach(function (o) { tgSend_(chat, accMsg_(o, nm), '', true); });
+  return JSON.stringify({ made: res.made.map(function (o) { return { name: o.name, user: o.user }; }), had: res.had });
+}
+// رسالة بيانات الدخول لصاحب الحساب الجديد (جاهزة للتحويل أو للإرسال في خاصه)
+function accMsg_(o, nm) {
+  return 'السلام عليكم أ. ' + h_(o.name) + ' 🌿\n' +
       'هذا حسابك في <b>منصة الأنشطة التربوية</b> لمسار ' + h_(nm) + ':\n\n' +
       'الرابط: ' + SITE_URL + '\n' +
       'اسم المستخدم: <code>' + h_(o.user) + '</code>\n' +
       'كلمة المرور: <code>' + h_(o.pw) + '</code>\n\n' +
       'اضغط على اسم المستخدم أو كلمة المرور لنسخها. وبعد أول دخول غيّر كلمة المرور من «تغيير كلمة المرور» في قائمة حسابك.' +
-      (o.atar && o.atar.username ? '\n\nوالحساب نفسه يفتح لك «أثر» لتصميم إعلانات مسارك: ' + ATAR_SITE + (o.atar.username !== o.user ? '\nاسم الدخول في أثر: <code>' + h_(o.atar.username) + '</code>' : '') : ''), '', true);
+      (o.atar && o.atar.username ? '\n\nوالحساب نفسه يفتح لك «أثر» لتصميم إعلانات مسارك: ' + ATAR_SITE + (o.atar.username !== o.user ? '\nاسم الدخول في أثر: <code>' + h_(o.atar.username) + '</code>' : '') : '');
+}
+// اسم الدخول العام من رقم آخر الاسم: «مشرف جذور ٥» ← judhoor5، و«مشرف إثمار ٢ - ٦» ← ithmar2.6
+function autoUser_(tid, m, i) {
+  var d = /(\d+)\s*$/.exec(String(m).replace(/[٠-٩]/g, function (c) { return String(c.charCodeAt(0) - 0x660); }));
+  var n = d ? +d[1] : i + 1;
+  return norm_(tid) + (/\d$/.test(tid) ? '.' : '') + n;
+}
+/* إنشاء حسابات الأعضاء تلقائيًا (طلب أمين، ٣ نوفمبر): العضو في «الفريق» الذي كُتب بريده (أو معرّفه في تليجرام) الآن ولا حساب له
+   يُنشأ حسابه بالنمط العام في مساره، ومعه حسابه في أثر. وتُرسل بيانات دخوله إلى خاصه مع البوت إن عُرف معرّفه (tgs)،
+   وإلا إلى محادثة الإدارة لتُحوَّل. والإدارة يصلها سطر بما جرى. لا تظهر الكلمة في الرد ولا في السجل. يوقفه مفتاح في صفحة الحسابات.
+   names: أسماء أعضاء بعينهم؛ ويُتجاوز بها شرط البريد (تشغيل الإدارة من المحرر). */
+function autoAccounts_(tid, names, force) {
+  var s = cfg_(); if (s.autoAcc === false && !force) return { off: true, made: [], skip: [] };
+  if (!props_().getProperty('TG_TOKEN')) return { made: [], skip: [{ why: 'البوت غير مضبوط' }] };
+  var admin = s.adminChat && s.adminChat.id ? String(s.adminChat.id) : '';
+  var t = trackOf_(tid), nm = t.full || t.name;
+  var res = withLock_(function () {
+    var all = accs_(), list = Object.keys(all).map(function (k) { return all[k]; }), taken = {}, made = [], skip = [], dirty = false;
+    list.forEach(function (x) { taken[norm_(x.user)] = 1; });
+    (t.members || []).forEach(function (m, i) {
+      if (names && names.indexOf(m) < 0) return;
+      if (!force && !(t.emails || {})[m]) return;
+      var tg = (t.tgs || {})[m] || '';
+      var had = list.filter(function (x) { return !x.atar && (x.role === 'sup' || (x.track === tid && x.role === 'team')) && norm_(x.name) === norm_(m); })[0];
+      if (had) { if (tg && had.tg !== tg) { had.tg = tg; dirty = true; } if (force) skip.push({ name: m, why: 'له حساب من قبل' }); return; }
+      if (!tg && !admin) { skip.push({ name: m, why: 'لا معرّف تليجرام له ولا محادثة إدارة' }); return; }
+      var u = autoUser_(tid, m, i);
+      if (taken[u]) { skip.push({ name: m, user: u, why: 'اسم الدخول مستعمل' }); return; }
+      var x = { uid: uid_(), created: now_(), tv: 0 }, pw = tempPass_(); setPass_(x, pw);
+      x.user = u; x.name = m; x.role = 'team'; x.track = tid; x.disabled = false; if (tg) x.tg = tg;
+      all[x.uid] = x; taken[u] = 1; made.push({ uid: x.uid, name: m, user: u, pw: pw, tg: tg });
+    });
+    if (made.length || dirty) writeJson_('accounts.json', all);
+    return { made: made, skip: skip };
   });
-  return JSON.stringify({ made: res.made.map(function (o) { return { name: o.name, user: o.user }; }), had: res.had });
+  res.made.forEach(function (o) {
+    log_(null, tid, 'أنشأ حساباً', o.name);
+    try { o.atar = linkSync_(o.uid, o.pw); } catch (e) {}
+    var msg = accMsg_(o, nm), dm = false;
+    if (o.tg) { try { var r = tgSend_(o.tg, msg, '', true); dm = !(r && r.skipped); } catch (e) {} }
+    o.sent = dm ? 'dm' : admin ? 'admin' : '';
+    if (!admin) return;
+    if (dm) tgSend_(admin, 'أُنشئ حساب <code>' + h_(o.user) + '</code> لـ' + h_(o.name) + ' (' + h_(nm) + ') وأُرسل له في الخاص.', '', true);
+    else { tgSend_(admin, '<b>أُنشئ حساب <code>' + h_(o.user) + '</code> لـ' + h_(o.name) + '</b> (' + h_(nm) + ')' + (o.tg ? '، وتعذّر إرساله له في الخاص (لعله لم يبدأ المحادثة مع البوت)' : '، ولا معرّف تليجرام له في «الفريق»') + '.\nالرسالة التالية له، فحوّلها كما هي.', '', true); tgSend_(admin, msg, '', true); }
+  });
+  return { made: res.made.map(function (o) { return { name: o.name, user: o.user, sent: o.sent }; }), skip: res.skip };
 }
 /* ترحيل لمرة واحدة (قرار أمين، ٣ نوفمبر: لا أسماء شخصية في المنصة):
    كل اسم ثابت في by يُربط بحساب صاحبه (bu) ويصير اسمه الحالي، فيُعرض بعدها من الحساب نفسه.
@@ -753,7 +802,7 @@ function pubTrack_(t, admin) {
   var o = JSON.parse(JSON.stringify(t));
   o.linked = !!(t.chat && t.chat.id);
   if (o.editReq) named_(o.editReq);
-  if (!admin) { delete o.chat; delete o.sheet; }
+  if (!admin) { delete o.chat; delete o.sheet; delete o.tgs; }
   return o;
 }
 function boot(token) {
@@ -1145,10 +1194,11 @@ function parseSemCsv_(rows) {
 /* ================= المسار والإعدادات ================= */
 function track_save(token, tid, json) {
   var a = auth_(token), o = JSON.parse(json);
-  var teamOnly = Object.keys(o).every(function (k) { return k === 'members' || k === 'emails'; });
+  var teamOnly = Object.keys(o).every(function (k) { return k === 'members' || k === 'emails' || k === 'tgs'; });
   if (teamOnly) canView_(a, tid); else canEdit_(a, tid);   // أعضاء الفريق وبريدهم يكتبها الفريق نفسه دائمًا
   var res = withLock_(function () {
     var ts = tracks_(), t = ts.filter(function (x) { return x.id === tid; })[0];
+    var was = t ? { em: JSON.parse(JSON.stringify(t.emails || {})), tg: JSON.parse(JSON.stringify(t.tgs || {})) } : null;
     if (!t) throw new Error('المسار غير موجود');
     if ('members' in o) t.members = (o.members || []).map(function (m) { return txt_(m, 40); }).filter(String).slice(0, 40);
     if ('emails' in o) {
@@ -1156,6 +1206,12 @@ function track_save(token, tid, json) {
       (t.members || []).forEach(function (m) { var e = String(src[m] || '').trim().toLowerCase(); if (isEmail_(e)) em[m] = e; });
       t.emails = em;
     } else if ('members' in o && t.emails) { var keep = {}; t.members.forEach(function (m) { if (t.emails[m]) keep[m] = t.emails[m]; }); t.emails = keep; }
+    // معرّف تليجرام لكل عضو (محادثته الخاصة مع البوت): يُدمج مع الموجود، والقيمة الفارغة تحذفه
+    if ('tgs' in o && o.tgs) {
+      var tg = t.tgs || {}; Object.keys(o.tgs).forEach(function (m) { var v = String(o.tgs[m] == null ? '' : o.tgs[m]).trim(); if ((t.members || []).indexOf(m) < 0) return; if (/^\d{5,15}$/.test(v)) tg[m] = v; else if (!v) delete tg[m]; });
+      t.tgs = tg;
+    }
+    if ('members' in o && t.tgs) { var kt = {}; t.members.forEach(function (m) { if (t.tgs[m]) kt[m] = t.tgs[m]; }); t.tgs = kt; }
     if (a.role === 'admin') {
       ['name', 'full', 'age', 'cohort'].forEach(function (k) { if (k in o) t[k] = txt_(o[k], 60); });
       if ('color' in o && /^#[0-9a-f]{6}$/i.test(o.color)) t.color = o.color;
@@ -1170,9 +1226,12 @@ function track_save(token, tid, json) {
     props_().setProperty('rev_meta', String(now_()));
     var what = ('canEdit' in o && a.role === 'admin') ? (o.canEdit ? 'فتح تعديل الخطة للفريق' : 'أغلق تعديل الخطة للفريق') : teamOnly ? 'حدّث أعضاء الفريق' : 'عدّل بيانات المسار';
     log_(a, tid, what, t.name);
-    return { track: pubTrack_(t, a.role === 'admin'), t: t };
+    var fresh = (t.members || []).filter(function (m) { return (t.emails || {})[m] && ((t.emails[m] !== was.em[m]) || ((t.tgs || {})[m] && t.tgs[m] !== was.tg[m])); });
+    return { track: pubTrack_(t, a.role === 'admin'), t: t, fresh: fresh };
   });
   if ('emails' in o || 'members' in o) { try { meetResyncTrack_(res.t); } catch (e) {} }
+  if (res.fresh && res.fresh.length) { try { res.auto = autoAccounts_(tid, res.fresh); } catch (e) { res.auto = { err: e.message }; } }
+  delete res.fresh;
   delete res.t;
   return JSON.stringify(res);
 }
@@ -1191,6 +1250,7 @@ function settings_save(token, json) {
     if ('tpl' in o) { s.tpl = s.tpl || {}; ['d3', 'd1'].forEach(function (k) { if (o.tpl[k] != null) s.tpl[k] = txt_(o.tpl[k], 1200); }); }
     if ('adminTasks' in o) s.adminTasks = !!o.adminTasks;
     if ('checkins' in o) s.checkins = !!o.checkins;
+    if ('autoAcc' in o) s.autoAcc = !!o.autoAcc;
     writeJson_('settings.json', s);
     props_().setProperty('rev_meta', String(now_()));
     log_(a, '', 'عدّل الإعدادات', '');
