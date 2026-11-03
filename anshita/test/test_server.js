@@ -665,6 +665,9 @@ ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.te
   const f = ctx.autoAccounts_('budhoor', ['مشرف بذور ٧'], true);
   ok(f.made.length === 1 && f.made[0].user === 'budhoor7', 'والإدارة تنشئه من المحرر ولو كان المفتاح مطفأ');
   call('settings_save', AT, JSON.stringify({ autoAcc: true }));
+  call('track_save', BT, 'budhoor', JSON.stringify({ members: ['مشرف بذور ٢', 'عضو باسم شخصي'] }));
+  const r7 = call('track_save', BT, 'budhoor', JSON.stringify({ emails: { 'عضو باسم شخصي': 'p@example.com' } }));
+  ok(!r7.auto.made.length && /النمط العام/.test(r7.auto.skip[0].why) && !Object.values(ctx.accs_()).some(x => x.name === 'عضو باسم شخصي'), 'اسم ليس بالنمط العام: لا حساب ولا اسم دخول مخمَّن');
   ok(ctx.autoUser_('ithmar2', 'مشرف إثمار ٢ - ٦', 0) === 'ithmar2.6' && ctx.autoUser_('judhoor', 'مشرف جذور ٥', 0) === 'judhoor5', 'اسم الدخول العام من رقم الاسم');
 }
 

@@ -602,11 +602,11 @@ function accMsg_(o, nm) {
       'اضغط على اسم المستخدم أو كلمة المرور لنسخها. وبعد أول دخول غيّر كلمة المرور من «تغيير كلمة المرور» في قائمة حسابك.' +
       (o.atar && o.atar.username ? '\n\nوالحساب نفسه يفتح لك «أثر» لتصميم إعلانات مسارك: ' + ATAR_SITE + (o.atar.username !== o.user ? '\nاسم الدخول في أثر: <code>' + h_(o.atar.username) + '</code>' : '') : '');
 }
-// اسم الدخول العام من رقم آخر الاسم: «مشرف جذور ٥» ← judhoor5، و«مشرف إثمار ٢ - ٦» ← ithmar2.6
+// اسم الدخول العام من رقم آخر الاسم: «مشرف جذور ٥» ← judhoor5، و«مشرف إثمار ٢ - ٦» ← ithmar2.6؛ وبلا رقم فلا اسم
 function autoUser_(tid, m, i) {
   var d = /(\d+)\s*$/.exec(String(m).replace(/[٠-٩]/g, function (c) { return String(c.charCodeAt(0) - 0x660); }));
-  var n = d ? +d[1] : i + 1;
-  return norm_(tid) + (/\d$/.test(tid) ? '.' : '') + n;
+  if (!d) return '';   // اسم ليس بالنمط العام: لا حساب تلقائي، فلا يُخمَّن اسم دخول ولا يُسمّى حساب باسم شخصي
+  return norm_(tid) + (/\d$/.test(tid) ? '.' : '') + (+d[1]);
 }
 /* إنشاء حسابات الأعضاء تلقائيًا (طلب أمين، ٣ نوفمبر): العضو في «الفريق» الذي كُتب بريده (أو معرّفه في تليجرام) الآن ولا حساب له
    يُنشأ حسابه بالنمط العام في مساره، ومعه حسابه في أثر. وتُرسل بيانات دخوله إلى خاصه مع البوت إن عُرف معرّفه (tgs)،
@@ -628,6 +628,7 @@ function autoAccounts_(tid, names, force) {
       if (had) { if (tg && had.tg !== tg) { had.tg = tg; dirty = true; } if (force) skip.push({ name: m, why: 'له حساب من قبل' }); return; }
       if (!tg && !admin) { skip.push({ name: m, why: 'لا معرّف تليجرام له ولا محادثة إدارة' }); return; }
       var u = autoUser_(tid, m, i);
+      if (!u) { skip.push({ name: m, why: 'الاسم ليس بالنمط العام (مثل «مشرف جذور ٥»)' }); return; }
       if (taken[u]) { skip.push({ name: m, user: u, why: 'اسم الدخول مستعمل' }); return; }
       var x = { uid: uid_(), created: now_(), tv: 0 }, pw = tempPass_(); setPass_(x, pw);
       x.user = u; x.name = m; x.role = 'team'; x.track = tid; x.disabled = false; if (tg) x.tg = tg;
