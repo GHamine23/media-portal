@@ -549,6 +549,60 @@ ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.te
   cred.admin = pw[1];
 }
 
+// ٢٢) اسم صاحب الفعل يُعرض من حسابه الحالي، وترحيل الأسماء القديمة الثابتة، وإنشاء حسابات أعضاء بعينهم
+{
+  NOW = Date.UTC(2027, 1, 1, 7, 0);
+  const AT = call('login', 'admin', cred.admin).token, adm = ctx.cfg_().adminChat.id;
+  call('track_save', AT, 'judhoor', JSON.stringify({ canEdit: true }));
+  const nv = call('acc_save', AT, JSON.stringify({ user: 'old.m', name: 'عضو قديم', role: 'team', track: 'judhoor' }));
+  NOW += 60e3;
+  const OT = call('login', 'old.m', nv.pass).token;
+  const a1 = call('act_save', OT, 'judhoor', JSON.stringify({ title: 'لقاء الأسماء', type: 'لقاء', d: '2027-02-10', time: '20:00' })).act;
+  ok(a1.bu === nv.acc.uid && a1.by === 'عضو قديم', 'النشاط الجديد يحفظ حساب صاحبه');
+  call('meet_create', OT, 'judhoor', a1.id);
+  call('act_series', OT, 'judhoor', JSON.stringify({ base: { title: 'حلقة الأسماء', type: 'لقاء', time: '19:00' }, dates: ['2027-02-11', '2027-02-18'], rule: { every: 1, wd: [4] } }));
+  call('task_save', OT, 'judhoor', JSON.stringify({ title: 'مهمة الأسماء' }));
+  // بيانات قديمة كما كانت قبل الترحيل: الاسم نص ثابت بلا حساب
+  const strip = o => { if (o && typeof o === 'object') { delete o.bu; Object.values(o).forEach(strip); } };
+  const pj = ctx.readJson_('plan_judhoor.json'); strip(pj);
+  pj.acts.push({ id: 'lgc1', title: 'نشاط بلا صاحب معروف', type: 'لقاء', d: '2027-02-12', who: [], by: 'اسم مجهول', at: NOW, done: false, sem: pj.acts[0].sem });
+  ctx.writeJson_('plan_judhoor.json', pj);
+  const lg0 = ctx.readJson_('log.json'); strip(lg0); lg0.unshift({ at: NOW, by: 'سامر (من تليجرام)', role: 'team', t: 'judhoor', what: 'أتمّ نشاطاً', d: 'لقاء' }); ctx.writeJson_('log.json', lg0);
+  const al0 = ctx.readJson_('alerts.json', []); strip(al0); ctx.writeJson_('alerts.json', al0);
+  NOW += 60e3;
+  call('acc_save', AT, JSON.stringify({ uid: nv.acc.uid, user: 'old.m', name: 'مشرف جذور ٩', role: 'team', track: 'judhoor' }));
+  const has = (re) => ['plan_judhoor.json', 'log.json', 'alerts.json', 'tracks.json'].filter(f => re.test(JSON.stringify(ctx.readJson_(f, null))));
+  ok(has(/عضو قديم/).length >= 2, 'قبل الترحيل: الاسم القديم مخزّن في الأنشطة والسجل');
+  const dry = ctx.byMigrate_(false);
+  ok(/تجربة بلا حفظ/.test(dry) && has(/عضو قديم/).length >= 2, 'التجربة لا تحفظ شيئًا');
+  const res = ctx.byMigrate_(true);
+  ok(/حُفظ الترحيل/.test(res) && !has(/عضو قديم/).length, 'بعد الترحيل لا يبقى الاسم القديم في أي ملف');
+  const pm = ctx.plan_('judhoor'), mine = pm.acts.filter(x => /الأسماء/.test(x.title));
+  ok(mine.length === 3 && mine.every(x => x.bu === nv.acc.uid && x.by === 'مشرف جذور ٩'), 'أنشطته وسلسلته رُبطت بحسابه واسمه الحالي');
+  ok(mine[0].meet && mine[0].meet.bu === nv.acc.uid && Object.values(pm.series).some(x => x.bu === nv.acc.uid) && pm.tasks.some(x => x.title === 'مهمة الأسماء' && x.bu === nv.acc.uid), 'ورابط ميت والسلسلة والمهمة كذلك');
+  const tAcc = Object.values(ctx.accs_()).find(x => x.user === 'judhoor');
+  const lgc = pm.acts.find(x => x.id === 'lgc1'); ok(lgc.bu === tAcc.uid && lgc.by === tAcc.name && /اسم مجهول/.test(res), 'ما لا يُعرف صاحبه يُنسب إلى حساب المسار ويُذكر في النتيجة');
+  const L1 = ctx.readJson_('log.json');
+  ok(L1.some(e => e.what === 'أنشأ حساباً' && e.d === 'مشرف جذور ٩') && L1.some(e => e.by === 'سامر (من تليجرام)' && !e.bu), 'تفاصيل سجل الحسابات بالاسم الحالي، وضغطات تليجرام كما هي');
+  ok(/وبقي بلا صاحب: 0/.test(res) && /plan_judhoor \d+/.test(res), 'النتيجة تذكر الأعداد والملفات');
+  // تغيير الاسم بعد الترحيل يسري في العرض دون إعادة كتابة البيانات
+  call('acc_save', AT, JSON.stringify({ uid: nv.acc.uid, user: 'old.m', name: 'مشرف جذور ١٠', role: 'team', track: 'judhoor' }));
+  const shown = call('plan', AT, 'judhoor').acts.filter(x => /الأسماء/.test(x.title));
+  ok(shown.every(x => x.by === 'مشرف جذور ١٠') && shown[0].meet.by === 'مشرف جذور ١٠', 'الخطة تعرض الاسم الجديد');
+  ok(call('log_list', AT).filter(x => x.bu === nv.acc.uid).every(x => x.by === 'مشرف جذور ١٠') && call('boot', AT).log.some(x => x.by === 'مشرف جذور ١٠'), 'والسجل كذلك');
+  ok(ctx.plan_('judhoor').acts.find(x => x.id === a1.id).by === 'مشرف جذور ٩', 'والمخزّن لم يُمس: العرض من الحساب');
+  ok(/رُبط باسمه الحالي: 0، وصار اسمه الحالي بعد اسم قديم: 0، ونُسب إلى حساب المسار: 0/.test(ctx.byMigrate_(true)), 'إعادة الترحيل لا تغيّر شيئًا');
+  // حسابات لأعضاء بعينهم
+  call('track_save', AT, 'judhoor', JSON.stringify({ members: ['مشرف جذور ٣', 'مشرف جذور ٤', 'مشرف جذور ٥'] }));
+  TG.sent.length = 0;
+  const ma = JSON.parse(ctx.memberAccounts_('judhoor', { 'مشرف جذور ٣': 'judhoor3', 'مشرف جذور ٤': 'judhoor4' }, true));
+  ok(ma.made.length === 2 && ma.made[0].user === 'judhoor3' && ma.made[1].user === 'judhoor4' && ma.made[1].name === 'مشرف جذور ٤', 'يُنشأ الحسابان المسمّيان وحدهما');
+  ok(!Object.values(ctx.accs_()).some(x => x.name === 'مشرف جذور ٥'), 'ولا يُنشأ لغيرهما');
+  ok(TG.sent.length === 3 && TG.sent.every(m => m.chat === adm), 'وبياناتهما في محادثة الإدارة وحدها');
+  throws(() => ctx.memberAccounts_('judhoor', { 'مشرف جذور ٥': 'judhoor3' }, true), /مستعمل/, 'اسم دخول مستعمل يُرفض ولا يُغيَّر');
+  throws(() => ctx.memberAccounts_('judhoor', { 'مشرف جذور ٦': 'judhoor6' }, true), /ليس في «الفريق»/, 'واسم ليس في «الفريق» يُرفض');
+}
+
 if (process.env.PREVIEW) {
   const seen = new Set(); ALLSENT.forEach(m => { const k = m.text.split('\n')[0].replace(/«.*»/, ''); if (m.html && !seen.has(k)) { seen.add(k); console.log('\n=== ' + m.chat + '\n' + m.text); } });
   console.log('\n=== ADMIN TASKS\n' + ctx.adminTasksHtml_('2026-11-28', ctx.cfg_()));

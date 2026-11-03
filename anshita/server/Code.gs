@@ -12,7 +12,7 @@
      وملخص أسبوعي، وتنبيه عند نقل لقاء قريب أو إلغائه.
    أول تشغيل: شغّل setup() من المحرر مرة، ثم انشر «تطبيق ويب» (يُنفَّذ باسمك، متاح لأي شخص).
    ===================================================================== */
-var VERSION = '1.4.1';
+var VERSION = '1.5.0';
 var SITE_URL = 'https://ghamine23.github.io/media-portal/anshita/';
 var DATA_DIR_NAME = 'منصة الأنشطة التربوية — البيانات';
 var SESSION_DAYS = 60;
@@ -201,7 +201,7 @@ function savePlan_(tid, p) { p.rev = (p.rev || 0) + 1; writeJson_('plan_' + tid 
 function log_(a, tid, what, detail) {
   try {
     var l = readJson_('log.json', []);
-    l.unshift({ at: now_(), by: a ? a.name : 'النظام', role: a ? a.role : '', t: tid || '', what: what, d: clip_(detail, 160) });
+    l.unshift({ at: now_(), by: a ? a.name : 'النظام', bu: (a && a.uid) || '', role: a ? a.role : '', t: tid || '', what: what, d: clip_(detail, 160) });
     if (l.length > 500) l.length = 500;
     writeJson_('log.json', l);
     props_().setProperty('rev_log', String(now_()));
@@ -239,6 +239,19 @@ function tempPass_() {
 }
 function norm_(s) { return String(s || '').trim().toLowerCase(); }
 function accs_() { return readJson_('accounts.json', {}); }
+// اسم صاحب الفعل يُعرض من حسابه الحالي (bu) لا من النص المخزّن، فيسري أي تغيير لاسم الحساب تلقائيًا.
+// والنص by احتياط لما لا حساب له: النظام، وضغطات تليجرام، والحساب المحذوف
+function nameOf_(o, A) { var x = o && o.bu && (A || accs_())[o.bu]; return x ? x.name : ((o && o.by) || ''); }
+function named_(o, A) { if (o && o.bu) o.by = nameOf_(o, A); return o; }
+function namedAct_(x, A) { named_(x, A); if (x && x.meet) named_(x.meet, A); return x; }
+function namedPlan_(p, A) {
+  A = A || accs_();
+  (p.acts || []).forEach(function (x) { namedAct_(x, A); });
+  (p.tasks || []).forEach(function (x) { named_(x, A); });
+  Object.keys(p.series || {}).forEach(function (k) { named_(p.series[k], A); });
+  return p;
+}
+function namedList_(L, A) { A = A || accs_(); L.forEach(function (x) { named_(x, A); }); return L; }
 function pubAcc_(a) { return { uid: a.uid, user: a.user, name: a.name, role: a.role, track: a.track || '', created: a.created || 0, last: a.last || 0, disabled: !!a.disabled, atar: a.atar || '',
   linked: !!a.atarUid, atarSup: !!a.atarSup, lkPend: !!a.lkPend, lkErr: a.lkErr || '' }; }
 function meOf_(a) { return { uid: a.uid, user: a.user, name: a.name, role: a.role, track: a.track || '', atar: !!a.atar, linked: !!a.atarUid }; }
@@ -546,7 +559,8 @@ function acc_del(token, uid) {
 /* ================= حسابات أعضاء الفريق =================
    حساب لكل عضو في «الفريق» ليس له حساب باسمه في مساره. بيانات كل عضو تصل محادثة الإدارة مباشرة في رسالة جاهزة للتحويل إليه،
    فلا تظهر كلمة المرور المؤقتة في الرد ولا في السجل. users: {اسم العضو: اسم المستخدم}، وإلا فاسم المسار ورقم. */
-function memberAccounts_(tid, users) {
+// only: يُنشأ لمن سُمّوا في users وحدهم، ويُرفض اسم دخول محجوز بدل أن يُغيَّر
+function memberAccounts_(tid, users, only) {
   var t = trackOf_(tid), s = cfg_();
   if (!s.adminChat || !s.adminChat.id || !props_().getProperty('TG_TOKEN')) throw new Error('محادثة الإدارة غير مربوطة بالبوت');
   users = users || {};
@@ -554,14 +568,17 @@ function memberAccounts_(tid, users) {
     var all = accs_(), taken = {}, made = [], had = [];
     Object.keys(all).forEach(function (k) { taken[norm_(all[k].user)] = 1; });
     (t.members || []).forEach(function (m, i) {
+      if (only && !users[m]) return;
       var old = Object.keys(all).map(function (k) { return all[k]; }).filter(function (x) { return (x.role === 'sup' || (x.track === tid && x.role === 'team')) && norm_(x.name) === norm_(m); })[0];
       if (old) { had.push({ name: m, user: old.user }); return; }
       var base = norm_(users[m] || (tid + '.' + (i + 1))).replace(/[^a-z0-9_.\-]/g, '') || (tid + '.' + (i + 1)), u = base, n = 2;
+      if (only && taken[u]) throw new Error('اسم الدخول ' + u + ' مستعمل من قبل');
       while (taken[u]) u = base + (n++);
       var x = { uid: uid_(), created: now_(), tv: 0 }, pw = tempPass_(); setPass_(x, pw);
       x.user = u; x.name = m; x.role = 'team'; x.track = tid; x.disabled = false;
       all[x.uid] = x; taken[u] = 1; made.push({ uid: x.uid, name: m, user: u, pw: pw });
     });
+    if (only) Object.keys(users).forEach(function (m) { if ((t.members || []).indexOf(m) < 0) throw new Error('ليس في «الفريق» عضو باسم ' + m); });
     if (made.length) writeJson_('accounts.json', all);
     return { made: made, had: had };
   });
@@ -581,6 +598,70 @@ function memberAccounts_(tid, users) {
       (o.atar && o.atar.username ? '\n\nوالحساب نفسه يفتح لك «أثر» لتصميم إعلانات مسارك: ' + ATAR_SITE + (o.atar.username !== o.user ? '\nاسم الدخول في أثر: <code>' + h_(o.atar.username) + '</code>' : '') : ''), '', true);
   });
   return JSON.stringify({ made: res.made.map(function (o) { return { name: o.name, user: o.user }; }), had: res.had });
+}
+/* ترحيل لمرة واحدة (قرار أمين، ٣ نوفمبر: لا أسماء شخصية في المنصة):
+   كل اسم ثابت في by يُربط بحساب صاحبه (bu) ويصير اسمه الحالي، فيُعرض بعدها من الحساب نفسه.
+   صاحب الاسم يُعرف من اسمه الحالي، أو من اسمه وقت الإنشاء في سجل «أنشأ حساباً» (يُطابَق بوقت إنشاء الحساب)،
+   وما لا يُعرف صاحبه يُنسب إلى حساب المسار. ويُستبدل اسم الحساب في تفاصيل سجل الحسابات كذلك.
+   byMigrateDry يعرض ما سيتغير دون حفظ، وbyMigrate يحفظ. التكرار آمن: ما رُبط لا يُمس. */
+function byMigrateDry() { Logger.log(byMigrate_(false)); }
+function byMigrate() { Logger.log(byMigrate_(true)); }
+function byMigrate_(apply) {
+  return withLock_(function () {
+    var A = accs_(), list = Object.keys(A).map(function (k) { return A[k]; }), L = readJson_('log.json', []);
+    var byName = {}, made = {}, used = {}, st = { linked: 0, renamed: 0, toTrack: 0, tg: 0, left: 0, doneBy: 0 }, files = {}, unknown = {};
+    var add = function (n, uid) { n = norm_(n); if (!n) return; byName[n] = byName[n] || []; if (byName[n].indexOf(uid) < 0) byName[n].push(uid); };
+    list.forEach(function (x) { add(x.name, x.uid); });
+    // اسم وقت الإنشاء: الحساب الذي أُنشئ قبل سطر السجل بدقائق ولم يُطابَق بعد، الأقدم أولًا
+    L.filter(function (e) { return e.what === 'أنشأ حساباً'; }).sort(function (a, b) { return a.at - b.at; }).forEach(function (e) {
+      var c = list.filter(function (x) { return !used[x.uid] && !x.atar && x.role !== 'admin' && x.created && x.created <= e.at && e.at - x.created < 15 * 60e3; })
+        .sort(function (a, b) { return ((a.track === e.t) ? 0 : 1) - ((b.track === e.t) ? 0 : 1) || a.created - b.created; })[0];
+      if (c) { used[c.uid] = 1; made[e.at + '|' + e.d] = c.uid; add(e.d, c.uid); }
+    });
+    var trackAcc = function (tid) { return list.filter(function (x) { return x.role === 'team' && x.track === tid && x.user === tid; })[0]; };
+    var find = function (n, tid) {
+      var c = byName[norm_(n)] || [];
+      if (c.length > 1) c = c.filter(function (u) { return A[u].track === tid || A[u].role !== 'team'; });
+      return c.length === 1 ? c[0] : '';
+    };
+    var fix = function (o, tid, file) {
+      if (!o || o.bu || !o.by || o.by === 'النظام') return false;
+      if (/\(من تليجرام\)$/.test(o.by)) { st.tg++; return false; }
+      var u = find(o.by, tid), x = u ? null : trackAcc(tid);
+      if (!u && x) { u = x.uid; st.toTrack++; unknown[o.by] = (unknown[o.by] || 0) + 1; }
+      if (!u) { st.left++; unknown[o.by] = (unknown[o.by] || 0) + 1; return false; }
+      if (A[u].name !== o.by) st.renamed++; else st.linked++;
+      o.bu = u; o.by = A[u].name; files[file] = (files[file] || 0) + 1; return true;
+    };
+    var ts = tracks_(), tsCh = false;
+    ts.forEach(function (t) {
+      var p = plan_(t.id), ch = false, f = 'plan_' + t.id;
+      p.acts.forEach(function (x) { if (fix(x, t.id, f)) ch = true; if (x.meet && fix(x.meet, t.id, f)) ch = true; if (x.doneBy) st.doneBy++; });
+      (p.tasks || []).forEach(function (x) { if (fix(x, t.id, f)) ch = true; });
+      Object.keys(p.series || {}).forEach(function (k) { if (fix(p.series[k], t.id, f)) ch = true; });
+      if (ch && apply) savePlan_(t.id, p);
+      if (t.editReq && fix(t.editReq, t.id, 'tracks')) tsCh = true;
+    });
+    if (tsCh && apply) { writeJson_('tracks.json', ts); props_().setProperty('rev_meta', String(now_())); }
+    var al = readJson_('alerts.json', []), alCh = false;
+    al.forEach(function (x) { if (fix(x, x.t, 'alerts')) alCh = true; });
+    if (alCh && apply) { writeJson_('alerts.json', al); props_().setProperty('rev_alerts', String(now_())); }
+    var lgCh = false, det = 0;
+    L.forEach(function (e) {
+      if (fix(e, e.t, 'log')) lgCh = true;
+      if (e.what === 'أنشأ حساباً' || e.what === 'عدّل حساباً') {
+        var u = made[e.at + '|' + e.d] || find(e.d, e.t);
+        if (u && A[u].name !== e.d) { e.d = A[u].name; det++; lgCh = true; }
+      }
+    });
+    if (lgCh && apply) { writeJson_('log.json', L); props_().setProperty('rev_log', String(now_())); }
+    var un = Object.keys(unknown);
+    return (apply ? 'حُفظ الترحيل.' : 'تجربة بلا حفظ.') +
+      '\nرُبط باسمه الحالي: ' + st.linked + '، وصار اسمه الحالي بعد اسم قديم: ' + st.renamed + '، ونُسب إلى حساب المسار: ' + st.toTrack +
+      '\nتفاصيل سجل الحسابات المستبدلة: ' + det + '، وضغطات تليجرام (بلا حساب، لم تُمس): ' + st.tg + '، وبقي بلا صاحب: ' + st.left + '\nأنشطة علّمها أحد من تليجرام باسمه (doneBy، لم تُمس): ' + st.doneBy +
+      '\nفي الملفات: ' + Object.keys(files).map(function (k) { return k + ' ' + files[k]; }).join('، ') +
+      (un.length ? '\nأسماء لم يُعرف صاحبها: ' + un.map(function (k) { return k + ' (' + unknown[k] + ')'; }).join('، ') : '');
+  });
 }
 // الإرسال في مجموعات بعينها فقط: يعيد الإرسال العام ويفتح مفتاح هذه المجموعات ويطفئ غيرها (ومنها ما لم يُربط بعد)
 function groupsOnly_(ids) {
@@ -638,6 +719,7 @@ function adminPassToChat_() {
 function pubTrack_(t, admin) {
   var o = JSON.parse(JSON.stringify(t));
   o.linked = !!(t.chat && t.chat.id);
+  if (o.editReq) named_(o.editReq);
   if (!admin) { delete o.chat; delete o.sheet; }
   return o;
 }
@@ -645,14 +727,14 @@ function boot(token) {
   var a = auth_(token), admin = a.role === 'admin', all = allT_(a), s = cfg_();
   var ts = tracks_().filter(function (t) { return all || t.id === a.track; });
   var plans = {}, revsO = {};
-  ts.forEach(function (t) { plans[t.id] = plan_(t.id); revsO[t.id] = plans[t.id].rev; });
+  ts.forEach(function (t) { plans[t.id] = namedPlan_(plan_(t.id)); revsO[t.id] = plans[t.id].rev; });
   revsO._log = +(props_().getProperty('rev_log') || 0); revsO._meta = +(props_().getProperty('rev_meta') || 0);
   if (admin) revsO._alerts = +(props_().getProperty('rev_alerts') || 0);
   var out = {
     v: VERSION, me: meOf_(a), today: Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd'), tz: tz_(),
     types: TYPES, remindTypes: s.remindTypes, remindHour: s.remindHour,
     tracks: ts.map(function (t) { return pubTrack_(t, admin); }), plans: plans, revs: revsO,
-    log: readJson_('log.json', []).filter(function (x) { return all || x.t === a.track; }).slice(0, 60)
+    log: namedList_(readJson_('log.json', []).filter(function (x) { return all || x.t === a.track; }).slice(0, 60))
   };
   var tg0 = readJson_('tg.json', {});
   if (a.role === 'team' && tg0.bot && tg0.bot.username) {
@@ -677,8 +759,8 @@ function revs(token) {
   if (a.role === 'admin') o._alerts = +(all.rev_alerts || 0);
   return JSON.stringify(o);
 }
-function plan(token, tid) { var a = auth_(token); canView_(a, tid); return JSON.stringify(plan_(tid)); }
-function log_list(token) { var a = auth_(token); return JSON.stringify(readJson_('log.json', []).filter(function (x) { return allT_(a) || x.t === a.track; }).slice(0, 200)); }
+function plan(token, tid) { var a = auth_(token); canView_(a, tid); return JSON.stringify(namedPlan_(plan_(tid))); }
+function log_list(token) { var a = auth_(token); return JSON.stringify(namedList_(readJson_('log.json', []).filter(function (x) { return allT_(a) || x.t === a.track; }).slice(0, 200))); }
 
 /* ================= الأنشطة ================= */
 function padT_(t) { var m = /^(\d{1,2}):(\d{2})$/.exec(String(t || '')); if (!m || +m[1] > 23 || +m[2] > 59) return ''; return ('0' + m[1]).slice(-2) + ':' + m[2]; }
@@ -740,12 +822,12 @@ function alertText_(al, t, by) {
   return head + ' عدّل «' + al.title + '»:\n' + al.changes.map(function (c) { return c[1] || c[2] ? '- ' + c[0] + ': من ' + (c[1] || '—') + ' إلى ' + (c[2] || '—') : '- ' + c[0]; }).join('\n');
 }
 function pushAlert_(a, t, al) {
-  var L = readJson_('alerts.json', []), x = { id: uid_(), at: now_(), t: t.id, aid: al.aid || '', by: a.name, kind: al.kind, title: al.title, changes: al.changes || [], from: al.from || '', to: al.to || '', seen: false };
+  var L = readJson_('alerts.json', []), x = { id: uid_(), at: now_(), t: t.id, aid: al.aid || '', by: a.name, bu: a.uid, kind: al.kind, title: al.title, changes: al.changes || [], from: al.from || '', to: al.to || '', seen: false };
   L.unshift(x); if (L.length > 300) L.length = 300;
   writeJson_('alerts.json', L); props_().setProperty('rev_alerts', String(now_()));
   return x;
 }
-function alerts(token) { var a = auth_(token); needAdmin_(a); return JSON.stringify(readJson_('alerts.json', []).slice(0, 100)); }
+function alerts(token) { var a = auth_(token); needAdmin_(a); return JSON.stringify(namedList_(readJson_('alerts.json', []).slice(0, 100))); }
 function alerts_seen(token, ids) {
   var a = auth_(token); needAdmin_(a);
   return JSON.stringify(withLock_(function () {
@@ -774,7 +856,7 @@ function act_save(token, tid, json) {
     // آخر إعداد تذكير اختاره الفريق لهذا النوع يصير الافتراضي لما بعده
     if (!old && !x.rp) { var dr = ((t.defs || {}).rp || {})[x.type]; if (dr) x.rp = cleanRp_(dr); }
     var defUp = rpDef && x.rp ? remCfg_(x) : null;
-    if (!old) { x.by = a.name; if (!x.sem) x.sem = String(t.cur || ''); }
+    if (!old) { x.by = a.name; x.bu = a.uid; if (!x.sem) x.sem = String(t.cur || ''); }
     // تقويم جوجل: الاختيار للإدارة، وما أُرسل يبقى محدَّثاً
     if (a.role === 'admin' && calOn === false && x.cal) { try { calRemove_(x); } catch (e) { calErr = e.message; } delete x.cal; }
     else if ((a.role === 'admin' && calOn === true) || (x.cal && x.cal.id && x.cal.sig !== calSig_(t, x))) {
@@ -795,7 +877,7 @@ function act_save(token, tid, json) {
     log_(a, tid, what, x.title + (others.length ? ' (وما بعده: ' + apptText_(others.length) + ')' : ''));
     if (al && others.length) al.title += ' — ومعه ' + apptText_(others.length) + ' بعده من السلسلة';
     if (al) pushAlert_(a, t, al);
-    return { act: x, others: others, rev: p.rev, calErr: calErr, notice: notice, alert: al && al.kind !== 'add' ? alertHtml_(al, t, a.name) : '' };
+    return { act: namedAct_(JSON.parse(JSON.stringify(x))), others: others, rev: p.rev, calErr: calErr, notice: notice, alert: al && al.kind !== 'add' ? alertHtml_(al, t, a.name) : '' };
   });
   if (res.notice && gOn_(t, 'al')) { try { tgSend_(t.chat.id, res.notice, tid, true); } catch (e) {} }
   if (res.alert) adminTgHtml_(res.alert);
@@ -852,13 +934,13 @@ function act_series(token, tid, json) {
     dates.forEach(function (d) {
       var f = {}; ['title', 'type', 'time', 'dur', 'who', 'idea', 'rem', 'rp'].forEach(function (k) { if (k in base) f[k] = base[k]; });
       f.d = d; var x = cleanAct_(f, null);
-      x.by = a.name; x.ser = sid; x.sem = semOf_(p, d) || String(t.cur || '');
+      x.by = a.name; x.bu = a.uid; x.ser = sid; x.sem = semOf_(p, d) || String(t.cur || '');
       if (a.role === 'admin' && (o.calOn === true || (first && first.cal && first.cal.id))) { try { calUpsert_(t, x, s); } catch (e) { calErr = e.message; if (x.cal) x.cal.err = calErr; } }
       p.acts.push(x); made.push(x);
     });
     if (o.rule && rule.every && ((trackOf_(tid).defs || {}).every || 1) !== every) saveDefs_(tid, function (d) { d.every = every; });
     p.series = p.series || {};
-    p.series[sid] = { every: every, wd: (rule.wd || []).map(Number).filter(function (n) { return n >= 0 && n < 7; }), until: isIso_(rule.until) ? rule.until : '', at: now_(), by: a.name };
+    p.series[sid] = { every: every, wd: (rule.wd || []).map(Number).filter(function (n) { return n >= 0 && n < 7; }), until: isIso_(rule.until) ? rule.until : '', at: now_(), by: a.name, bu: a.uid };
     savePlan_(tid, p);
     var n = made.length + (first ? 1 : 0), title = (first || made[0]).title;
     log_(a, tid, 'أضاف نشاطًا متكررًا', title + ' (' + apptText_(n) + ')');
@@ -1094,7 +1176,7 @@ function edit_request(token, note) {
   var t = trackOf_(a.track);
   if (t.canEdit) return JSON.stringify({ ok: true, open: true });
   withLock_(function () {
-    var ts = tracks_(); ts.forEach(function (x) { if (x.id === t.id) x.editReq = { at: now_(), by: a.name, note: txt_(note, 300) }; });
+    var ts = tracks_(); ts.forEach(function (x) { if (x.id === t.id) x.editReq = { at: now_(), by: a.name, bu: a.uid, note: txt_(note, 300) }; });
     writeJson_('tracks.json', ts); props_().setProperty('rev_meta', String(now_()));
     log_(a, t.id, 'طلب فتح تعديل الخطة', txt_(note, 160));
   });
@@ -1149,10 +1231,10 @@ function task_save(token, tid, json) {
     if (o.id) L.forEach(function (y, k) { if (y.id === o.id) i = k; });
     if (o.id && i < 0) throw new Error('المهمة غير موجودة');
     var x = cleanTask_(o, i >= 0 ? L[i] : null);
-    if (i < 0) { x.by = a.name; L.push(x); } else L[i] = x;
+    if (i < 0) { x.by = a.name; x.bu = a.uid; L.push(x); } else L[i] = x;
     savePlan_(tid, p);
     log_(a, tid, i < 0 ? 'أضاف مهمة' : x.done && !(L[i] && L[i].done === false) ? 'حدّث مهمة' : 'حدّث مهمة', x.title);
-    return { task: x, rev: p.rev };
+    return { task: named_(JSON.parse(JSON.stringify(x))), rev: p.rev };
   }));
 }
 function task_del(token, tid, id) {
@@ -1287,9 +1369,9 @@ function meet_create(token, tid, id) {
   canView_(a, tid);
   var x0 = plan_(tid).acts.filter(function (y) { return y.id === id; })[0];
   if (!x0) throw new Error('النشاط غير موجود (ربما حُذف)');
-  if (x0.meet && x0.meet.uri) return JSON.stringify({ act: x0, rev: plan_(tid).rev });
+  if (x0.meet && x0.meet.uri) return JSON.stringify({ act: namedAct_(x0), rev: plan_(tid).rev });
   var sp = meetCall_('post', 'spaces', { config: { accessType: 'OPEN', entryPointAccess: 'ALL', moderation: 'ON', moderationRestrictions: MEET_MOD } });
-  var meet = { space: sp.name, uri: sp.meetingUri, code: sp.meetingCode, at: now_(), by: a.name, hosts: {}, cfgV: MEET_CFG_V };
+  var meet = { space: sp.name, uri: sp.meetingUri, code: sp.meetingCode, at: now_(), by: a.name, bu: a.uid, hosts: {}, cfgV: MEET_CFG_V };
   var tmp = JSON.parse(JSON.stringify(x0)); tmp.meet = meet; meetSync_(t, tmp, s);
   return JSON.stringify(withLock_(function () {
     var p = plan_(tid), i = -1;
@@ -1299,7 +1381,7 @@ function meet_create(token, tid, id) {
     if (x.cal && x.cal.id) { try { calUpsert_(t, x, s); } catch (e) { if (x.cal) x.cal.err = e.message; } }
     savePlan_(tid, p);
     log_(a, tid, 'أنشأ رابط ميت', x.title);
-    return { act: x, rev: p.rev };
+    return { act: namedAct_(JSON.parse(JSON.stringify(x))), rev: p.rev };
   }));
 }
 function meet_unlink(token, tid, id) {
@@ -1311,7 +1393,7 @@ function meet_unlink(token, tid, id) {
     delete x.meet;
     if (x.cal && x.cal.id) { try { calUpsert_(t, x, s); } catch (e) {} }
     savePlan_(tid, p); log_(a, tid, 'أزال رابط ميت', x.title);
-    return { act: x, rev: p.rev };
+    return { act: namedAct_(JSON.parse(JSON.stringify(x))), rev: p.rev };
   }));
 }
 
@@ -2016,7 +2098,7 @@ function report_data(key, days) {
   needKey_(key);
   var s = cfg_(), g = readJson_('tg.json', {}), today = today_(), since = now_() - Math.max(1, Math.min(60, +days || 14)) * 864e5;
   var tracks = tracks_().map(function (t) {
-    var p = plan_(t.id), S = p.sems[String(t.cur)] || null;
+    var p = namedPlan_(plan_(t.id)), S = p.sems[String(t.cur)] || null;
     return {
       id: t.id, name: t.name, full: t.full, cohort: t.cohort, age: t.age, cur: t.cur, canEdit: !!t.canEdit, members: t.members || [],
       bot: { linked: !!(t.chat && t.chat.id), group: t.chat ? t.chat.title : '', remind: t.remind !== false, send: sendOf_(t) }, editReq: t.editReq || null,
@@ -2031,7 +2113,7 @@ function report_data(key, days) {
     settings: { remindHour: s.remindHour, remindTypes: s.remindTypes, digest: s.digest, notifyChanges: s.notifyChanges, calendar: s.calName || 'التقويم الأساسي' },
     bot: { username: g.bot ? g.bot.username : '', adminLinked: !!(s.adminChat && s.adminChat.id), lastTick: g.lastTick || null },
     tracks: tracks,
-    log: readJson_('log.json', []).filter(function (x) { return x.at >= since; }),
+    log: namedList_(readJson_('log.json', []).filter(function (x) { return x.at >= since; })),
     lastReports: readJson_('reports.json', []).slice(0, 2).map(function (r) { return { at: r.at, title: r.title }; })
   });
 }
