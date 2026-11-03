@@ -604,6 +604,22 @@ ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.te
   throws(() => ctx.memberAccounts_('judhoor', { 'مشرف جذور ٦': 'judhoor6' }, true), /ليس في «الفريق»/, 'واسم ليس في «الفريق» يُرفض');
 }
 
+// ٢٣) كلمة مرور جديدة لحساب عضو تصل محادثة الإدارة وحدها
+{
+  const adm = ctx.cfg_().adminChat.id, AT = call('login', 'admin', cred.admin).token;
+  const acc = call('acc_save', AT, JSON.stringify({ user: 'ithmar2.9', name: 'مشرف إثمار ٢ - ٩', role: 'team', track: 'ithmar2' }));
+  const T0 = call('login', 'ithmar2.9', acc.pass).token;
+  TG.sent.length = 0;
+  const msg = ctx.memberPassToChat_('ithmar2.9');
+  const m = TG.sent.filter(x => x.chat === adm), pw = m.length > 1 && /كلمة المرور: <code>([^<]+)<\/code>/.exec(m[1].text);
+  ok(TG.sent.length === 2 && m.length === 2 && pw && /مشرف إثمار ٢ - ٩/.test(m[1].text) && /حوّلها/.test(m[0].text), 'رسالتان في محادثة الإدارة وحدها: تنبيه، ثم رسالة جاهزة للتحويل');
+  ok(!msg.includes(pw[1]) && !JSON.stringify(call('log_list', AT)).includes(pw[1]), 'الكلمة لا تظهر في الرد ولا في السجل');
+  ok(call('login', 'ithmar2.9', pw[1]).me.user === 'ithmar2.9', 'يدخل بالكلمة الجديدة');
+  throws(() => call('boot', T0), /تغيّرت كلمة المرور/, 'والجلسات القديمة خرجت');
+  throws(() => ctx.memberPassToChat_('admin'), /adminPassToChat/, 'حساب الإدارة له دالته');
+  throws(() => ctx.memberPassToChat_('nobody.x'), /لا حساب/, 'اسم غير موجود يُرفض');
+}
+
 if (process.env.PREVIEW) {
   const seen = new Set(); ALLSENT.forEach(m => { const k = m.text.split('\n')[0].replace(/«.*»/, ''); if (m.html && !seen.has(k)) { seen.add(k); console.log('\n=== ' + m.chat + '\n' + m.text); } });
   console.log('\n=== ADMIN TASKS\n' + ctx.adminTasksHtml_('2026-11-28', ctx.cfg_()));

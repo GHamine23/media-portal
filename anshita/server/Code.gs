@@ -12,7 +12,7 @@
      وملخص أسبوعي، وتنبيه عند نقل لقاء قريب أو إلغائه.
    أول تشغيل: شغّل setup() من المحرر مرة، ثم انشر «تطبيق ويب» (يُنفَّذ باسمك، متاح لأي شخص).
    ===================================================================== */
-var VERSION = '1.5.1';
+var VERSION = '1.5.2';
 var SITE_URL = 'https://ghamine23.github.io/media-portal/anshita/';
 var DATA_DIR_NAME = 'منصة الأنشطة التربوية — البيانات';
 var SESSION_DAYS = 60;
@@ -718,6 +718,34 @@ function adminPassToChat_() {
     'خرجت الجلسات المفتوحة بالكلمة القديمة. وتغيّرها متى شئت من «تغيير كلمة المرور» في قائمة حسابك.', '', true);
   log_(null, '', 'أعاد كلمة مرور الإدارة', 'وصلت محادثة الإدارة');
   return 'أُرسلت كلمة مرور الإدارة الجديدة إلى محادثة الإدارة على تليجرام';
+}
+
+// كلمة مرور جديدة لحساب عضو (فريق أو مشرف عام) تصل محادثة الإدارة وحدها برسالة جاهزة للتحويل إلى صاحبه، ولا تظهر في الرد ولا في السجل.
+// تُشغَّل من المحرر: memberPassToChat_('اسم الدخول')
+function memberPassToChat_(user) {
+  var s = cfg_();
+  if (!s.adminChat || !s.adminChat.id || !props_().getProperty('TG_TOKEN')) throw new Error('محادثة الإدارة غير مربوطة بالبوت');
+  var r = withLock_(function () {
+    var all = accs_(), x = Object.keys(all).map(function (k) { return all[k]; }).filter(function (a) { return !a.atar && norm_(a.user) === norm_(user); })[0];
+    if (!x) throw new Error('لا حساب باسم الدخول ' + user);
+    if (x.role === 'admin') throw new Error('حساب الإدارة له adminPassToChat');
+    if (x.disabled) throw new Error('هذا الحساب موقوف');
+    var pw = tempPass_(); setPass_(x, pw); x.tv = (x.tv || 0) + 1; x.fails = 0; x.lockUntil = 0;
+    writeJson_('accounts.json', all);
+    return { uid: x.uid, user: x.user, name: x.name, track: x.track, pw: pw, linked: !!x.atarUid };
+  });
+  linkPassOut_(r.uid, r.pw);
+  var lk = accs_()[r.uid] || {}, t = null; try { t = r.track ? trackOf_(r.track) : null; } catch (e) {}
+  tgSend_(s.adminChat.id, '<b>كلمة مرور جديدة لحساب ' + h_(r.name) + '</b> (<code>' + h_(r.user) + '</code>)\nالرسالة التالية له، فحوّلها كما هي.', '', true);
+  tgSend_(s.adminChat.id, 'السلام عليكم أ. ' + h_(r.name) + ' 🌿\n' +
+    'هذه كلمة مرور جديدة لحسابك في <b>منصة الأنشطة التربوية</b>' + (t ? ' لمسار ' + h_(t.full || t.name) : '') + ':\n\n' +
+    'الرابط: ' + SITE_URL + '\n' +
+    'اسم المستخدم: <code>' + h_(r.user) + '</code>\n' +
+    'كلمة المرور: <code>' + h_(r.pw) + '</code>\n\n' +
+    'اضغط على اسم المستخدم أو كلمة المرور لنسخها. وبعد الدخول غيّرها من «تغيير كلمة المرور» في قائمة حسابك.' +
+    (r.linked ? '\n\n' + (lk.lkPend ? 'وتصير كلمة حسابك في «أثر» أيضًا عند أول دخول بها.' : 'وهي كلمة حسابك في «أثر» أيضًا: ' + ATAR_SITE) : ''), '', true);
+  log_(null, r.track || '', 'أعاد كلمة مرور حساب', r.name);
+  return 'أُرسلت كلمة المرور الجديدة لحساب ' + r.user + ' إلى محادثة الإدارة على تليجرام';
 }
 
 /* ================= القراءة ================= */
