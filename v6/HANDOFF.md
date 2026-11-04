@@ -175,3 +175,11 @@
 - `calLoad(true)` يُعاد في كل رسم للتقويم؛ أداة الرئيسية تستعمل الذاكرة دقيقتين، و`POSTS = null` يُبطلها.
 - المحاكي `v6/gas/shim.js`: `Utilities.formatDate` يدعم `yyyy MM dd HH mm d M` فقط، وقفل `withLock_` لا يتداخل (الإشعارات تُدفع خارج القفل).
 - `DEMO` في `v6/demo6.js` يحاكي تليجرام (getUpdates/getChat/getChatMember) وOpenverse وapi.islamic.app وPollinations.
+
+## نظام تصميم الأكاديمية (نوفمبر 2026)
+- المرجع: نظام التصميم «أكاديمية الجيل الصاعد» (artifact ErcdUMHnDvrjWKDGYT5wXZ): الألوان الرسمية #00837b #522b60 #c70e3a #f45907، وخط «عام الحرف اليدوية».
+- `ID_FONTS` في `src/identities.js`: خط الهوية بمعرّفها (الخادم لا يحفظ للهويات إلا الألوان). يسري في `renderTo` بعد خطوط التصميم (fs) وقبل خط البرنامج، وخطوط القالب (`tpl.fonts`) تبقى أعلى منه.
+- `familyOf` يسمّي ملفات The Year of Handicrafts عائلة `handicrafts`. الخط لا يُرفع إلى المستودع (حقوقه محفوظة): يُرفع من لوحة الإدارة إلى الخادم.
+- ألوان هوية الأكاديمية الحية في programs.json على الخادم، وتُعدّل من «البرامج والهويات»؛ تعديل identities.js يغيّر البذرة فقط.
+- القالب `ac_poster` «إعلان الأكاديمية» في `src/templates6.js`.
+

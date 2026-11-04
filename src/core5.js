@@ -82,6 +82,9 @@ function photoOf(v) {
 function renderTo(canvas, tpl, sizeKey, st, T, scale, collect) {
   // تصميم له خطوط عامة خاصة (fs): نرسمه بها ثم نعيد الخط الحالي
   if (st && st.fs && typeof FS !== 'undefined' && (st.fs.title !== FS.title || st.fs.body !== FS.body) && !renderTo._in) { const keep = { title: FS.title, body: FS.body, tw: FS.tw }; FS.title = st.fs.title || FS.title; FS.body = st.fs.body || FS.body; FS.tw = st.fs.tw || ''; renderTo._in = true; try { return renderTo(canvas, tpl, sizeKey, st, T, scale, collect); } finally { renderTo._in = false; FS.title = keep.title; FS.body = keep.body; FS.tw = keep.tw; } }
+  // خط الهوية (مثل «عام الحرف اليدوية» للأكاديمية) يسري ما لم يختر المصمم خطوطاً لتصميمه، وإذا كان الخط مرفوعاً إلى المنصة
+  const idf = (!(st && st.fs) && T && T.fonts && typeof FONTS !== 'undefined' && FONTS[T.fonts.title]) ? T.fonts : null;
+  if (idf && typeof FS !== 'undefined' && (idf.title !== FS.title || (idf.body || idf.title) !== FS.body) && !renderTo._in) { const keep = { title: FS.title, body: FS.body, tw: FS.tw }; FS.title = idf.title; FS.body = idf.body || idf.title; FS.tw = ''; renderTo._in = true; try { return renderTo(canvas, tpl, sizeKey, st, T, scale, collect); } finally { renderTo._in = false; FS.title = keep.title; FS.body = keep.body; FS.tw = keep.tw; } }
   const sz = SIZES[sizeKey];
   // خطوط القالب تسري ما لم يختر المصمم خطوطاً عامة لتصميمه (fs)
   if (typeof TPLF !== 'undefined') TPLF = (st && st.fs) ? null : (tpl.fonts || null);
