@@ -210,7 +210,7 @@ function log_(a, tid, what, detail) {
 }
 
 // التحكم التفصيلي في مجموعات الفرق (قرار أمين، ٣٠ أكتوبر): لكل مجموعة مفتاح رئيسي (t.remind) وما يُرسل فيها (t.send):
-// rem التذكيرات، ck سؤال «هل تم؟»، wk خطة الأسبوع ومهامه، al التنبيهات (نقل لقاء قريب أو إلغاؤه، واقتراح الكاهوت). وفوقها كلها الإيقاف العام groupsPaused.
+// rem التذكيرات، ck سؤال «هل تم؟»، wk خطة الأسبوع ومهامه، al التنبيهات (نقل لقاء قريب أو إلغاؤه، واقتراح الكاهوت، والتذكير بخطة فارغة). وفوقها كلها الإيقاف العام groupsPaused.
 var SEND_KINDS = ['rem', 'ck', 'wk', 'al'];
 function sendOf_(t) { var o = {}, s = (t && t.send) || {}; SEND_KINDS.forEach(function (k) { o[k] = s[k] !== false; }); return o; }
 function gOn_(t, kind) { return !!(t && t.chat && t.chat.id) && t.remind !== false && (!kind || sendOf_(t)[kind]); }
@@ -410,7 +410,7 @@ function linkSync_(uid, pw, merge) {
   } catch (e) { err = String(e.message || e); }
   withLock_(function () {
     var all = accs_(), y = all[uid]; if (!y) return;
-    if (r) { y.atarUid = r.atar; y.lkPend = !!r.pend; delete y.lkErr; } else y.lkErr = clip_(err, 200);
+    if (r) { y.atarUid = r.atar; y.lkPend = !!r.pend; delete y.lkErr; delete y.lkErrSent; } else y.lkErr = clip_(err, 200);
     writeJson_('accounts.json', all);
   });
   return r ? { username: r.username, isNew: !!r.isNew } : { err: err };
@@ -2289,6 +2289,49 @@ function runSuggest_() {
   if (sentKeys.length) withLock_(function () { var g2 = readJson_('tg.json', {}); g2.kahoot = g2.kahoot || {}; sentKeys.forEach(function (k) { g2.kahoot[k] = today; }); writeJson_('tg.json', g2); });
   return n;
 }
+// بعد أسبوع من بداية الفصل: تذكير لطيف في مجموعة المسار الذي لم يضع في خطته نشاطًا بعد، مرة واحدة في الفصل
+function runEmptyNudge_() {
+  var s = cfg_(), tz = tz_(), now = new Date(), today = Utilities.formatDate(now, tz, 'yyyy-MM-dd'), hour = +Utilities.formatDate(now, tz, 'H');
+  if (!props_().getProperty('TG_TOKEN') || hour < s.remindHour || s.groupsPaused) return 0;
+  var g = readJson_('tg.json', {}), done = g.emptyNudge || {}, n = 0, sentKeys = [];
+  tracks_().forEach(function (t) {
+    if (!gOn_(t, 'al')) return;
+    var p = plan_(t.id), S = p.sems[String(t.cur)]; if (!S || !S.start) return;
+    var since = dayDiff_(today, S.start), key = t.id + '|' + t.cur + '|' + S.start;
+    if (since < 7 || since > 13 || done[key]) return;
+    if (p.acts.some(function (x) { return String(x.sem || '') === String(t.cur) || (x.d >= S.start && (!S.end || x.d <= S.end)); })) return;
+    try { tgSend_(t.chat.id, emptyNudgeHtml_(t, S, since), t.id, true); n++; sentKeys.push(key); } catch (e) {}
+  });
+  if (sentKeys.length) withLock_(function () { var g2 = readJson_('tg.json', {}); g2.emptyNudge = g2.emptyNudge || {}; sentKeys.forEach(function (k) { g2.emptyNudge[k] = today; }); writeJson_('tg.json', g2); });
+  return n;
+}
+function emptyNudgeHtml_(t, S, since) {
+  var sem = S.title || 'الفصل';
+  return '<b>' + pick_(['خطة ' + sem + ' تنتظر أول نشاط', 'لنضع أول نشاط في ' + sem], t.id + S.start) + '</b>\n' +
+    'مضى ' + (since < 10 ? 'أسبوع' : 'أكثر من أسبوع') + ' على بداية ' + h_(sem) + '، وخطة ' + h_(t.full || t.name) + ' ما زالت بلا نشاط.\n' +
+    pick_(['نشاط واحد صغير يكفي لتنطلقوا: ديوانية ترحيب، أو تحدٍّ أسبوعي، أو كاهوت على مقرر الأسبوع.',
+      'ابدؤوا بما تيسّر: لقاء تعارف، أو مسابقة سريعة على ما قرأه الطلاب، ثم تكتمل الخطة شيئًا فشيئًا.'], t.id + t.cur) + '\n' +
+    siteLink_('#t/' + t.id, 'افتحوا الخطة');
+}
+// تنبيه الإدارة بكل حساب تعذّر ربطه بأثر: مرة واحدة للخطأ نفسه، ويُنبَّه بالخطأ الجديد، ويُمحى بنجاح الربط
+function runLinkAlerts_() {
+  var s = cfg_();
+  if (!props_().getProperty('TG_TOKEN') || !s.adminChat || !s.adminChat.id) return 0;
+  var all = accs_(), bad = Object.keys(all).map(function (k) { return all[k]; }).filter(function (x) { return x.lkErr && !x.disabled && !x.atar && x.lkErrSent !== x.lkErr; });
+  if (!bad.length) return 0;
+  var ts = tracks_(), T = function (id) { var t = ts.filter(function (y) { return y.id === id; })[0]; return t ? (t.full || t.name) : ''; }, MAX = 15;
+  var msg = '<b>تعذّر ربط ' + (bad.length === 1 ? 'حساب' : 'حسابات') + ' بأثر</b>\n' +
+    bad.slice(0, MAX).map(function (x) { return '• ' + h_(x.name) + ' (<code>' + h_(x.user) + '</code>' + (T(x.track) ? '، ' + h_(T(x.track)) : '') + '): ' + h_(x.lkErr); }).join('\n') +
+    (bad.length > MAX ? '\n• وغيرهم ' + (bad.length - MAX) : '') + '\n\n' +
+    (bad.length === 1 ? 'لم يُنشأ حسابه في أثر أو لم يُحدَّث، فلا يدخله بكلمة المنصة.' : 'لم تُنشأ حساباتهم في أثر أو لم تُحدَّث، فلا يدخلونه بكلمة المنصة.') +
+    ' وبعد إصلاح السبب يُعاد الربط بحفظ الحساب من «الحسابات».\n' + siteLink_('#accounts', 'صفحة الحسابات');
+  tgSend_(s.adminChat.id, msg, '', true);
+  withLock_(function () {
+    var A = accs_(); bad.forEach(function (x) { var y = A[x.uid]; if (y && y.lkErr === x.lkErr) y.lkErrSent = x.lkErr; });
+    writeJson_('accounts.json', A);
+  });
+  return 1;
+}
 function countDays_(n) { return n === 1 ? 'يوم' : n === 2 ? 'يومين' : n <= 10 ? n + ' أيام' : n + ' يوماً'; }
 function tick() {
   var r = { at: now_(), ok: true, msg: '', sent: 0 };
@@ -2298,6 +2341,8 @@ function tick() {
   try { ensureQuick_(); } catch (e) {}
   try { r.sent += runDigests_(); } catch (e) { r.ok = false; r.msg += ' ملخص: ' + e.message; }
   try { r.sent += runSuggest_(); } catch (e) { r.msg += ' اقتراح: ' + e.message; }
+  try { r.sent += runEmptyNudge_(); } catch (e) { r.msg += ' الخطة الفارغة: ' + e.message; }
+  try { r.sent += runLinkAlerts_(); } catch (e) { r.msg += ' تنبيه الربط: ' + e.message; }
   try { withLock_(function () { var g = readJson_('tg.json', {}); g.lastTick = r; writeJson_('tg.json', g); }); } catch (e) {}
   return r;
 }

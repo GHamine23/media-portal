@@ -1,0 +1,31 @@
+# فحوص منصة الأنشطة والحساب الموحّد مع أثر: تعمل على كل طلب دمج وكل دفع إلى main يمسّ أحد الخادمين أو الواجهة
+name: فحوص منصة الأنشطة
+on:
+  pull_request:
+    paths: ['anshita/**', 'docs/anshita/**', 'server/Code.gs', 'v6/gas/**', '.github/workflows/anshita-tests.yml']
+  push:
+    branches: [main]
+    paths: ['anshita/**', 'docs/anshita/**', 'server/Code.gs', 'v6/gas/**', '.github/workflows/anshita-tests.yml']
+permissions:
+  contents: read
+jobs:
+  server:
+    name: خادم المنصة والموقع المبني
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: اختبار الخادم
+        run: TZ=Asia/Riyadh node anshita/test/test_server.js
+      - name: الموقع المبني مطابق للمصادر
+        run: python3 anshita/tools/build.py && git diff --exit-code -- docs/anshita
+  link:
+    name: الحساب الموحّد مع أثر
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: الخادمان معًا
+        run: TZ=Asia/Riyadh node anshita/test/test_link.js
