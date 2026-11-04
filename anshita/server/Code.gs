@@ -595,7 +595,7 @@ function memberAccounts_(tid, users, only) {
 // رسالة بيانات الدخول لصاحب الحساب الجديد (جاهزة للتحويل أو للإرسال في خاصه)
 function accMsg_(o, nm) {
   return 'السلام عليكم أ. ' + h_(o.name) + ' 🌿\n' +
-      'هذا حسابك في <b>منصة الأنشطة التربوية</b> لمسار ' + h_(nm) + ':\n\n' +
+      'هذا حسابك في <b>منصة الأنشطة التربوية</b> ل' + h_(nm) + ':\n\n' +
       'الرابط: ' + SITE_URL + '\n' +
       'اسم المستخدم: <code>' + h_(o.user) + '</code>\n' +
       'كلمة المرور: <code>' + h_(o.pw) + '</code>\n\n' +
@@ -788,7 +788,7 @@ function memberPassToChat_(user) {
   var lk = accs_()[r.uid] || {}, t = null; try { t = r.track ? trackOf_(r.track) : null; } catch (e) {}
   tgSend_(s.adminChat.id, '<b>كلمة مرور جديدة لحساب ' + h_(r.name) + '</b> (<code>' + h_(r.user) + '</code>)\nالرسالة التالية له، فحوّلها كما هي.', '', true);
   tgSend_(s.adminChat.id, 'السلام عليكم أ. ' + h_(r.name) + ' 🌿\n' +
-    'هذه كلمة مرور جديدة لحسابك في <b>منصة الأنشطة التربوية</b>' + (t ? ' لمسار ' + h_(t.full || t.name) : '') + ':\n\n' +
+    'هذه كلمة مرور جديدة لحسابك في <b>منصة الأنشطة التربوية</b>' + (t ? ' ل' + h_(t.full || t.name) : '') + ':\n\n' +
     'الرابط: ' + SITE_URL + '\n' +
     'اسم المستخدم: <code>' + h_(r.user) + '</code>\n' +
     'كلمة المرور: <code>' + h_(r.pw) + '</code>\n\n' +

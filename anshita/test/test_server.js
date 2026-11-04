@@ -496,6 +496,7 @@ ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.te
   ok(!JSON.stringify(r1).match(/[a-z2-9]{4}-[a-z2-9]{5}/), 'كلمة المرور لا تظهر في الرد');
   const msgs = TG.sent.filter(m => m.chat === adm); ok(msgs.length === 3 && msgs.every(m => m.html), 'رسالة عامة ثم رسالة لكل عضو في محادثة الإدارة');
   const pw = /كلمة المرور: <code>([^<]+)<\/code>/.exec(msgs[1].text)[1];
+  ok(/لمسار إشراق:/.test(msgs[1].text) && !/مسار مسار/.test(msgs[1].text), 'اسم المسار في رسالة الحساب بلا تكرار «مسار»');
   const lg = call('login', 'ahmad', pw); ok(lg.me.track === 'ishraq' && lg.me.role === 'team' && lg.me.name === 'أحمد علي', 'العضو يدخل بحسابه في مساره');
   ok(!TG.sent.some(m => m.chat !== adm), 'البيانات لا تصل غير الإدارة');
   ok(!JSON.stringify(call('log_list', AT)).match(new RegExp(pw)), 'كلمة المرور ليست في السجل');
@@ -614,6 +615,7 @@ ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.te
   const msg = ctx.memberPassToChat_('ithmar2.9');
   const m = TG.sent.filter(x => x.chat === adm), pw = m.length > 1 && /كلمة المرور: <code>([^<]+)<\/code>/.exec(m[1].text);
   ok(TG.sent.length === 2 && m.length === 2 && pw && /مشرف إثمار ٢ - ٩/.test(m[1].text) && /حوّلها/.test(m[0].text), 'رسالتان في محادثة الإدارة وحدها: تنبيه، ثم رسالة جاهزة للتحويل');
+  ok(/لمسار إثمار · الدفعة ٢:/.test(m[1].text) && !/مسار مسار/.test(m[1].text), 'وفيها اسم المسار بلا تكرار «مسار»');
   ok(!msg.includes(pw[1]) && !JSON.stringify(call('log_list', AT)).includes(pw[1]), 'الكلمة لا تظهر في الرد ولا في السجل');
   ok(call('login', 'ithmar2.9', pw[1]).me.user === 'ithmar2.9', 'يدخل بالكلمة الجديدة');
   throws(() => call('boot', T0), /تغيّرت كلمة المرور/, 'والجلسات القديمة خرجت');
