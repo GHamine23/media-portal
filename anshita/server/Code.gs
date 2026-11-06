@@ -12,7 +12,7 @@
      وملخص أسبوعي، وتنبيه عند نقل لقاء قريب أو إلغائه.
    أول تشغيل: شغّل setup() من المحرر مرة، ثم انشر «تطبيق ويب» (يُنفَّذ باسمك، متاح لأي شخص).
    ===================================================================== */
-var VERSION = '1.6.0';
+var VERSION = '1.6.1';
 var SITE_URL = 'https://ghamine23.github.io/media-portal/anshita/';
 var DATA_DIR_NAME = 'منصة الأنشطة التربوية — البيانات';
 var SESSION_DAYS = 60;
@@ -1398,10 +1398,10 @@ function tg_menu(token) { var a = auth_(token); needAdmin_(a); var n = tgMenu_()
    يحتاج مشروع المنصة: واجهة ميت مفعّلة في مشروع Google Cloud المرتبط، والنطاق meetings.space.created في appsscript.json.
    x.meet: {space, uri, code, at, by, hosts:{email: memberName}, miss:[أسماء بلا بريد], err, cfgV: إصدار إعداد الغرفة} */
 var MEET_API = 'https://meet.googleapis.com/v2/';
-// إعداد الغرف (قرار أمين، ٣ نوفمبر): «إدارة المضيف» مفعّلة، والحضور يدخلون مشاهدين (لا ميكروفون ولا كاميرا ولا مشاركة شاشة ولا دردشة)،
-// والمسؤولون وبريد الإدارة مضيفون مشاركون يفتحون لمن يشاؤون أثناء اللقاء. المشاركة والدردشة للمضيفين. الإصدار يتغيّر كلما تغيّر الإعداد فتُحدَّث الغرف القادمة
-var MEET_CFG_V = 2;
-var MEET_MOD = { chatRestriction: 'HOSTS_ONLY', reactionRestriction: 'NO_RESTRICTION', presentRestriction: 'HOSTS_ONLY', defaultJoinAsViewerType: 'ON' };
+// إعداد الغرف (قرار أمين، ٦ نوفمبر، يحل محل قرار ٣ نوفمبر): الغرف مفتوحة؛ الحضور يدخلون مشاركين (صوت وكاميرا ومشاركة ودردشة)،
+// و«إدارة المضيف» تبقى مفعّلة حتى يكون المسؤولون وبريد الإدارة مضيفين مشاركين يقفلون ما يشاؤون أثناء اللقاء. الإصدار يتغيّر كلما تغيّر الإعداد فتُحدَّث الغرف القادمة
+var MEET_CFG_V = 3;
+var MEET_MOD = { chatRestriction: 'NO_RESTRICTION', reactionRestriction: 'NO_RESTRICTION', presentRestriction: 'NO_RESTRICTION', defaultJoinAsViewerType: 'OFF' };
 // ميت يرفض المسار config.moderationRestrictions جملةً ويقبل كل حقل منه مسمًّى (جُرّب على غرفة حقيقية)
 var MEET_MASK = ['config.moderation'].concat(Object.keys(MEET_MOD).map(function (k) { return 'config.moderationRestrictions.' + k; })).join(',');
 function meetConfig_(x) {
