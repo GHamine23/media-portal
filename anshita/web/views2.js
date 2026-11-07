@@ -447,7 +447,7 @@ VIEWS.bot = {
         </ol></div>
         <div class="card"><div class="card-h"><h3>هكذا تصل التذكيرات</h3></div><div class="tgwall">${tgPreview(s, 'd3')}${tgPreview(s, 'd1')}</div></div></div>`;
     const bot = BS.bot || {}, lt = BS.lastTick;
-    const GK = [['rem', 'التذكيرات', 'تذكير التصميم والنشر، وما قبل الموعد ويومه', true], ['ck', '«هل تم؟»', 'سؤال المتابعة بعد النشاط بساعتين', s.checkins !== false], ['wk', 'خطة الأسبوع', 'رسالة السبت ببطاقتها', !!(s.digest || {}).on], ['al', 'التنبيهات', 'نقل لقاء قريب أو إلغاؤه، واقتراح الكاهوت', !!s.notifyChanges]];
+    const GK = [['rem', 'التذكيرات', 'تذكير التصميم والنشر، وما قبل الموعد ويومه', true], ['ck', '«هل تم؟»', 'سؤال المتابعة بعد النشاط بساعتين', s.checkins !== false], ['wk', 'خطة الأسبوع', 'رسالة السبت ببطاقتها', !!(s.digest || {}).on], ['al', 'التنبيهات', 'نقل لقاء قريب أو إلغاؤه، واقتراح الكاهوت، والتذكير بخطة فارغة', !!s.notifyChanges]];
     const trRows = BS.tracks.map(t => { const tt = T(t.id), sd = t.send || {}, onK = GK.filter(k => sd[k[0]] !== false && k[3]).map(k => k[1]);
       const state = !t.chat ? 'لم تُربط مجموعة بعد' : `مربوط بـ «${esc(t.chat.title)}»${BS.settings.groupsPaused ? ' · موقوف مع كل المجموعات' : !t.remind ? ' · الإرسال فيها موقوف' : onK.length ? '' : ' · لا يُرسل فيها شيء'}`;
       const chips = t.chat && t.remind ? `<div class="gk" role="group" aria-label="ما يُرسل في مجموعة ${esc(tt.name)}">${GK.map(k => `<button type="button" class="${k[3] ? '' : 'goff'}" aria-pressed="${sd[k[0]] !== false}" data-act="bot-kind" data-id="${t.id}" data-k="${k[0]}" data-tip="${esc(k[3] ? k[2] : k[2] + ' · موقوف لكل المجموعات من الإعدادات')}">${sd[k[0]] !== false ? svg('check') : ''}${k[1]}</button>`).join('')}</div>` : '';

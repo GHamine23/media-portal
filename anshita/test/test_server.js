@@ -671,6 +671,53 @@ ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.te
   ok(ctx.autoUser_('ithmar2', 'مشرف إثمار ٢ - ٦', 0) === 'ithmar2.6' && ctx.autoUser_('judhoor', 'مشرف جذور ٥', 0) === 'judhoor5', 'اسم الدخول العام من رقم الاسم');
 }
 
+// ٢٥) تنبيه الإدارة بحساب تعذّر ربطه بأثر: مرة للخطأ نفسه، وتصل ولو كانت المجموعات موقوفة
+{
+  const adm = ctx.cfg_().adminChat.id, setAcc = f => ctx.withLock_(() => { const all = ctx.readJson_('accounts.json', {}); f(all); ctx.writeJson_('accounts.json', all); });
+  const team = Object.values(ctx.accs_()).find(x => x.role === 'team' && x.track === 'judhoor' && !x.disabled && !x.atar);
+  setAcc(all => { Object.values(all).forEach(x => { delete x.lkErr; delete x.lkErrSent; }); all[team.uid].lkErr = 'طلب غير معروف'; });
+  const st = ctx.readJson_('settings.json', {}); st.groupsPaused = true; ctx.writeJson_('settings.json', st);
+  TG.sent.length = 0;
+  ok(ctx.runLinkAlerts_() === 1 && TG.sent.length === 1 && TG.sent[0].chat === adm && TG.sent[0].html, 'رسالة واحدة في محادثة الإدارة وحدها، ولو كانت المجموعات موقوفة');
+  ok(/تعذّر ربط حساب بأثر/.test(TG.sent[0].text) && TG.sent[0].text.includes(team.user) && /مسار جذور/.test(TG.sent[0].text) && /طلب غير معروف/.test(TG.sent[0].text) && /#accounts/.test(TG.sent[0].text), 'فيها الحساب ومساره والسبب ورابط الحسابات');
+  ok(ctx.runLinkAlerts_() === 0 && TG.sent.length === 1, 'لا تتكرر للخطأ نفسه');
+  setAcc(all => { all[team.uid].lkErr = 'تعذّر الاتصال بأثر'; });
+  ok(ctx.runLinkAlerts_() === 1 && /تعذّر الاتصال بأثر/.test(TG.sent[1].text), 'والخطأ الجديد يُنبَّه به');
+  const other = Object.values(ctx.accs_()).find(x => x.role === 'team' && x.uid !== team.uid && !x.atar);
+  setAcc(all => { all[team.uid].lkErr = 'خطأ ثالث'; all[team.uid].disabled = true; all[other.uid].lkErr = 'خطأ ثالث'; });
+  TG.sent.length = 0; ctx.runLinkAlerts_();
+  ok(TG.sent.length === 1 && TG.sent[0].text.includes(other.user) && !TG.sent[0].text.includes('(<code>' + team.user + '</code>'), 'الحساب الموقوف لا يُنبَّه به');
+  setAcc(all => { delete all[team.uid].disabled; Object.values(all).forEach(x => { delete x.lkErr; delete x.lkErrSent; }); });
+  st.groupsPaused = false; ctx.writeJson_('settings.json', st);
+}
+
+// ٢٦) بعد أسبوع من بداية الفصل: تذكير المسار الذي خطته بلا نشاط، مرة واحدة
+{
+  const setT = (id, f) => ctx.withLock_(() => { const ts = ctx.readJson_('tracks.json', []); f(ts.find(t => t.id === id)); ctx.writeJson_('tracks.json', ts); });
+  const plan = (id, start, acts) => { const p = ctx.plan_(id); p.sems['2'] = { title: 'الفصل الثاني', start, end: '2027-04-30', days: [] }; p.acts = acts; ctx.writeJson_('plan_' + id + '.json', p); };
+  setT('ishraq', t => { t.chat = { id: '-100777', title: 'مربو إشراق' }; t.remind = true; t.cur = 2; t.send = {}; });
+  setT('budhoor', t => { t.chat = { id: '-100778', title: 'مربو بذور' }; t.remind = true; t.cur = 2; t.send = {}; });
+  plan('ishraq', '2027-01-02', []);
+  plan('budhoor', '2027-01-02', [{ id: 'x1', title: 'لقاء', type: 'لقاء', d: '2027-01-05', sem: '2', who: [] }]);
+  const nudges = () => TG.sent.filter(m => m.chat === '-100777' || m.chat === '-100778');
+  TG.sent.length = 0;
+  NOW = Date.UTC(2027, 0, 8, 16, 0); ctx.runEmptyNudge_(); ok(!nudges().length, 'لا تذكير قبل أن يمضي أسبوع');
+  NOW = Date.UTC(2027, 0, 9, 5, 0); ctx.runEmptyNudge_(); ok(!nudges().length, 'ولا قبل ساعة التذكيرات');  // ساعة التذكيرات هنا ١٨
+  NOW = Date.UTC(2027, 0, 9, 16, 0); ctx.runEmptyNudge_();
+  const nm = nudges();
+  ok(nm.length === 1 && nm[0].chat === '-100777' && nm[0].html, 'يصل المسار الذي خطته فارغة وحده');
+  ok(/ما زالت بلا نشاط/.test(nm[0].text) && /الفصل الثاني/.test(nm[0].text) && /مسار إشراق/.test(nm[0].text) && /#t\/ishraq/.test(nm[0].text) && !/مسار مسار/.test(nm[0].text), 'وفيه الفصل والمسار ورابط خطته');
+  NOW += 864e5; ctx.runEmptyNudge_(); ok(nudges().length === 1, 'لا يتكرر');
+  plan('ishraq', '2026-12-26', []); ctx.runEmptyNudge_(); ok(nudges().length === 1, 'ولا يصل بعد أسبوعين من البداية');
+  plan('ishraq', '2027-01-03', []);
+  setT('ishraq', t => { t.send = { al: false }; }); ctx.runEmptyNudge_(); ok(nudges().length === 1, 'ومفتاح «التنبيهات» المطفأ يمنعه');
+  setT('ishraq', t => { t.send = {}; });
+  const st = ctx.readJson_('settings.json', {}); st.groupsPaused = true; ctx.writeJson_('settings.json', st);
+  ctx.runEmptyNudge_(); ok(nudges().length === 1, 'والإيقاف العام يمنعه');
+  st.groupsPaused = false; ctx.writeJson_('settings.json', st);
+  ctx.runEmptyNudge_(); ok(nudges().length === 2 && /أكثر من أسبوع/.test(nudges()[1].text) === false && /مضى أسبوع/.test(nudges()[1].text), 'فصل جديد البداية: تذكير جديد');
+}
+
 if (process.env.PREVIEW) {
   const seen = new Set(); ALLSENT.forEach(m => { const k = m.text.split('\n')[0].replace(/«.*»/, ''); if (m.html && !seen.has(k)) { seen.add(k); console.log('\n=== ' + m.chat + '\n' + m.text); } });
   console.log('\n=== ADMIN TASKS\n' + ctx.adminTasksHtml_('2026-11-28', ctx.cfg_()));
