@@ -676,5 +676,8 @@ if (process.env.PREVIEW) {
   console.log('\n=== ADMIN TASKS\n' + ctx.adminTasksHtml_('2026-11-28', ctx.cfg_()));
   console.log('\n=== REPORT PARTS\n' + ctx.mdToTgParts_('التقرير الأسبوعي — السبت 31 أكتوبر', '## الخلاصة\nيبدأ الفصل اليوم. **خمسة مسارات** وضعت أنشطة.\n\n## ما يحتاج قرارك\n- إثمار ٣ بلا أنشطة\n- لقاء جذور بلا مسؤول\n\n## جذور\n' + Array.from({length: 20}, (_, i) => '- نشاط رقم ' + i + ' في الأسبوع').join('\n')).join('\n---- next message ----\n'));
 }
+// لا تكرار لكلمة «مسار» في أي رسالة أُرسلت («لمسار مسار إشراق»)
+ok(ALLSENT.length && !ALLSENT.some(m => /مسار\s+مسار/.test(m.text || '')), 'لا «مسار مسار» في رسائل البوت: ' + ((ALLSENT.find(m => /مسار\s+مسار/.test(m.text || '')) || {}).text || '').slice(0, 120));
+ok(ctx.forTrack_('مسار إشراق') === 'لمسار إشراق' && ctx.forTrack_('إشراق') === 'لمسار إشراق', 'اسم المسار في الرسائل: «لمسار إشراق» من الاسمين');
 console.log((fail ? '✗' : '✓') + ' ' + pass + ' فحصاً ناجحاً' + (fail ? '، و' + fail + ' فاشلة' : ''));
 process.exit(fail ? 1 : 0);

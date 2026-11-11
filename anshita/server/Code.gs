@@ -592,10 +592,12 @@ function memberAccounts_(tid, users, only) {
   res.made.forEach(function (o) { tgSend_(chat, accMsg_(o, nm), '', true); });
   return JSON.stringify({ made: res.made.map(function (o) { return { name: o.name, user: o.user }; }), had: res.had });
 }
+// «لمسار إشراق» من الاسم الكامل («مسار إشراق») أو المختصر («إشراق») بلا تكرار الكلمة
+function forTrack_(nm) { nm = String(nm || '').trim(); return /^مسار\s/.test(nm) ? 'ل' + h_(nm) : 'لمسار ' + h_(nm); }
 // رسالة بيانات الدخول لصاحب الحساب الجديد (جاهزة للتحويل أو للإرسال في خاصه)
 function accMsg_(o, nm) {
   return 'السلام عليكم أ. ' + h_(o.name) + ' 🌿\n' +
-      'هذا حسابك في <b>منصة الأنشطة التربوية</b> لمسار ' + h_(nm) + ':\n\n' +
+      'هذا حسابك في <b>منصة الأنشطة التربوية</b> ' + forTrack_(nm) + ':\n\n' +
       'الرابط: ' + SITE_URL + '\n' +
       'اسم المستخدم: <code>' + h_(o.user) + '</code>\n' +
       'كلمة المرور: <code>' + h_(o.pw) + '</code>\n\n' +
@@ -788,7 +790,7 @@ function memberPassToChat_(user) {
   var lk = accs_()[r.uid] || {}, t = null; try { t = r.track ? trackOf_(r.track) : null; } catch (e) {}
   tgSend_(s.adminChat.id, '<b>كلمة مرور جديدة لحساب ' + h_(r.name) + '</b> (<code>' + h_(r.user) + '</code>)\nالرسالة التالية له، فحوّلها كما هي.', '', true);
   tgSend_(s.adminChat.id, 'السلام عليكم أ. ' + h_(r.name) + ' 🌿\n' +
-    'هذه كلمة مرور جديدة لحسابك في <b>منصة الأنشطة التربوية</b>' + (t ? ' لمسار ' + h_(t.full || t.name) : '') + ':\n\n' +
+    'هذه كلمة مرور جديدة لحسابك في <b>منصة الأنشطة التربوية</b>' + (t ? ' ' + forTrack_(t.full || t.name) : '') + ':\n\n' +
     'الرابط: ' + SITE_URL + '\n' +
     'اسم المستخدم: <code>' + h_(r.user) + '</code>\n' +
     'كلمة المرور: <code>' + h_(r.pw) + '</code>\n\n' +
