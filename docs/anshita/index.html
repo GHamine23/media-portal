@@ -122,7 +122,7 @@ kbd{font-family:var(--fn);font-size:11px;line-height:1;padding:3px 6px;border-ra
   .side{display:none}
   .topbar{display:flex;position:sticky;top:0;z-index:25;align-items:center;gap:10px;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));background:color-mix(in srgb,var(--canvas) 88%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
   .topbar img{height:32px;width:auto}
-  .main{padding:18px 16px 110px}
+  .main{padding:18px 16px calc(160px + env(safe-area-inset-bottom))}   /* آخر المحتوى يُمرَّر فوق الزر العائم (+) وشريط التبويب */
   .tabbar{display:flex;position:fixed;inset:auto 0 0 0;z-index:25;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px 6px max(8px,env(safe-area-inset-bottom))}
   .tabbar a,.tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;color:var(--ink3);text-decoration:none;padding:6px 2px;border-radius:12px;font-family:var(--fn)}
   .tabbar svg{width:22px;height:22px}
@@ -2638,7 +2638,7 @@ function openAct(tid, id, preset = {}) {
   if (!a && tid && !canEdit(tid)) return toast('إضافة الأنشطة مغلقة لفريقكم. اطلبوا فتحها من الإدارة.', 'err');
   F = a ? Object.assign({ tid, isNew: false }, JSON.parse(JSON.stringify(a)), { calOn: !!(a.cal && a.cal.id) })
     : { tid, isNew: true, title: preset.title || '', type: preset.type || 'لقاء', d: preset.date || (tid ? defDate(tid) : TODAY), time: '', dur: 0, who: [], idea: '', rem: null, calOn: false, done: false, note: '', link: '' };
-  F.newNames = []; F.lockTrack = !!tid; F.d0 = F.d; F.rep = preset.repeat && !a ? newRep() : null;
+  F.newNames = []; F.lockTrack = !!tid; F.d0 = F.d; F.who0 = (F.who || []).join('|'); F.whoNext = false; F.rep = preset.repeat && !a ? newRep() : null;
   if (!a && tid) F.rp = defRp(tid, F.type);
   F.dock = dockOn(F.tid) && !!$('#dock');
   drawAct();
@@ -2671,6 +2671,16 @@ function repBlock(mode) {
   return h;
 }
 const nextOf = () => 0;   // التكرار مواعيد مستقلة: تعديل موعد لا يمس غيره
+// المسؤول وحده يُعيَّن للمواعيد القادمة من السلسلة دفعة واحدة إن اختار الفريق ذلك
+const apptIn = n => n === 2 ? 'موعدين' : apptText(n);   // بعد حرف الجر
+const laterOf = () => F && F.ser && !F.isNew ? seriesOf(F.tid, F.ser).filter(a => a.id !== F.id && a.d > F.d0).length : 0;
+const whoMoved = () => F && !F.isNew && (F.who || []).join('|') !== F.who0;
+function whoNextOpt() {
+  const n = laterOf();
+  if (!n || !whoMoved()) return '';
+  const who = (F.who || []).length ? F.who.join('، ') : 'بلا مسؤول';
+  return `<div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('users')}</span><div class="tx"><b>والمواعيد القادمة من هذا النشاط</b><span>${esc(who)} في ${apptIn(n)} بعده أيضًا، ولا يتغير فيها شيء غير المسؤول.</span></div><button class="sw" type="button" role="switch" aria-checked="${!!F.whoNext}" data-act="f-whonext" aria-label="المسؤول للمواعيد القادمة"></button></div>`;
+}
 function defDate(tid) { const r = semRange(tid, curN(tid)); return r && TODAY < r.from ? r.from : TODAY; }
 // صلاحية النموذج: full تعديل كامل، adj تعديل نشاط قائم بلا حذف (يصل الإدارةَ تنبيه)، ro متابعة فقط
 function fMode() {
@@ -2720,7 +2730,7 @@ function actParts() {
       <div class="row" style="gap:8px;align-items:flex-end"><div class="field" style="flex:1"><label for="f-time">الوقت</label><select class="inp" id="f-time">${(TIMES.includes(F.time || '') ? TIMES : TIMES.concat(F.time).sort()).map(x => `<option value="${x}" ${x === (F.time || '') ? 'selected' : ''}>${x ? timeText(x) : 'بلا وقت'}</option>`).join('')}</select></div>
       <div class="field" style="width:96px"><label for="f-dur">المدة</label><select class="inp" id="f-dur">${[[0, 'تلقائي'], [30, '٣٠ د'], [45, '٤٥ د'], [60, 'ساعة'], [90, 'ساعة ونصف'], [120, 'ساعتان']].map(([v, l]) => `<option value="${v}" ${+F.dur === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div></div>
     ${ctx}${clash}
-    <div class="field"><span class="flabel">المسؤول من الفريق</span><div class="whos">${[...new Set(members(tid).concat(F.who || []))].map(w => `<button class="chip" type="button" aria-pressed="${(F.who || []).includes(w)}" data-act="f-who" data-v="${esc(w)}">${esc(w)}</button>`).join('')}<input id="f-whonew" placeholder="+ اسم جديد" aria-label="إضافة اسم"></div></div>
+    <div class="field"><span class="flabel">المسؤول من الفريق</span><div class="whos">${[...new Set(members(tid).concat(F.who || []))].map(w => `<button class="chip" type="button" aria-pressed="${(F.who || []).includes(w)}" data-act="f-who" data-v="${esc(w)}">${esc(w)}</button>`).join('')}<input id="f-whonew" placeholder="+ اسم جديد" aria-label="إضافة اسم"></div></div>${whoNextOpt()}
     <div class="field"><label for="f-idea">الفكرة</label><textarea class="inp" id="f-idea" rows="3" placeholder="الفكرة في سطرين: ماذا سيحدث؟ ولمن؟">${esc(F.idea || '')}</textarea></div>
     <div class="opt"><span class="tile sm" style="--tc:var(--brand)">${svg('bell')}</span><div class="tx"><b>تذكير البوت في مجموعة الفريق</b><span>${esc(remSub)}</span></div><button class="sw" type="button" role="switch" aria-checked="${willRem}" data-act="f-rem" aria-label="تذكير البوت"></button></div>${remBox}
     ${repBlock(mode)}
@@ -2810,6 +2820,7 @@ async function saveF(scope) {
     if (isAdmin()) { const was = !!(f.cal && f.cal.id); if (f.calOn !== was) patch.calOn = !!f.calOn; }
     const s = semFor(tid, f.d); if (s) patch.sem = s;
     if (scope === 'next' && f.ser) patch.scope = 'next';
+    else if (f.whoNext && f.ser && whoMoved() && laterOf()) { patch.scope = 'who'; f.whoN = laterOf(); }
   }
   // التكرار: يُضاف النشاط في كل المواعيد المختارة
   const rep = mode === 'full' && f.rep && f.rep.on ? repDates(tid, f).filter(x => x.on).map(x => x.d) : null;
@@ -2832,7 +2843,7 @@ async function saveF(scope) {
   if (f.dock) F = null; else closeLayer();
   try {
     await saveAct(tid, patch);
-    toast((f.isNew ? `أُضيف ${qt(patch.title)}` : scope === 'next' ? `حُفظ لهذا الموعد وما بعده` : 'حُفظ') + (cl.length ? ` — تنبيه: ${clashText(cl.concat(qt(patch.title)))}` : '') + (!isAdmin() && !f.isNew && mode !== 'ro' ? '. وصل الإدارةَ تنبيه بالتغيير' : ''));
+    toast((f.isNew ? `أُضيف ${qt(patch.title)}` : scope === 'next' ? `حُفظ لهذا الموعد وما بعده` : patch.scope === 'who' ? `حُفظ، والمسؤول نفسه في ${apptIn(f.whoN)} بعده` : 'حُفظ') + (cl.length ? ` — تنبيه: ${clashText(cl.concat(qt(patch.title)))}` : '') + (!isAdmin() && !f.isNew && mode !== 'ro' ? '. وصل الإدارةَ تنبيه بالتغيير' : ''));
     if (newNames.length && canEdit(tid)) trackSave(tid, { members: members(tid).concat(newNames) }).catch(() => {});
   } catch (e) {}
 }
@@ -3323,6 +3334,7 @@ const H = {
   done: el => { const tid = el.dataset.track, a = planOf(tid).acts.find(x => x.id === el.dataset.id); if (!a) return; const v = !a.done; return saveAct(tid, { id: a.id, done: v }).then(() => toast(v ? `تم تنفيذ ${qt(a.title)}` : 'أُعيد إلى الخطة', '', () => saveAct(tid, { id: a.id, done: !v }))).catch(() => {}); },
   'f-track': el => { readF(); F.tid = el.dataset.v; if (F.isNew && !F.rpTouched) F.rp = defRp(F.tid, F.type); drawAct(true); }, 'f-type': el => { readF(); F.type = el.dataset.v; if (F.isNew && !F.rpTouched && F.tid) F.rp = defRp(F.tid, F.type); drawAct(true); },
   'f-who': el => { readF(); const w = el.dataset.v; F.who = (F.who || []).includes(w) ? F.who.filter(x => x !== w) : (F.who || []).concat(w); drawAct(true); },
+  'f-whonext': () => { readF(); F.whoNext = !F.whoNext; drawAct(true); },
   'f-rem': () => { readF(); const cur = F.rem === true || (F.rem !== false && (D.remindTypes || []).includes(F.type)); F.rem = !cur; drawAct(true); },
   'f-cal': () => { readF(); F.calOn = !F.calOn; drawAct(true); },
   'f-rp': el => { readF(); const k = el.dataset.v, c = remCfg(F); F.rp = Object.assign({}, c, { [k]: !c[k] }); F.rpTouched = true; drawAct(true); }, 'f-done': () => { readF(); F.done = !F.done; drawAct(true); },
