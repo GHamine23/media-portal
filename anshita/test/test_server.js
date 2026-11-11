@@ -341,6 +341,11 @@ throws(() => call('report_data', rk), /مفتاح/, 'المفتاح القديم
   const nA = ctx.readJson_('alerts.json', []).length;
   call('act_save', JT, 'judhoor', JSON.stringify({ id: a2.id, who: ['يوسف'], scope: 'next' }));
   ok(by(a3.id).who.join() === 'يوسف' && ctx.readJson_('alerts.json', []).length === nA + 1 && /بعده من السلسلة/.test(ctx.readJson_('alerts.json', [])[0].title), 'تعديل الفريق للسلسلة: تنبيه واحد للإدارة');
+  // المسؤول وحده للمواعيد القادمة: لا يتغير معه الوقت ولا العنوان ولا اليوم
+  const w = call('act_save', JT, 'judhoor', JSON.stringify({ id: a2.id, who: ['حمزة'], time: '22:00', title: 'حلقة مختلفة', scope: 'who' }));
+  ok(w.others.length === 1 && by(a3.id).who.join() === 'حمزة' && by(a3.id).time === '21:00' && by(a3.id).title === 'حلقة الأحد' && by(a3.id).d === '2026-11-23' && by(a2.id).time === '22:00', 'المسؤول وحده يسري على المواعيد القادمة');
+  ok(by(a1.id).who.join() === 'معاذ', 'ولا يمس ما قبله');
+  call('act_save', AT, 'judhoor', JSON.stringify({ id: a2.id, time: '21:00', title: 'حلقة الأحد' }));
   const d = call('act_del', AT, 'judhoor', a2.id, 'next');
   ok(d.ids.length === 2 && !by(a2.id) && !by(a3.id) && by(a1.id), 'حذف هذا وما بعده يبقي ما قبله');
   call('act_del', AT, 'judhoor', a1.id);
@@ -676,6 +681,8 @@ if (process.env.PREVIEW) {
   console.log('\n=== ADMIN TASKS\n' + ctx.adminTasksHtml_('2026-11-28', ctx.cfg_()));
   console.log('\n=== REPORT PARTS\n' + ctx.mdToTgParts_('التقرير الأسبوعي — السبت 31 أكتوبر', '## الخلاصة\nيبدأ الفصل اليوم. **خمسة مسارات** وضعت أنشطة.\n\n## ما يحتاج قرارك\n- إثمار ٣ بلا أنشطة\n- لقاء جذور بلا مسؤول\n\n## جذور\n' + Array.from({length: 20}, (_, i) => '- نشاط رقم ' + i + ' في الأسبوع').join('\n')).join('\n---- next message ----\n'));
 }
+// سؤال المتابعة يذكر «نشاط» قبل العنوان فيتفق الضمير المذكّر مع أي عنوان («مسابقة» أو «لقاء»)
+ok(ALLSENT.some(m => /(كيف مضى|كيف جرى|ما أخبار) نشاط «/.test(m.text || '')) && !ALLSENT.some(m => /<b>كيف كان «/.test(m.text || '')), 'سؤال المتابعة: «كيف مضى نشاط «…»؟»');
 // لا تكرار لكلمة «مسار» في أي رسالة أُرسلت («لمسار مسار إشراق»)
 ok(ALLSENT.length && !ALLSENT.some(m => /مسار\s+مسار/.test(m.text || '')), 'لا «مسار مسار» في رسائل البوت: ' + ((ALLSENT.find(m => /مسار\s+مسار/.test(m.text || '')) || {}).text || '').slice(0, 120));
 ok(ctx.forTrack_('مسار إشراق') === 'لمسار إشراق' && ctx.forTrack_('إشراق') === 'لمسار إشراق', 'اسم المسار في الرسائل: «لمسار إشراق» من الاسمين');

@@ -12,7 +12,7 @@
      وملخص أسبوعي، وتنبيه عند نقل لقاء قريب أو إلغائه.
    أول تشغيل: شغّل setup() من المحرر مرة، ثم انشر «تطبيق ويب» (يُنفَّذ باسمك، متاح لأي شخص).
    ===================================================================== */
-var VERSION = '1.6.0';
+var VERSION = '1.6.1';
 var SITE_URL = 'https://ghamine23.github.io/media-portal/anshita/';
 var DATA_DIR_NAME = 'منصة الأنشطة التربوية — البيانات';
 var SESSION_DAYS = 60;
@@ -955,7 +955,7 @@ function act_save(token, tid, json) {
     if (old) p.acts[i] = x; else p.acts.push(x);
     // نشاط متكرر: «هذا وما بعده» ينقل التغيير نفسه إلى المواعيد اللاحقة من السلسلة
     var others = [];
-    if (old && old.ser && scope === 'next') others = seriesApply_(p, t, s, old, x);
+    if (old && old.ser && (scope === 'next' || scope === 'who')) others = seriesApply_(p, t, s, old, x, scope === 'who');
     savePlan_(tid, p);
     if (defUp) saveDefs_(tid, function (d) { d.rp = d.rp || {}; d.rp[x.type] = defUp; });
     var what = !old ? 'أضاف نشاطاً' : old.d !== x.d || (old.time || '') !== (x.time || '') ? 'غيّر موعد نشاط' : (old.who || []).join() !== (x.who || []).join() ? 'غيّر القائم على نشاط' : old.done !== x.done ? (x.done ? 'أتمّ نشاطاً' : 'أعاد نشاطاً إلى الخطة') : al ? 'عدّل نشاطاً' : 'تابع نشاطاً';
@@ -1075,10 +1075,11 @@ function seriesText_(r, n) {
   var days = (r.wd || []).map(function (i) { return DAYS[i]; }).join(' و');
   return ev + (days ? ' يوم ' + days : '') + '، ' + apptText_(n) + (r.until ? ' حتى ' + dayText_(r.until) : '');
 }
-// ينقل تغيير موعد من السلسلة إلى ما بعده: الحقول المتغيّرة تُنسخ، وتغيّر اليوم يُزاح بالفرق نفسه
-function seriesApply_(p, t, s, old, x) {
-  var f = {}, shift = dayDiff_(x.d, old.d), out = [];
-  ['title', 'type', 'time', 'dur', 'idea', 'rem', 'rp'].forEach(function (k) { if (JSON.stringify(old[k]) !== JSON.stringify(x[k])) f[k] = x[k] === undefined ? null : x[k]; });
+// ينقل تغيير موعد من السلسلة إلى ما بعده: الحقول المتغيّرة تُنسخ، وتغيّر اليوم يُزاح بالفرق نفسه.
+// onlyWho: المسؤول وحده (المواعيد مستقلة، ويُعيَّن المسؤول لما بعده دفعة واحدة)
+function seriesApply_(p, t, s, old, x, onlyWho) {
+  var f = {}, shift = onlyWho ? 0 : dayDiff_(x.d, old.d), out = [];
+  if (!onlyWho) ['title', 'type', 'time', 'dur', 'idea', 'rem', 'rp'].forEach(function (k) { if (JSON.stringify(old[k]) !== JSON.stringify(x[k])) f[k] = x[k] === undefined ? null : x[k]; });
   if ((old.who || []).join() !== (x.who || []).join()) f.who = x.who;
   if (!Object.keys(f).length && !shift) return out;
   p.acts.forEach(function (y, k) {
@@ -1548,7 +1549,7 @@ function remindHtml_(kind, x, t, left, p) {
   return L.join('\n');
 }
 function noticeHtml_(x, old, t) {
-  if (!old) return '<b>أُلغي ' + h_(q_(x.title)) + '</b>\nكان موعده ' + h_(whenText_(x)) + '. نعتذر للطلاب إن كان قد أُعلن، وسنخبركم بالبديل.';
+  if (!old) return '<b>أُلغي نشاط ' + h_(q_(x.title)) + '</b>\nكان موعده ' + h_(whenText_(x)) + '. نعتذر للطلاب إن كان قد أُعلن، وسنخبركم بالبديل.';
   return '<b>تعديل في الخطة</b>\n' + h_(q_(x.title)) + ' صار ' + h_(whenText_(x)) + '\nبدل ' + h_(whenText_(old)) + '\n\n' + whoLine_(x) + (x.meet && x.meet.uri ? '\n• رابط اللقاء: ' + h_(x.meet.uri) : '') + '\nإن كان الإعلان قد نُشر فحدّثوه بالموعد الجديد.';
 }
 // ملخص الأسبوع ومهامه لمجموعة الفريق
@@ -2103,7 +2104,7 @@ function ckDue_(x, today, nowMin) {
   return nowMin >= st + Math.max(120, dur + 60);
 }
 function ckHtml_(x, t) {
-  return '<b>' + pick_(['كيف كان ', 'نسأل عن ', 'أخبرونا عن '], x.id + 'ck') + h_(q_(x.title)) + '؟</b>\n' +
+  return '<b>' + pick_(['كيف مضى نشاط ', 'كيف جرى نشاط ', 'ما أخبار نشاط '], x.id + 'ck') + h_(q_(x.title)) + '؟</b>\n' +
     'كان موعده ' + h_(whenText_(x)) + ((x.who && x.who.length) ? '، بإشراف ' + h_(x.who.join('، ')) : '') + '.\n\n' +
     'هل أُقيم؟ اختاروا من الأزرار، فيُسجَّل في المنصة مباشرة.\nوإن أحببتم فاكتبوا عدد الحضور أو ملاحظة قصيرة ردًّا على هذه الرسالة.';
 }
