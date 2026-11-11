@@ -6,7 +6,7 @@
 - المستودع: `GHamine23/media-portal` · الاستنساخ في `/home/claude/media-portal` (يُستنسخ من جديد في كل جلسة).
 - الموقع الحي: https://ghamine23.github.io/media-portal/ · الإصدار السادس: https://ghamine23.github.io/media-portal/v6/
 - النشر: GitHub Pages من `main` مجلد `docs`.
-- الخادم: Google Apps Script. المصدر `src/Code.gs` → يُبنى إلى `server/Code.gs` بـ `python3 v6/build_gs.py`. **المستخدم يلصقه يدوياً** في Apps Script وينشر نسخة جديدة. الرابط الخام: https://raw.githubusercontent.com/GHamine23/media-portal/main/server/Code.gs
+- الخادم: Google Apps Script. المصدر `src/Code.gs` → يُبنى إلى `server/Code.gs` بـ `python3 v6/build_gs.py`. **المستخدم يلصقه يدوياً** في Apps Script وينشر نسخة جديدة. لا يُعدَّل `server/Code.gs` مباشرة أبداً (كل تعديل في `src/Code.gs` ثم إعادة البناء): اختبار الخادم يرفض أي اختلاف بينهما، ويتحقق من وجود كود الحساب الموحّد مع منصة الأنشطة (`link_op`, `link_check`). الرابط الخام: https://raw.githubusercontent.com/GHamine23/media-portal/main/server/Code.gs
 - الواجهة: `python3 v6/build6.py` (→ `docs/v6` و`dist6`)، والإصدار الخامس `python3 src/build.py` (يشترك مع السادس في `src/core5.js`).
 - خادم الاختبار المحلي: من `/home/claude`: `python3 -m http.server 8765 --bind 127.0.0.1` (يُعاد تشغيله بعد كل انقطاع للحاوية).
 - الاختبارات: `node v6/gas/test_server.js` (١٣٥) · `python3 v6/t6m.py` (التطبيق) · `python3 v6/pixeltest.py` (٣٨/٣٨) · `python3 v6/t6b.py` … `t6k.py` (كلها ناجحة؛ `t6d` فيه فحص واحد يحتاج خطوط ثمانية في `/fonts_thm/` فيفشل في البيئة الخالية منها) · `v6/tour6.py` لقطات مراجعة لكل الصفحات.

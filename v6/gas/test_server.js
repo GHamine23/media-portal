@@ -617,4 +617,13 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   fails('quiz_results', /ليس من برامجك/, ot, r.id);
   fails('quiz_form', /ليس من برامجك/, ot, JSON.stringify({ program: 'academy', items: items }));
 })();
+// server/Code.gs مبني من src/Code.gs: كل تعديل للخادم يكون في المصدر ثم «python3 v6/build_gs.py».
+// (عُدّل الملف المبني مرة مباشرة فمحا إعادة البناء كود الحساب الموحّد؛ هذا الفحص يمنع تكرارها)
+(function () {
+  const src = fs.readFileSync(path.join(ROOT, 'src/Code.gs'), 'utf8').split('\n'), out = fs.readFileSync(path.join(ROOT, 'server/Code.gs'), 'utf8').split('\n');
+  const sv = require('crypto').createHash('sha1').update(src.join('\n')).digest('hex').slice(0, 8);
+  const same = src.length === out.length && src.every(function (l, i) { return /\/\*(SEED_IDENTITIES|OPEN_FONTS)\*\//.test(l) || l.replace('/*SRV_VER*/', sv) === out[i]; });
+  ok(same, 'server/Code.gs يطابق بناء src/Code.gs (أعد python3 v6/build_gs.py ولا تعدّل الملف المبني)');
+  ok(typeof ctx.link_op === 'function' && typeof ctx.link_check === 'function' && typeof ctx.linkSend_ === 'function', 'كود الحساب الموحّد مع منصة الأنشطة موجود في الخادم');
+})();
 console.log('server tests passed:', n);
