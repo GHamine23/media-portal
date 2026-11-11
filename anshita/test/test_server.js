@@ -44,6 +44,7 @@ GAS._fetch.handler = function (url, opt) {
     if (m === 'deleteWebhook' || m === 'setMyCommands') return { code: 200, body: '{"ok":true,"result":true}' };
     if (m === 'getUpdates') { if (p.offset) TG.offsetUsed = true; const off = +p.offset || 0; return { code: 200, body: JSON.stringify({ ok: true, result: TG.updates.filter(u => u.update_id >= off) }) }; }
     if (m === 'sendMessage') {
+      if (TG.blocked && TG.blocked.includes(String(p.chat_id))) return { code: 403, body: JSON.stringify({ ok: false, description: 'Forbidden: bot can\'t initiate conversation with a user' }) };
       if (TG.migrate && String(p.chat_id) === TG.migrate[0]) return { code: 400, body: JSON.stringify({ ok: false, description: 'Bad Request: group chat was upgraded to a supergroup chat', parameters: { migrate_to_chat_id: +TG.migrate[1] } }) };
       TG.sent.push({ chat: String(p.chat_id), text: p.text, html: p.parse_mode === 'HTML', kb: p.reply_markup || '' }); ALLSENT.push(TG.sent[TG.sent.length - 1]); return { code: 200, body: JSON.stringify({ ok: true, result: { message_id: TG.sent.length } }) };
     }
@@ -549,10 +550,134 @@ ok(TG.sent.some(m => m.chat === '-100999' && /كاهوت مراجعة/.test(m.te
   cred.admin = pw[1];
 }
 
+// ٢٢) اسم صاحب الفعل يُعرض من حسابه الحالي، وترحيل الأسماء القديمة الثابتة، وإنشاء حسابات أعضاء بعينهم
+{
+  NOW = Date.UTC(2027, 1, 1, 7, 0);
+  const AT = call('login', 'admin', cred.admin).token, adm = ctx.cfg_().adminChat.id;
+  call('track_save', AT, 'judhoor', JSON.stringify({ canEdit: true }));
+  const nv = call('acc_save', AT, JSON.stringify({ user: 'old.m', name: 'عضو قديم', role: 'team', track: 'judhoor' }));
+  NOW += 60e3;
+  const OT = call('login', 'old.m', nv.pass).token;
+  const a1 = call('act_save', OT, 'judhoor', JSON.stringify({ title: 'لقاء الأسماء', type: 'لقاء', d: '2027-02-10', time: '20:00' })).act;
+  ok(a1.bu === nv.acc.uid && a1.by === 'عضو قديم', 'النشاط الجديد يحفظ حساب صاحبه');
+  call('meet_create', OT, 'judhoor', a1.id);
+  call('act_series', OT, 'judhoor', JSON.stringify({ base: { title: 'حلقة الأسماء', type: 'لقاء', time: '19:00' }, dates: ['2027-02-11', '2027-02-18'], rule: { every: 1, wd: [4] } }));
+  call('task_save', OT, 'judhoor', JSON.stringify({ title: 'مهمة الأسماء' }));
+  // بيانات قديمة كما كانت قبل الترحيل: الاسم نص ثابت بلا حساب
+  const strip = o => { if (o && typeof o === 'object') { delete o.bu; Object.values(o).forEach(strip); } };
+  const pj = ctx.readJson_('plan_judhoor.json'); strip(pj);
+  pj.acts.push({ id: 'lgc1', title: 'نشاط بلا صاحب معروف', type: 'لقاء', d: '2027-02-12', who: [], by: 'اسم مجهول', at: NOW, done: false, sem: pj.acts[0].sem });
+  ctx.writeJson_('plan_judhoor.json', pj);
+  const lg0 = ctx.readJson_('log.json'); strip(lg0); lg0.unshift({ at: NOW, by: 'سامر (من تليجرام)', role: 'team', t: 'judhoor', what: 'أتمّ نشاطاً', d: 'لقاء' }, { at: NOW, by: 'المدير العام', role: 'admin', t: 'judhoor', what: 'عدّل حساباً', d: 'اسم وسيط' }, { at: NOW, by: 'المدير العام', role: 'admin', t: '', what: 'حذف حساباً', d: 'اسم محذوف' }); ctx.writeJson_('log.json', lg0);
+  const al0 = ctx.readJson_('alerts.json', []); strip(al0); ctx.writeJson_('alerts.json', al0);
+  NOW += 60e3;
+  call('acc_save', AT, JSON.stringify({ uid: nv.acc.uid, user: 'old.m', name: 'مشرف جذور ٩', role: 'team', track: 'judhoor' }));
+  const has = (re) => ['plan_judhoor.json', 'log.json', 'alerts.json', 'tracks.json'].filter(f => re.test(JSON.stringify(ctx.readJson_(f, null))));
+  ok(has(/عضو قديم/).length >= 2, 'قبل الترحيل: الاسم القديم مخزّن في الأنشطة والسجل');
+  const dry = ctx.byMigrate_(false);
+  ok(/تجربة بلا حفظ/.test(dry) && has(/عضو قديم/).length >= 2, 'التجربة لا تحفظ شيئًا');
+  const res = ctx.byMigrate_(true);
+  ok(/حُفظ الترحيل/.test(res) && !has(/عضو قديم/).length, 'بعد الترحيل لا يبقى الاسم القديم في أي ملف');
+  const pm = ctx.plan_('judhoor'), mine = pm.acts.filter(x => /الأسماء/.test(x.title));
+  ok(mine.length === 3 && mine.every(x => x.bu === nv.acc.uid && x.by === 'مشرف جذور ٩'), 'أنشطته وسلسلته رُبطت بحسابه واسمه الحالي');
+  ok(mine[0].meet && mine[0].meet.bu === nv.acc.uid && Object.values(pm.series).some(x => x.bu === nv.acc.uid) && pm.tasks.some(x => x.title === 'مهمة الأسماء' && x.bu === nv.acc.uid), 'ورابط ميت والسلسلة والمهمة كذلك');
+  const tAcc = Object.values(ctx.accs_()).find(x => x.user === 'judhoor');
+  const lgc = pm.acts.find(x => x.id === 'lgc1'); ok(lgc.bu === tAcc.uid && lgc.by === tAcc.name && /اسم مجهول/.test(res), 'ما لا يُعرف صاحبه يُنسب إلى حساب المسار ويُذكر في النتيجة');
+  const L1 = ctx.readJson_('log.json');
+  ok(L1.some(e => e.what === 'أنشأ حساباً' && e.d === 'مشرف جذور ٩') && L1.some(e => e.by === 'سامر (من تليجرام)' && !e.bu), 'تفاصيل سجل الحسابات بالاسم الحالي، وضغطات تليجرام كما هي');
+  ok(/وبقي بلا صاحب: 0/.test(res) && /plan_judhoor \d+/.test(res), 'النتيجة تذكر الأعداد والملفات');
+  ok(!L1.some(e => /اسم وسيط|اسم محذوف/.test(e.d)) && L1.some(e => e.what === 'عدّل حساباً' && e.d === 'حساب في جذور') && L1.some(e => e.what === 'حذف حساباً' && e.d === 'حساب'), 'اسم لا يُعرف صاحبه في سجل الحسابات يصير وصفًا عامًا');
+  // تغيير الاسم بعد الترحيل يسري في العرض دون إعادة كتابة البيانات
+  call('acc_save', AT, JSON.stringify({ uid: nv.acc.uid, user: 'old.m', name: 'مشرف جذور ١٠', role: 'team', track: 'judhoor' }));
+  const shown = call('plan', AT, 'judhoor').acts.filter(x => /الأسماء/.test(x.title));
+  ok(shown.every(x => x.by === 'مشرف جذور ١٠') && shown[0].meet.by === 'مشرف جذور ١٠', 'الخطة تعرض الاسم الجديد');
+  ok(call('log_list', AT).filter(x => x.bu === nv.acc.uid).every(x => x.by === 'مشرف جذور ١٠') && call('boot', AT).log.some(x => x.by === 'مشرف جذور ١٠'), 'والسجل كذلك');
+  ok(ctx.plan_('judhoor').acts.find(x => x.id === a1.id).by === 'مشرف جذور ٩', 'والمخزّن لم يُمس: العرض من الحساب');
+  const again = ctx.byMigrate_(true); ok(/رُبط باسمه الحالي: 0، وصار اسمه الحالي بعد اسم قديم: 0، ونُسب إلى حساب المسار: 0/.test(again) && /لا يُعرف صاحبه: 0/.test(again), 'إعادة الترحيل لا تغيّر شيئًا');
+  // حسابات لأعضاء بعينهم
+  call('track_save', AT, 'judhoor', JSON.stringify({ members: ['مشرف جذور ٣', 'مشرف جذور ٤', 'مشرف جذور ٥'] }));
+  TG.sent.length = 0;
+  const ma = JSON.parse(ctx.memberAccounts_('judhoor', { 'مشرف جذور ٣': 'judhoor3', 'مشرف جذور ٤': 'judhoor4' }, true));
+  ok(ma.made.length === 2 && ma.made[0].user === 'judhoor3' && ma.made[1].user === 'judhoor4' && ma.made[1].name === 'مشرف جذور ٤', 'يُنشأ الحسابان المسمّيان وحدهما');
+  ok(!Object.values(ctx.accs_()).some(x => x.name === 'مشرف جذور ٥'), 'ولا يُنشأ لغيرهما');
+  ok(TG.sent.length === 3 && TG.sent.every(m => m.chat === adm), 'وبياناتهما في محادثة الإدارة وحدها');
+  throws(() => ctx.memberAccounts_('judhoor', { 'مشرف جذور ٥': 'judhoor3' }, true), /مستعمل/, 'اسم دخول مستعمل يُرفض ولا يُغيَّر');
+  throws(() => ctx.memberAccounts_('judhoor', { 'مشرف جذور ٦': 'judhoor6' }, true), /ليس في «الفريق»/, 'واسم ليس في «الفريق» يُرفض');
+}
+
+// ٢٣) كلمة مرور جديدة لحساب عضو تصل محادثة الإدارة وحدها
+{
+  const adm = ctx.cfg_().adminChat.id, AT = call('login', 'admin', cred.admin).token;
+  const acc = call('acc_save', AT, JSON.stringify({ user: 'ithmar2.9', name: 'مشرف إثمار ٢ - ٩', role: 'team', track: 'ithmar2' }));
+  const T0 = call('login', 'ithmar2.9', acc.pass).token;
+  TG.sent.length = 0;
+  const msg = ctx.memberPassToChat_('ithmar2.9');
+  const m = TG.sent.filter(x => x.chat === adm), pw = m.length > 1 && /كلمة المرور: <code>([^<]+)<\/code>/.exec(m[1].text);
+  ok(TG.sent.length === 2 && m.length === 2 && pw && /مشرف إثمار ٢ - ٩/.test(m[1].text) && /حوّلها/.test(m[0].text), 'رسالتان في محادثة الإدارة وحدها: تنبيه، ثم رسالة جاهزة للتحويل');
+  ok(!msg.includes(pw[1]) && !JSON.stringify(call('log_list', AT)).includes(pw[1]), 'الكلمة لا تظهر في الرد ولا في السجل');
+  ok(call('login', 'ithmar2.9', pw[1]).me.user === 'ithmar2.9', 'يدخل بالكلمة الجديدة');
+  throws(() => call('boot', T0), /تغيّرت كلمة المرور/, 'والجلسات القديمة خرجت');
+  throws(() => ctx.memberPassToChat_('admin'), /adminPassToChat/, 'حساب الإدارة له دالته');
+  throws(() => ctx.memberPassToChat_('nobody.x'), /لا حساب/, 'اسم غير موجود يُرفض');
+}
+
+// ٢٤) إنشاء حسابات الأعضاء تلقائيًا حين يُكتب بريدهم في «الفريق»، وتسليمها في خاص العضو
+{
+  NOW = Date.UTC(2027, 1, 3, 7, 0);
+  const adm = ctx.cfg_().adminChat.id, AT = call('login', 'admin', cred.admin).token, BT = call('login', 'budhoor', cred.budhoor).token;
+  ok(ctx.cfg_().autoAcc === true, 'مفعّل افتراضيًا');
+  const acc = u => Object.values(ctx.accs_()).find(x => x.user === u);
+  TG.sent.length = 0; TG.blocked = [];
+  const r = call('track_save', BT, 'budhoor', JSON.stringify({ members: ['مشرف بذور ٢', 'مشرف بذور ٣', 'مشرف بذور ٤'], emails: { 'مشرف بذور ٢': 'b2@example.com', 'مشرف بذور ٣': 'b3@example.com' }, tgs: { 'مشرف بذور ٢': '7001002003', 'مشرف بذور ٤': 'not-an-id' } }));
+  ok(r.auto && r.auto.made.length === 2 && r.auto.made[0].user === 'budhoor2' && r.auto.made[0].sent === 'dm' && r.auto.made[1].user === 'budhoor3' && r.auto.made[1].sent === 'admin', 'حسابان بالنمط العام: الأول في الخاص، والثاني إلى الإدارة');
+  ok(!acc('budhoor4'), 'ولا حساب لمن لا بريد له');
+  ok(!/[a-z2-9]{4}-[a-z2-9]{5}/.test(JSON.stringify(r)), 'كلمة المرور ليست في الرد');
+  const dm = TG.sent.filter(m => m.chat === '7001002003'), pw2 = dm.length === 1 && /كلمة المرور: <code>([^<]+)<\/code>/.exec(dm[0].text);
+  ok(pw2 && /مشرف بذور ٢/.test(dm[0].text) && call('login', 'budhoor2', pw2[1]).me.track === 'budhoor', 'بيانات الأول في خاصه، ويدخل بها مساره');
+  const ad = TG.sent.filter(m => m.chat === adm);
+  ok(ad.length === 3 && /budhoor2.*وأُرسل له في الخاص/.test(ad[0].text) && !/كلمة المرور/.test(ad[0].text) && /حوّلها/.test(ad[1].text) && /budhoor3/.test(ad[2].text), 'والإدارة يصلها سطر للأول، ورسالة جاهزة للتحويل للثاني');
+  ok(TG.sent.length === 4, 'ولا يصل شيء لغيرهما');
+  ok(acc('budhoor2').tg === '7001002003' && !acc('budhoor3').tg, 'معرّف تليجرام يُحفظ في الحساب');
+  ok(!JSON.stringify(call('log_list', AT)).includes(pw2[1]), 'ولا الكلمة في السجل');
+  ok(!('tgs' in call('boot', BT).tracks.find(t => t.id === 'budhoor')) && call('boot', AT).tracks.find(t => t.id === 'budhoor').tgs['مشرف بذور ٢'] === '7001002003', 'المعرّفات تراها الإدارة وحدها');
+  TG.sent.length = 0;
+  const r2 = call('track_save', BT, 'budhoor', JSON.stringify({ members: ['مشرف بذور ٢', 'مشرف بذور ٣', 'مشرف بذور ٤'], emails: { 'مشرف بذور ٢': 'b2@example.com', 'مشرف بذور ٣': 'b3@example.com' } }));
+  ok(!r2.auto && !TG.sent.length && ctx.trackOf_('budhoor').tgs['مشرف بذور ٢'] === '7001002003', 'إعادة الحفظ لا تنشئ شيئًا وتحفظ المعرّف');
+  // خاص لم يُفتح مع البوت: تصل الإدارةَ لتحوّلها
+  TG.blocked = ['7009'];
+  const r3 = call('track_save', BT, 'budhoor', JSON.stringify({ emails: { 'مشرف بذور ٢': 'b2@example.com', 'مشرف بذور ٣': 'b3@example.com', 'مشرف بذور ٤': 'b4@example.com' }, tgs: { 'مشرف بذور ٤': '700900' } }));
+  TG.blocked = ['700900'];
+  ok(r3.auto.made.length === 1 && r3.auto.made[0].user === 'budhoor4', 'كتابة البريد تنشئ الحساب');
+  TG.blocked = [];
+  call('track_save', BT, 'budhoor', JSON.stringify({ members: ['مشرف بذور ٢', 'مشرف بذور ٣', 'مشرف بذور ٤', 'مشرف بذور ٥'] }));
+  TG.blocked = ['7005005005']; TG.sent.length = 0;
+  const r4 = call('track_save', BT, 'budhoor', JSON.stringify({ emails: { 'مشرف بذور ٢': 'b2@example.com', 'مشرف بذور ٣': 'b3@example.com', 'مشرف بذور ٤': 'b4@example.com', 'مشرف بذور ٥': 'b5@example.com' }, tgs: { 'مشرف بذور ٥': '7005005005' } }));
+  ok(r4.auto.made[0].sent === 'admin' && TG.sent.some(m => m.chat === adm && /تعذّر إرساله له في الخاص/.test(m.text)) && TG.sent.some(m => m.chat === adm && /كلمة المرور/.test(m.text)), 'تعذّر الخاص: تصل الإدارةَ لتحوّلها');
+  TG.blocked = [];
+  // اسم دخول مستعمل، والإيقاف، والتشغيل من المحرر
+  call('acc_save', AT, JSON.stringify({ user: 'budhoor6', name: 'حساب آخر', role: 'team', track: 'budhoor' }));
+  call('track_save', BT, 'budhoor', JSON.stringify({ members: ['مشرف بذور ٢', 'مشرف بذور ٣', 'مشرف بذور ٤', 'مشرف بذور ٥', 'مشرف بذور ٦', 'مشرف بذور ٧'] }));
+  const r5 = call('track_save', BT, 'budhoor', JSON.stringify({ emails: { 'مشرف بذور ٦': 'b6@example.com' } }));
+  ok(!r5.auto.made.length && r5.auto.skip[0].why === 'اسم الدخول مستعمل', 'اسم دخول مستعمل: لا يُنشأ ويُذكر السبب');
+  call('settings_save', AT, JSON.stringify({ autoAcc: false }));
+  const r6 = call('track_save', BT, 'budhoor', JSON.stringify({ emails: { 'مشرف بذور ٦': 'b6@example.com', 'مشرف بذور ٧': 'b7@example.com' } }));
+  ok(r6.auto.off && !acc('budhoor7'), 'المفتاح مطفأ: لا إنشاء');
+  const f = ctx.autoAccounts_('budhoor', ['مشرف بذور ٧'], true);
+  ok(f.made.length === 1 && f.made[0].user === 'budhoor7', 'والإدارة تنشئه من المحرر ولو كان المفتاح مطفأ');
+  call('settings_save', AT, JSON.stringify({ autoAcc: true }));
+  call('track_save', BT, 'budhoor', JSON.stringify({ members: ['مشرف بذور ٢', 'عضو باسم شخصي'] }));
+  const r7 = call('track_save', BT, 'budhoor', JSON.stringify({ emails: { 'عضو باسم شخصي': 'p@example.com' } }));
+  ok(!r7.auto.made.length && /النمط العام/.test(r7.auto.skip[0].why) && !Object.values(ctx.accs_()).some(x => x.name === 'عضو باسم شخصي'), 'اسم ليس بالنمط العام: لا حساب ولا اسم دخول مخمَّن');
+  ok(ctx.autoUser_('ithmar2', 'مشرف إثمار ٢ - ٦', 0) === 'ithmar2.6' && ctx.autoUser_('judhoor', 'مشرف جذور ٥', 0) === 'judhoor5', 'اسم الدخول العام من رقم الاسم');
+}
+
 if (process.env.PREVIEW) {
   const seen = new Set(); ALLSENT.forEach(m => { const k = m.text.split('\n')[0].replace(/«.*»/, ''); if (m.html && !seen.has(k)) { seen.add(k); console.log('\n=== ' + m.chat + '\n' + m.text); } });
   console.log('\n=== ADMIN TASKS\n' + ctx.adminTasksHtml_('2026-11-28', ctx.cfg_()));
   console.log('\n=== REPORT PARTS\n' + ctx.mdToTgParts_('التقرير الأسبوعي — السبت 31 أكتوبر', '## الخلاصة\nيبدأ الفصل اليوم. **خمسة مسارات** وضعت أنشطة.\n\n## ما يحتاج قرارك\n- إثمار ٣ بلا أنشطة\n- لقاء جذور بلا مسؤول\n\n## جذور\n' + Array.from({length: 20}, (_, i) => '- نشاط رقم ' + i + ' في الأسبوع').join('\n')).join('\n---- next message ----\n'));
 }
+// لا تكرار لكلمة «مسار» في أي رسالة أُرسلت («لمسار مسار إشراق»)
+ok(ALLSENT.length && !ALLSENT.some(m => /مسار\s+مسار/.test(m.text || '')), 'لا «مسار مسار» في رسائل البوت: ' + ((ALLSENT.find(m => /مسار\s+مسار/.test(m.text || '')) || {}).text || '').slice(0, 120));
+ok(ctx.forTrack_('مسار إشراق') === 'لمسار إشراق' && ctx.forTrack_('إشراق') === 'لمسار إشراق', 'اسم المسار في الرسائل: «لمسار إشراق» من الاسمين');
 console.log((fail ? '✗' : '✓') + ' ' + pass + ' فحصاً ناجحاً' + (fail ? '، و' + fail + ' فاشلة' : ''));
 process.exit(fail ? 1 : 0);

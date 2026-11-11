@@ -26,6 +26,8 @@ async def main():
         ok(r[2] is None, 'TPLF reset after drawing')
         ok(await pg.evaluate("ntClean('كيفية إدارة المشاريعـ ؟') === 'كيفية إدارة المشاريع؟'"), 'clean: no space before ? and no trailing tatweel')
         ok(await pg.evaluate("ntClean('يوم الأحد 1/6/1448هـ') === 'يوم الأحد 1/6/1448هـ' && ntClean('سنة 1448 هـ.') === 'سنة 1448 هـ.'"), 'clean: keeps the Hijri abbreviation')
+        ok(await pg.evaluate("familyOf('82a81fe1-1793792989822_TheYearofHandicrafts-SemiBold.otf').family === 'handicrafts' && weightOf('TheYearofHandicrafts-SemiBold.otf') === '600' && weightOf('The Year of Handicrafts-Black.otf') === '900' && familyOf('TheYearofHandicraftsTTF-Reg.ttf').label === 'عام الحرف اليدوية'"), 'academy font files map to one family with the right weights')
+        ok(await pg.evaluate("TRACKS.academy && TRACKS.academy.fonts.title === 'handicrafts' && TRACKS.academy.c.p === '#00837b' && ACADEMY.purple === '#522b60'"), 'academy identity: official colours and its font')
         # المحرر: لوحة الخطوط تُظهر خط القالب
         await pg.goto(URL + '#/e/judhoor/nt_ticket'); await pg.wait_for_timeout(3000)
         await pg.evaluate("document.querySelectorAll('.coach,.gintro').forEach(x=>x.remove())")

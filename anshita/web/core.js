@@ -606,7 +606,7 @@ function moveAct(tid, id, d) {
 }
 async function trackSave(tid, patch) {
   setSync('busy');
-  try { const r = await API.me('track_save', tid, JSON.stringify(patch)); const i = D.tracks.findIndex(t => t.id === tid), nt = Object.assign({}, D.tracks[i], r.track); if (!r.track.editReq) delete nt.editReq; D.tracks[i] = nt; setSync('ok'); render(); return r.track; }
+  try { const r = await API.me('track_save', tid, JSON.stringify(patch)); const i = D.tracks.findIndex(t => t.id === tid), nt = Object.assign({}, D.tracks[i], r.track); if (!r.track.editReq) delete nt.editReq; D.tracks[i] = nt; setSync('ok'); render(); autoNote(r.auto); return r.track; }
   catch (e) { setSync('ok'); toast(e.message, 'err'); throw e; }
 }
 
@@ -739,4 +739,10 @@ function runAct(f, el, e) {
     r.catch(() => {}).finally(() => { clearTimeout(t); BUSY.delete(k); paintBusy(); });
   }
   return r;
+}
+// حسابات الأعضاء التي أنشأها الخادم تلقائيًا حين كُتب بريدهم في «الفريق»
+function autoNote(au) {
+  if (!au || !au.made) return;
+  if (au.made.length) toast('أُنشئ ' + au.made.map(m => 'حساب ' + m.name + (m.sent === 'dm' ? ' وأُرسل له في الخاص' : ' ووصلت بياناته محادثة الإدارة')).join('، '));
+  if (au.skip && au.skip.length) toast('لم يُنشأ حساب لـ' + au.skip.map(m => m.name + ' (' + m.why + ')').join('، '), 'err');
 }

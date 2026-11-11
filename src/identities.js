@@ -63,15 +63,21 @@ const TRACKS = {
   academy: {
     id: 'academy', group: 'act', name: 'الأكاديمية', full: 'أكاديمية الجيل الصاعد', logo: 'lg_academy',
     desc: 'للإعلانات العامة',
-    c: { p: '#16817a', pd: '#0e5753', pl: '#4bb0a8', s: '#512c62', sd: '#3b1f48', sdd: '#24122e', a: '#f7931e', a2: '#c70d3a',
-      paper: '#f8f8f8', warm: '#eceae6', ink: '#2b2b2b', muted: '#8d8d8d', teal: '#0d4f4b', tealL: '#4b9d97' }
+    // نظام تصميم الأكاديمية (نوفمبر 2026): الألوان الأربعة من ملف الهوية الرسمي، والورق نعناعي، والحبر مائل إلى الأخضر
+    fonts: { title: 'handicrafts', body: 'handicrafts' },
+    c: { p: '#00837b', pd: '#005c56', pl: '#5fcfc4', s: '#522b60', sd: '#3a1d45', sdd: '#24122e', a: '#f45907', a2: '#c70e3a',
+      paper: '#f5f8f7', warm: '#e3f1ef', ink: '#1c2b2a', muted: '#7d8c8a', teal: '#005c56', tealL: '#4b9d97' }
   }
 };
 const GROUPS = [['track', 'المسارات'], ['act', 'الأنشطة التربوية']];
 // ألوان الأكاديمية: هوية الموقع نفسه
-const ACADEMY = { orange: '#f45905', red: '#c70d3a', purple: '#512c62', teal: '#16817a' };
+const ACADEMY = { orange: '#f45907', red: '#c70e3a', purple: '#522b60', teal: '#00837b' };   // ملف الهوية الرسمي
 
+// خطوط الهويات الافتراضية: الهويات تُحفظ في الخادم بألوانها فقط، فخطها يُعرف هنا بمعرّفها.
+// يسري الخط إذا كان مرفوعاً إلى المنصة، وإلا بقي خط البرنامج.
+const ID_FONTS = { academy: { title: 'handicrafts', body: 'handicrafts' } };
 function finishTrack(t) {
+  if (!t.fonts && ID_FONTS[t.id]) t.fonts = ID_FONTS[t.id];
   if (!t.swatches) { const c = t.c; t.swatches = [c.pd, c.p, c.pl, c.sdd, c.sd, c.s, c.teal, c.a, c.a2, c.warm, c.paper, '#ffffff', '#2b2b2b']; }
   t.swatches = t.swatches.map(function (x) { return x.toLowerCase(); }).filter(function (x, i, a) { return a.indexOf(x) === i; });
   return t;

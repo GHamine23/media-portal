@@ -54,6 +54,7 @@ function familyOf(fileName) {
   if (/thmanyah.*serif.*display/.test(n)) return { family: 'thm-display', label: 'ثمانية للعناوين' };
   if (/thmanyah.*serif.*text/.test(n)) return { family: 'thm-text', label: 'ثمانية للنصوص' };
   if (/thmanyah.*sans/.test(n)) return { family: 'thm-sans', label: 'ثمانية' };
+  if (/year ?of ?handicrafts|yearofhandicrafts/.test(n.replace(/[-_ ]/g, ''))) return { family: 'handicrafts', label: 'عام الحرف اليدوية' };
   const base = n.split(/[-_]/)[0].replace(/[^a-z0-9]/g, '') || 'font';
   return { family: base, label: base };
 }
@@ -127,6 +128,8 @@ async function useProgram(id, silent) {
 function tplFontFams() {
   const out = [];
   (typeof TEMPLATES !== 'undefined' ? TEMPLATES : []).forEach(function (t) { if (t.fonts) Object.keys(t.fonts).forEach(function (k) { const f = t.fonts[k]; if (f && out.indexOf(f) < 0 && FONTS[f]) out.push(f); }); });
+  // وخطوط الهويات (خط الأكاديمية)
+  Object.keys(typeof TRACKS !== 'undefined' ? TRACKS : {}).forEach(function (k) { const f = TRACKS[k].fonts; if (f) [f.title, f.body].forEach(function (x) { if (x && out.indexOf(x) < 0 && FONTS[x]) out.push(x); }); });
   return out;
 }
 function applyProgramColor(p) {
