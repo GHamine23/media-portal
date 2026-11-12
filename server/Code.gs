@@ -121,7 +121,7 @@ function apiFns_() {
     rv_request: rv_request, rv_list: rv_list, rv_mine: rv_mine, rv_img: rv_img, rv_reply: rv_reply,
     me_week: me_week, wk_admin: wk_admin, ai_skills: ai_skills, ai_skill_save: ai_skill_save, ai_skill_reset: ai_skill_reset, img_requests: img_requests, img_decide: img_decide, quran_find: quran_find, hadith_find: hadith_find,
     quiz_form: quiz_form, quiz_results: quiz_results, quiz_accept: quiz_accept,
-    link_op: link_op, link_check: link_check
+    link_op: link_op, link_check: link_check, bridge_op: bridge_op, bridge_key: bridge_key
   };
 }
 function doPost(e) {
@@ -207,7 +207,7 @@ function tempPass_() {
 function publicAcc_(a) {
   return { uid: a.uid, username: a.username, email: a.email || '', name: a.name, role: a.role, programs: a.programs || [], perms: a.perms || {},
     mustChange: !!a.mustChange, disabled: !!a.disabled, created: a.created, last: a.last || 0, legacy: !!a.legacyKey, note: a.note || '',
-    tracks: a.tracks || [], editLevel: a.editLevel || '', hasAvatar: !!a.hasAvatar, anshita: !!a.ansUid, trackSup: !!a.linkSup };
+    tracks: a.tracks || [], editLevel: a.editLevel || '', hasAvatar: !!a.hasAvatar, anshita: !!a.ansUid, trackSup: !!a.linkSup, bridge: a.bridge || '' };
 }
 function findAcc_(accs, id) {
   var n = normUser_(id);
@@ -593,6 +593,224 @@ function linkUnlink_(uid, disable) {
 function linkPeek_(ids) {
   var accs = readJson_('accounts.json', {});
   return ids.slice(0, 100).map(function (id) { var a = accs[id]; return a ? { uid: a.uid, username: a.username, name: a.name, role: a.role, tracks: a.tracks || [], linked: a.ansUid || '' } : { uid: id, missing: true }; });
+}
+
+/* ================= جسر محادثة الربط (طلبات ١١ و١٢ نوفمبر) =================
+   محادثة الربط (كلود الذي يقرأ بوت الأكاديمية) تنادي bridge_op بمفتاح خاص لا بكلمة مرور: BRIDGE_KEY في خصائص السكربت،
+   يُظهره ويجدّده المدير العام من «الإعدادات ← محادثة الربط».
+   العمليات (o.op):
+     make     حساب في أثر وحده (بلا حساب في منصة الأنشطة):
+              kind 'shared' حساب عام للأكاديمية (قسم الإناث مثلًا): تصميم في كل المسارات، بلا إدارة، بلا بريد ولا ربط.
+              kind 'sup'    مشرف من غير الأنشطة: اسم دخوله بنمط ac.N، ويُحفظ معرّفه في تليجرام لتُنسب إليه تصاميمه الواردة.
+              بيانات الدخول يرسلها بوت الأكاديمية إلى المحادثة المعطاة (chat) وحدها، ولا تظهر في الرد ولا في السجل.
+              وإن تعذّر الإرسال بقي الحساب بلا كلمة معروفة حتى تُعاد بـ resend.
+     resend   كلمة مرور جديدة لحساب أُنشئ هنا، إلى المحادثة المعطاة أو المحفوظة.
+     inbox    تصميم أرسله مشرف إلى البوت: يُحفظ في مجلد «تصاميم واردة من المشرفين» في درايف، ويُسجَّل في inbox.json.
+     inbox_list / inbox_get / inbox_done   لمراجعة الوارد أسبوعيًا وتحويله إلى قوالب.
+     stats    إحصاء أثر للقراءة فقط: الحسابات لكل مسار، ومن دخل في ٧ و٣٠ يومًا، والتصاميم لكل حساب ومسار، وآخر دخول.
+              بلا كلمات مرور ولا بريد ولا معرّفات داخلية. */
+var BRIDGE_PROG = 'academy';
+var BRIDGE_PERMS = ['social', 'ai', 'upload', 'slides'];   // تصميم: الصور والمساعد والنص المصاحب والعروض، بلا نشر في القنوات ولا رفع خطوط
+var INBOX_DIR = 'تصاميم واردة من المشرفين';
+var INBOX_MIME = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'application/pdf': 'pdf' };
+function bridgeKey_() { return props_().getProperty('BRIDGE_KEY') || ''; }
+function needBridge_(key) {
+  var k = bridgeKey_(), g = String(key || '');
+  if (!k || g.length !== k.length) throw new Error('مفتاح محادثة الربط غير صحيح');
+  var d = 0; for (var i = 0; i < k.length; i++) d |= k.charCodeAt(i) ^ g.charCodeAt(i);
+  if (d) throw new Error('مفتاح محادثة الربط غير صحيح');
+}
+// يُظهره المدير العام وحده، ويجدّده متى شاء (فيتوقف القديم فورًا)
+function bridge_key(token, renew) {
+  var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
+  var k = bridgeKey_();
+  if (!k || renew) { k = uid_() + uid_() + uid_(); props_().setProperty('BRIDGE_KEY', k); audit_(a, renew ? 'جدّد مفتاح محادثة الربط' : 'أنشأ مفتاح محادثة الربط', ''); }
+  return JSON.stringify({ key: k });
+}
+function bridge_op(key, json) {
+  needBridge_(key);
+  json = String(json || '');
+  if (json.length > 30 * 1024 * 1024) throw new Error('الطلب أكبر من المسموح');
+  var o = JSON.parse(json || '{}');
+  if (o.op === 'make') return JSON.stringify(bridgeMake_(o));
+  if (o.op === 'resend') return JSON.stringify(bridgeResend_(o));
+  if (o.op === 'inbox') return JSON.stringify(inboxPut_(o));
+  if (o.op === 'inbox_list') return JSON.stringify(inboxList_(o));
+  if (o.op === 'inbox_get') return inboxGet_(o.id);
+  if (o.op === 'inbox_done') return JSON.stringify(inboxDone_(o));
+  if (o.op === 'stats') return JSON.stringify(bridgeStats_(o));
+  throw new Error('عملية غير معروفة');
+}
+function bridgeChat_(c, privateOnly) {
+  c = String(c == null ? '' : c).trim();
+  if (!/^-?\d{4,20}$/.test(c)) throw new Error('معرّف محادثة تليجرام رقمي مطلوب');
+  if (privateOnly && c.charAt(0) === '-') throw new Error('بيانات المشرف تُرسل في خاصه فقط (معرّف موجب)');
+  return c;
+}
+function bridgeTracks_(list) {
+  var p = progs_().filter(function (x) { return x.id === BRIDGE_PROG; })[0], ids = ((p && p.identities) || []).map(function (x) { return x.id; });
+  return (list || []).map(function (t) { t = String(t || '').trim(); if (ids.indexOf(t) < 0) throw new Error('مسار غير معروف في الأكاديمية: ' + t); return t; });
+}
+// نص رسالة بيانات الدخول (يُرسل كما هو، وكلمة المرور فيه وحده)
+function bridgeMsg_(a, pw, renew) {
+  var shared = a.bridge === 'shared';
+  return 'السلام عليكم' + (shared ? '' : ' أ. ' + h0_(a.name)) + ' 🌿\n' +
+    (renew ? 'كلمة مرور جديدة لـ' : 'هذا ') + (shared ? '<b>' + h0_(a.name) + '</b> في <b>منصة الأثر الإعلامي</b> لتصميم إعلانات الأكاديمية ومساراتها' : 'حسابك في <b>منصة الأثر الإعلامي</b> لتصميم إعلانات الأكاديمية') + ':\n\n' +
+    'الرابط: ' + SITE_URL + '\n' +
+    'اسم المستخدم: <code>' + h0_(a.username) + '</code>\n' +
+    'كلمة المرور: <code>' + h0_(pw) + '</code>\n\n' +
+    'اضغط على اسم المستخدم أو كلمة المرور لنسخها.' +
+    (shared ? ' هذا الحساب مشترك، فلا تغيّروا كلمة مروره إلا باتفاق.' : ' وبعد أول دخول اختر كلمة مرور لك.') +
+    (a.bridge === 'sup' ? '\n\nوما صمّمته خارج المنصة أرسله هنا للبوت صورةً أو ملف PDF، فيُحفظ لفريق الأكاديمية ويُبنى منه قالب.' : '');
+}
+function h0_(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+// يضع كلمة مرور جديدة ويرسلها؛ وإن فشل الإرسال تُمحى الكلمة (لا تبقى كلمة لم تصل أحدًا)
+function bridgeIssue_(uid, chat, renew) {
+  var pw = tempPass_() + tempPass_().slice(0, 2);
+  var a = withLock_(function () {
+    var accs = readJson_('accounts.json', {}), x = accs[uid]; if (!x) throw new Error('الحساب غير موجود');
+    x.salt = Utilities.getUuid(); x.hash = pwHash_(x.salt, pw); x.mustChange = x.bridge !== 'shared'; x.noPw = false; x.fails = 0; x.lockUntil = 0;
+    writeJson_('accounts.json', accs); return x;
+  });
+  try { tgCall_('sendMessage', { chat_id: chat, text: bridgeMsg_(a, pw, renew), parse_mode: 'HTML', disable_web_page_preview: 'true' }, BRIDGE_PROG); }
+  catch (e) {
+    withLock_(function () { var accs = readJson_('accounts.json', {}), x = accs[uid]; if (x) { x.salt = Utilities.getUuid(); x.hash = pwHash_(x.salt, Utilities.getUuid()); x.noPw = true; writeJson_('accounts.json', accs); } dropSessions_(uid); });
+    return { sent: false, why: String(e && e.message || e) };
+  }
+  if (renew) withLock_(function () { dropSessions_(uid); });
+  return { sent: true };
+}
+// o = {kind: 'shared'|'sup', name, user?, tracks?, chat, tg?, note?}
+function bridgeMake_(o) {
+  var kind = o.kind === 'shared' ? 'shared' : o.kind === 'sup' ? 'sup' : '';
+  if (!kind) throw new Error('نوع الحساب: shared أو sup');
+  var chat = bridgeChat_(o.chat, kind === 'sup'), tracks = kind === 'shared' ? [] : bridgeTracks_(o.tracks);
+  var name = clip_(String(o.name || (kind === 'shared' ? 'حساب الأكاديمية' : '')).trim(), 80);
+  if (!name) throw new Error('اسم صاحب الحساب مطلوب');
+  var res = withLock_(function () {
+    var accs = readJson_('accounts.json', {}), list = Object.keys(accs).map(function (k) { return accs[k]; });
+    var taken = function (u) { return list.some(function (x) { return normUser_(x.username) === u || (x.email && normUser_(x.email) === u); }); };
+    var u = normUser_(o.user || '');
+    if (kind === 'shared') { u = u || 'academy1'; if (!/^[a-z][a-z0-9._\-]{2,29}$/.test(u)) throw new Error('اسم الدخول حروف إنجليزية صغيرة وأرقام'); }
+    else if (u) { if (!/^ac\.[a-z0-9][a-z0-9._\-]{0,26}$/.test(u)) throw new Error('اسم دخول المشرف يبدأ بـ ac. (مثل ac.7 أو ac.khaled)'); }
+    else { var n = 1; while (taken('ac.' + n)) n++; u = 'ac.' + n; }
+    if (taken(u)) throw new Error('اسم الدخول ' + u + ' مستعمل');
+    var tgId = kind === 'sup' ? String(o.tg || chat) : '';
+    if (tgId && list.some(function (x) { return x.tg && String(x.tg) === tgId && !x.disabled; })) throw new Error('لهذا المعرّف في تليجرام حساب في أثر من قبل');
+    var pp = {}; BRIDGE_PERMS.forEach(function (k) { pp[k] = true; });
+    var salt = Utilities.getUuid(), a = { uid: uid_(), username: u, email: '', name: name, role: 'user', programs: [BRIDGE_PROG], tracks: tracks, perms: pp, editLevel: '',
+      salt: salt, hash: pwHash_(salt, Utilities.getUuid()), noPw: true, mustChange: false, created: now_(), last: 0, fails: 0, prefs: {},
+      bridge: kind, note: clip_(o.note || (kind === 'shared' ? 'حساب عام للأكاديمية (من محادثة الربط)' : 'مشرف من غير الأنشطة (من محادثة الربط)'), 300) };
+    if (tgId) a.tg = tgId;
+    accs[a.uid] = a; writeJson_('accounts.json', accs);
+    audit_(null, kind === 'shared' ? 'أنشأ حسابًا عامًا للأكاديمية من محادثة الربط' : 'أنشأ حساب مشرف في أثر من محادثة الربط', u);
+    return a;
+  });
+  var d = bridgeIssue_(res.uid, chat, false);
+  return { username: res.username, name: res.name, kind: kind, tracks: res.tracks, sent: d.sent, why: d.why || '' };
+}
+// o = {user, chat?}
+function bridgeResend_(o) {
+  var accs = readJson_('accounts.json', {}), a = findAcc_(accs, o.user || '');
+  if (!a || !a.bridge) throw new Error('لا حساب بهذا الاسم أُنشئ من محادثة الربط');
+  if (a.disabled) throw new Error('هذا الحساب موقوف');
+  var chat = bridgeChat_(o.chat || (a.bridge === 'sup' ? a.tg : ''), a.bridge === 'sup');
+  var d = bridgeIssue_(a.uid, chat, true);
+  audit_(null, 'كلمة مرور جديدة من محادثة الربط', a.username + (d.sent ? '' : ' (لم تصل)'));
+  return { username: a.username, sent: d.sent, why: d.why || '' };
+}
+
+/* ---------- التصاميم الواردة إلى البوت ----------
+   inbox.json: [{id, at, from, fromName, acc, accName, track, fid, mime, size, caption, msg, status: new|done|skip, note, tpl, upd}] */
+function inboxPub_(x) { var o = Object.assign({}, x); delete o.fid; return o; }
+// o = {from: معرّف المرسل في تليجرام, fromName, msg: رقم الرسالة, file: base64 أو dataUrl, mime, caption}
+function inboxPut_(o) {
+  var from = String(o.from == null ? '' : o.from).trim(); if (!/^\d{4,20}$/.test(from)) throw new Error('معرّف المرسل مطلوب');
+  var b64 = String(o.file || ''), m = /^data:([\w\/+.-]+);base64,(.*)$/.exec(b64), mime = String((m && m[1]) || o.mime || '').toLowerCase();
+  if (m) b64 = m[2];
+  if (!INBOX_MIME[mime]) throw new Error('يُقبل التصميم صورةً (PNG أو JPG أو WEBP) أو ملف PDF');
+  if (!b64 || b64.length > 28 * 1024 * 1024) throw new Error('الملف فارغ أو أكبر من ٢٠ ميغابايت');
+  var msg = clip_(o.msg || '', 30);
+  var dup = msg && readJson_('inbox.json', []).filter(function (x) { return x.from === from && x.msg === msg; })[0];
+  if (dup) return { id: dup.id, dup: true };
+  var accs = readJson_('accounts.json', {}), acc = Object.keys(accs).map(function (k) { return accs[k]; }).filter(function (x) { return x.tg && String(x.tg) === from && !x.disabled; })[0] || null;
+  var who = acc ? acc.name : clip_(o.fromName || 'مرسل', 60), stamp = Utilities.formatDate(new Date(), 'Asia/Riyadh', 'yyyy-MM-dd HHmm');
+  var bytes = Utilities.base64Decode(b64);
+  var f = sub_(INBOX_DIR).createFile(Utilities.newBlob(bytes, mime, stamp + ' ' + who.replace(/[\\\/:*?"<>|]/g, '') + '.' + INBOX_MIME[mime]));
+  if (o.caption) { try { f.setDescription(clip_(o.caption, 900)); } catch (e) {} }
+  var x = withLock_(function () {
+    var list = readJson_('inbox.json', []);
+    var y = { id: uid_(), at: now_(), from: from, fromName: clip_(o.fromName || '', 60), acc: acc ? acc.username : '', accName: acc ? acc.name : '', track: acc && (acc.tracks || []).length === 1 ? acc.tracks[0] : '',
+      fid: f.getId(), mime: mime, size: bytes.length, caption: clip_(o.caption || '', 900), msg: msg, status: 'new', note: '', tpl: '', upd: now_() };
+    list.unshift(y); if (list.length > 2000) list.length = 2000;
+    writeJson_('inbox.json', list); return y;
+  });
+  return { id: x.id, acc: x.acc, saved: true };
+}
+// o = {status?: new|done|skip|all, days?: آخر كم يومًا}
+function inboxList_(o) {
+  var st = o.status || 'new', since = o.days ? now_() - Math.max(1, Math.min(365, +o.days)) * 864e5 : 0;
+  return readJson_('inbox.json', []).filter(function (x) { return (st === 'all' || x.status === st) && x.at >= since; }).slice(0, 300).map(inboxPub_);
+}
+function inboxGet_(id) {
+  var x = readJson_('inbox.json', []).filter(function (y) { return y.id === String(id || ''); })[0];
+  if (!x) throw new Error('غير موجود');
+  return fileDataUrl_(x.fid);
+}
+// o = {ids: [], status: done|skip|new, note?, tpl?: معرّف القالب الذي بُني منه}
+function inboxDone_(o) {
+  var st = ({ done: 1, skip: 1, 'new': 1 })[o.status] ? o.status : 'done', ids = (o.ids || []).map(String);
+  return withLock_(function () {
+    var list = readJson_('inbox.json', []), n = 0;
+    list.forEach(function (x) { if (ids.indexOf(x.id) >= 0) { x.status = st; if (o.note != null) x.note = clip_(o.note, 300); if (o.tpl != null) x.tpl = clip_(o.tpl, 60); x.upd = now_(); n++; } });
+    writeJson_('inbox.json', list); return { n: n };
+  });
+}
+// مع تقارير السبت: سطر للمدير العام بما ورد هذا الأسبوع ولم يُحوَّل قالبًا بعد
+function inboxWeekly_() {
+  try {
+    var wk = now_() - 7 * 864e5, list = readJson_('inbox.json', []), fresh = list.filter(function (x) { return x.status === 'new' && x.at >= wk; }).length, all = list.filter(function (x) { return x.status === 'new'; }).length;
+    if (all) adminNotify_('', 'inbox', 'تصاميم المشرفين الواردة: ' + fresh + ' هذا الأسبوع، و' + all + ' تنتظر تحويلها إلى قوالب', '#/admin', 'مجلد درايف: ' + INBOX_DIR);
+  } catch (e) {}
+}
+
+/* ---------- إحصاء أثر لمحادثة الربط (قراءة فقط) ---------- */
+// o = {days?: نافذة التنزيلات، الافتراضي ٣٠}
+function bridgeStats_(o) {
+  var t = now_(), d7 = t - 7 * 864e5, d30 = t - 30 * 864e5, days = Math.max(1, Math.min(90, +o.days || 30)), win = t - days * 864e5;
+  var p = progs_().filter(function (x) { return x.id === BRIDGE_PROG; })[0], ids = ((p && p.identities) || []).map(function (x) { return { id: x.id, name: x.name || x.id }; });
+  var accs = readJson_('accounts.json', {}), list = Object.keys(accs).map(function (k) { return accs[k]; }).filter(function (a) { return a.role === 'super' || (a.programs || []).indexOf(BRIDGE_PROG) >= 0; });
+  var saved = {}, savedTr = {};
+  readJson_('index.json', []).forEach(function (x) {
+    if (itemProg_(x) !== BRIDGE_PROG) return;
+    var u = /^a:/.test(x.ownerKey || '') ? x.ownerKey.slice(2) : ''; if (!u) return;
+    saved[u] = (saved[u] || 0) + 1; savedTr[u] = savedTr[u] || {}; if (x.track) savedTr[u][x.track] = (savedTr[u][x.track] || 0) + 1;
+  });
+  var exp = {}, expTr = {}, months = {}, m = new Date(win); m.setDate(1);
+  for (var k = 0; k < 5; k++) { var mk = monthKey_(m.getTime()); months[mk] = 1; if (mk === monthKey_(t)) break; m.setMonth(m.getMonth() + 1); }
+  Object.keys(months).forEach(function (mk) {
+    readJson_(arcName_(mk), []).forEach(function (x) {
+      if (x.program !== BRIDGE_PROG || (x.upd || x.at || 0) < win) return;
+      exp[x.uid] = (exp[x.uid] || 0) + 1; expTr[x.track || ''] = (expTr[x.track || ''] || 0) + 1;
+    });
+  });
+  var kindOf = function (a) { return a.role === 'super' ? 'المدير العام' : a.bridge === 'shared' ? 'حساب عام' : a.bridge === 'sup' ? 'مشرف (أثر وحده)' : a.ansUid ? (a.linkGen ? 'المشرف العام (الأنشطة)' : 'منصة الأنشطة') : a.role === 'sup' ? 'مشرف البرنامج' : 'أثر وحده'; };
+  var rows = list.map(function (a) {
+    var tr = a.role === 'super' || !(a.tracks || []).length ? [] : a.tracks.slice();
+    return { username: a.username, name: a.name, kind: kindOf(a), role: ROLES[a.role] || a.role, tracks: tr, allTracks: !tr.length, disabled: !!a.disabled,
+      last: a.last ? Utilities.formatDate(new Date(a.last), 'Asia/Riyadh', 'yyyy-MM-dd HH:mm') : '', in7: (a.last || 0) >= d7, in30: (a.last || 0) >= d30,
+      saved: saved[a.uid] || 0, savedByTrack: savedTr[a.uid] || {}, exports: exp[a.uid] || 0, created: a.created ? dayKey_(a.created) : '' };
+  }).sort(function (x, y) { return (y.last || '') < (x.last || '') ? -1 : (y.last || '') > (x.last || '') ? 1 : 0; });
+  var tracks = ids.map(function (tr) {
+    var own = rows.filter(function (r) { return !r.disabled && r.tracks.indexOf(tr.id) >= 0; });
+    var sv = 0; rows.forEach(function (r) { sv += r.savedByTrack[tr.id] || 0; });
+    return { id: tr.id, name: tr.name, accounts: own.length, in7: own.filter(function (r) { return r.in7; }).length, in30: own.filter(function (r) { return r.in30; }).length, saved: sv, exports: expTr[tr.id] || 0 };
+  });
+  var live = rows.filter(function (r) { return !r.disabled; });
+  return { at: Utilities.formatDate(new Date(t), 'Asia/Riyadh', 'yyyy-MM-dd HH:mm'), days: days,
+    totals: { accounts: live.length, allTracks: live.filter(function (r) { return r.allTracks; }).length, in7: live.filter(function (r) { return r.in7; }).length, in30: live.filter(function (r) { return r.in30; }).length,
+      saved: rows.reduce(function (s, r) { return s + r.saved; }, 0), exports: Object.keys(exp).reduce(function (s, k) { return s + exp[k]; }, 0), inboxNew: readJson_('inbox.json', []).filter(function (x) { return x.status === 'new'; }).length },
+    tracks: tracks, accounts: rows };
 }
 
 /* ================= البرامج =================
@@ -1161,7 +1379,7 @@ function hasGemini_() { return geminiKeys_().length > 0; }
 function aiAny_(s) { var h = aiHave_(); return !!(h.gemini || h.groq || h.cf || (s.ai && s.ai.pollFallback !== false)); }
 function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: aiAny_(s), vision: hasGemini_(), capPrompt: (s.ai && s.ai.capPrompt) || '' }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN'), pexels: true, imgKeys: { pixabay: !!props_().getProperty('PIXABAY_KEY'), pexels: !!props_().getProperty('PEXELS_KEY') }, tgKnown: (s.tgKnown || []).length }; }
 // بصمة نسخة الخادم: يضعها البناء، ويقارنها الموقع ليخبر المدير إن كان الخادم المنشور أقدم
-var SRV_VER = 'decd36f9';
+var SRV_VER = 'b846e30a';
 function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.srvVer = SRV_VER; s.aiKey = hasGemini_(); s.aiKeys = geminiKeys_().length; s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); s.pixabayOn = !!props_().getProperty('PIXABAY_KEY'); s.groqOn = !!props_().getProperty('GROQ_KEY'); s.cfOn = !!(props_().getProperty('CF_ACCOUNT') && props_().getProperty('CF_TOKEN')); s.routeDefault = AI_ROUTE_DEFAULT; return JSON.stringify(s); }
 function set_save(token, json) {
   var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
@@ -2006,6 +2224,7 @@ function wkBuild_(uids, withAI) {
 function weeklyUserStats() {
   var r = wkBuild_(null, true);
   r.rows.forEach(function (x) { ntPush_(x.uid, 'week', 'تقرير أسبوعك في أثر جاهز: ' + x.c.exports + ' تنزيلاً و' + x.c.active + ' أيام نشطة', '#/week'); });
+  inboxWeekly_();
   return r.rows.length;
 }
 function me_week(token, fresh) {

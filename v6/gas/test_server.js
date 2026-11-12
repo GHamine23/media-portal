@@ -617,6 +617,69 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   fails('quiz_results', /ليس من برامجك/, ot, r.id);
   fails('quiz_form', /ليس من برامجك/, ot, JSON.stringify({ program: 'academy', items: items }));
 })();
+// جسر محادثة الربط (طلبات ١١ و١٢ نوفمبر): مفتاح لا كلمة مرور، وحسابات أثر وحده، والتصاميم الواردة، والإحصاء
+(function () {
+  fails('bridge_op', /مفتاح محادثة الربط/, '', JSON.stringify({ op: 'stats' }));
+  const no = J('acc_save', adm, JSON.stringify({ username: 'nokey1', name: 'مستخدم', role: 'user', programs: ['academy'], perms: {} }));
+  const nt = J('auth_login', 'nokey1', no.temp).token; J('auth_password', nt, no.temp, 'NoKey12345');
+  fails('bridge_key', /للمدير العام/, nt);
+  const K = J('bridge_key', adm).key; ok(K.length === 48 && J('bridge_key', adm).key === K, 'key created once and kept');
+  fails('bridge_op', /غير صحيح/, K.slice(0, -1) + 'x', JSON.stringify({ op: 'stats' }));
+  const B = function (o) { return J('bridge_op', K, JSON.stringify(o)); };
+  fails('bridge_op', /معرّف محادثة/, K, JSON.stringify({ op: 'make', kind: 'shared' }));
+  GAS._tg = [];
+  // ١) الحساب العام للأكاديمية: كل المسارات، بلا إدارة ولا بريد ولا ربط، وبياناته إلى محادثة الإدارة وحدها
+  const sh = B({ op: 'make', kind: 'shared', chat: '-1009876543210' });
+  ok(sh.username === 'academy1' && sh.name === 'حساب الأكاديمية' && sh.sent && sh.tracks.length === 0, 'shared academy account made and sent');
+  const m1 = GAS._tg.filter(function (x) { return /sendMessage$/.test(x.url); })[0];
+  const pw = /كلمة المرور: <code>([^<]+)<\/code>/.exec(m1.opt.payload.text)[1];
+  ok(m1.opt.payload.chat_id === '-1009876543210' && /academy1/.test(m1.opt.payload.text), 'credentials go to the given chat');
+  ok(JSON.stringify(sh).indexOf(pw) < 0, 'password never in the reply');
+  const al = J('audit_list', adm); ok(JSON.stringify(al).indexOf(pw) < 0, 'password never in the audit log');
+  const ss = J('auth_login', 'academy1', pw); ok(!ss.me.mustChange && ss.me.role === 'user', 'shared account logs in without forced change');
+  const accA = J('acc_list', adm).filter(function (x) { return x.username === 'academy1'; })[0];
+  ok(accA.programs.join() === 'academy' && !accA.tracks.length && !accA.email && !accA.anshita && accA.perms.ai && !accA.perms.send && accA.bridge === 'shared', 'shared account shape');
+  fails('bridge_op', /مستعمل/, K, JSON.stringify({ op: 'make', kind: 'shared', chat: '-1009876543210' }));
+  // ٢) مشرف من غير الأنشطة: نمط ac.N، في خاصه فقط، بلا حساب في المنصة
+  fails('bridge_op', /في خاصه/, K, JSON.stringify({ op: 'make', kind: 'sup', name: 'أ. خالد', chat: '-100123456' }));
+  fails('bridge_op', /مسار غير معروف/, K, JSON.stringify({ op: 'make', kind: 'sup', name: 'أ. خالد', chat: '5550001', tracks: ['nope'] }));
+  fails('bridge_op', /ac\./, K, JSON.stringify({ op: 'make', kind: 'sup', name: 'أ. خالد', chat: '5550001', user: 'khaled' }));
+  GAS._tg = [];
+  const s1 = B({ op: 'make', kind: 'sup', name: 'أ. خالد', chat: '5550001', tracks: ['ishraq'] });
+  ok(s1.username === 'ac.1' && s1.sent && s1.tracks.join() === 'ishraq', 'supervisor account ac.1');
+  const s2 = B({ op: 'make', kind: 'sup', name: 'أ. سالم', chat: '5550002' }); ok(s2.username === 'ac.2' && !s2.tracks.length, 'next supervisor ac.2 with all tracks');
+  fails('bridge_op', /من قبل/, K, JSON.stringify({ op: 'make', kind: 'sup', name: 'مكرر', chat: '5550001' }));
+  const p1 = /كلمة المرور: <code>([^<]+)<\/code>/.exec(GAS._tg.filter(function (x) { return x.opt.payload.chat_id === '5550001'; })[0].opt.payload.text)[1];
+  ok(J('auth_login', 'ac.1', p1).me.mustChange, 'supervisor must choose own password');
+  // إرسال فاشل: لا تبقى كلمة لم تصل أحدًا، ثم resend
+  const keep = GAS._fetch.handler; GAS._fetch.handler = function (url, opt) { if (/sendMessage$/.test(url)) return { code: 403, body: JSON.stringify({ ok: false, description: 'Forbidden: bot can\'t initiate conversation with a user' }) }; return keep(url, opt); };
+  const s3 = B({ op: 'make', kind: 'sup', name: 'أ. ماجد', chat: '5550003' });
+  ok(s3.username === 'ac.3' && !s3.sent && /initiate/.test(s3.why), 'failed delivery reported');
+  GAS._fetch.handler = keep; GAS._tg = [];
+  const r3 = B({ op: 'resend', user: 'ac.3' }); ok(r3.sent, 'resend to the stored private chat');
+  const p3 = /كلمة المرور: <code>([^<]+)<\/code>/.exec(GAS._tg[GAS._tg.length - 1].opt.payload.text)[1];
+  ok(J('auth_login', 'ac.3', p3).me.username === 'ac.3', 'resent password works');
+  fails('bridge_op', /محادثة الربط/, K, JSON.stringify({ op: 'resend', user: 'nokey1' }));
+  // التصاميم الواردة
+  fails('bridge_op', /صورةً/, K, JSON.stringify({ op: 'inbox', from: '5550001', file: 'data:text/html;base64,PGI+', msg: '1' }));
+  const png = 'data:image/png;base64,' + Buffer.from([137, 80, 78, 71, 1, 2]).toString('base64');
+  const i1 = B({ op: 'inbox', from: '5550001', fromName: 'Khaled', msg: '77', file: png, caption: 'إعلان لقاء الجمعة' });
+  ok(i1.saved && i1.acc === 'ac.1', 'design saved and linked to its supervisor');
+  ok(B({ op: 'inbox', from: '5550001', msg: '77', file: png }).dup, 'same message not saved twice');
+  B({ op: 'inbox', from: '9990001', fromName: 'غريب', msg: '5', file: png, mime: 'image/png' });
+  let L = B({ op: 'inbox_list' }); ok(L.length === 2 && L[1].track === 'ishraq' && !L[0].fid, 'inbox list without drive ids');
+  ok(/^data:image\/png;base64,/.test(call('bridge_op', K, JSON.stringify({ op: 'inbox_get', id: i1.id }))), 'design fetched by the weekly job');
+  ok(B({ op: 'inbox_done', ids: [i1.id], tpl: 'ac_poster' }).n === 1 && B({ op: 'inbox_list' }).length === 1 && B({ op: 'inbox_list', status: 'done' })[0].tpl === 'ac_poster', 'marked as built into a template');
+  // الإحصاء: بلا كلمات مرور ولا بريد ولا معرّفات
+  const st = B({ op: 'stats' }), raw = JSON.stringify(st);
+  ok(st.tracks.length === 10 && st.totals.accounts >= 4 && st.totals.inboxNew === 1, 'stats per track and totals');
+  const rA = st.accounts.filter(function (x) { return x.username === 'academy1'; })[0];
+  ok(rA.in7 && rA.in30 && rA.allTracks && rA.kind === 'حساب عام' && rA.last, 'last login and 7/30 day activity');
+  ok(st.tracks.filter(function (x) { return x.id === 'ishraq'; })[0].accounts >= 1, 'ishraq counts its supervisor');
+  ok(!/salt|hash|"uid"|email|@/.test(raw) && raw.indexOf(pw) < 0 && raw.indexOf(K) < 0, 'no secrets, emails or internal ids in stats');
+  // تجديد المفتاح يوقف القديم
+  const K2 = J('bridge_key', adm, true).key; ok(K2 !== K, 'renewed'); fails('bridge_op', /غير صحيح/, K, JSON.stringify({ op: 'stats' }));
+})();
 // server/Code.gs مبني من src/Code.gs: كل تعديل للخادم يكون في المصدر ثم «python3 v6/build_gs.py».
 // (عُدّل الملف المبني مرة مباشرة فمحا إعادة البناء كود الحساب الموحّد؛ هذا الفحص يمنع تكرارها)
 (function () {
