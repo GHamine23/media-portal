@@ -2,7 +2,7 @@
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const GAS = require('./shim.js');
 const ROOT = path.resolve(__dirname, '../..');
-const ctx = Object.assign({ console: { log: function () {}, warn: function () {} }, JSON, Date, Math, Object, Array, String, Number, Error, RegExp, encodeURIComponent }, GAS);
+const ctx = Object.assign({ console: { log: function () {}, warn: function () { if (process.env.DBG) console.error.apply(console, arguments); } }, JSON, Date, Math, Object, Array, String, Number, Error, RegExp, encodeURIComponent }, GAS);
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'server/Code.gs'), 'utf8'), ctx, { filename: 'Code.gs' });
 GAS._fetch.handler = function (url, opt) {
@@ -695,12 +695,162 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   // تجديد المفتاح يوقف القديم
   const K2 = J('bridge_key', adm, true).key; ok(K2 !== K, 'renewed'); fails('bridge_op', /غير صحيح/, K, JSON.stringify({ op: 'stats' }));
 })();
+// بوت أثر (طلب ١٢ نوفمبر): التحقق من initData، والموافقة، ومنع التكرار، والحد اليومي، والتسليم
+(function () {
+  const crypto = require('crypto');
+  const ABOT = '555666777:AtharBotTokenAtharBotTokenAtharBotTok';
+  const mkInit = function (user, opts) {
+    opts = opts || {}; const tok = opts.token || ABOT;
+    const f = { auth_date: String(opts.at != null ? opts.at : Math.floor(Date.now() / 1000)), query_id: 'AAH' + user.id, user: JSON.stringify(user) };
+    const dcs = Object.keys(f).sort().map(function (k) { return k + '=' + f[k]; }).join('\n');
+    const secret = crypto.createHmac('sha256', 'WebAppData').update(tok).digest();
+    const hash = crypto.createHmac('sha256', secret).update(dcs).digest('hex');
+    if (opts.tamper) f.user = JSON.stringify(Object.assign({}, user, { id: 999 }));
+    return Object.keys(f).map(function (k) { return k + '=' + encodeURIComponent(f[k]); }).join('&') + '&hash=' + hash;
+  };
+  const nt0 = function () { return J('auth_login', 'nokey1', 'NoKey12345').token; };
+  const sent = function () { return (GAS._tg || []).filter(function (x) { return x.url.indexOf('bot' + ABOT + '/') >= 0; }); };
+  const sentTo = function (id, m) { return sent().filter(function (x) { return (!m || x.url.endsWith('/' + m)) && String(x.opt.payload.chat_id) === String(id); }); };
+  const keep = GAS._fetch.handler;
+  GAS._fetch.handler = function (url, opt) {
+    if (url.indexOf('api.telegram.org/file/bot') >= 0) return { code: 200, body: [255, 216, 255, 1, 2], mime: 'image/jpeg' };
+    if (/getFile$/.test(url)) { GAS._tg = GAS._tg || []; GAS._tg.push({ url: url, opt: opt }); return { code: 200, body: JSON.stringify({ ok: true, result: { file_path: 'photos/f1.jpg' } }) }; }
+    if (/(setWebhook|setMy\w+|setChatMenuButton|answerCallbackQuery|deleteWebhook)$/.test(url)) { GAS._tg = GAS._tg || []; GAS._tg.push({ url: url, opt: opt }); return { code: 200, body: JSON.stringify({ ok: true, result: true }) }; }
+    if (/getWebhookInfo$/.test(url)) return { code: 200, body: JSON.stringify({ ok: true, result: { url: 'x', pending_update_count: 0 } }) };
+    if (/getMe$/.test(url) && url.indexOf(ABOT) >= 0) return { code: 200, body: JSON.stringify({ ok: true, result: { id: 555666777, username: 'mediaManarMuslihen_ai' } }) };
+    return keep(url, opt);
+  };
+  fails('tg_login', /غير مضبوط/, mkInit({ id: 1 }));
+  fails('abot_set', /للمدير العام/, nt0(), ABOT);
+  ok(J('abot_set', adm, ABOT).user === 'mediaManarMuslihen_ai', 'bot token saved, username read');
+  fails('abot_setup', /رابط الخادم/, adm, 'https://evil.example/exec');
+  GAS._tg = [];
+  const su = J('abot_setup', adm, 'https://script.google.com/macros/s/AKfycbTESTdeploymentIdTESTdeploymentId/exec');
+  ok(su.ok && su.done.indexOf('الأوامر') >= 0 && su.done.indexOf('زر القائمة') >= 0, 'setup: webhook, names, commands, menu button');
+  const hookCall = sent().filter(function (x) { return /setWebhook$/.test(x.url); })[0];
+  const SEC = GAS._props.ATHAR_HOOK; ok(SEC && hookCall.opt.payload.url.endsWith('/exec?hook=' + SEC), 'webhook URL carries the secret parameter');
+  const hook = function (u, sec) { return ctx.doPost({ parameter: { hook: sec || SEC }, postData: { contents: JSON.stringify(u) } }).getContent(); };
+  let UID = 7000;
+  const msg = function (from, text, extra) { return Object.assign({ update_id: ++UID, message: Object.assign({ message_id: UID, chat: { id: from.id, type: 'private' }, from: from, text: text }, extra || {}) }); };
+  ok(hook(msg({ id: 1 }, '/start'), 'wrongsecret') === 'no', 'webhook refuses a request without the secret');
+
+  // initData: صحيح، مزوّر، قديم، ومن بوت آخر
+  const AMIN = { id: 674650224, first_name: 'أمين', username: 'amine' };
+  ok(J('tg_login', mkInit({ id: 42, first_name: 'سالم', username: 'salem_k' })).need, 'valid initData, unknown user → request form');
+  fails('tg_login', /غير صحيحة/, mkInit({ id: 42, first_name: 'سالم' }, { tamper: true }));
+  fails('tg_login', /انتهت صلاحية/, mkInit({ id: 42, first_name: 'سالم' }, { at: Math.floor(Date.now() / 1000) - 3 * 86400 }));
+  fails('tg_login', /غير صحيحة/, mkInit({ id: 42, first_name: 'سالم' }, { token: PBOT }));
+
+  // المدير العام يربط حسابه برمز من الموقع
+  const lc = J('tg_link_code', adm); ok(/^https:\/\/t\.me\/mediaManarMuslihen_ai\?start=L[a-z0-9]+$/.test(lc.url), 'link code deep link');
+  GAS._tg = [];
+  hook(msg(AMIN, '/start ' + lc.url.split('start=')[1]));
+  ok(J('acc_list', adm).filter(function (x) { return x.role === 'super'; })[0].tg && /رُبط حسابك/.test(sentTo(AMIN.id, 'sendMessage')[0].opt.payload.text), 'admin linked by code');
+  ok(hook(msg(AMIN, '/start ' + lc.url.split('start=')[1])) === 'ok' && /انتهت صلاحية رابط/.test(sentTo(AMIN.id, 'sendMessage').pop().opt.payload.text), 'code works once');
+
+  // طلب دخول ثم الموافقة بالأزرار
+  const SALEM = { id: 42, first_name: 'سالم', last_name: 'الكردي', username: 'salem_k' };
+  fails('tg_request', /حروف إنجليزية/, mkInit(SALEM), JSON.stringify({ program: 'academy', track: 'ishraq', name: 'سالم الكردي', username: 'سالم' }));
+  fails('tg_request', /مستعمل/, mkInit(SALEM), JSON.stringify({ program: 'academy', track: 'ishraq', name: 'سالم الكردي', username: 'admin' }));
+  GAS._tg = [];
+  ok(J('tg_request', mkInit(SALEM), JSON.stringify({ program: 'academy', track: 'ishraq', name: 'سالم الكردي', username: 'salem.k' })).pending, 'request recorded');
+  const ask = sentTo(AMIN.id, 'sendMessage')[0];
+  ok(ask && /طلب دخول/.test(ask.opt.payload.text) && /salem\.k/.test(ask.opt.payload.text) && /@salem_k/.test(ask.opt.payload.text), 'approval message carries all the info');
+  const kb = JSON.parse(ask.opt.payload.reply_markup).inline_keyboard, newBtn = kb[0][0].callback_data;
+  ok(/^ap:[a-z0-9]+:n$/.test(newBtn) && kb.some(function (r) { return r.some(function (b) { return /:x$/.test(b.callback_data); }); }), 'buttons: accept, link, change, reject');
+  ok(J('tg_login', mkInit(SALEM)).pending, 'pending until approved');
+  ok(hook(msg(SALEM, 'السلام عليكم')) === 'ok' && /يتم مراجعة حسابك/.test(sentTo(42, 'sendMessage').pop().opt.payload.text), 'waiting message in the bot');
+  const cb = function (from, data) { return { update_id: ++UID, callback_query: { id: 'cq' + UID, from: from, data: data, message: { message_id: 900, chat: { id: from.id, type: 'private' } } } }; };
+  GAS._tg = [];
+  hook(cb(SALEM, newBtn)); ok(J('tg_login', mkInit(SALEM)).pending, 'only the super admin can approve');
+  GAS._tg = [];
+  const upd = cb(AMIN, newBtn);
+  ok(hook(upd) === 'ok' && hook(upd) === 'dup', 'the same update is processed once (302 retries)');
+  ok(sentTo(42, 'sendMessage').length === 5 && /قُبل حسابك/.test(sentTo(42, 'sendMessage')[0].opt.payload.text), 'approved: one welcome + 3-step tour + menu, no duplicate');
+  ok(sent().some(function (x) { return /editMessageText$/.test(x.url) && /قُبل/.test(x.opt.payload.text); }), 'approval message updated');
+  const s1 = J('tg_login', mkInit(SALEM)); ok(s1.token && s1.me.username === 'salem.k' && s1.me.tgOnly && s1.me.perms.ai && !s1.me.perms.send, 'login by Telegram after approval');
+  const T1 = s1.token + '#tg#' + mkInit(SALEM);
+  ok(J('auth_me', T1).username === 'salem.k', 'every request verified with initData');
+  fails('auth_me', /انتهت الجلسة/, s1.token);
+  fails('auth_me', /انتهت الجلسة/, s1.token + '#tg#' + mkInit({ id: 43, first_name: 'آخر' }));
+  fails('auth_me', /انتهت الجلسة/, J('auth_login', 'admin', 'StrongPass#1').token + '#tg#' + mkInit(SALEM));
+  fails('auth_login', /غير صحيحة/, 'salem.k', 'anything');
+
+  // كلمة سر للموقع، والتسليم في المحادثة
+  fails('tg_site_pw', /تيليجرام فقط/, J('auth_login', 'admin', 'StrongPass#1').token, 'Pass12345678');
+  ok(J('tg_site_pw', T1, 'SalemPass123').username === 'salem.k' && J('auth_login', 'salem.k', 'SalemPass123').token, 'site password from inside Telegram');
+  GAS._tg = [];
+  ok(J('tg_deliver', T1, JSON.stringify({ b64: Buffer.from([137, 80, 78, 71]).toString('base64'), mime: 'image/png', fileName: 'إعلان.png', tplName: 'إعلان الأكاديمية', trackName: 'إشراق' })).ok, 'deliver');
+  const doc = sentTo(42, 'sendDocument')[0]; ok(doc && /إعلان الأكاديمية/.test(doc.opt.payload.caption) && doc.opt.payload.document.getContentType() === 'image/png', 'design arrives as a full-quality document');
+  fails('tg_deliver', /داخل تيليجرام/, J('auth_login', 'salem.k', 'SalemPass123').token, JSON.stringify({ b64: 'AA==', mime: 'image/png' }));
+
+  // اسأل أثر: الحد اليومي المشترك مع الموقع
+  const salemUid = J('acc_list', adm).filter(function (x) { return x.username === 'salem.k'; })[0].uid;
+  GAS._cache['aih:' + salemUid + ':' + ctx.dayKey_(Date.now())] = { v: '40', e: Date.now() + 1e7 };
+  GAS._tg = []; const ai0 = GAS._lastAi;
+  hook(msg(SALEM, 'كيف أنزل التصميم؟'));
+  ok(/كثيرًا اليوم/.test(sentTo(42, 'sendMessage').pop().opt.payload.text) && GAS._lastAi === ai0, 'daily limit shared with the site, no AI call');
+  delete GAS._cache['aih:' + salemUid + ':' + ctx.dayKey_(Date.now())];
+  fails('ai_make', /كثيراً اليوم/, (function () { GAS._cache['aih:' + salemUid + ':' + ctx.dayKey_(Date.now())] = { v: '40', e: Date.now() + 1e7 }; return T1; })(), JSON.stringify({ kind: 'help', prompt: 'x' }));
+  delete GAS._cache['aih:' + salemUid + ':' + ctx.dayKey_(Date.now())];
+  GAS._tg = []; hook(msg(SALEM, 'كيف أغيّر الخط؟'));
+  ok(GAS._cache['aih:' + salemUid + ':' + ctx.dayKey_(Date.now())].v === '1', 'a bot question counts in the same daily counter');
+
+  // تعلّم التصميم بالودجت، والإشعارات، والدليل، والفكرة
+  GAS._tg = []; hook(msg(SALEM, '/learn'));
+  const w = sentTo(42, 'sendWidget')[0]; ok(w && w.opt.payload.html.length < 32768 && require('zlib').deflateSync(Buffer.from(w.opt.payload.html), { level: 9 }).length <= 4096 && w.opt.payload.caption, 'design rule as a widget within limits, with caption fallback');
+  GAS._tg = []; hook(msg(SALEM, '/guide')); ok(JSON.parse(sentTo(42, 'sendMessage')[0].opt.payload.reply_markup).inline_keyboard[0][0].web_app.url.indexOf('app/?tg=1&r=%2Fguide%2F') > 0, 'guide buttons open the clip in the mini app');
+  GAS._tg = []; hook(msg(SALEM, '/idea')); hook(msg(SALEM, 'لقاء الأحد مع د. محمد'));
+  ok(/make%3Fidea%3D/.test(JSON.parse(sentTo(42, 'sendMessage').pop().opt.payload.reply_markup).inline_keyboard[0][0].web_app.url), 'idea opens the smart designer prefilled');
+  GAS._tg = []; hook(cb(SALEM, 'nt:w')); ok(J('auth_me', T1).prefs.tgOff.w === true, 'weekly report can be turned off');
+  // اقتراح بالصورة يصل صندوق الاقتراحات
+  GAS._tg = []; hook(msg(SALEM, '/feedback')); hook(msg(SALEM, '', { text: undefined, caption: 'زر التنزيل بطيء', photo: [{ file_id: 'p1', file_size: 10 }] }));
+  const fbx = J('fb_list', adm, '').filter(function (x) { return /بطيء/.test(x.text); })[0];
+  ok(fbx && fbx.v === 'bot' && fbx.imgs.length === 1 && /وصلت/.test(sentTo(42, 'sendMessage').pop().opt.payload.text), 'feedback with photo, marked as from the bot');
+  // صورة بلا حالة: تصميم يُبنى منه قالب
+  GAS._tg = []; hook(msg(SALEM, '', { text: undefined, photo: [{ file_id: 'p2', file_size: 10 }] }));
+  const inB = JSON.parse(sentTo(42, 'sendMessage').pop().opt.payload.reply_markup).inline_keyboard[0][0].callback_data;
+  hook(cb(SALEM, inB)); ok(ctx.readJson_('inbox.json', []).some(function (x) { return x.from === '42' && x.mime === 'image/jpeg'; }), 'design sent to the bot saved to the new-designs box');
+
+  // الربط بقائمة محادثة الربط: يدخل مباشرة ويصل المدير سطر
+  const BK = J('bridge_key', adm).key;
+  const mp = J('bridge_op', BK, JSON.stringify({ op: 'tg_map', list: [{ user: 'nokey1', tg: '8800' }, { user: 'nobody', tg: '8801' }, { user: 'academy1', tg: '42' }] }));
+  ok(mp.linked === 1 && mp.skip.length === 2, 'tg_map links known accounts, skips unknown and duplicates');
+  GAS._tg = []; const nk = J('tg_login', mkInit({ id: 8800, first_name: 'ن' }));
+  ok(nk.token && sentTo(AMIN.id, 'sendMessage').some(function (x) { return /لأول مرة/.test(x.opt.payload.text); }), 'pre-linked user enters directly; admin gets a line');
+
+  // إعلان في البوت على دفعات، ولا شيء لمن أوقف الإشعارات
+  GAS._tg = [];
+  J('bc_save', adm, JSON.stringify({ title: 'لقاء المشرفين', body: 'الأحد القادم', kind: 'banner', bot: true, aud: { kind: 'all' } }));
+  ok(!sent().some(function (x) { return /sendMessage$/.test(x.url) && /لقاء المشرفين/.test(x.opt.payload.text); }), 'broadcast queued, not sent inline');
+  ctx.tgTick(); ok(sent().filter(function (x) { return /sendMessage$/.test(x.url) && /لقاء المشرفين/.test(x.opt.payload.text); }).length === 6, 'queue drained by the timer');
+
+  // بيانات محادثة الربط تصل من بوت أثر
+  GAS._tg = []; J('bridge_send', adm, true);
+  const B2 = J('bridge_op', BK, JSON.stringify({ op: 'make', kind: 'sup', name: 'أ. فهد', chat: '5550099' }));
+  ok(B2.sent && sentTo('5550099', 'sendMessage').length === 1, 'bridge credentials sent from the Athar bot');
+  J('bridge_send', adm, false);
+
+  // التقرير الأسبوعي الخاص: أرقام، ورسالة، وتعلّم التصميم، ولا يصل من أوقفه
+  GAS._tg = []; try { ctx.weeklyUserStats(); } catch (e) {}
+  const nW = ctx.botWeekly(), wk = sent().filter(function (x) { return /sendMessage$/.test(x.url) && /أسبوعك في أثر/.test(x.opt.payload.text); });
+  ok(nW >= 2 && wk.length === nW && wk.every(function (x) { return /تعلّم التصميم/.test(x.opt.payload.text) && /التنزيلات/.test(x.opt.payload.text); }) && !wk.some(function (x) { return String(x.opt.payload.chat_id) === '42'; }), 'weekly bot report with numbers and design rules, respecting the off switch');
+  // لا شيء خارج المحادثات الخاصة
+  GAS._tg = []; hook({ update_id: ++UID, message: { message_id: 1, chat: { id: -100123, type: 'supergroup' }, from: SALEM, text: '/start' } });
+  ok(!sent().length, 'the bot never answers in groups');
+  // طلب الرفض
+  const RAMI = { id: 77, first_name: 'رامي' };
+  J('tg_request', mkInit(RAMI), JSON.stringify({ program: 'academy', track: '', name: 'رامي', username: 'rami77' }));
+  const rq = J('tg_req_list', adm).filter(function (r) { return r.tg === '77'; })[0];
+  ok(J('tg_req_act', adm, rq.id, 'x').status === 'no' && J('tg_login', mkInit(RAMI)).need, 'rejected from the admin panel');
+  GAS._fetch.handler = keep;
+})();
 // server/Code.gs مبني من src/Code.gs: كل تعديل للخادم يكون في المصدر ثم «python3 v6/build_gs.py».
 // (عُدّل الملف المبني مرة مباشرة فمحا إعادة البناء كود الحساب الموحّد؛ هذا الفحص يمنع تكرارها)
 (function () {
-  const src = fs.readFileSync(path.join(ROOT, 'src/Code.gs'), 'utf8').split('\n'), out = fs.readFileSync(path.join(ROOT, 'server/Code.gs'), 'utf8').split('\n');
+  const src = fs.readFileSync(path.join(ROOT, 'src/Code.gs'), 'utf8').split('\n'), out = fs.readFileSync(path.join(ROOT, 'server/Code.gs'), 'utf8').replace(/var BOT_KBCTX = function \(\) \{[\s\S]*?\/\*BOT_KBCTX_END\*\/;/, 'var BOT_KBCTX = /*BOT_KBCTX*/null;').split('\n');
   const sv = require('crypto').createHash('sha1').update(src.join('\n')).digest('hex').slice(0, 8);
-  const same = src.length === out.length && src.every(function (l, i) { return /\/\*(SEED_IDENTITIES|OPEN_FONTS)\*\//.test(l) || l.replace('/*SRV_VER*/', sv) === out[i]; });
+  const same = src.length === out.length && src.every(function (l, i) { return /\/\*(SEED_IDENTITIES|OPEN_FONTS|BOT_KB|BOT_KBCTX)\*\//.test(l) || l.replace('/*SRV_VER*/', sv) === out[i]; });
   ok(same, 'server/Code.gs يطابق بناء src/Code.gs (أعد python3 v6/build_gs.py ولا تعدّل الملف المبني)');
   ok(typeof ctx.link_op === 'function' && typeof ctx.link_check === 'function' && typeof ctx.linkSend_ === 'function', 'كود الحساب الموحّد مع منصة الأنشطة موجود في الخادم');
 })();
