@@ -213,7 +213,7 @@ function buildTop() {
   } });
   if (V6.me.avatar) av.appendChild(el('img', { src: V6.me.avatar, alt: '' }));
   top.appendChild(el('div', { class: 'wrap in' }, [
-    el('a', { href: '#/', class: 'logo', 'aria-label': 'الرئيسية' }, [brandImg('c', 'lg-full'), brandImg('mark', 'lg-mark')]), nav, el('span', { class: 'sp' }), psw, fb, bell, av
+    el('a', { href: '#/', class: 'logo', 'aria-label': 'الرئيسية' }, [brandImg('c', 'lg-full'), brandImg('mark', 'lg-mark')]), nav, el('span', { class: 'sp' }), typeof TG6 !== 'undefined' ? TG6.linkBtn() : null, psw, fb, bell, av
   ]));
   markNav();
 }

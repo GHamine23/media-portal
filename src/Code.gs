@@ -295,7 +295,7 @@ function newSession_(uid) {
 function meOf_(a) {
   var progs = progsFor_(a).map(function (p) { return { id: p.id, name: p.name, color: p.color || '', features: p.features || {} }; });
   var av = a.hasAvatar ? (readJson_('avatars.json', {})[a.uid] || '') : '';
-  return Object.assign(publicAcc_(a), { prefs: a.prefs || {}, programsInfo: progs, roleName: ROLES[a.role] || '', avatar: av });
+  return Object.assign(publicAcc_(a), { prefs: a.prefs || {}, programsInfo: progs, roleName: ROLES[a.role] || '', avatar: av, bot: abotUser_() && abotOn_() ? abotUser_() : '' });
 }
 // المستخدم يغيّر اسمه الظاهر وصورته (صورة صغيرة تُحفظ في avatars.json)
 function me_profile(token, json) {

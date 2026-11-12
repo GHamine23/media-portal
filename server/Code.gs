@@ -295,7 +295,7 @@ function newSession_(uid) {
 function meOf_(a) {
   var progs = progsFor_(a).map(function (p) { return { id: p.id, name: p.name, color: p.color || '', features: p.features || {} }; });
   var av = a.hasAvatar ? (readJson_('avatars.json', {})[a.uid] || '') : '';
-  return Object.assign(publicAcc_(a), { prefs: a.prefs || {}, programsInfo: progs, roleName: ROLES[a.role] || '', avatar: av });
+  return Object.assign(publicAcc_(a), { prefs: a.prefs || {}, programsInfo: progs, roleName: ROLES[a.role] || '', avatar: av, bot: abotUser_() && abotOn_() ? abotUser_() : '' });
 }
 // المستخدم يغيّر اسمه الظاهر وصورته (صورة صغيرة تُحفظ في avatars.json)
 function me_profile(token, json) {
@@ -2676,7 +2676,7 @@ function hasGemini_() { return geminiKeys_().length > 0; }
 function aiAny_(s) { var h = aiHave_(); return !!(h.gemini || h.groq || h.cf || (s.ai && s.ai.pollFallback !== false)); }
 function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: aiAny_(s), vision: hasGemini_(), capPrompt: (s.ai && s.ai.capPrompt) || '' }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN'), pexels: true, imgKeys: { pixabay: !!props_().getProperty('PIXABAY_KEY'), pexels: !!props_().getProperty('PEXELS_KEY') }, tgKnown: (s.tgKnown || []).length }; }
 // بصمة نسخة الخادم: يضعها البناء، ويقارنها الموقع ليخبر المدير إن كان الخادم المنشور أقدم
-var SRV_VER = 'ac478a1a';
+var SRV_VER = 'bbf46ef4';
 function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.srvVer = SRV_VER; s.aiKey = hasGemini_(); s.aiKeys = geminiKeys_().length; s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); s.pixabayOn = !!props_().getProperty('PIXABAY_KEY'); s.groqOn = !!props_().getProperty('GROQ_KEY'); s.cfOn = !!(props_().getProperty('CF_ACCOUNT') && props_().getProperty('CF_TOKEN')); s.routeDefault = AI_ROUTE_DEFAULT; return JSON.stringify(s); }
 function set_save(token, json) {
   var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');

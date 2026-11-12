@@ -17,7 +17,7 @@ function mHome() {
   const recent = el('div', { class: 'mstrip' }), models = el('div', { class: 'mstrip' });
   const recentSec = msection('آخر تصاميمك', '#/mine', [recent]); recentSec.hidden = true;
   const modelsSec = msection('نماذج جاهزة', '#/mine', [models]); modelsSec.hidden = true;
-  const sc = mscreen({ title: 'أثر', right: [el('a', { class: 'nb', href: '#/more', 'aria-label': 'حسابك', onclick: function () { M.dir = 'fwd'; } }, [me.avatar ? el('img', { src: me.avatar, alt: '', style: 'width:30px;height:30px;border-radius:50%' }) : ico('user')])] }, [
+  const sc = mscreen({ title: 'أثر', right: [typeof TG6 !== 'undefined' ? TG6.linkBtn('m') : null, el('a', { class: 'nb', href: '#/more', 'aria-label': 'حسابك', onclick: function () { M.dir = 'fwd'; } }, [me.avatar ? el('img', { src: me.avatar, alt: '', style: 'width:30px;height:30px;border-radius:50%' }) : ico('user')])] }, [
     el('div', { class: 'mhero' }, [(typeof progMark === 'function' && progMark(P, 'm', timeGreeting(nm))) || el('span', { class: 'greet', text: timeGreeting(nm) + ' · ' + P.name }), el('h2', { text: 'ماذا ستصمّم اليوم؟' })]),
     typeof installBanner === 'function' ? installBanner() : null,
     quick,

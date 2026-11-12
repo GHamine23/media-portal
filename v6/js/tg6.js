@@ -96,13 +96,35 @@ const TG6 = {
       el('p', {}, ['اسم المستخدم: ', el('bdi', { dir: 'ltr', text: me.username || '' })]),
       el('div', { class: 'card lgcard' }, [form])]));
   },
+  // زر «اربط تيليجرام» البارز في الرأس (الموقع) وفي رأس الرئيسية (تطبيق الجوال): لمن لم يربط بعد، والبوت مضبوط
+  needLink: function () { const me = V6.me || {}; return !!(me.bot && !me.tg && !TG6.on()); },
+  // تُفتح النافذة قبل انتظار الخادم كي لا يمنعها المتصفح، ثم يوضع فيها رابط البوت
+  linkGo: async function (btn) {
+    let w = null; try { w = window.open('', '_blank'); } catch (e) {}
+    if (btn) btn.disabled = true;
+    try {
+      const r = await API6.me('tg_link_code');
+      if (w && !w.closed) w.location.href = r.url; else location.href = r.url;
+      toast('في البوت اضغط «ابدأ»، فيُربط حسابك');
+      // بعد عودته من تيليجرام: نعيد قراءة حسابه، فيختفي الزر إن رُبط
+      window.addEventListener('focus', async function once() {
+        window.removeEventListener('focus', once);
+        try { const me = await API6.me('auth_me'); if (me && me.tg) { V6.me.tg = true; if (typeof buildTop === 'function') buildTop(); $$('.tglink').forEach(function (x) { x.remove(); }); toast('رُبط حسابك بتيليجرام ✓'); } } catch (e) {}
+      });
+    } catch (e) { try { if (w) w.close(); } catch (x) {} toast(e.message); }
+    finally { if (btn) btn.disabled = false; }
+  },
+  linkBtn: function (cls) {
+    if (!TG6.needLink()) return null;
+    return el('button', { type: 'button', class: 'tglink ' + (cls || ''), title: 'اربط حسابك ببوت أثر في تيليجرام: تدخل منه بلا كلمة سر، ويصلك تصميمك في المحادثة', onclick: function (e) { TG6.linkGo(e.currentTarget); } }, [ico('send'), el('span', { text: 'اربط تيليجرام' })]);
+  },
   // في الموقع: ربط الحساب بتيليجرام برمز لمرة واحدة
   linkCard: function () {
     const me = V6.me || {};
     return el('div', { class: 'card rv actg' }, [el('h2', { class: 'ch', text: 'بوت أثر في تيليجرام' }),
       el('p', { class: 'muted small', text: me.tg ? 'حسابك مربوط بتيليجرام: تدخل أثر من البوت بلا كلمة سر، ويصلك تصميمك في المحادثة.' : 'اربط حسابك بتيليجرام لتدخل أثر من البوت بلا كلمة سر، ويصلك تصميمك في المحادثة بجودته الكاملة.' }),
       el('div', { class: 'row wrapr' }, [el('button', { type: 'button', class: 'btn ' + (me.tg ? 'line' : 'dark'), onclick: function (e) {
-        return withBusy(e.currentTarget, async function () { const r = await API6.me('tg_link_code'); window.open(r.url, '_blank', 'noopener'); toast('افتح البوت واضغط «ابدأ»'); }, { busy: 'نجهّز الرابط…', done: 'فُتح البوت' });
+        return TG6.linkGo(e.currentTarget);
       } }, [ico('send'), me.tg ? 'اربط حساباً آخر في تيليجرام' : 'اربط تيليجرام'])])]);
   }
 };

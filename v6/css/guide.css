@@ -168,3 +168,17 @@ body.in-editor .gx-intro{top:calc(var(--top) + 12px);bottom:auto}
 .nav a.nguide:hover{color:#7a3a0b;background:linear-gradient(135deg,#ffecd9,#ffdcb8)}
 .nav a.nguide.on{color:#fff;background:linear-gradient(135deg,#f0731f,#d4580c);box-shadow:0 6px 16px -8px #f0731f}
 .nav a.nguide.on svg{color:#fff}
+/* زر «اربط تيليجرام» البارز في الرأس (لمن لم يربط حسابه ببوت أثر) */
+.tglink{display:inline-flex;align-items:center;gap:6px;border:0;cursor:pointer;font:inherit;font-size:14px;font-weight:600;color:#fff;background:linear-gradient(135deg,#37aee2,#1e96c8);border-radius:99px;padding:7px 14px 7px 12px;margin-inline-end:6px;box-shadow:0 6px 16px -8px #1e96c8;white-space:nowrap;transition:transform .15s,box-shadow .15s}
+.tglink svg{width:16px;height:16px}
+.tglink:hover{transform:translateY(-1px);box-shadow:0 8px 20px -8px #1e96c8}
+.tglink:disabled{opacity:.7;cursor:progress}
+@media (max-width:560px){.tglink:not(.m){padding:8px}.tglink:not(.m) span{display:none}}
+/* حين يظهر شريط التنقل (فوق ١٠٦٠ بكسل) يضيق الرأس: الزر أيقونة تيليجرام الزرقاء (والاسم في تلميحه)، ويختصر مبدّل البرنامج.
+   وتحته يختفي شريط التنقل فيتسع الزر لاسمه، وعلى الجوال يعود أيقونة */
+@media (min-width:1061px){.tglink:not(.m) span{display:none}.tglink:not(.m){padding:9px}.tglink:not(.m) svg{width:18px;height:18px}
+  .top .in:has(.tglink) .prog-sw span{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block}}
+@media (min-width:1101px){.top .in:has(.tglink) .nav a{white-space:nowrap}}
+/* على الشاشات الواسعة يتسع الرأس لاسم الزر إذا ضاقت حشوة روابط التنقل قليلًا */
+@media (min-width:1190px){.top .in:has(.tglink) .nav a{padding-inline:9px}.tglink:not(.m){padding:7px 13px 7px 11px}.tglink:not(.m) span{display:inline}.tglink:not(.m) svg{width:16px;height:16px}}
+@media (min-width:1061px){.top .in:has(.tglink) .prog-sw span{display:none}}

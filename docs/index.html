@@ -169,7 +169,7 @@ p{margin:0}
 .menu i.sw{width:10px;height:10px;border-radius:50%}
 .menu svg{width:18px;height:18px;flex:none;color:var(--ink2)}
 :where(button,a,span,div,label,b,li) > svg[viewBox="0 0 24 24"]{width:18px;height:18px;flex:none}
-@media (max-width:860px){.nav{display:none}.top .in{gap:8px}.prog-sw{max-width:150px}}
+@media (max-width:1060px){.nav{display:none}.top .in{gap:8px}.prog-sw{max-width:150px}}
 </style>
 <style>
 /* ===== لون الواجهة (تضبطه applyAccent؛ هذه القيم الافتراضية قبل تشغيل السكربت) ===== */
@@ -1800,6 +1800,20 @@ body.in-editor .gx-intro{top:calc(var(--top) + 12px);bottom:auto}
 .nav a.nguide:hover{color:#7a3a0b;background:linear-gradient(135deg,#ffecd9,#ffdcb8)}
 .nav a.nguide.on{color:#fff;background:linear-gradient(135deg,#f0731f,#d4580c);box-shadow:0 6px 16px -8px #f0731f}
 .nav a.nguide.on svg{color:#fff}
+/* زر «اربط تيليجرام» البارز في الرأس (لمن لم يربط حسابه ببوت أثر) */
+.tglink{display:inline-flex;align-items:center;gap:6px;border:0;cursor:pointer;font:inherit;font-size:14px;font-weight:600;color:#fff;background:linear-gradient(135deg,#37aee2,#1e96c8);border-radius:99px;padding:7px 14px 7px 12px;margin-inline-end:6px;box-shadow:0 6px 16px -8px #1e96c8;white-space:nowrap;transition:transform .15s,box-shadow .15s}
+.tglink svg{width:16px;height:16px}
+.tglink:hover{transform:translateY(-1px);box-shadow:0 8px 20px -8px #1e96c8}
+.tglink:disabled{opacity:.7;cursor:progress}
+@media (max-width:560px){.tglink:not(.m){padding:8px}.tglink:not(.m) span{display:none}}
+/* حين يظهر شريط التنقل (فوق ١٠٦٠ بكسل) يضيق الرأس: الزر أيقونة تيليجرام الزرقاء (والاسم في تلميحه)، ويختصر مبدّل البرنامج.
+   وتحته يختفي شريط التنقل فيتسع الزر لاسمه، وعلى الجوال يعود أيقونة */
+@media (min-width:1061px){.tglink:not(.m) span{display:none}.tglink:not(.m){padding:9px}.tglink:not(.m) svg{width:18px;height:18px}
+  .top .in:has(.tglink) .prog-sw span{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block}}
+@media (min-width:1101px){.top .in:has(.tglink) .nav a{white-space:nowrap}}
+/* على الشاشات الواسعة يتسع الرأس لاسم الزر إذا ضاقت حشوة روابط التنقل قليلًا */
+@media (min-width:1190px){.top .in:has(.tglink) .nav a{padding-inline:9px}.tglink:not(.m){padding:7px 13px 7px 11px}.tglink:not(.m) span{display:inline}.tglink:not(.m) svg{width:16px;height:16px}}
+@media (min-width:1061px){.top .in:has(.tglink) .prog-sw span{display:none}}
 
 /* ===== ia.css ===== */
 /* ===== بنية الموقع والصفحات العامة (ia): الرأس، حسابي، الرئيسية، الإدارة ===== */
@@ -2589,7 +2603,7 @@ textarea.pc-notes-t::placeholder{color:#6e6e80;font-size:15px}
 <script src="js/core6.js?v=a646ca35a8"></script>
 <script src="js/freetpl6.js?v=f9b7e44ff1"></script>
 <script src="js/assets6.js?v=cb1a0d2678"></script>
-<script src="js/auth6.js?v=10ea041b7d"></script>
+<script src="js/auth6.js?v=e78fece497"></script>
 <script src="js/home6.js?v=a7b5f0e7ae"></script>
 <script src="js/sections6.js?v=798f2452b2"></script>
 <script src="js/updates6.js?v=1210eaa02d"></script>
@@ -2611,9 +2625,9 @@ textarea.pc-notes-t::placeholder{color:#6e6e80;font-size:15px}
 <script src="js/tips6.js?v=86b4f361a7"></script>
 <script src="js/social6.js?v=05c796e7ed"></script>
 <script src="js/mine6.js?v=bca6971598"></script>
-<script src="js/admin6.js?v=1281a37b32"></script>
+<script src="js/admin6.js?v=2bfce421cd"></script>
 <script src="js/pstats6.js?v=6e18786688"></script>
-<script src="js/tg6.js?v=220f6a11f3"></script>
+<script src="js/tg6.js?v=1e8ac59278"></script>
 <script src="js/app6.js?v=49ca97ea05"></script>
 </body>
 </html>

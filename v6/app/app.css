@@ -323,3 +323,7 @@ body.mapp .e-top .e-mundo svg{width:20px;height:20px}
 .tgx .lglogo img{height:44px;width:auto}
 .tgx h1{font-size:1.5rem;margin:0}
 .tgapp .minstall{display:none!important}
+/* زر «اربط تيليجرام» في رأس الرئيسية */
+.mnav .tglink.m{display:inline-flex;align-items:center;gap:5px;border:0;font:inherit;font-size:14px;font-weight:600;color:#fff;background:linear-gradient(135deg,#37aee2,#1e96c8);border-radius:99px;padding:6px 12px;min-height:34px;margin-inline-end:4px;box-shadow:0 4px 12px -6px #1e96c8;white-space:nowrap}
+.mnav .tglink.m svg{width:15px;height:15px}
+.mnav .tglink.m:disabled{opacity:.7}
