@@ -884,7 +884,7 @@ function abot_(method, payload) {
   var t = abotToken_(); if (!t) throw new Error('بوت أثر غير مضبوط بعد');
   var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + t + '/' + method, { method: 'post', payload: payload || {}, muteHttpExceptions: true });
   var j; try { j = JSON.parse(res.getContentText()); } catch (e) { j = { ok: false, description: 'رد غير مفهوم (' + res.getResponseCode() + ')' }; }
-  if (!j.ok) throw new Error(tgErr_(j, res.getResponseCode()));
+  if (!j.ok) { if (method !== 'getWebhookInfo') abotLog_({ r: 'api', k: method, e: clip_(String(j.description || res.getResponseCode()), 200) }); throw new Error(tgErr_(j, res.getResponseCode())); }
   return j.result;
 }
 function abotKb_(rows) { return JSON.stringify({ inline_keyboard: rows }); }
@@ -1075,6 +1075,10 @@ function tgLinkByCode_(code, from) {
     if (other && other.uid !== a.uid) return { err: 'حسابك في تيليجرام مربوط بحساب آخر في أثر (' + other.username + ')' };
     a.tg = String(from.id); if (from.username) a.tgUser = clip_(from.username, 40); a.tgAt = now_();
     writeJson_('accounts.json', accs); audit_(a, 'ربط حسابه بتيليجرام', a.username);
+    // طلب دخول سابق من الحساب نفسه في تيليجرام: انتهى بالربط، فلا يُقبل بحساب ثانٍ
+    var reqs = readJson_('tgreq.json', []), ch = false;
+    reqs.forEach(function (r) { if (r.tg === a.tg && r.status === 'new') { r.status = 'linked'; r.acc = a.username; r.upd = now_(); ch = true; } });
+    if (ch) writeJson_('tgreq.json', reqs);
     return { a: a };
   });
 }
@@ -1105,14 +1109,34 @@ function tg_deliver(token, json) {
 }
 
 /* ---------- الويبهوك ---------- */
+// الرد بـ HtmlService لا ContentService: الثاني يرد على تيليجرام بتحويل 302 فيعدّ التسليم فاشلًا ويعيده ويؤخّر ما بعده،
+// والأول يرد 200 مباشرة.
+function abotOut_(t) { return HtmlService.createHtmlOutput(t); }
 function abotHook_(e) {
   var sec = props_().getProperty('ATHAR_HOOK') || '';
-  if (!sec || String(e.parameter.hook || '') !== sec) return ContentService.createTextOutput('no');
+  if (!sec || String(e.parameter.hook || '') !== sec) { abotLog_({ r: 'bad' }); return abotOut_('no'); }
   var u = null; try { u = JSON.parse(e.postData.contents); } catch (x) {}
-  if (!u || u.update_id == null) return ContentService.createTextOutput('ok');
-  if (!abotFresh_(u.update_id)) return ContentService.createTextOutput('dup');
-  try { abotUpdate_(u); } catch (err) { console.warn('abot', err); }
-  return ContentService.createTextOutput('ok');
+  if (!u || u.update_id == null) { abotLog_({ r: 'empty' }); return abotOut_('ok'); }
+  var k = abotKind_(u);
+  try { if (!abotFresh_(u.update_id)) { abotLog_({ r: 'dup', k: k }); return abotOut_('dup'); } }
+  catch (err) { abotLog_({ r: 'err', k: k, e: 'القفل: ' + clip_(String(err && err.message || err), 200) }); return abotOut_('ok'); }
+  try { abotUpdate_(u); abotLog_({ r: 'ok', k: k }); }
+  catch (err) { abotLog_({ r: 'err', k: k, e: clip_(String(err && err.message || err), 300) }); console.warn('abot', err); }
+  return abotOut_('ok');
+}
+// نوع التحديث للسجل: الأمر وحده لا نص الرسالة
+function abotKind_(u) {
+  if (u.callback_query) return 'زر ' + clip_(String(u.callback_query.data || '').split(':').slice(0, 2).join(':'), 20);
+  var m = u.message || {}; if (m.chat && m.chat.type !== 'private') return 'خارج الخاص';
+  if (m.photo || m.document) return 'ملف';
+  var t = String(m.text || ''); return /^\//.test(t) ? clip_(t.split(/\s/)[0], 20) : (t ? 'نص' : 'آخر');
+}
+// سجل قصير لآخر ما وصل البوت (يُعرض للمدير في «الإعدادات ← بوت أثر»)
+function abotLog_(o) {
+  try {
+    var c = CacheService.getScriptCache(), L = []; try { L = JSON.parse(c.get('abotlog') || '[]'); } catch (x) {}
+    o.t = now_(); L.unshift(o); if (L.length > 15) L.length = 15; c.put('abotlog', JSON.stringify(L), 21600);
+  } catch (x) {}
 }
 // يعيد true مرة واحدة فقط لكل تحديث
 function abotFresh_(id) {
@@ -1143,14 +1167,16 @@ function abotUpdate_(u) {
   if (a && a.disabled) return abotSend_(from, 'هذا الحساب موقوف في أثر. راجع مشرف برنامجك.');
   if (!a) {
     var q = readJson_('tgreq.json', []).filter(function (r) { return r.tg === from && r.status === 'new'; })[0];
-    if (q) return abotSend_(from, 'أهلًا بك في أثر 🌿 يتم مراجعة حسابك قبل قبول الدخول، وتصلك رسالة هنا حين يُقبل.');
+    if (q) return abotSend_(from, 'أهلًا بك في أثر 🌿 يتم مراجعة طلبك قبل قبول الدخول، وتصلك رسالة هنا حين يُقبل.\n\nوإن كان لك حساب في أثر من قبل، فاربطه بدل الانتظار: ادخل الموقع، ومن «حسابي» اضغط «اربط تيليجرام».', [[{ text: '🔗 لي حساب في أثر: اربطه', url: SITE_URL + '#/account' }]]);
     return abotSend_(from, '<b>أهلًا بك في أثر 🌿</b>\nمنصة الأثر الإعلامي للعاملين في الأكاديمية: تصمّم إعلانات مسارك بهويته، ويصلك تصميمك هنا بجودته الكاملة.\n\n' +
-      'إن كان لك حساب في أثر: ادخل الموقع، ومن «حسابي» اضغط «اربط تيليجرام».\nوإن لم يكن لك حساب: اطلب الدخول، ويصلك القبول هنا.', [[abotWeb_('📝 اطلب الدخول', '')]]);
+      'إن كان لك حساب في أثر: ادخل الموقع، ومن «حسابي» اضغط «اربط تيليجرام»، فيعرفك البوت.\nوإن لم يكن لك حساب: اطلب الدخول، ويصلك القبول هنا.', [[{ text: '🔗 لي حساب في أثر: اربطه', url: SITE_URL + '#/account' }], [abotWeb_('📝 ليس لي حساب: اطلب الدخول', '')]]);
   }
   if (m.photo || m.document) return abotFile_(a, m);
   var st = abotState_(from);
+  if (!c && ABOT_KEYMAP[text]) { c = ABOT_KEYMAP[text]; abotState_(from, ''); st = ''; }   // أزرار لوحة المفاتيح الدائمة
   switch (c) {
-    case 'start': case 'menu': abotState_(from, ''); return abotMenu_(a);
+    case 'start': abotState_(from, ''); abotSend_(from, 'أهلًا ' + h0_(String(m.from.first_name || a.name || '')) + ' 🌿\nأزرار أثر تحت خانة الكتابة دائمًا، وزر «افتح أثر» بجانبها.', null, { reply_markup: abotKeys_() }); return abotMenu_(a);
+    case 'menu': abotState_(from, ''); return abotMenu_(a);
     case 'design': return abotSend_(from, 'افتح أثر واختر قالبك، ويصلك التصميم هنا حين تنزّله.', [[abotWeb_('🎨 افتح أثر', '/sections')], [abotWeb_('📂 تصاميمي', '/mine')]]);
     case 'idea': abotState_(from, 'idea'); return abotSend_(from, '<b>صمّم بفكرة</b>\nاكتب فكرة إعلانك في رسالة واحدة: النشاط، وموعده، ولمن (المسار).\nمثال: «لقاء الأحد ٨:٣٠ مساءً مع د. محمد عن بر الوالدين لمسار إشراق».');
     case 'guide': return abotGuide_(a);
@@ -1170,6 +1196,13 @@ function abotPwText_(a) {
   return '<b>كلمة سر للموقع</b>\nدخولك من تيليجرام لا يحتاج كلمة سر، لأن تيليجرام نفسه يثبت أنه أنت. أما الموقع في متصفح الحاسوب أو الجوال فلا يعرف تيليجرام، فيسألك اسم المستخدم وكلمة السر.\n' +
     'اسم المستخدم: <code>' + h0_(a.username) + '</code>\n' + (a.noPw ? 'ليس لحسابك كلمة سر بعد: اجعلها من الزر، ثم ادخل بها الموقع متى شئت.' : 'لحسابك كلمة سر؛ ولك أن تغيّرها من الزر.');
 }
+// لوحة مفاتيح دائمة تحت خانة الكتابة: قائمة المهام ظاهرة دائمًا (أزرار نصية؛ زر «افتح أثر» فيها يرد بزر التطبيق المصغّر،
+// لأن التطبيق إذا فُتح من زر لوحة المفاتيح لا تصله بيانات الدخول)
+var ABOT_KEYS = [['🎨 افتح أثر', '💡 صمّم بفكرة'], ['❓ اسأل أثر', '🎬 دليل أثر'], ['✏️ تعلّم التصميم', '📋 القائمة']];
+var ABOT_KEYMAP = { '🎨 افتح أثر': 'design', '💡 صمّم بفكرة': 'idea', '❓ اسأل أثر': 'ask', '🎬 دليل أثر': 'guide', '✏️ تعلّم التصميم': 'learn', '📋 القائمة': 'menu' };
+function abotKeys_() {
+  return JSON.stringify({ keyboard: ABOT_KEYS.map(function (r) { return r.map(function (t) { return { text: t }; }); }), is_persistent: true, resize_keyboard: true, input_field_placeholder: 'اكتب سؤالك عن أثر، أو اختر من الأزرار' });
+}
 function abotMenu_(a) {
   return abotSend_(a.tg, '<b>أثر | المنصة الإعلامية</b>\nماذا تريد الآن؟', [
     [abotWeb_('🎨 افتح أثر', '')],
@@ -1182,7 +1215,7 @@ function abotMenu_(a) {
 function abotWelcome_(a, linked) {
   if (!abotOn_() || !a.tg) return;
   if (!linked) abotSend_(a.tg, '<b>قُبل حسابك في أثر ✅</b>\nاسم المستخدم: <code>' + h0_(a.username) + '</code>\nتدخل من هنا بلا كلمة سر.', [[abotWeb_('🎨 افتح أثر', '')]]);
-  abotSend_(a.tg, '<b>١. ما هو أثر؟</b>\nمنصة تصمّم فيها إعلانات برنامجك ومسارك بهويتهما: قوالب جاهزة بالألوان والخطوط والشعارات، ومحرر بسيط، ومساعد ذكي يقترح عليك النص والقالب.');
+  abotSend_(a.tg, '<b>١. ما هو أثر؟</b>\nمنصة تصمّم فيها إعلانات برنامجك ومسارك بهويتهما: قوالب جاهزة بالألوان والخطوط والشعارات، ومحرر بسيط، ومساعد ذكي يقترح عليك النص والقالب.', null, { reply_markup: abotKeys_() });
   abotSend_(a.tg, '<b>٢. صمّم واستلم هنا</b>\nاضغط «افتح أثر»، واختر قالبًا، واكتب نصك، ثم «تنزيل»: يصلك التصميم في هذه المحادثة ملفًا بجودته الكاملة. وإن كانت عندك فكرة فقط، فاضغط «صمّم بفكرة» واكتبها.');
   abotSend_(a.tg, '<b>٣. اسأل أثر، وشاهد الدليل</b>\nاكتب لي أي سؤال عن المنصة فأجيبك، وفي «دليل أثر» مقطع قصير لكل قسم، وفي «تعلّم التصميم» قاعدة بعد قاعدة.\n\nاسألني أي سؤال 👇');
   abotMenu_(a);
@@ -1413,7 +1446,10 @@ function abot_set(token, bot) {
 function abot_info(token) {
   var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
   var o = { on: abotOn_(), user: abotUser_(), linked: !!a.tg, reqs: readJson_('tgreq.json', []).filter(function (r) { return r.status === 'new'; }).length };
-  if (o.on) { try { var w = abot_('getWebhookInfo', {}); o.hook = { set: !!w.url, pending: w.pending_update_count || 0, err: w.last_error_message || '', at: w.last_error_date || 0 }; } catch (e) { o.err = e.message; } }
+  if (o.on) { try { var w = abot_('getWebhookInfo', {}), P = props_(), want = (P.getProperty('ATHAR_URL') || '') + '?hook=' + (P.getProperty('ATHAR_HOOK') || '');
+    // urlOk: الويبهوك المسجّل في تيليجرام هو رابط هذا الخادم بمعامله السري (لا يُعرض المعامل)
+    o.hook = { set: !!w.url, urlOk: !!w.url && w.url === want, pending: w.pending_update_count || 0, err: w.last_error_message || '', at: w.last_error_date || 0 }; } catch (e) { o.err = e.message; } }
+  try { o.log = JSON.parse(CacheService.getScriptCache().get('abotlog') || '[]'); } catch (e) { o.log = []; }
   var accs = readJson_('accounts.json', {}); o.users = Object.keys(accs).filter(function (k) { return accs[k].tg && !accs[k].disabled; }).length;
   return JSON.stringify(o);
 }

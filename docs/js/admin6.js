@@ -567,7 +567,7 @@ async function aTgReq(body) {
   if (!list.length) { box.appendChild(el('p', { class: 'empty', text: 'لا طلبات بعد.' })); return; }
   const act = function (r, a, arg) { return function (e) { return withBusy(e.currentTarget, async function () { await API6.me('tg_req_act', r.id, a, arg || ''); showAdmin('tgreq'); }, { busy: '…', done: 'تم' }); }; };
   list.forEach(function (r) {
-    const st = { new: ['ينتظر', 'or'], ok: ['قُبل', 'gr'], no: ['رُفض', ''] }[r.status] || ['', ''];
+    const st = { new: ['ينتظر', 'or'], ok: ['قُبل', 'gr'], no: ['رُفض', ''], linked: ['رَبط حسابه بنفسه', 'gr'] }[r.status] || ['', ''];
     box.appendChild(el('div', { class: 'card flat arow2 tgreq' }, [el('div', {}, [
       el('div', { class: 'row wrapr' }, [el('b', { text: r.name }), el('span', { class: 'pill ' + st[1], text: st[0] }), el('span', { class: 'tiny', text: new Date(r.at).toLocaleString('ar') })]),
       el('p', { class: 'small muted' }, ['في تيليجرام: ' + (r.tgName || '') + ' ', r.tgUser ? el('bdi', { dir: 'ltr', text: '@' + r.tgUser }) : '', ' · ' + r.where]),
@@ -577,6 +577,13 @@ async function aTgReq(body) {
         .concat([el('button', { type: 'button', class: 'btn sm ghost', onclick: act(r, 'x') }, ['رفض'])])) : null])]));
   });
 }
+// آخر ما وصل البوت: لتشخيص صمته (السجل في ذاكرة الخادم ست ساعات)
+function abotLogView(L) {
+  const R = { ok: ['عولج', 'ok'], dup: ['مكرر (أعاده تيليجرام)', 'muted'], bad: ['رُفض: المعامل السري لا يطابق', 'err'], empty: ['فارغ', 'muted'], err: ['خطأ', 'err'], api: ['رفضه تيليجرام', 'err'] };
+  if (!L.length) return el('p', { class: 'small muted', text: 'لم يصل البوت شيء في الساعات الست الأخيرة. أرسل له /start ثم اضغط «حدّث».' });
+  return el('details', { class: 'small' }, [el('summary', { text: 'آخر ما وصل البوت (' + L.length + ')' }),
+    el('ul', { class: 'tiny' }, L.map(function (x) { const r = R[x.r] || [x.r, '']; return el('li', { class: r[1] }, [new Date(x.t).toLocaleTimeString('ar') + ' · ' + r[0] + (x.k ? ' · ' : ''), x.k ? el('bdi', { text: x.k }) : '', x.e ? ' · ' + x.e : '']); }))]);
+}
 function abotCard() {
   const box = el('div', { class: 'fld' }, [el('p', { class: 'small muted', text: 'نتحقق من حال البوت…' })]);
   const tokI = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: '123456789:AAF…', 'aria-label': 'رمز بوت أثر' });
@@ -585,7 +592,10 @@ function abotCard() {
     const hk = r.hook || {};
     box.replaceChildren.apply(box, [
       el('p', { class: 'small ' + (r.on ? 'ok' : 'err'), text: r.on ? 'البوت مضبوط' + (r.user ? ': @' + r.user : '') + ' · ' + r.users + ' مستخدماً ربطوا تيليجرام · طلبات تنتظر: ' + r.reqs : 'لم يُضبط بوت أثر بعد. الصق رمزه من BotFather.' }),
-      r.on ? el('p', { class: 'small ' + (hk.set && !hk.err ? 'ok' : 'err'), text: hk.set ? (hk.err ? 'الويبهوك مضبوط، وآخر خطأ: ' + hk.err : 'الويبهوك يعمل' + (hk.pending ? ' (ينتظر ' + hk.pending + ')' : '')) : 'الويبهوك غير مضبوط: اضغط «أعدّ البوت».' }) : null,
+      r.on ? el('p', { class: 'small ' + (hk.set && hk.urlOk !== false && !hk.err ? 'ok' : 'err'), text: !hk.set ? 'الويبهوك غير مضبوط: اضغط «أعدّ البوت».'
+        : hk.urlOk === false ? 'الويبهوك مسجّل على رابط غير هذا الخادم: اضغط «أعدّ البوت».'
+        : (hk.err ? 'الويبهوك مضبوط، وآخر خطأ من تيليجرام: ' + hk.err + (hk.at ? ' (' + new Date(hk.at * 1000).toLocaleString('ar') + ')' : '') : 'الويبهوك يعمل') + (hk.pending ? ' · تحديثات تنتظر: ' + hk.pending : '') }) : null,
+      r.on ? abotLogView(r.log || []) : null,
       r.on && !r.linked ? el('p', { class: 'small err', text: 'لم تربط حسابك بتيليجرام بعد، فلن تصلك طلبات الدخول في البوت: من «حسابي» اضغط «اربط تيليجرام».' }) : null].filter(Boolean));
   }
   load();
@@ -595,6 +605,7 @@ function abotCard() {
     el('div', { class: 'fld' }, [el('label', { text: 'رمز البوت (يُحفظ في الخادم ولا يُعرض)' }), tokI]),
     el('div', { class: 'row wrapr' }, [
       el('button', { type: 'button', class: 'btn sm line', text: 'احفظ الرمز', onclick: function (e) { if (!tokI.value.trim()) { toast('الصق الرمز أولاً'); return; } return withBusy(e.currentTarget, async function () { await API6.me('abot_set', tokI.value.trim()); tokI.value = ''; load(); }, { busy: 'نحفظ…', done: 'حُفظ' }); } }),
+      el('button', { type: 'button', class: 'btn sm ghost', text: 'حدّث', onclick: function () { load(); } }),
       el('button', { type: 'button', class: 'btn sm dark', text: 'أعدّ البوت', onclick: function (e) { return withBusy(e.currentTarget, async function () { const r = await API6.me('abot_setup', API_URL); toast('ضُبط: ' + r.done.join('، ') + (r.errs.length ? ' · لم يُضبط: ' + r.errs.join('، ') : '')); load(); }, { busy: 'نضبط…', done: 'أُعدّ البوت' }); } })]),
     el('p', { class: 'tiny', text: '«أعدّ البوت» يضبط الويبهوك واسم البوت ووصفه وأوامره وزر القائمة. أعده بعد كل نشر جديد للخادم.' })]);
 }
@@ -633,7 +644,7 @@ async function aSettings(body) {
   const pollOn = el('input', { type: 'checkbox', checked: s.ai.pollFallback !== false });
   const capPrompt = el('textarea', { class: 'inp', rows: '4', dir: 'auto', placeholder: 'مثال: ابدأ كل رسالة بسطر ترحيبي قصير، واختم بالوسم ورابط القناة. لا تستعمل أكثر من رمزين تعبيريين. نبرة هادئة محفّزة.', 'aria-label': 'تعليمات النص المصاحب' }); capPrompt.value = s.ai.capPrompt || '';
   // هل الخادم المنشور هو نفسه نسخة الموقع؟ (يمنع حيرة «حفظتُ ولم يتغير شيء»)
-  const SRV_EXPECT = 'a15a294c', srvOk = !!s.srvVer && s.srvVer === SRV_EXPECT;
+  const SRV_EXPECT = 'ac478a1a', srvOk = !!s.srvVer && s.srvVer === SRV_EXPECT;
   body.appendChild(el('div', { class: 'srvver ' + (srvOk ? 'ok' : 'old') }, [ico(srvOk ? 'check' : 'info'), el('span', { text: srvOk ? 'الخادم محدَّث ويطابق نسخة الموقع.' : 'الخادم المنشور أقدم من الموقع: بعض الإعدادات لن تُحفظ أو لن تعمل. الصق server/Code.gs في Apps Script، ثم «إدارة عمليات النشر» ← تعديل النشر الحالي ← «إصدار جديد» ← نشر.' }), el('small', { dir: 'ltr', text: (s.srvVer || '—') + ' / ' + SRV_EXPECT })]));
   body.appendChild(el('div', { class: 'grid two' }, [
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-pu' }, [ico('ai')]), el('h3', { text: 'اصنع إعلانك بالذكاء' }),

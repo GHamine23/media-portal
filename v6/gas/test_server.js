@@ -759,7 +759,7 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   const kb = JSON.parse(ask.opt.payload.reply_markup).inline_keyboard, newBtn = kb[0][0].callback_data;
   ok(/^ap:[a-z0-9]+:n$/.test(newBtn) && kb.some(function (r) { return r.some(function (b) { return /:x$/.test(b.callback_data); }); }), 'buttons: accept, link, change, reject');
   ok(J('tg_login', mkInit(SALEM)).pending, 'pending until approved');
-  ok(hook(msg(SALEM, 'السلام عليكم')) === 'ok' && /يتم مراجعة حسابك/.test(sentTo(42, 'sendMessage').pop().opt.payload.text), 'waiting message in the bot');
+  ok(hook(msg(SALEM, 'السلام عليكم')) === 'ok' && /يتم مراجعة طلبك/.test(sentTo(42, 'sendMessage').pop().opt.payload.text) && /#\/account/.test(sentTo(42, 'sendMessage').pop().opt.payload.reply_markup), 'waiting message in the bot, with a link-my-account button');
   const cb = function (from, data) { return { update_id: ++UID, callback_query: { id: 'cq' + UID, from: from, data: data, message: { message_id: 900, chat: { id: from.id, type: 'private' } } } }; };
   GAS._tg = [];
   hook(cb(SALEM, newBtn)); ok(J('tg_login', mkInit(SALEM)).pending, 'only the super admin can approve');
@@ -783,6 +783,29 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   ok(J('tg_deliver', T1, JSON.stringify({ b64: Buffer.from([137, 80, 78, 71]).toString('base64'), mime: 'image/png', fileName: 'إعلان.png', tplName: 'إعلان الأكاديمية', trackName: 'إشراق' })).ok, 'deliver');
   const doc = sentTo(42, 'sendDocument')[0]; ok(doc && /إعلان الأكاديمية/.test(doc.opt.payload.caption) && doc.opt.payload.document.getContentType() === 'image/png', 'design arrives as a full-quality document');
   fails('tg_deliver', /داخل تيليجرام/, J('auth_login', 'salem.k', 'SalemPass123').token, JSON.stringify({ b64: 'AA==', mime: 'image/png' }));
+
+  // الرد على تيليجرام 200 (HtmlService) لا تحويل 302، وسجل التشخيص للمدير
+  const ho = ctx.doPost({ parameter: { hook: SEC }, postData: { contents: JSON.stringify(msg(SALEM, '/menu')) } });
+  ok(Object.prototype.hasOwnProperty.call(ho, 'h') && ho.getContent() === 'ok', 'webhook answers with HtmlService (200), not ContentService (302)');
+  const inf = J('abot_info', adm);
+  ok(inf.log.length && inf.log.some(function (x) { return x.r === 'ok' && x.k === '/menu'; }) && inf.log.some(function (x) { return x.r === 'dup'; }) && inf.log.some(function (x) { return x.r === 'bad'; }), 'diagnostic log: ok, dup, bad secret');
+  ok(!inf.log.some(function (x) { return /كيف|السلام/.test(JSON.stringify(x)); }), 'the log keeps the command only, never the message text');
+  ok(inf.hook.urlOk === false, 'webhook registered elsewhere is flagged');
+  // لوحة المفاتيح الدائمة: قائمة المهام تحت خانة الكتابة
+  GAS._tg = []; hook(msg(SALEM, '/start'));
+  const st0 = sentTo(42, 'sendMessage'); const rk = JSON.parse(st0[0].opt.payload.reply_markup);
+  ok(rk.is_persistent && rk.keyboard.length === 3 && /القائمة/.test(JSON.stringify(rk)) && /inline_keyboard/.test(st0[1].opt.payload.reply_markup), '/start: persistent keyboard + inline menu');
+  GAS._tg = []; hook(msg(SALEM, '🎨 افتح أثر'));
+  ok(/web_app/.test(sentTo(42, 'sendMessage')[0].opt.payload.reply_markup), 'keyboard «افتح أثر» answers with the mini-app button');
+  GAS._tg = []; hook(msg(SALEM, '💡 صمّم بفكرة'));
+  ok(/صمّم بفكرة/.test(sentTo(42, 'sendMessage')[0].opt.payload.text) && ctx.abotState_('42') === 'idea', 'keyboard button → command');
+  ctx.abotState_('42', '');
+  // من طلب الدخول ثم ربط حسابه القائم برمز: يُغلق طلبه
+  const ZED = { id: 77, first_name: 'زيد' };
+  J('tg_request', mkInit(ZED), JSON.stringify({ program: 'academy', track: '', name: 'زيد', username: 'zaid.new' }));
+  const zc = J('tg_link_code', nt0()).url.split('start=')[1]; hook(msg(ZED, '/start ' + zc));
+  ok(J('tg_req_list', adm).filter(function (r) { return r.tg === '77'; })[0].status === 'linked', 'linking by code closes his pending request');
+  (function () { const A = ctx.readJson_('accounts.json', {}); Object.keys(A).forEach(function (k) { if (A[k].tg === '77') { delete A[k].tg; delete A[k].tgAt; } }); ctx.writeJson_('accounts.json', A); })();
 
   // اسأل أثر: الحد اليومي المشترك مع الموقع
   const salemUid = J('acc_list', adm).filter(function (x) { return x.username === 'salem.k'; })[0].uid;
