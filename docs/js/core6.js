@@ -19,7 +19,7 @@ const API6 = {
   // بالجلسة الحالية
   me: function (fn) { const a = Array.prototype.slice.call(arguments, 1); return API6.json.apply(null, [fn, V6.token].concat(a)); }
 };
-function sessionLost(msg) { if (!V6.token) return; V6.token = ''; ls('token', null); toast(msg || 'انتهت الجلسة'); setTimeout(function () { go('#/login'); }, 400); }
+function sessionLost(msg) { if (!V6.token) return; if (typeof TG6 !== 'undefined' && TG6.on()) { V6.token = ''; TG6.expired(); return; } V6.token = ''; ls('token', null); toast(msg || 'انتهت الجلسة'); setTimeout(function () { go('#/login'); }, 400); }
 
 /* ---------- ذاكرة دائمة للملفات (IndexedDB): الخطوط والشعارات لا تُنزَّل إلا مرة ---------- */
 const IDB = {

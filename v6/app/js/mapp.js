@@ -30,6 +30,7 @@ function mwrap(title, fn, opt) { return function () { M.wrap = Object.assign({ t
 function plain(fn) { return function () { M.wrap = null; return fn.apply(null, arguments); }; }
 maybeTour = function () {};
 ROUTES.length = 0;
+route6(/^\/tgpw$/, mwrap('كلمة سر للموقع', function () { if (typeof TG6 === 'undefined' || !TG6.on()) return go('#/account'); TG6.pwPage(); }, { back: '#/account', noTitle: true }), { page: 'more', noVT: true });   // بوت أثر
 route6(/^\/login$/, plain(function () { if (V6.token && V6.me && !V6.me.mustChange) return go('#/'); showLogin(); }), { public: true, page: 'login', noVT: true });
 route6(/^\/about$/, function () { if (V6.token && V6.me) { M.wrap = { title: 'تعرّف على أثر', back: '#/more', noTitle: true }; } else M.wrap = null; showAbout6(); }, { public: true, page: 'more', noVT: true });
 route6(/^\/password$/, mwrap('كلمة المرور', function () { showChangePw(false); }, { back: '#/more' }), { page: 'more', noVT: true });

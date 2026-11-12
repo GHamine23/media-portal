@@ -46,7 +46,8 @@ function showLogin() {
       H('h1', 'ادخل إلى منصتك', 'lgh'),
       el('p', { class: 'muted rv', style: '--d:2', text: 'قوالب بهوية برنامجك، ومحرر سهل، ومساعد يصمّم معك.' }),
       el('div', { class: 'card lgcard rv', style: '--d:3' }, [form]),
-      el('p', { class: 'tiny rv', style: '--d:4', text: typeof ABOUT_TXT !== 'undefined' ? ABOUT_TXT.account : 'لا يوجد تسجيل ذاتي. حسابك ينشئه مدير المنصة أو مشرف برنامجك.' })
+      el('p', { class: 'tiny rv', style: '--d:4', text: typeof ABOUT_TXT !== 'undefined' ? ABOUT_TXT.account : 'لا يوجد تسجيل ذاتي. حسابك ينشئه مدير المنصة أو مشرف برنامجك.' }),
+      el('p', { class: 'tiny rv lgtg', style: '--d:5', text: 'دخلت أثر من بوت تيليجرام؟ حسابك هناك بلا كلمة سر، لأن تيليجرام يثبت أنه أنت. وليدخل الموقع في المتصفح: افتح البوت، واضغط «كلمة سر للموقع»، ثم ادخل هنا باسم المستخدم وتلك الكلمة.' })
     ])
   ]));
   setTimeout(function () { idI.focus(); }, 300);
@@ -98,6 +99,10 @@ async function afterLogin() {
   loadNews().then(function (shown) { if (!shown) setTimeout(function () { if (document.body.dataset.page === 'home') maybeTour('home'); }, 700); });
 }
 async function restore() {
+  if (typeof TG6 !== 'undefined' && TG6.on()) {   // من بوت أثر: الدخول بحساب تيليجرام، والجلسة لا تُحفظ في المتصفح
+    V6.token = await TG6.login(); if (!V6.token) return 'must';
+    try { V6.me = await API6.me('auth_me'); } catch (e) { TG6.expired(); return 'must'; }
+  } else {
   V6.token = ls('token') || '' || await ssoFromAnshita();
   if (!V6.token) return false;
   try { V6.me = await API6.me('auth_me'); }
@@ -105,6 +110,7 @@ async function restore() {
     V6.token = ''; ls('token', null);
     V6.token = await ssoFromAnshita(); if (!V6.token) return false;
     try { V6.me = await API6.me('auth_me'); } catch (e2) { V6.token = ''; ls('token', null); return false; }
+  }
   }
   if (V6.me.mustChange) { showChangePw(true); return 'must'; }
   try { ls('lastName', String(V6.me.name || '').split(' ')[0]); } catch (e) {}
@@ -232,7 +238,8 @@ async function showAccount() {
         el('dl', { class: 'kv' }, [el('dt', { text: 'اسم المستخدم' }), el('dd', { dir: 'auto', text: me.username }), el('dt', { text: 'البرامج' }), el('dd', { text: (me.programsInfo || []).map(function (p) { return p.name; }).join('، ') || '—' }),
           el('dt', { text: 'الصلاحيات' }), el('dd', { text: permsText(me) }),
           el('dt', { text: 'تصاميمك' }), el('dd', { class: 'small', text: 'لك وحدك حتى تشاركها. وما تنزّله أو تشاركه تُحفظ نسخته في أرشيف البرنامج لمشرفه.' })]),
-        el('div', { class: 'row' }, [el('a', { class: 'btn dark', href: '#/password' }, [ico('key'), 'تغيير كلمة المرور'])])]),
+        me.noPw ? null : el('div', { class: 'row' }, [el('a', { class: 'btn dark', href: '#/password' }, [ico('key'), 'تغيير كلمة المرور'])])]),
+      typeof TG6 === 'undefined' ? null : TG6.on() ? el('div', { class: 'card rv actg' }, [el('h2', { class: 'ch', text: 'كلمة سر للموقع' }), el('p', { class: 'muted small', text: me.noPw ? 'دخولك من تيليجرام بلا كلمة سر. لتدخل الموقع في المتصفح اجعل لنفسك كلمة سر.' : 'لحسابك كلمة سر للموقع، ولك أن تغيّرها.' }), el('div', { class: 'row' }, [el('a', { class: 'btn dark', href: '#/tgpw' }, [ico('key'), me.noPw ? 'اجعل لي كلمة سر للموقع' : 'غيّر كلمة السر'])])]) : TG6.linkCard(),
       inApp ? null : el('div', { class: 'card rv aclook', style: '--d:1' }, [el('h2', { class: 'ch', text: 'المظهر' }), el('p', { class: 'muted small', text: 'يتبعك على كل أجهزتك، في الموقع والتطبيق.' }),
         el('h3', { class: 'acsub', text: 'لون الواجهة' }), accentPicker(function (id, nm) { toast('لون الواجهة: ' + nm); }),
         el('h3', { class: 'acsub', text: 'الحركة في الواجهة' }), motion]),

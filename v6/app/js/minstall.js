@@ -27,7 +27,7 @@ function installSheet() {
 }
 // بطاقة في الرئيسية تدعو إلى التثبيت (تختفي بعد التثبيت، وتُؤجَّل أسبوعاً عند الرفض)
 function installBanner() {
-  if (isStandalone()) return null;
+  if (isStandalone() || (typeof TG6 !== 'undefined' && TG6.on())) return null;   // داخل تيليجرام: لا تثبيت
   const until = ls('installDismiss'); if (until && until > Date.now()) return null;
   const b = el('div', { class: 'mbanner' }, [el('img', { src: 'icons/icon-192.png', alt: '' }), el('span', { class: 'mt' }, [el('b', { text: 'ثبّت أثر على شاشتك الرئيسية' }), el('small', { text: 'يفتح كتطبيق، وأسرع، وبلا شريط المتصفح' })]),
     el('button', { type: 'button', class: 'btn', text: 'ثبّت', onclick: function () { installSheet(); } }),

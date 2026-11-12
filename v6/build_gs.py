@@ -35,9 +35,19 @@ var('vazir', 'وزير متن', 'vazirmatn', 'Vazirmatn[wght].ttf', '100 900')
 var('rubik', 'روبيك', 'rubik', 'Rubik[wght].ttf', '300 900')
 var('handjet', 'هاندجت', 'handjet', 'Handjet[ELGR,ELSH,wght].ttf', '100 900')
 import hashlib
+# بوت أثر: قواعد «اسأل أثر» ومخططه، ومقاطع الدليل، وقواعد التصميم، ودليل المنصة (kb6.js) كما في الواجهة نفسها
+botkb = json.loads(subprocess.check_output(['node', '-e', r"""
+const fs=require('fs'); const g=fs.readFileSync(process.argv[1],'utf8'), t=fs.readFileSync(process.argv[2],'utf8');
+const pick=(src,re)=>{const m=re.exec(src); if(!m) throw new Error('missing '+re); return eval('('+m[1]+')');};
+const rules=pick(g,/const G_RULES = ([\s\S]*?);\n/), schema=pick(g,/const G_SCHEMA = (\{[\s\S]*?\});\n/), clips=pick(g,/const G_FALLBACK = (\[[\s\S]*?\]\]);/), tips=pick(t,/const TIPS_BASE = (\[[\s\S]*?\n\]);/);
+console.log(JSON.stringify({rules, schema, clips: clips.map(c=>[c[0],c[1],c[2],!!c[3]]), tips: tips.map(x=>[x[0],x[1],x[2],x[3]||'',x[4]||''])}));
+""", str(ROOT / 'v6/js/guide6.js'), str(ROOT / 'v6/js/tips6.js')]))
+kbsrc = (ROOT / 'v6/js/kb6.js').read_text()
+assert '*/null' not in kbsrc
+kbfn = 'function () { if (BOT_KBCTX._f) return BOT_KBCTX._f;\n' + kbsrc + '\nreturn (BOT_KBCTX._f = kbContext); } /*BOT_KBCTX_END*/'
 SRV = hashlib.sha1(src.encode()).hexdigest()[:8]
-out = src.replace('/*SRV_VER*/', SRV).replace('/*SEED_IDENTITIES*/[]', json.dumps(ids, ensure_ascii=False)).replace('/*OPEN_FONTS*/[]', json.dumps(fonts, ensure_ascii=False))
-assert '/*SEED' not in out and '/*OPEN_FONTS' not in out
+out = src.replace('/*SRV_VER*/', SRV).replace('/*SEED_IDENTITIES*/[]', json.dumps(ids, ensure_ascii=False)).replace('/*OPEN_FONTS*/[]', json.dumps(fonts, ensure_ascii=False)).replace("/*BOT_KB*/{ rules: '', schema: null, clips: [], tips: [] }", json.dumps(botkb, ensure_ascii=False)).replace('/*BOT_KBCTX*/null', kbfn)
+assert '/*SEED' not in out and '/*OPEN_FONTS' not in out and '/*BOT_KB*/' not in out and '/*BOT_KBCTX*/' not in out
 (ROOT / 'server').mkdir(exist_ok=True)
 (ROOT / 'server/Code.gs').write_text(out)
-print('server/Code.gs', len(out) // 1024, 'KB |', len(ids), 'identities |', len(fonts), 'font files')
+print('server/Code.gs', len(out) // 1024, 'KB |', len(ids), 'identities |', len(fonts), 'font files |', len(botkb['tips']), 'tips |', len(botkb['clips']), 'clips')

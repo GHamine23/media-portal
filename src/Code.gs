@@ -121,10 +121,13 @@ function apiFns_() {
     rv_request: rv_request, rv_list: rv_list, rv_mine: rv_mine, rv_img: rv_img, rv_reply: rv_reply,
     me_week: me_week, wk_admin: wk_admin, ai_skills: ai_skills, ai_skill_save: ai_skill_save, ai_skill_reset: ai_skill_reset, img_requests: img_requests, img_decide: img_decide, quran_find: quran_find, hadith_find: hadith_find,
     quiz_form: quiz_form, quiz_results: quiz_results, quiz_accept: quiz_accept,
-    link_op: link_op, link_check: link_check, bridge_op: bridge_op, bridge_key: bridge_key, bridge_send: bridge_send
+    link_op: link_op, link_check: link_check, bridge_op: bridge_op, bridge_key: bridge_key, bridge_send: bridge_send,
+    tg_login: tg_login, tg_request: tg_request, tg_req_list: tg_req_list, tg_req_act: tg_req_act, tg_link_code: tg_link_code, tg_site_pw: tg_site_pw, tg_deliver: tg_deliver,
+    abot_set: abot_set, abot_info: abot_info, abot_setup: abot_setup
   };
 }
 function doPost(e) {
+  if (e && e.parameter && e.parameter.hook) return abotHook_(e);   // تحديثات بوت أثر
   var out; JC = {};
   try {
     var req = JSON.parse(e.postData.contents);
@@ -207,7 +210,7 @@ function tempPass_() {
 function publicAcc_(a) {
   return { uid: a.uid, username: a.username, email: a.email || '', name: a.name, role: a.role, programs: a.programs || [], perms: a.perms || {},
     mustChange: !!a.mustChange, disabled: !!a.disabled, created: a.created, last: a.last || 0, legacy: !!a.legacyKey, note: a.note || '',
-    tracks: a.tracks || [], editLevel: a.editLevel || '', hasAvatar: !!a.hasAvatar, anshita: !!a.ansUid, trackSup: !!a.linkSup, bridge: a.bridge || '' };
+    tracks: a.tracks || [], editLevel: a.editLevel || '', hasAvatar: !!a.hasAvatar, anshita: !!a.ansUid, trackSup: !!a.linkSup, bridge: a.bridge || '', tg: !!a.tg, tgUser: a.tgUser || '', noPw: !!a.noPw };
 }
 function findAcc_(accs, id) {
   var n = normUser_(id);
@@ -216,14 +219,17 @@ function findAcc_(accs, id) {
 }
 // الجلسة → الحساب. يرمي خطأ إن انتهت
 function auth_(token, opt) {
-  token = String(token || '');
+  var sp = splitTok_(token); token = sp.t;
   if (!token) throw new Error('ادخل أولاً');
   var ss = readJson_('sessions.json', {}), s = ss[token];
   if (!s || s.e < now_()) throw new Error('انتهت الجلسة، ادخل مرة أخرى');
+  // جلسة تيليجرام: تُقبل من داخل تيليجرام وحده، ببيانات موقّعة في كل طلب
+  if (s.tg || sp.init) { if (!s.tg || !sp.init) throw new Error('انتهت الجلسة، ادخل مرة أخرى'); if (abotInit_(sp.init).id !== s.tg) throw new Error('انتهت الجلسة، ادخل مرة أخرى'); }
   var accs = readJson_('accounts.json', {}), a = accs[s.u];
   if (!a || a.disabled) throw new Error('هذا الحساب موقوف');
+  if (s.tg) { if (String(a.tg || '') !== s.tg) throw new Error('انتهت الجلسة، ادخل مرة أخرى'); Object.defineProperty(a, '_tg', { value: s.tg, enumerable: false }); }
   if (a.mustChange && !(opt && opt.allowMust)) throw new Error('غيّر كلمة المرور المؤقتة أولاً');
-  if (now_() - (s.l || 0) > 864e5) {   // تمديد الجلسة مرة في اليوم
+  if (!s.tg && now_() - (s.l || 0) > 864e5) {   // تمديد الجلسة مرة في اليوم (جلسة تيليجرام لا تُمدّد: تتجدد بفتح أثر من البوت)
     withLock_(function () { var s2 = readJson_('sessions.json', {}); if (s2[token]) { s2[token].l = now_(); s2[token].e = now_() + SESSION_DAYS * 864e5; writeJson_('sessions.json', s2); }
       var a2 = readJson_('accounts.json', {}); if (a2[a.uid]) { a2[a.uid].last = now_(); writeJson_('accounts.json', a2); } });
   }
@@ -310,7 +316,7 @@ function me_profile(token, json) {
 }
 function auth_me(token) { var a = auth_(token, { allowMust: true }); return JSON.stringify(meOf_(a)); }
 function auth_logout(token) {
-  return withLock_(function () { var ss = readJson_('sessions.json', {}); delete ss[String(token || '')]; writeJson_('sessions.json', ss); return 'ok'; });
+  return withLock_(function () { var ss = readJson_('sessions.json', {}); delete ss[splitTok_(token).t]; writeJson_('sessions.json', ss); return 'ok'; });
 }
 function auth_password(token, oldPw, newPw) {
   var a0 = auth_(token, { allowMust: true });
@@ -649,6 +655,7 @@ function bridge_op(key, json) {
   if (o.op === 'inbox_get') return inboxGet_(o.id);
   if (o.op === 'inbox_done') return JSON.stringify(inboxDone_(o));
   if (o.op === 'stats') return JSON.stringify(bridgeStats_(o));
+  if (o.op === 'tg_map') return JSON.stringify(bridgeTgMap_(o));
   throw new Error('عملية غير معروفة');
 }
 function bridgeChat_(c, privateOnly) {
@@ -683,7 +690,7 @@ function bridgeIssue_(uid, chat, renew) {
     writeJson_('accounts.json', accs); return x;
   });
   needBridgeSend_();
-  try { tgCall_('sendMessage', { chat_id: chat, text: bridgeMsg_(a, pw, renew), parse_mode: 'HTML', disable_web_page_preview: 'true' }, BRIDGE_PROG); }
+  try { if (abotOn_()) abot_('sendMessage', { chat_id: chat, text: bridgeMsg_(a, pw, renew), parse_mode: 'HTML', link_preview_options: JSON.stringify({ is_disabled: true }) }); else tgCall_('sendMessage', { chat_id: chat, text: bridgeMsg_(a, pw, renew), parse_mode: 'HTML', disable_web_page_preview: 'true' }, BRIDGE_PROG); }
   catch (e) {
     withLock_(function () { var accs = readJson_('accounts.json', {}), x = accs[uid]; if (x) { x.salt = Utilities.getUuid(); x.hash = pwHash_(x.salt, Utilities.getUuid()); x.noPw = true; writeJson_('accounts.json', accs); } dropSessions_(uid); });
     return { sent: false, why: String(e && e.message || e) };
@@ -733,12 +740,31 @@ function bridgeResend_(o) {
   return { username: a.username, sent: d.sent, why: d.why || '' };
 }
 
+// o = {list: [{user | ans, tg}]}: معرّفات تيليجرام المعروفة من بوت الأنشطة، فيدخل أصحابها أثر من بوته مباشرة (قرار أمين ١٢ نوفمبر)
+function bridgeTgMap_(o) {
+  var list = (o.list || []).slice(0, 500);
+  return withLock_(function () {
+    var accs = readJson_('accounts.json', {}), all = Object.keys(accs).map(function (k) { return accs[k]; }), out = { linked: 0, had: 0, skip: [] };
+    list.forEach(function (it) {
+      var tg = String(it.tg == null ? '' : it.tg).trim(); if (!/^\d{4,20}$/.test(tg)) { out.skip.push({ it: it.user || it.ans || '', why: 'معرّف تيليجرام غير صحيح' }); return; }
+      var a = it.ans ? all.filter(function (x) { return x.ansUid === it.ans; })[0] : findAcc_(accs, it.user || '');
+      if (!a) { out.skip.push({ it: it.user || it.ans, why: 'لا حساب' }); return; }
+      if (String(a.tg || '') === tg) { out.had++; return; }
+      var other = tgAcc_(accs, tg); if (other) { out.skip.push({ it: a.username, why: 'المعرّف مربوط بحساب آخر (' + other.username + ')' }); return; }
+      if (a.tg) { out.skip.push({ it: a.username, why: 'الحساب مربوط بمعرّف آخر' }); return; }
+      a.tg = tg; a.tgPre = true; a.tgAt = now_(); out.linked++;
+    });
+    if (out.linked) { writeJson_('accounts.json', accs); audit_(null, 'ربط حسابات بتيليجرام من محادثة الربط', String(out.linked)); }
+    return out;
+  });
+}
+
 /* ---------- التصاميم الواردة إلى البوت ----------
    inbox.json: [{id, at, from, fromName, acc, accName, track, fid, mime, size, caption, msg, status: new|done|skip, note, tpl, upd}] */
 function inboxPub_(x) { var o = Object.assign({}, x); delete o.fid; return o; }
 // o = {from: معرّف المرسل في تليجرام, fromName, msg: رقم الرسالة, file: base64 أو dataUrl, mime, caption}
 function inboxPut_(o) {
-  var from = String(o.from == null ? '' : o.from).trim(); if (!/^\d{4,20}$/.test(from)) throw new Error('معرّف المرسل مطلوب');
+  var from = String(o.from == null ? "" : o.from).trim(); if (!/^\d{1,20}$/.test(from)) throw new Error('معرّف المرسل مطلوب');
   var b64 = String(o.file || ''), m = /^data:([\w\/+.-]+);base64,(.*)$/.exec(b64), mime = String((m && m[1]) || o.mime || '').toLowerCase();
   if (m) b64 = m[2];
   if (!INBOX_MIME[mime]) throw new Error('يُقبل التصميم صورةً (PNG أو JPG أو WEBP) أو ملف PDF');
@@ -836,6 +862,588 @@ function bridgeStats_(o) {
       saved: rows.reduce(function (s, r) { return s + r.saved; }, 0), exports: Object.keys(exp).reduce(function (s, k) { return s + exp[k]; }, 0), inboxNew: readJson_('inbox.json', []).filter(function (x) { return x.status === 'new'; }).length },
     tracks: tracks, accounts: rows };
 }
+
+/* ================= بوت أثر في تيليجرام (طلب أمين، ١٢ نوفمبر) =================
+   بوت مستقل لمستخدمي أثر وحدهم: باب الدخول والتصميم والاستلام والسؤال والتعلّم. لا يرسل إلى مجموعة أو قناة أبدًا.
+   - مفتاحه في خاصية السكربت ATHAR_BOT (يلصقه المدير العام في «الإعدادات ← بوت أثر»)، ومعامل الويبهوك السري ATHAR_HOOK.
+   - الويبهوك: doPost?hook=<السر>. أبس سكريبت لا يقرأ الترويسات فلا secret_token، ويرد بتحويل 302 فقد يعيد تيليجرام التحديث:
+     يُمنع التكرار بحفظ كل update_id معالَج (الذاكرة المؤقتة ٦ ساعات) وآخرها في الخصائص.
+   - التطبيق المصغّر يرسل initData مع كل طلب (الرمز «جلسة#tg#initData»)، ويُتحقق منه بالطريقة الرسمية في كل طلب.
+   - الحساب: a.tg معرّف تيليجرام الثابت. يُربط برمز من الموقع، أو بقائمة من محادثة الربط (bridge tg_map)، أو بموافقة المدير العام.
+   - tgreq.json طلبات الدخول: [{id, tg, tgName, tgUser, name, username, program, track, status: new|ok|no, at, by, acc}]
+   - a.prefs.tgOff = {n: الإشعارات, w: التقرير الأسبوعي}، a.prefs.tgTip رقم آخر قاعدة تصميم. */
+var ABOT_INIT_MAX = 86400;   // عمر initData المقبول بالثواني
+var ABOT_PERMS = ['social', 'ai', 'upload', 'slides'];
+var BOT_KB = /*BOT_KB*/{ rules: '', schema: null, clips: [], tips: [] };
+var BOT_KBCTX = /*BOT_KBCTX*/null;
+function abotToken_() { return props_().getProperty('ATHAR_BOT') || ''; }
+function abotOn_() { return !!abotToken_(); }
+function abotUser_() { return props_().getProperty('ATHAR_BOT_USER') || ''; }
+function abotApp_(route) { return SITE_URL + 'app/?tg=1' + (route ? '&r=' + encodeURIComponent(route) : ''); }
+function abot_(method, payload) {
+  var t = abotToken_(); if (!t) throw new Error('بوت أثر غير مضبوط بعد');
+  var res = UrlFetchApp.fetch('https://api.telegram.org/bot' + t + '/' + method, { method: 'post', payload: payload || {}, muteHttpExceptions: true });
+  var j; try { j = JSON.parse(res.getContentText()); } catch (e) { j = { ok: false, description: 'رد غير مفهوم (' + res.getResponseCode() + ')' }; }
+  if (!j.ok) throw new Error(tgErr_(j, res.getResponseCode()));
+  return j.result;
+}
+function abotKb_(rows) { return JSON.stringify({ inline_keyboard: rows }); }
+function abotWeb_(text, route) { return { text: text, web_app: { url: abotApp_(route) } }; }
+// كل ما يرسله البوت: محادثة خاصة فقط (معرّف موجب)
+function abotSend_(chat, text, rows, extra) {
+  chat = String(chat || ''); if (!/^\d{1,20}$/.test(chat)) throw new Error("البوت يرسل في المحادثات الخاصة وحدها");
+  var p = { chat_id: chat, text: clip_(text, 4096), parse_mode: 'HTML', link_preview_options: JSON.stringify({ is_disabled: true }) };
+  if (rows) p.reply_markup = abotKb_(rows);
+  Object.keys(extra || {}).forEach(function (k) { p[k] = extra[k]; });
+  return abot_('sendMessage', p);
+}
+
+/* ---------- التحقق من بيانات التطبيق المصغّر (الطريقة الرسمية) ---------- */
+function abotHex_(bytes) { return bytes.map(function (b) { return ('0' + (b & 255).toString(16)).slice(-2); }).join(''); }
+function abotDec_(s) { return decodeURIComponent(String(s).replace(/\+/g, ' ')); }
+function abotInit_(init) {
+  init = String(init || '');
+  if (JC.hasOwnProperty('ti:' + init)) return JC['ti:' + init];
+  if (!init || init.length > 8000) throw new Error('افتح أثر من داخل تيليجرام');
+  var tok = abotToken_(); if (!tok) throw new Error('بوت أثر غير مضبوط بعد');
+  var o = {}, hash = '';
+  init.split('&').forEach(function (p) { var i = p.indexOf('='); if (i < 1) return; var k = abotDec_(p.slice(0, i)), v = abotDec_(p.slice(i + 1)); if (k === 'hash') hash = v; else o[k] = v; });
+  var dcs = Object.keys(o).sort().map(function (k) { return k + '=' + o[k]; }).join('\n');
+  var secret = Utilities.computeHmacSha256Signature(Utilities.newBlob(tok).getBytes(), Utilities.newBlob('WebAppData').getBytes());
+  var want = abotHex_(Utilities.computeHmacSha256Signature(Utilities.newBlob(dcs).getBytes(), secret));
+  var d = want.length ^ hash.length; for (var i = 0; i < want.length; i++) d |= want.charCodeAt(i) ^ (hash.charCodeAt(i) || 0);
+  if (d) throw new Error('بيانات تيليجرام غير صحيحة، افتح أثر من البوت من جديد');
+  var at = +o.auth_date || 0, nowS = Math.floor(now_() / 1000);
+  if (!at || nowS - at > ABOT_INIT_MAX || at - nowS > 300) throw new Error('انتهت صلاحية فتح أثر، أغلقه وافتحه من البوت من جديد');
+  var u = {}; try { u = JSON.parse(o.user || '{}'); } catch (e) {}
+  if (!u.id) throw new Error('لم تصل بيانات حسابك في تيليجرام');
+  var r = { id: String(u.id), user: u, start: o.start_param || '' };
+  JC['ti:' + init] = r;
+  return r;
+}
+// الرمز في التطبيق المصغّر: «جلسة#tg#initData»
+function splitTok_(token) { token = String(token || ''); var i = token.indexOf('#tg#'); return i < 0 ? { t: token, init: '' } : { t: token.slice(0, i), init: token.slice(i + 4) }; }
+function tgAcc_(accs, tg) { tg = String(tg || ''); if (!tg) return null; for (var k in accs) { if (accs[k] && String(accs[k].tg || '') === tg) return accs[k]; } return null; }
+function tgName_(u) { return clip_([u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || 'مستخدم', 80); }
+
+/* ---------- الدخول من التطبيق المصغّر ---------- */
+function tg_login(init) {
+  var v = abotInit_(init), accs = readJson_('accounts.json', {}), a = tgAcc_(accs, v.id);
+  if (a) {
+    if (a.disabled) throw new Error('هذا الحساب موقوف');
+    var first = !a.tgSeen;
+    var res = withLock_(function () {
+      var all = readJson_('accounts.json', {}), x = all[a.uid]; x.last = now_(); x.tgLast = now_(); if (!x.tgSeen) x.tgSeen = now_();
+      if (!x.tgUser && v.user.username) x.tgUser = clip_(v.user.username, 40);
+      writeJson_('accounts.json', all);
+      var ss = readJson_('sessions.json', {}), tok = Utilities.getUuid() + Utilities.getUuid().slice(0, 8), t = now_();
+      Object.keys(ss).forEach(function (k) { if (ss[k].e < t) delete ss[k]; });
+      ss[tok] = { u: x.uid, e: t + ABOT_INIT_MAX * 1000, l: t, tg: v.id };
+      writeJson_('sessions.json', ss);
+      return { token: tok, me: meOf_(x) };
+    });
+    if (first && a.tgPre) abotAdminLine_('دخل ' + h0_(a.name) + ' (' + h0_(a.username) + ') إلى أثر من تيليجرام لأول مرة');
+    res.me.tgOnly = !!a.noPw; res.me.via = 'tg';
+    return JSON.stringify(res);
+  }
+  var q = readJson_('tgreq.json', []).filter(function (r) { return r.tg === v.id && r.status === 'new'; })[0];
+  if (q) return JSON.stringify({ pending: true, name: q.name });
+  return JSON.stringify({ need: true, name: tgName_(v.user), user: v.user.username || '', programs: abotProgs_() });
+}
+function abotProgs_() {
+  return progs_().filter(function (p) { return p.active !== false; }).map(function (p) { return { id: p.id, name: p.name, tracks: (p.identities || []).map(function (i) { return { id: i.id, name: i.name || i.id }; }) }; });
+}
+var TG_USER_RE = /^[a-z][a-z0-9._\-]{2,29}$/;
+function tgUserFree_(accs, u, reqs, self) {
+  if (!TG_USER_RE.test(u) || /^ac\./.test(u) || /^(admin|academy\d*)$/.test(u)) return false;
+  for (var k in accs) { var x = accs[k]; if (normUser_(x.username) === u || (x.email && normUser_(x.email) === u)) return false; }
+  return !(reqs || []).some(function (r) { return r.status === 'new' && r.username === u && r.id !== self; });
+}
+// o = {program, track, name, username}
+function tg_request(init, json) {
+  var v = abotInit_(init), o = JSON.parse(json || '{}'), p = abotProgs_().filter(function (x) { return x.id === o.program; })[0];
+  if (!p) throw new Error('اختر برنامجك');
+  var track = String(o.track || ''); if (track && !p.tracks.some(function (t) { return t.id === track; })) throw new Error('اختر مسارك');
+  var u = normUser_(o.username || ''), name = clip_(String(o.name || '').trim(), 80);
+  if (name.length < 2) throw new Error('اكتب اسمك');
+  var req = withLock_(function () {
+    var accs = readJson_('accounts.json', {}), reqs = readJson_('tgreq.json', []);
+    if (tgAcc_(accs, v.id)) throw new Error('لحسابك في تيليجرام حساب في أثر، أغلق أثر وافتحه من جديد');
+    var old = reqs.filter(function (r) { return r.tg === v.id && r.status === 'new'; })[0]; if (old) return old;
+    if (!TG_USER_RE.test(u)) throw new Error('اسم الدخول حروف إنجليزية صغيرة وأرقام (٣ إلى ٣٠)، يبدأ بحرف');
+    if (!tgUserFree_(accs, u, reqs)) throw new Error('اسم الدخول «' + u + '» مستعمل، اختر غيره');
+    if (reqs.filter(function (r) { return r.at > now_() - 864e5; }).length > 200) throw new Error('طلبات كثيرة اليوم، حاول غدًا');
+    var r = { id: uid_(), tg: v.id, tgName: tgName_(v.user), tgUser: clip_(v.user.username || '', 40), name: name, username: u, program: p.id, track: track, status: 'new', at: now_() };
+    reqs.unshift(r); if (reqs.length > 1000) reqs.length = 1000; writeJson_('tgreq.json', reqs);
+    return r;
+  });
+  abotNotifyReq_(req);
+  adminNotify_('', 'tgreq', 'طلب دخول من تيليجرام: ' + req.name, '#/admin/tgreq', '');
+  return JSON.stringify({ pending: true, name: req.name });
+}
+// أقرب الحسابات إلى اسمه (بلا تيليجرام بعد)
+function tgSuggest_(accs, r) {
+  var norm = function (s) { return String(s || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[^؀-ۿa-z0-9 ]/gi, ' ').toLowerCase().split(/\s+/).filter(function (w) { return w.length > 1 && !/^(ا|أ)?\.?$/.test(w); }); };
+  var want = norm(r.name + ' ' + r.tgName + ' ' + r.username + ' ' + r.tgUser);
+  return Object.keys(accs).map(function (k) { return accs[k]; }).filter(function (a) { return !a.tg && !a.disabled && a.role !== 'super'; }).map(function (a) {
+    var have = norm(a.name + ' ' + a.username), s = 0; want.forEach(function (w) { if (have.indexOf(w) >= 0) s += 2; else if (have.some(function (h) { return h.length > 2 && (h.indexOf(w) === 0 || w.indexOf(h) === 0); })) s += 1; });
+    if ((a.programs || []).indexOf(r.program) >= 0) s += 0.5;
+    return { a: a, s: s };
+  }).filter(function (x) { return x.s >= 2; }).sort(function (x, y) { return y.s - x.s; }).slice(0, 3).map(function (x) { return x.a; });
+}
+function abotProgName_(pid, tid) {
+  var p = progs_().filter(function (x) { return x.id === pid; })[0]; if (!p) return pid;
+  var t = tid ? (p.identities || []).filter(function (i) { return i.id === tid; })[0] : null;
+  return p.name + ' · ' + (tid ? (t ? t.name : tid) : 'كل المسارات');
+}
+function abotReqText_(r, note) {
+  return '<b>طلب دخول إلى أثر من تيليجرام</b>\n' +
+    'الاسم: ' + h0_(r.name) + (r.tgName && r.tgName !== r.name ? ' (في تيليجرام: ' + h0_(r.tgName) + ')' : '') + '\n' +
+    'معرّفه: ' + (r.tgUser ? '@' + h0_(r.tgUser) + ' · ' : '') + '<code>' + h0_(r.tg) + '</code>\n' +
+    'البرنامج والمسار: ' + h0_(abotProgName_(r.program, r.track)) + '\n' +
+    'اسم الدخول الذي اختاره: <code>' + h0_(r.username) + '</code>' + (note ? '\n\n' + note : '');
+}
+function abotReqRows_(r) {
+  var rows = [[{ text: '✅ قبول بحساب جديد', callback_data: 'ap:' + r.id + ':n' }]];
+  tgSuggest_(readJson_('accounts.json', {}), r).forEach(function (a) { rows.push([{ text: '🔗 ربطه بـ ' + clip_(a.name, 24) + ' (' + clip_(a.username, 18) + ')', callback_data: 'ap:' + r.id + ':l:' + a.uid }]); });
+  rows.push([{ text: '✏️ غيّر البرنامج أو المسار', callback_data: 'ap:' + r.id + ':c' }, { text: '✖️ رفض', callback_data: 'ap:' + r.id + ':x' }]);
+  return rows;
+}
+// من يوافق: المدير العام وحده الآن (قرار أمين)، ومن ربط تيليجرام بحسابه
+function abotApprovers_() { var accs = readJson_('accounts.json', {}); return Object.keys(accs).map(function (k) { return accs[k]; }).filter(function (a) { return a.role === 'super' && !a.disabled && a.tg; }); }
+function abotNotifyReq_(r) {
+  if (!abotOn_()) return;
+  abotApprovers_().forEach(function (a) { try { abotSend_(a.tg, abotReqText_(r), abotReqRows_(r)); } catch (e) {} });
+}
+function abotAdminLine_(html) { if (!abotOn_()) return; abotApprovers_().forEach(function (a) { try { abotSend_(a.tg, html); } catch (e) {} }); }
+// القرار نفسه من البوت أو من لوحة المدير. act: n جديد، l ربط (arg = uid)، x رفض، set تغيير (arg = {program, track})
+function tgDecide_(id, act, arg, by) {
+  var out = withLock_(function () {
+    var reqs = readJson_('tgreq.json', []), r = reqs.filter(function (x) { return x.id === id; })[0];
+    if (!r) throw new Error('الطلب غير موجود');
+    if (r.status !== 'new') return { r: r, done: true };
+    var accs = readJson_('accounts.json', {});
+    if (act === 'set') {
+      var p = abotProgs_().filter(function (x) { return x.id === arg.program; })[0]; if (!p) throw new Error('برنامج غير معروف');
+      r.program = p.id; r.track = arg.track && p.tracks.some(function (t) { return t.id === arg.track; }) ? arg.track : '';
+      writeJson_('tgreq.json', reqs); return { r: r, set: true };
+    }
+    if (act === 'x') { r.status = 'no'; r.by = by.name; r.upd = now_(); writeJson_('tgreq.json', reqs); return { r: r }; }
+    if (tgAcc_(accs, r.tg)) throw new Error('هذا الحساب في تيليجرام مربوط من قبل');
+    var a;
+    if (act === 'l') {
+      a = accs[arg]; if (!a) throw new Error('الحساب غير موجود'); if (a.tg) throw new Error('هذا الحساب مربوط بتيليجرام آخر'); if (a.role === 'super') throw new Error('لا يُربط المدير العام من طلب');
+    } else if (act === 'n') {
+      var u = r.username; if (!tgUserFree_(accs, u, reqs, r.id)) throw new Error('اسم الدخول «' + u + '» صار مستعملًا؛ اطلب منه اسمًا آخر أو اربطه بحساب قائم');
+      var pp = {}; ABOT_PERMS.forEach(function (k) { pp[k] = true; });
+      var salt = Utilities.getUuid();
+      a = { uid: uid_(), username: u, email: '', name: r.name, role: 'user', programs: [r.program], tracks: r.track ? [r.track] : [], perms: pp, editLevel: '',
+        salt: salt, hash: pwHash_(salt, Utilities.getUuid()), noPw: true, mustChange: false, created: now_(), last: 0, fails: 0, prefs: {}, note: 'من بوت أثر' };
+      accs[a.uid] = a;
+    } else throw new Error('قرار غير معروف');
+    a.tg = r.tg; if (r.tgUser) a.tgUser = r.tgUser; a.tgAt = now_();
+    r.status = 'ok'; r.by = by.name; r.acc = a.username; r.upd = now_();
+    writeJson_('accounts.json', accs); writeJson_('tgreq.json', reqs);
+    audit_(by, act === 'n' ? 'قبل طلب دخول من تيليجرام بحساب جديد' : 'ربط طلب دخول من تيليجرام بحساب قائم', a.username);
+    return { r: r, acc: a };
+  });
+  if (out.acc) { try { abotWelcome_(out.acc); } catch (e) {} }
+  else if (out.r.status === 'no' && !out.done) { try { abotSend_(out.r.tg, 'شكرًا لاهتمامك بأثر 🌿 لم يُقبل طلب الدخول. إن كان لك حساب في أثر فاطلب من مشرف برنامجك ربطه بتيليجرام.'); } catch (e) {} }
+  return out;
+}
+function tg_req_list(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var accs = readJson_('accounts.json', {});
+  return JSON.stringify(readJson_('tgreq.json', []).slice(0, 200).map(function (r) { var o = Object.assign({}, r); o.where = abotProgName_(r.program, r.track); if (r.status === 'new') o.sugg = tgSuggest_(accs, r).map(function (x) { return { uid: x.uid, name: x.name, username: x.username }; }); return o; })); }
+function tg_req_act(token, id, act, arg) {
+  var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
+  var r = tgDecide_(String(id || ''), String(act || ''), typeof arg === 'string' && arg.charAt(0) === '{' ? JSON.parse(arg) : arg, a);
+  return JSON.stringify({ status: r.r.status, acc: r.acc ? r.acc.username : (r.r.acc || '') });
+}
+
+/* ---------- الربط الذاتي برمز من الموقع، وكلمة سر للموقع ---------- */
+function tg_link_code(token) {
+  var a = auth_(token); if (!abotOn_()) throw new Error('بوت أثر غير مضبوط بعد');
+  var code = uid_() + uid_().slice(0, 6);
+  CacheService.getScriptCache().put('tglk:' + code, a.uid, 900);
+  return JSON.stringify({ url: 'https://t.me/' + abotUser_() + '?start=L' + code, linked: !!a.tg });
+}
+function tgLinkByCode_(code, from) {
+  var c = CacheService.getScriptCache(), uid = c.get('tglk:' + code); if (!uid) return { err: 'انتهت صلاحية رابط الربط (ربع ساعة). اطلبه من جديد من صفحة حسابك في الموقع.' };
+  c.remove('tglk:' + code);
+  return withLock_(function () {
+    var accs = readJson_('accounts.json', {}), a = accs[uid], other = tgAcc_(accs, from.id);
+    if (!a || a.disabled) return { err: 'الحساب غير موجود أو موقوف' };
+    if (other && other.uid !== a.uid) return { err: 'حسابك في تيليجرام مربوط بحساب آخر في أثر (' + other.username + ')' };
+    a.tg = String(from.id); if (from.username) a.tgUser = clip_(from.username, 40); a.tgAt = now_();
+    writeJson_('accounts.json', accs); audit_(a, 'ربط حسابه بتيليجرام', a.username);
+    return { a: a };
+  });
+}
+// لمن دخل من تيليجرام: كلمة سر للموقع العادي في المتصفح
+function tg_site_pw(token, pw) {
+  var a = auth_(token); if (!a._tg) throw new Error('هذا من داخل تيليجرام فقط');
+  pw = String(pw || ''); if (pw.length < 8) throw new Error('كلمة المرور ثمانية أحرف على الأقل');
+  return withLock_(function () {
+    var accs = readJson_('accounts.json', {}), x = accs[a.uid];
+    x.salt = Utilities.getUuid(); x.hash = pwHash_(x.salt, pw); x.noPw = false; x.mustChange = false; x.pendPw = false; x.fails = 0; x.lockUntil = 0;
+    writeJson_('accounts.json', accs); audit_(x, 'جعل كلمة سر للموقع من تيليجرام', x.username);
+    return JSON.stringify({ username: x.username });
+  });
+}
+
+/* ---------- التسليم في المحادثة: الملف بجودته الكاملة ---------- */
+// o = {b64, mime, fileName, tplName, trackName, kind}
+function tg_deliver(token, json) {
+  var a = auth_(token); if (!a._tg) throw new Error('التسليم في المحادثة من داخل تيليجرام فقط');
+  var o = JSON.parse(json || '{}'), b64 = String(o.b64 || '').replace(/^data:[^,]*,/, '');
+  if (!b64) throw new Error('الملف فارغ'); if (b64.length > 48 * 1024 * 1024 * 4 / 3) throw new Error('الملف أكبر من حد تيليجرام (٥٠ ميغابايت)');
+  var mime = /^(image\/png|image\/jpeg|application\/pdf)$/.test(o.mime) ? o.mime : 'application/octet-stream';
+  var name = clip_(String(o.fileName || 'تصميم').replace(/[\\\/:*?"<>|\n]/g, ' '), 90);
+  var cap = '<b>' + h0_(o.tplName || name) + '</b>' + (o.trackName ? ' · ' + h0_(o.trackName) : '') + '\nبجودته الكاملة من أثر 🌿';
+  var r = abot_('sendDocument', { chat_id: a._tg, document: Utilities.newBlob(Utilities.base64Decode(b64), mime, name), caption: cap, parse_mode: 'HTML',
+    reply_markup: abotKb_([[abotWeb_('🎨 صمّم آخر', '/sections')], [abotWeb_('📂 تصاميمي', '/mine')]]) });
+  return JSON.stringify({ ok: true, msg: r.message_id });
+}
+
+/* ---------- الويبهوك ---------- */
+function abotHook_(e) {
+  var sec = props_().getProperty('ATHAR_HOOK') || '';
+  if (!sec || String(e.parameter.hook || '') !== sec) return ContentService.createTextOutput('no');
+  var u = null; try { u = JSON.parse(e.postData.contents); } catch (x) {}
+  if (!u || u.update_id == null) return ContentService.createTextOutput('ok');
+  if (!abotFresh_(u.update_id)) return ContentService.createTextOutput('dup');
+  try { abotUpdate_(u); } catch (err) { console.warn('abot', err); }
+  return ContentService.createTextOutput('ok');
+}
+// يعيد true مرة واحدة فقط لكل تحديث
+function abotFresh_(id) {
+  id = +id; var c = CacheService.getScriptCache(), k = 'tgu:' + id, lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    if (c.get(k)) return false;
+    var last = +(props_().getProperty('ATHAR_LAST') || 0);
+    if (last && id <= last - 1000) return false;   // قديم جدًا أعاده تيليجرام
+    c.put(k, '1', 21600);
+    if (id > last) props_().setProperty('ATHAR_LAST', String(id));
+    return true;
+  } finally { lock.releaseLock(); }
+}
+function abotState_(tg, v) { var c = CacheService.getScriptCache(), k = 'tgst:' + tg; if (v === undefined) return c.get(k) || ''; if (v) c.put(k, v, 3600); else c.remove(k); }
+function abotUpdate_(u) {
+  JC = {};
+  if (u.callback_query) return abotCallback_(u.callback_query);
+  var m = u.message; if (!m || !m.chat || m.chat.type !== 'private' || !m.from || m.from.is_bot) return;   // لا شيء خارج المحادثات الخاصة
+  var from = String(m.from.id), accs = readJson_('accounts.json', {}), a = tgAcc_(accs, from), text = String(m.text || m.caption || '').trim();
+  var cmd = /^\/(\w+)(?:@\w+)?(?:\s+(.*))?$/.exec(m.text || ''), c = cmd ? cmd[1].toLowerCase() : '', arg = cmd ? (cmd[2] || '').trim() : '';
+  if (c === 'start' && /^L[a-z0-9]{10,40}$/.test(arg)) {
+    var lk = tgLinkByCode_(arg.slice(1), m.from);
+    if (lk.err) return abotSend_(from, lk.err);
+    abotSend_(from, 'رُبط حسابك في أثر (<code>' + h0_(lk.a.username) + '</code>) بتيليجرام ✅\nتدخل أثر من هنا بلا كلمة سر.');
+    return abotWelcome_(lk.a, true);
+  }
+  if (a && a.disabled) return abotSend_(from, 'هذا الحساب موقوف في أثر. راجع مشرف برنامجك.');
+  if (!a) {
+    var q = readJson_('tgreq.json', []).filter(function (r) { return r.tg === from && r.status === 'new'; })[0];
+    if (q) return abotSend_(from, 'أهلًا بك في أثر 🌿 يتم مراجعة حسابك قبل قبول الدخول، وتصلك رسالة هنا حين يُقبل.');
+    return abotSend_(from, '<b>أهلًا بك في أثر 🌿</b>\nمنصة الأثر الإعلامي للعاملين في الأكاديمية: تصمّم إعلانات مسارك بهويته، ويصلك تصميمك هنا بجودته الكاملة.\n\n' +
+      'إن كان لك حساب في أثر: ادخل الموقع، ومن «حسابي» اضغط «اربط تيليجرام».\nوإن لم يكن لك حساب: اطلب الدخول، ويصلك القبول هنا.', [[abotWeb_('📝 اطلب الدخول', '')]]);
+  }
+  if (m.photo || m.document) return abotFile_(a, m);
+  var st = abotState_(from);
+  switch (c) {
+    case 'start': case 'menu': abotState_(from, ''); return abotMenu_(a);
+    case 'design': return abotSend_(from, 'افتح أثر واختر قالبك، ويصلك التصميم هنا حين تنزّله.', [[abotWeb_('🎨 افتح أثر', '/sections')], [abotWeb_('📂 تصاميمي', '/mine')]]);
+    case 'idea': abotState_(from, 'idea'); return abotSend_(from, '<b>صمّم بفكرة</b>\nاكتب فكرة إعلانك في رسالة واحدة: النشاط، وموعده، ولمن (المسار).\nمثال: «لقاء الأحد ٨:٣٠ مساءً مع د. محمد عن بر الوالدين لمسار إشراق».');
+    case 'guide': return abotGuide_(a);
+    case 'ask': abotState_(from, 'ask'); return abotSend_(from, 'اكتب سؤالك عن أي شيء في أثر، وأجيبك من دليل المنصة.');
+    case 'feedback': abotState_(from, 'fb'); return abotSend_(from, '<b>اقتراح أو ملاحظة</b>\nاكتب رسالتك، ولك أن ترفق صورة معها. تصل إلى صندوق الاقتراحات في المنصة باسمك.');
+    case 'notify': return abotNotifyMenu_(a);
+    case 'learn': return abotTip_(a, 1);
+    case 'password': return abotSend_(from, abotPwText_(a), [[abotWeb_('🔑 اجعل لي كلمة سر للموقع', '/tgpw')]]);
+  }
+  if (c) return abotMenu_(a);
+  if (!text) return;
+  if (st === 'fb') { abotState_(from, ''); return abotFeedback_(a, text, null); }
+  if (st === 'idea') { abotState_(from, ''); return abotIdea_(a, text); }
+  return abotAsk_(a, text);
+}
+function abotPwText_(a) {
+  return '<b>كلمة سر للموقع</b>\nدخولك من تيليجرام لا يحتاج كلمة سر، لأن تيليجرام نفسه يثبت أنه أنت. أما الموقع في متصفح الحاسوب أو الجوال فلا يعرف تيليجرام، فيسألك اسم المستخدم وكلمة السر.\n' +
+    'اسم المستخدم: <code>' + h0_(a.username) + '</code>\n' + (a.noPw ? 'ليس لحسابك كلمة سر بعد: اجعلها من الزر، ثم ادخل بها الموقع متى شئت.' : 'لحسابك كلمة سر؛ ولك أن تغيّرها من الزر.');
+}
+function abotMenu_(a) {
+  return abotSend_(a.tg, '<b>أثر | المنصة الإعلامية</b>\nماذا تريد الآن؟', [
+    [abotWeb_('🎨 افتح أثر', '')],
+    [{ text: '💡 صمّم بفكرة', callback_data: 'm:idea' }, { text: '❓ اسأل أثر', callback_data: 'm:ask' }],
+    [{ text: '🎬 دليل أثر', callback_data: 'm:guide' }, { text: '✏️ تعلّم التصميم', callback_data: 'm:learn' }],
+    [{ text: '💬 اقتراح أو ملاحظة', callback_data: 'm:fb' }, { text: '🔔 الإشعارات', callback_data: 'm:notify' }],
+    [{ text: '🔑 كلمة سر للموقع', callback_data: 'm:pw' }]]);
+}
+// بعد القبول أو الربط: الجولة التعريفية (ثلاث رسائل)
+function abotWelcome_(a, linked) {
+  if (!abotOn_() || !a.tg) return;
+  if (!linked) abotSend_(a.tg, '<b>قُبل حسابك في أثر ✅</b>\nاسم المستخدم: <code>' + h0_(a.username) + '</code>\nتدخل من هنا بلا كلمة سر.', [[abotWeb_('🎨 افتح أثر', '')]]);
+  abotSend_(a.tg, '<b>١. ما هو أثر؟</b>\nمنصة تصمّم فيها إعلانات برنامجك ومسارك بهويتهما: قوالب جاهزة بالألوان والخطوط والشعارات، ومحرر بسيط، ومساعد ذكي يقترح عليك النص والقالب.');
+  abotSend_(a.tg, '<b>٢. صمّم واستلم هنا</b>\nاضغط «افتح أثر»، واختر قالبًا، واكتب نصك، ثم «تنزيل»: يصلك التصميم في هذه المحادثة ملفًا بجودته الكاملة. وإن كانت عندك فكرة فقط، فاضغط «صمّم بفكرة» واكتبها.');
+  abotSend_(a.tg, '<b>٣. اسأل أثر، وشاهد الدليل</b>\nاكتب لي أي سؤال عن المنصة فأجيبك، وفي «دليل أثر» مقطع قصير لكل قسم، وفي «تعلّم التصميم» قاعدة بعد قاعدة.\n\nاسألني أي سؤال 👇');
+  abotMenu_(a);
+}
+
+/* ---------- الأزرار ---------- */
+function abotCallback_(q) {
+  var from = String(q.from.id), data = String(q.data || ''), accs = readJson_('accounts.json', {}), a = tgAcc_(accs, from), msg = q.message || {};
+  var ack = function (t, alert) { try { abot_('answerCallbackQuery', { callback_query_id: q.id, text: t || '', show_alert: alert ? 'true' : 'false' }); } catch (e) {} };
+  var eph = function (t) { try { abot_('sendMessage', { text: t, ephemeral_message_parameters: JSON.stringify({ callback_query_id: q.id }) }); ack(); } catch (e) { ack(t); } };
+  if (/^ap:/.test(data)) {
+    if (!a || a.role !== 'super') return ack('للمدير العام وحده', true);
+    var p = data.split(':'), id = p[1], act = p[2];
+    try {
+      if (act === 'c') { ack(); return abot_('editMessageReplyMarkup', { chat_id: from, message_id: String(msg.message_id), reply_markup: abotKb_(abotProgs_().map(function (x) { return [{ text: x.name, callback_data: 'ap:' + id + ':p:' + x.id }]; }).concat([[{ text: '↩️ رجوع', callback_data: 'ap:' + id + ':b' }]])) }); }
+      if (act === 'p') {
+        var pr = abotProgs_().filter(function (x) { return x.id === p[3]; })[0]; ack();
+        var rows = [[{ text: 'كل المسارات', callback_data: 'ap:' + id + ':t:' + p[3] + ':' }]]; (pr ? pr.tracks : []).forEach(function (t, i) { if (i % 2 === 0) rows.push([]); rows[rows.length - 1].push({ text: t.name, callback_data: 'ap:' + id + ':t:' + p[3] + ':' + t.id }); });
+        return abot_('editMessageReplyMarkup', { chat_id: from, message_id: String(msg.message_id), reply_markup: abotKb_(rows) });
+      }
+      var r0 = readJson_('tgreq.json', []).filter(function (x) { return x.id === id; })[0]; if (!r0) return ack('الطلب غير موجود', true);
+      if (act === 'b') { ack(); return abot_('editMessageReplyMarkup', { chat_id: from, message_id: String(msg.message_id), reply_markup: abotKb_(abotReqRows_(r0)) }); }
+      var res = act === 't' ? tgDecide_(id, 'set', { program: p[3], track: p[4] || '' }, a) : tgDecide_(id, act, p[3], a);
+      var r = res.r, note = res.done ? '<i>عولج من قبل: ' + ({ ok: 'قُبل', no: 'رُفض' })[r.status] + (r.acc ? ' (' + h0_(r.acc) + ')' : '') + '</i>'
+        : res.set ? '' : r.status === 'ok' ? '✅ <b>قُبل</b>، حسابه <code>' + h0_(r.acc) + '</code>، ووصلته الجولة التعريفية.' : '✖️ <b>رُفض</b>.';
+      ack(res.set ? 'غُيّر' : r.status === 'ok' ? 'قُبل' : r.status === 'no' ? 'رُفض' : '');
+      return abot_('editMessageText', { chat_id: from, message_id: String(msg.message_id), text: abotReqText_(r, note), parse_mode: 'HTML', reply_markup: abotKb_(r.status === 'new' ? abotReqRows_(r) : []) });
+    } catch (e) { return ack(String(e.message || e).slice(0, 190), true); }
+  }
+  if (!a) return ack('ادخل أثر أولًا', true);
+  if (data === 'm:idea') { ack(); abotState_(from, 'idea'); return abotSend_(from, '<b>صمّم بفكرة</b>\nاكتب فكرة إعلانك في رسالة واحدة: النشاط، وموعده، ولمن (المسار).'); }
+  if (data === 'm:ask') { ack(); abotState_(from, 'ask'); return abotSend_(from, 'اكتب سؤالك عن أي شيء في أثر.'); }
+  if (data === 'm:guide') { ack(); return abotGuide_(a); }
+  if (data === 'm:learn') { ack(); return abotTip_(a, 1); }
+  if (data === 'm:fb') { ack(); abotState_(from, 'fb'); return abotSend_(from, '<b>اقتراح أو ملاحظة</b>\nاكتب رسالتك، ولك أن ترفق صورة.'); }
+  if (data === 'm:notify') { ack(); return abotNotifyMenu_(a); }
+  if (data === 'm:pw') { ack(); return abotSend_(from, abotPwText_(a), [[abotWeb_('🔑 اجعل لي كلمة سر للموقع', '/tgpw')]]); }
+  if (data === 'tip:n') { ack(); return abotTip_(a, 1); }
+  if (/^nt:[nw]$/.test(data)) {
+    var k = data.slice(3), off = withLock_(function () { var all = readJson_('accounts.json', {}), x = all[a.uid]; x.prefs = x.prefs || {}; var o = x.prefs.tgOff || {}; o[k] = !o[k]; x.prefs.tgOff = o; writeJson_('accounts.json', all); return o; });
+    try { abot_('editMessageReplyMarkup', { chat_id: from, message_id: String(msg.message_id), reply_markup: abotKb_(abotNotifyRows_(off)) }); } catch (e) {}
+    return eph(off[k] ? (k === 'n' ? 'أُوقفت الإشعارات' : 'أُوقف التقرير الأسبوعي') : (k === 'n' ? 'فُعّلت الإشعارات' : 'فُعّل التقرير الأسبوعي'));
+  }
+  if (/^in:[a-z0-9]+$/.test(data) || /^fx:[a-z0-9]+$/.test(data)) {   // ملف أرسله: تصميم يُبنى منه قالب، أو مرفق ملاحظة
+    var f = CacheService.getScriptCache().get('tgf:' + data.slice(3)); if (!f) return ack('انتهت مهلة هذا الملف، أرسله من جديد', true);
+    f = JSON.parse(f);
+    if (data.charAt(0) === 'i') { var saved = abotInbox_(a, f); return eph(saved ? 'وصل التصميم، جزاك الله خيرًا. يُبنى منه قالب في صيانة الأسبوع.' : 'تعذّر حفظه، حاول بعد قليل'); }
+    abotState_(from, 'fb'); CacheService.getScriptCache().put('tgfb:' + from, JSON.stringify(f), 3600); ack();
+    return abotSend_(from, 'اكتب ملاحظتك عن هذه الصورة في رسالة، فتصل مع الصورة.');
+  }
+  if (/^esc:/.test(data)) {
+    var qq = CacheService.getScriptCache().get('tgq:' + data.slice(4)); if (!qq) return ack('انتهت المهلة، اكتب سؤالك في «اقتراح أو ملاحظة»', true);
+    fb_store_(a, { kind: 'q', text: qq, page: 'بوت أثر', v: 'bot', program: (a.programs || [])[0] || '' });
+    return eph('وصل سؤالك إلى الإشراف، جزاك الله خيرًا.');
+  }
+  ack();
+}
+function abotNotifyRows_(off) {
+  off = off || {};
+  return [[{ text: (off.n ? '🔕 الإشعارات: موقوفة' : '🔔 الإشعارات: مفعّلة') + ' (اضغط للتبديل)', callback_data: 'nt:n' }],
+          [{ text: (off.w ? '🔕 التقرير الأسبوعي: موقوف' : '📊 التقرير الأسبوعي: مفعّل') + ' (اضغط للتبديل)', callback_data: 'nt:w' }]];
+}
+function abotNotifyMenu_(a) { return abotSend_(a.tg, '<b>الإشعارات</b>\nالإشعارات: القوالب الجديدة وإعلانات الإدارة. والتقرير الأسبوعي: أرقامك وتعلّم التصميم كل سبت.', abotNotifyRows_((a.prefs || {}).tgOff)); }
+
+/* ---------- الدليل، وتعلّم التصميم، والفكرة ---------- */
+function abotGuide_(a) {
+  var admin = a.role === 'super' || a.role === 'sup', clips = (BOT_KB.clips || []).filter(function (c) { return !c[3] || admin; }), rows = [];
+  clips.forEach(function (c, i) { if (i % 2 === 0) rows.push([]); rows[rows.length - 1].push(abotWeb_('▶️ ' + c[1], '/guide/' + c[0])); });
+  return abotSend_(a.tg, '<b>دليل أثر</b>\nلكل قسم مقطع قصير يشرحه. اختر القسم فيُفتح مقطعه، وبعده اسألني ما شئت عنه.', rows.length ? rows : [[abotWeb_('🎬 افتح الدليل', '/guide')]]);
+}
+function abotTipHtml_(t, n, total) {
+  var e = function (s) { return h0_(s).replace(/"/g, '&quot;'); };
+  return '<!doctype html><html dir="rtl"><meta charset="utf-8"><style>body{margin:0;font:15px/1.6 system-ui,sans-serif;padding:16px;background:var(--b,#f5f8f7);color:var(--t,#1c2b2a)}' +
+    '.k{font-size:12px;opacity:.7}h1{font-size:20px;margin:6px 0 8px;line-height:1.35}.d,.x{border-radius:10px;padding:8px 10px;margin-top:8px;font-size:14px}.d{background:rgba(0,131,123,.12)}.x{background:rgba(199,14,58,.1)}' +
+    '.bar{display:flex;gap:4px;margin-bottom:10px}.bar i{height:5px;flex:1;border-radius:3px}</style>' +
+    '<div class="bar"><i style="background:#00837b"></i><i style="background:#522b60"></i><i style="background:#c70e3a"></i><i style="background:#f45907"></i></div>' +
+    '<div class="k">تعلّم التصميم · ' + n + ' من ' + total + '</div><h1>' + e(t[1]) + '</h1><div>' + e(t[2]) + '</div>' +
+    (t[3] ? '<div class="d">✓ ' + e(t[3]) + '</div>' : '') + (t[4] ? '<div class="x">✗ ' + e(t[4]) + '</div>' : '') +
+    '<script>var W=window.TelegramWidget;if(W){var p=W.themeParams||{};document.body.style.setProperty("--b",p.bg_color||"");document.body.style.setProperty("--t",p.text_color||"");W.ready&&W.ready();}</script>';
+}
+function abotTip_(a, step) {
+  var tips = BOT_KB.tips || []; if (!tips.length) return abotSend_(a.tg, 'لا قواعد بعد.');
+  var i = withLock_(function () { var all = readJson_('accounts.json', {}), x = all[a.uid]; x.prefs = x.prefs || {}; var n = ((+x.prefs.tgTip || 0) + (step || 0)) % tips.length; x.prefs.tgTip = n; writeJson_('accounts.json', all); return n; });
+  var t = tips[i], cap = '<b>تعلّم التصميم: ' + h0_(t[1]) + '</b>\n' + h0_(t[2]) + (t[3] ? '\n✓ ' + h0_(t[3]) : '') + (t[4] ? '\n✗ ' + h0_(t[4]) : '');
+  var rows = abotKb_([[{ text: 'القاعدة التالية ⬅️', callback_data: 'tip:n' }], [abotWeb_('📚 كل القواعد في أثر', '/tips')]]);
+  try { return abot_('sendWidget', { chat_id: a.tg, html: abotTipHtml_(t, i + 1, tips.length), caption: cap, parse_mode: 'HTML', width: '360', height: '0', reply_markup: rows }); }
+  catch (e) { return abot_('sendMessage', { chat_id: a.tg, text: cap + '\n\n<i>حدّث تيليجرام لترى القاعدة في بطاقة.</i>', parse_mode: 'HTML', reply_markup: rows }); }
+}
+function abotIdea_(a, text) {
+  if (!perm_(a, 'ai')) return abotSend_(a.tg, '«صمّم بفكرة» يحتاج صلاحية المساعد من مشرف برنامجك. ولك أن تختار قالبًا مباشرة.', [[abotWeb_('🎨 افتح القوالب', '/sections')]]);
+  var idea = clip_(text, 500);
+  return abotSend_(a.tg, '<b>فكرتك جاهزة 💡</b>\n«' + h0_(idea) + '»\n\nاضغط الزر: يقترح عليك المصمّم الذكي النص والقالب المناسب، فتعدّل وتنزّل، ويصلك التصميم هنا.', [[abotWeb_('✨ صمّم هذه الفكرة', '/make?idea=' + encodeURIComponent(idea))]]);
+}
+
+/* ---------- اسأل أثر: الدالة نفسها والحد نفسه ---------- */
+function abotAsk_(a, q) {
+  q = clip_(q, 600);
+  try { abot_('sendChatAction', { chat_id: a.tg, action: 'typing' }); } catch (e) {}
+  var s = settings_();
+  if (!s.ai.enabled) return abotSend_(a.tg, 'المساعد متوقف الآن. أرسل سؤالك من «اقتراح أو ملاحظة».');
+  var c = CacheService.getScriptCache(), ck = 'aih:' + a.uid + ':' + dayKey_(now_()), used = +(c.get(ck) || 0);
+  if (used >= AI_HELP_PER_DAY) return abotSend_(a.tg, 'سألت «اسأل أثر» كثيرًا اليوم (' + AI_HELP_PER_DAY + ' سؤالًا). عُد غدًا، أو أرسل سؤالك إلى المشرفين من «اقتراح أو ملاحظة».');
+  var role = a.role, ctx = '';
+  try { ctx = BOT_KBCTX ? BOT_KBCTX()('#/', role, { question: q, inApp: true, page: 'بوت أثر في تيليجرام' }) : ''; } catch (e) { ctx = ''; }
+  var clips = (BOT_KB.clips || []).map(function (x) { return x[0] + ': ' + x[1]; }).join('، ');
+  var req = { kind: 'help', system: BOT_KB.rules + '\n- السائل يكتب من بوت أثر في تيليجرام: الروابط تفتح أثر داخل تيليجرام، والتنزيل يصل في المحادثة.\n\n' + ctx + (clips ? '\n\nالمقدمات المتحركة (clip): ' + clips : '') + skillsFor_('help'),
+    prompt: 'السؤال الآن: ' + q + '\nالصفحة: بوت أثر في تيليجرام', schema: BOT_KB.schema, temperature: 0.2 };
+  var r;
+  try { r = JSON.parse(geminiCall_(req, { uid: a.uid, name: a.name })); } catch (e) { r = null; }
+  c.put(ck, String(used + 1), 90000);
+  if (!r || !String(r.answer || '').trim()) return abotSend_(a.tg, 'تعذّر الجواب الآن. حاول بعد قليل، أو أرسل سؤالك من «اقتراح أو ملاحظة».');
+  var steps = (r.steps || []).map(function (x) { return String(x || '').replace(/^\s*[\d٠-٩]+[.)\-–]\s*/, '').trim(); }).filter(Boolean).slice(0, 8);
+  var txt = h0_(r.answer) + (steps.length ? '\n\n' + steps.map(function (x, i) { return (i + 1) + '. ' + h0_(x); }).join('\n') : '');
+  var rows = [];
+  (r.links || []).slice(0, 3).forEach(function (l) { var h = String(l && l.hash || ''); if (/^#\/[\w\-\/?=&.%]*$/.test(h)) rows.push([abotWeb_('↗️ ' + clip_(l.label || 'افتح', 40), h.slice(1))]); });
+  if (r.clip && (BOT_KB.clips || []).some(function (x) { return x[0] === r.clip; })) rows.push([abotWeb_('▶️ شاهد المقدمة', '/guide/' + r.clip)]);
+  if (r.escalate) { var qk = uid_(); c.put('tgq:' + qk, q, 21600); rows.push([{ text: '📨 أرسل سؤالي إلى الإشراف', callback_data: 'esc:' + qk }]); }
+  return abotSend_(a.tg, txt, rows.length ? rows : null);
+}
+
+/* ---------- الملفات: تصميم يُبنى منه قالب، أو مرفق ملاحظة ---------- */
+function abotFile_(a, m) {
+  var f = m.document ? { id: m.document.file_id, mime: m.document.mime_type || '', name: m.document.file_name || '', size: m.document.file_size || 0 }
+    : (function (p) { return { id: p.file_id, mime: 'image/jpeg', name: 'photo.jpg', size: p.file_size || 0 }; })(m.photo[m.photo.length - 1]);
+  f.cap = clip_(m.caption || '', 900); f.msg = String(m.message_id);
+  if (abotState_(a.tg) === 'fb' && m.caption) { abotState_(a.tg, ''); return abotFeedback_(a, m.caption, f); }
+  var k = uid_(); CacheService.getScriptCache().put('tgf:' + k, JSON.stringify(f), 21600);
+  return abotSend_(a.tg, 'وصل الملف. ماذا أفعل به؟', [[{ text: '🧩 تصميم يُبنى منه قالب', callback_data: 'in:' + k }], [{ text: '💬 مرفق لاقتراح أو ملاحظة', callback_data: 'fx:' + k }]], { reply_parameters: JSON.stringify({ message_id: m.message_id }) });
+}
+function abotDownload_(f) {
+  if (f.size && f.size > 19 * 1048576) throw new Error('الملف أكبر من ٢٠ ميغابايت');
+  var info = abot_('getFile', { file_id: f.id });
+  var r = UrlFetchApp.fetch('https://api.telegram.org/file/bot' + abotToken_() + '/' + info.file_path, { muteHttpExceptions: true });
+  if (r.getResponseCode() !== 200) throw new Error('تعذّر تنزيل الملف من تيليجرام');
+  return r.getBlob();
+}
+function abotInbox_(a, f) {
+  try {
+    var b = abotDownload_(f), mime = INBOX_MIME[f.mime] ? f.mime : (/\.pdf$/i.test(f.name) ? 'application/pdf' : /\.png$/i.test(f.name) ? 'image/png' : 'image/jpeg');
+    inboxPut_({ from: a.tg, fromName: a.name, msg: 'ab' + f.msg, file: 'data:' + mime + ';base64,' + Utilities.base64Encode(b.getBytes()), caption: f.cap });
+    return true;
+  } catch (e) { console.warn('abotInbox_', e); return false; }
+}
+function abotFeedback_(a, text, f) {
+  var imgs = [];
+  if (!f) { var pf = CacheService.getScriptCache().get('tgfb:' + a.tg); if (pf) { f = JSON.parse(pf); CacheService.getScriptCache().remove('tgfb:' + a.tg); } }
+  if (f) { try { var b = abotDownload_(f); imgs.push('data:' + (/png/.test(b.getContentType()) ? 'image/png' : 'image/jpeg') + ';base64,' + Utilities.base64Encode(b.getBytes())); } catch (e) {} }
+  fb_store_(a, { kind: 'idea', text: '[من بوت أثر] ' + text, page: 'بوت أثر', v: 'bot', imgs: imgs, track: (a.tracks || [])[0] || '', program: (a.programs || [])[0] || '' });
+  return abotSend_(a.tg, 'وصلت، جزاك الله خيرًا 🌿');
+}
+
+/* ---------- الإشعارات والإعلانات (على دفعات) ---------- */
+// tgout.json: [{to, text, rows}] طابور يرسله المؤقّت tgTick بحدود تيليجرام
+function abotQueue_(list) {
+  if (!abotOn_() || !list.length) return 0;
+  withLock_(function () { var q = readJson_('tgout.json', []); writeJson_('tgout.json', q.concat(list).slice(-3000)); });
+  return list.length;
+}
+function abotAudience_(aud, kind) {
+  var accs = readJson_('accounts.json', {});
+  return Object.keys(accs).map(function (k) { return accs[k]; }).filter(function (a) {
+    if (!a.tg || a.disabled || ((a.prefs || {}).tgOff || {})[kind]) return false;
+    if (!aud || aud.kind === 'all') return true;
+    if (aud.kind === 'program') return a.role === 'super' || (a.programs || []).indexOf(aud.id) >= 0;
+    if (aud.kind === 'track') return a.role === 'super' || ((a.programs || []).indexOf(aud.program || 'academy') >= 0 && (!(a.tracks || []).length || a.tracks.indexOf(aud.id) >= 0));
+    return false;
+  });
+}
+function abotDrain_() {
+  if (!abotOn_()) return 0;
+  var batch = withLock_(function () { var q = readJson_('tgout.json', []); if (!q.length) return []; var b = q.splice(0, 120); writeJson_('tgout.json', q); return b; });
+  var n = 0, t0 = now_();
+  batch.forEach(function (x) { if (now_() - t0 > 240000) { abotQueue_([x]); return; } try { abotSend_(x.to, x.text, x.rows || null); n++; } catch (e) { if (/retry after (\d+)/i.test(String(e))) { Utilities.sleep(1500); abotQueue_([x]); } } Utilities.sleep(60); });
+  return n;
+}
+// إعلان من «رسائل للمستخدمين» بخيار «أرسلها في البوت أيضًا»
+function abotBroadcast_(b) {
+  if (!b || !b.bot) return 0;
+  return abotQueue_(abotAudience_(b.aud, 'n').map(function (a) { return { to: a.tg, text: '<b>' + h0_(b.title || 'من إدارة أثر') + '</b>\n' + h0_(b.body || ''), rows: b.link ? [[{ text: 'التفاصيل', url: b.link }]] : [[abotWeb_('🎨 افتح أثر', '')]] }; }));
+}
+// قوالب جديدة: إشعار واحد مجمّع لكل حزمة جديدة
+function abotPacks_() {
+  try {
+    var seen = JSON.parse(props_().getProperty('ATHAR_PACKS') || 'null'), now = [], it = DriveApp.getFolderById(IDS.packs).getFiles();
+    while (it.hasNext()) { var f = it.next(); if (!f.isTrashed()) now.push(f.getId()); }
+    props_().setProperty('ATHAR_PACKS', JSON.stringify(now));
+    if (!seen) return 0;   // أول مرة: نحفظ الموجود ولا نُشعر
+    var fresh = now.filter(function (id) { return seen.indexOf(id) < 0; }); if (!fresh.length) return 0;
+    var nT = 0; fresh.forEach(function (id) { try { nT += (DriveApp.getFileById(id).getBlob().getDataAsString().match(/\bid\s*:\s*['"]/g) || []).length; } catch (e) {} });
+    return abotQueue_(abotAudience_(null, 'n').map(function (a) { return { to: a.tg, text: '<b>قوالب جديدة في أثر ✨</b>\n' + (nT ? 'نزل ' + nT + ' قالبًا جديدًا هذا الأسبوع' : 'نزلت قوالب جديدة') + '، ومعها نصائح تصميم جديدة.', rows: [[abotWeb_('افتحها', '/sections')]] }; }));
+  } catch (e) { return 0; }
+}
+
+/* ---------- التقرير الأسبوعي الخاص (السبت ١٠:٠٠) ---------- */
+function botWeekly() {
+  if (!abotOn_()) return 0;
+  var wsT = new Date(weekStart_(now_()) + 'T00:00:00Z').getTime() - 3 * 3600000, key = weekStart_(wsT - 864e5);
+  var st = readJson_('wk_' + key + '.json', null), prevKey = weekStart_(new Date(key + 'T12:00:00Z').getTime() - 7 * 864e5), prev = readJson_('wk_' + prevKey + '.json', null);
+  var cl = readJson_('changelog.json', []), tips = BOT_KB.tips || [], list = abotAudience_(null, 'w'), wn = Math.floor(new Date(key + 'T12:00:00Z').getTime() / (7 * 864e5)), out = [];
+  list.forEach(function (a) {
+    var u = st && st.users ? st.users[a.uid] : null, c = (u && u.c) || { exports: 0, active: 0 }, p = (u && u.p) || (prev && prev.users && prev.users[a.uid] ? prev.users[a.uid].c : null);
+    var lines = ['<b>أسبوعك في أثر 📊</b>', 'التنزيلات: ' + (c.exports || 0) + (p ? ' (الأسبوع السابق ' + (p.exports || 0) + ')' : ''), 'الأيام النشطة: ' + (c.active || 0) + ' من ٧'];
+    if (c.saves) lines.push('المحفوظ: ' + c.saves);
+    if ((u && u.badges || []).length) lines.push('🏅 ' + u.badges.map(h0_).join('، '));
+    var kind = wn % 3, x = '';
+    if (kind === 0 && u && u.msg) x = h0_(String(u.msg));
+    else if (kind === 1 && cl.length) { var v = cl[0], it = (v.items || [])[(a.uid.charCodeAt(0) + wn) % Math.max(1, (v.items || []).length)]; if (it) x = 'جديد في أثر: <b>' + h0_(it.t) + '</b>' + (it.d ? ' — ' + h0_(it.d) : ''); }
+    if (!x) x = (c.exports || 0) > (p ? p.exports || 0 : 0) ? 'أحسنت، أسبوعك أنشط من سابقه. بارك الله في جهدك.' : (c.exports ? 'جزاك الله خيرًا على ما صمّمت. الإعلان الحسن يبلّغ الخير أبعد.' : 'هذا الأسبوع فرصة: إعلان واحد لنشاط مسارك يصنع فرقًا. «صمّم بفكرة» يختصر عليك الطريق.');
+    lines.push('', x, '', '<b>تعلّم التصميم ✏️</b>');
+    var base = (+((a.prefs || {}).tgTip) || 0);
+    for (var j = 1; j <= 2 && tips.length; j++) { var t = tips[(base + j) % tips.length]; lines.push('• <b>' + h0_(t[1]) + '</b>: ' + h0_(t[2])); }
+    out.push({ to: a.tg, text: lines.join('\n'), rows: [[abotWeb_('🎨 صمّم الآن', '/sections'), { text: '✏️ قاعدة أخرى', callback_data: 'tip:n' }]] });
+  });
+  abotQueue_(out); abotDrain_();
+  return out.length;
+}
+
+/* ---------- الإعداد (من الإعدادات أو المحرر) ---------- */
+function abot_set(token, bot) {
+  var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
+  var tk = String(bot || '').trim();
+  if (tk && !/^\d+:[\w-]{30,}$/.test(tk)) throw new Error('رمز البوت غير صحيح');
+  if (tk) { props_().setProperty('ATHAR_BOT', tk); var me = abot_('getMe', {}); props_().setProperty('ATHAR_BOT_USER', me.username || ''); }
+  else { try { abot_('deleteWebhook', {}); } catch (e) {} props_().deleteProperty('ATHAR_BOT'); props_().deleteProperty('ATHAR_BOT_USER'); }
+  audit_(a, tk ? 'ضبط بوت أثر' : 'أزال بوت أثر', tk ? '@' + abotUser_() : '');
+  return JSON.stringify({ on: abotOn_(), user: abotUser_() });
+}
+function abot_info(token) {
+  var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
+  var o = { on: abotOn_(), user: abotUser_(), linked: !!a.tg, reqs: readJson_('tgreq.json', []).filter(function (r) { return r.status === 'new'; }).length };
+  if (o.on) { try { var w = abot_('getWebhookInfo', {}); o.hook = { set: !!w.url, pending: w.pending_update_count || 0, err: w.last_error_message || '', at: w.last_error_date || 0 }; } catch (e) { o.err = e.message; } }
+  var accs = readJson_('accounts.json', {}); o.users = Object.keys(accs).filter(function (k) { return accs[k].tg && !accs[k].disabled; }).length;
+  return JSON.stringify(o);
+}
+// يضبط الويبهوك والاسم والوصف والأوامر وزر القائمة
+function abot_setup(token, url) {
+  var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
+  url = String(url || ''); if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]{20,}\/exec$/.test(url)) throw new Error('رابط الخادم غير صحيح');
+  props_().setProperty('ATHAR_URL', url);
+  var r = abotSetup_(); audit_(a, 'أعدّ بوت أثر', ''); return JSON.stringify(r);
+}
+function abotSetup_() {
+  if (!abotOn_()) throw new Error('الصق رمز بوت أثر أولًا');
+  var P = props_(), sec = P.getProperty('ATHAR_HOOK'); if (!sec) { sec = uid_() + uid_(); P.setProperty('ATHAR_HOOK', sec); }
+  var url = P.getProperty('ATHAR_URL'); if (!url) throw new Error('شغّل الإعداد من الموقع المنشور (الإعدادات ← بوت أثر)');
+  abot_('setWebhook', { url: url + '?hook=' + sec, allowed_updates: JSON.stringify(['message', 'callback_query']), drop_pending_updates: 'true', max_connections: '10' });
+  var done = ['الويبهوك'];
+  var tries = [
+    ['setMyName', { name: 'أثر | المنصة الإعلامية' }, 'الاسم'],
+    ['setMyShortDescription', { short_description: 'صمّم إعلانات مسارك بهوية الأكاديمية، واستلمها هنا.' }, 'الوصف القصير'],
+    ['setMyDescription', { description: 'باب منصة الأثر الإعلامي للعاملين في الأكاديمية. ادخل بحسابك في تيليجرام بلا كلمة سر، وصمّم من قوالب مسارك، فيصلك تصميمك هنا بجودته الكاملة. واسأل أثر عن أي شيء في المنصة.' }, 'الوصف'],
+    ['setMyCommands', { commands: JSON.stringify([['start', 'البداية'], ['design', 'افتح أثر'], ['idea', 'صمّم بفكرة'], ['guide', 'دليل أثر'], ['ask', 'اسأل أثر'], ['learn', 'تعلّم التصميم'], ['feedback', 'اقتراح أو ملاحظة'], ['notify', 'الإشعارات'], ['password', 'كلمة سر للموقع']].map(function (c) { return { command: c[0], description: c[1] }; })) }, 'الأوامر'],
+    ['setChatMenuButton', { menu_button: JSON.stringify({ type: 'web_app', text: 'افتح أثر', web_app: { url: abotApp_('') } }) }, 'زر القائمة']
+  ];
+  var errs = [];
+  tries.forEach(function (t) { try { abot_(t[0], t[1]); done.push(t[2]); } catch (e) { errs.push(t[2] + ': ' + e.message); } });
+  abotPacks_();   // يحفظ الحزم الحالية فلا يُشعر بها
+  return { ok: true, done: done, errs: errs, user: abotUser_() };
+}
+// تُشغَّل من المحرر عند الحاجة: تعيد ضبط الأوامر والوصف (الويبهوك يُضبط من الموقع)
+function setupAtharBotTexts() { Logger.log(JSON.stringify(abotSetup_())); }
 
 /* ================= البرامج =================
    programs.json: [{id, name, desc, color, order, active, features: {social, slides, ai}, identities: [ {id, group, name, full, desc, logo, logos, c} ]}]
@@ -1128,7 +1736,7 @@ function item_del(token, id) {
 /* ================= أرشيف التصاميم: كل تصميم يُنزَّل أو يُشارَك أو يُحفظ =================
    arc_YYYY-MM.json: [{id, name, kind, tpl, tplName, track, trackName, program, size, pages, uid, uname, at, upd, n, via, vias, item, sf, tf}]
    sf ملف حالة التصميم كاملة (يُفتح بها في المحرر بجودته الأصلية)، و tf معاينة للتصفح. الملفات في المجلد الفرعي archive */
-var ARC_VIA = { png: 'PNG', jpg: 'JPG', pdf: 'PDF', share: 'مشاركة', save: 'حفظ' };
+var ARC_VIA = { png: 'PNG', jpg: 'JPG', pdf: 'PDF', share: 'مشاركة', save: 'حفظ', tg: 'تيليجرام' };
 function arcName_(m) { return 'arc_' + m + '.json'; }
 function arc_put(token, metaJson, stateJson, thumb) {
   var a = auth_(token), m = JSON.parse(metaJson), prog = m.program || 'academy';
@@ -1364,6 +1972,11 @@ function bc_all(token) {
   return JSON.stringify(readJson_('broadcasts.json', []).filter(function (b) { return isSuper_(a) || (b.programs || []).some(function (p) { return adminOf_(a, p); }); }));
 }
 function bc_save(token, json) {
+  var cur = bcSave_(token, json);
+  if (cur.bot && !cur.botSent) { cur.botN = abotBroadcast_(cur); withLock_(function () { var l = readJson_('broadcasts.json', []); l.forEach(function (x) { if (x.id === cur.id) { x.botSent = now_(); x.botN = cur.botN; } }); writeJson_('broadcasts.json', l); }); }
+  return JSON.stringify(cur);
+}
+function bcSave_(token, json) {
   var a = auth_(token); needAdmin_(a); var b = JSON.parse(json);
   if (!isSuper_(a)) { if (!b.programs || !b.programs.length) throw new Error('حدّد برنامجك'); b.programs.forEach(function (p) { if (!adminOf_(a, p)) throw new Error('لا تملك صلاحية على ' + p); }); }
   return withLock_(function () {
@@ -1373,9 +1986,10 @@ function bc_save(token, json) {
     cur.title = clip_(b.title, 120); cur.body = clip_(b.body, 2000); cur.kind = ({ banner: 1, modal: 1, tip: 1 })[b.kind] ? b.kind : 'banner';
     cur.programs = (b.programs || []).slice(0, 20); cur.from = +b.from || 0; cur.until = +b.until || 0; cur.active = b.active !== false; cur.by = a.name; cur.upd = now_();
     cur.link = clip_(b.link, 300); cur.target = clip_(b.target, 120);
+    if (b.bot && !cur.botSent) { cur.bot = true; cur.aud = b.aud && ({ all: 1, program: 1, track: 1 })[b.aud.kind] ? { kind: b.aud.kind, id: clip_(b.aud.id || '', 40), program: clip_(b.aud.program || '', 40) } : { kind: 'all' }; }
     writeJson_('broadcasts.json', list.slice(0, 300));
     audit_(a, 'نشر رسالة', cur.title);
-    return JSON.stringify(cur);
+    return cur;
   });
 }
 function bc_del(token, id) {
@@ -1862,6 +2476,7 @@ function tgTick() {
   JC = {};
   try { tgSendDue_(); } catch (e) { console.warn('tgSendDue_', e); }
   try { taskRemindTick_(); } catch (e) { console.warn('taskRemindTick_', e); }
+  try { if (abotOn_()) { var c = CacheService.getScriptCache(); if (!c.get('abpk')) { c.put('abpk', '1', 3500); abotPacks_(); } abotDrain_(); } } catch (e) { console.warn('abot', e); }
 }
 function tgSendDue_() {
   var due = readJson_('tgq.json', []).filter(function (x) { return x.status === 'queued' && x.when <= now_(); });
@@ -2052,6 +2667,8 @@ function ensureTriggers_(log) {
     if (!has) { ScriptApp.newTrigger('tgTick').timeBased().everyMinutes(10).create(); if (log) log.push('أُنشئ مؤقّت المنشورات المجدولة (كل ١٠ دقائق).'); }
     var hasW = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'weeklyUserStats'; });
     if (!hasW) { ScriptApp.newTrigger('weeklyUserStats').timeBased().onWeekDay(ScriptApp.WeekDay.SATURDAY).atHour(7).create(); if (log) log.push('أُنشئ مؤقّت تقارير الأسبوع للمستخدمين (كل سبت صباحاً).'); }
+    var hasB = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'botWeekly'; });
+    if (!hasB) { ScriptApp.newTrigger('botWeekly').timeBased().onWeekDay(ScriptApp.WeekDay.SATURDAY).atHour(10).create(); if (log) log.push('أُنشئ مؤقّت تقرير بوت أثر الأسبوعي (كل سبت ١٠:٠٠).'); }
   } catch (e) { if (log) log.push('تعذّر إنشاء المؤقّت: ' + e); }
 }
 
