@@ -60,6 +60,8 @@
   File.prototype.getSize = function () { return this.r.bytes.length; };
   File.prototype.setContent = function (s) { this.r.bytes = utf8(s); this.r.upd = Date.now(); return this; };
   File.prototype.isTrashed = function () { return !!this.r.trashed; };
+  File.prototype.getParents = function () { const pid = this.r.parent; return Iter(pid && ST.folders[pid] ? [new Folder(ST.folders[pid])] : []); };
+  File.prototype.moveTo = function (folder) { this.r.parent = folder.r.id; return this; };
   File.prototype.setTrashed = function (t) { this.r.trashed = !!t; return this; };
   File.prototype.getLastUpdated = function () { return new Date(this.r.upd); };
   File.prototype.setDescription = function (d) { this.r.desc = d; return this; };

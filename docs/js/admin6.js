@@ -539,7 +539,7 @@ function bridgeCard() {
   }
   sendState();
   return el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-pu' }, [ico('send')]), el('h3', { text: 'محادثة الربط' }),
-    el('p', { class: 'small muted', text: 'مفتاح تستعمله محادثة الربط مع بوت الأكاديمية لثلاثة أشياء: إنشاء حسابات أثر لمن ليس في منصة الأنشطة (وتصل بياناتهم من البوت إلى أصحابها)، وحفظ التصاميم التي يرسلها المشرفون للبوت في مجلد «تصاميم واردة من المشرفين»، وقراءة إحصاء أثر بلا كلمات مرور ولا بريد.' }),
+    el('p', { class: 'small muted', text: 'مفتاح تستعمله محادثة الربط مع بوت الأكاديمية لثلاثة أشياء: إنشاء حسابات أثر لمن ليس في منصة الأنشطة (وتصل بياناتهم من البوت إلى أصحابها)، وحفظ التصاميم التي يرسلها المشرفون للبوت في «١- صندوق التصاميم الجديدة» لتبني منها الصيانة الأسبوعية قوالب، وقراءة إحصاء أثر بلا كلمات مرور ولا بريد.' }),
     el('div', { class: 'row wrapr' }, [el('button', { type: 'button', class: 'btn sm line', text: 'أظهر المفتاح', onclick: function () { show(false); } }),
       el('button', { type: 'button', class: 'btn sm line', text: 'جدّد المفتاح', onclick: async function () { if (await ask('تجديد المفتاح', 'يتوقف المفتاح القديم فورًا، فتحتاج محادثة الربط المفتاح الجديد.', 'جدّد')) show(true); } })]),
     box, sendBox]);
@@ -579,7 +579,7 @@ async function aSettings(body) {
   const pollOn = el('input', { type: 'checkbox', checked: s.ai.pollFallback !== false });
   const capPrompt = el('textarea', { class: 'inp', rows: '4', dir: 'auto', placeholder: 'مثال: ابدأ كل رسالة بسطر ترحيبي قصير، واختم بالوسم ورابط القناة. لا تستعمل أكثر من رمزين تعبيريين. نبرة هادئة محفّزة.', 'aria-label': 'تعليمات النص المصاحب' }); capPrompt.value = s.ai.capPrompt || '';
   // هل الخادم المنشور هو نفسه نسخة الموقع؟ (يمنع حيرة «حفظتُ ولم يتغير شيء»)
-  const SRV_EXPECT = 'adab582b', srvOk = !!s.srvVer && s.srvVer === SRV_EXPECT;
+  const SRV_EXPECT = '5bfc3b67', srvOk = !!s.srvVer && s.srvVer === SRV_EXPECT;
   body.appendChild(el('div', { class: 'srvver ' + (srvOk ? 'ok' : 'old') }, [ico(srvOk ? 'check' : 'info'), el('span', { text: srvOk ? 'الخادم محدَّث ويطابق نسخة الموقع.' : 'الخادم المنشور أقدم من الموقع: بعض الإعدادات لن تُحفظ أو لن تعمل. الصق server/Code.gs في Apps Script، ثم «إدارة عمليات النشر» ← تعديل النشر الحالي ← «إصدار جديد» ← نشر.' }), el('small', { dir: 'ltr', text: (s.srvVer || '—') + ' / ' + SRV_EXPECT })]));
   body.appendChild(el('div', { class: 'grid two' }, [
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-pu' }, [ico('ai')]), el('h3', { text: 'اصنع إعلانك بالذكاء' }),

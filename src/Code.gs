@@ -611,7 +611,8 @@ function linkPeek_(ids) {
               بلا كلمات مرور ولا بريد ولا معرّفات داخلية. */
 var BRIDGE_PROG = 'academy';
 var BRIDGE_PERMS = ['social', 'ai', 'upload', 'slides'];   // تصميم: الصور والمساعد والنص المصاحب والعروض، بلا نشر في القنوات ولا رفع خطوط
-var INBOX_DIR = 'تصاميم واردة من المشرفين';
+var INBOX_DIR = '١- صندوق التصاميم الجديدة';
+function inboxDir_() { return DriveApp.getFolderById(IDS.inbox); }
 var INBOX_MIME = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'application/pdf': 'pdf' };
 function bridgeKey_() { return props_().getProperty('BRIDGE_KEY') || ''; }
 function needBridge_(key) {
@@ -746,9 +747,9 @@ function inboxPut_(o) {
   var dup = msg && readJson_('inbox.json', []).filter(function (x) { return x.from === from && x.msg === msg; })[0];
   if (dup) return { id: dup.id, dup: true };
   var accs = readJson_('accounts.json', {}), acc = Object.keys(accs).map(function (k) { return accs[k]; }).filter(function (x) { return x.tg && String(x.tg) === from && !x.disabled; })[0] || null;
-  var who = acc ? acc.name : clip_(o.fromName || 'مرسل', 60), stamp = Utilities.formatDate(new Date(), 'Asia/Riyadh', 'yyyy-MM-dd HHmm');
+  var who = 'من البوت - ' + (acc ? acc.name : clip_(o.fromName || 'مرسل', 60)), stamp = Utilities.formatDate(new Date(), 'Asia/Riyadh', 'yyyy-MM-dd HHmm');
   var bytes = Utilities.base64Decode(b64);
-  var f = sub_(INBOX_DIR).createFile(Utilities.newBlob(bytes, mime, stamp + ' ' + who.replace(/[\\\/:*?"<>|]/g, '') + '.' + INBOX_MIME[mime]));
+  var f = inboxDir_().createFile(Utilities.newBlob(bytes, mime, stamp + ' ' + who.replace(/[\\\/:*?"<>|]/g, '') + '.' + INBOX_MIME[mime]));
   if (o.caption) { try { f.setDescription(clip_(o.caption, 900)); } catch (e) {} }
   var x = withLock_(function () {
     var list = readJson_('inbox.json', []);
@@ -759,8 +760,18 @@ function inboxPut_(o) {
   });
   return { id: x.id, acc: x.acc, saved: true };
 }
+// ما نقلته الصيانة الأسبوعية من الصندوق (أو حذفه) صار «تم»
+function inboxSync_() {
+  var list = readJson_('inbox.json', []), moved = [];
+  list.forEach(function (x) {
+    if (x.status !== 'new') return;
+    try { var f = DriveApp.getFileById(x.fid), it = f.getParents(), inBox = false; while (it.hasNext()) { if (it.next().getId() === IDS.inbox) inBox = true; } if (f.isTrashed() || !inBox) moved.push(x.id); } catch (e) { moved.push(x.id); }
+  });
+  if (moved.length) withLock_(function () { var l2 = readJson_('inbox.json', []); l2.forEach(function (x) { if (moved.indexOf(x.id) >= 0 && x.status === 'new') { x.status = 'done'; x.note = x.note || 'عالجته الصيانة الأسبوعية'; x.upd = now_(); } }); writeJson_('inbox.json', l2); });
+}
 // o = {status?: new|done|skip|all, days?: آخر كم يومًا}
 function inboxList_(o) {
+  inboxSync_();
   var st = o.status || 'new', since = o.days ? now_() - Math.max(1, Math.min(365, +o.days)) * 864e5 : 0;
   return readJson_('inbox.json', []).filter(function (x) { return (st === 'all' || x.status === st) && x.at >= since; }).slice(0, 300).map(inboxPub_);
 }
@@ -781,8 +792,9 @@ function inboxDone_(o) {
 // مع تقارير السبت: سطر للمدير العام بما ورد هذا الأسبوع ولم يُحوَّل قالبًا بعد
 function inboxWeekly_() {
   try {
+    inboxSync_();
     var wk = now_() - 7 * 864e5, list = readJson_('inbox.json', []), fresh = list.filter(function (x) { return x.status === 'new' && x.at >= wk; }).length, all = list.filter(function (x) { return x.status === 'new'; }).length;
-    if (all) adminNotify_('', 'inbox', 'تصاميم المشرفين الواردة: ' + fresh + ' هذا الأسبوع، و' + all + ' تنتظر تحويلها إلى قوالب', '#/admin', 'مجلد درايف: ' + INBOX_DIR);
+    if (all) adminNotify_('', 'inbox', 'تصاميم المشرفين الواردة: ' + fresh + ' هذا الأسبوع، و' + all + ' تنتظر تحويلها إلى قوالب', '#/admin', 'في مجلد درايف «' + INBOX_DIR + '»، وتبني منها الصيانة الأسبوعية قوالب');
   } catch (e) {}
 }
 

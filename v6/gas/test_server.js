@@ -676,6 +676,10 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   B({ op: 'inbox', from: '9990001', fromName: 'غريب', msg: '5', file: png, mime: 'image/png' });
   let L = B({ op: 'inbox_list' }); ok(L.length === 2 && L[1].track === 'ishraq' && !L[0].fid, 'inbox list without drive ids');
   ok(/^data:image\/png;base64,/.test(call('bridge_op', K, JSON.stringify({ op: 'inbox_get', id: i1.id }))), 'design fetched by the weekly job');
+  ok(ctx.DriveApp.getFileById(ctx.readJson_('inbox.json', []).filter(function (x) { return x.id === i1.id; })[0].fid).getParents().next().getId() === ctx.IDS.inbox, 'saved into the new-designs box');
+  { const x2 = ctx.readJson_('inbox.json', []).filter(function (x) { return x.from === '9990001'; })[0]; ctx.DriveApp.getFileById(x2.fid).moveTo(ctx.DriveApp.getFolderById('done-folder'));
+    ok(B({ op: 'inbox_list' }).length === 1 && B({ op: 'inbox_list', status: 'done' })[0].note === 'عالجته الصيانة الأسبوعية', 'moved out by weekly maintenance → done');
+    ctx.DriveApp.getFileById(x2.fid).moveTo(ctx.DriveApp.getFolderById(ctx.IDS.inbox)); B({ op: 'inbox_done', ids: [x2.id], status: 'new' }); }
   ok(B({ op: 'inbox_done', ids: [i1.id], tpl: 'ac_poster' }).n === 1 && B({ op: 'inbox_list' }).length === 1 && B({ op: 'inbox_list', status: 'done' })[0].tpl === 'ac_poster', 'marked as built into a template');
   // الإحصاء: بلا كلمات مرور ولا بريد ولا معرّفات
   const st = B({ op: 'stats' }), raw = JSON.stringify(st);
