@@ -488,6 +488,7 @@ function link_op(nonce, json) {
   if (o.op === 'session') return JSON.stringify(linkSession_(o.atar));
   if (o.op === 'unlink') return JSON.stringify(linkUnlink_(o.atar, !!o.disable));
   if (o.op === 'peek') return JSON.stringify(linkPeek_(o.ids || []));
+  if (o.op === 'tg') return JSON.stringify(linkTgSet_(o.atar, o.tg, false));
   throw new Error('عملية ربط غير معروفة');
 }
 function linkUnique_(accs, base, self) {
@@ -556,14 +557,35 @@ function linkUpsert_(o) {
       }
       if ('disabled' in s) a.disabled = !!s.disabled;
     }
+    var tgNote = s.tg ? linkTgApply_(accs, a, s.tg, false) : '';   // معرّفه في تليجرام من منصة الأنشطة: يدخل بوت أثر به (طلب ٨)
     if (o.pw) { a.salt = Utilities.getUuid(); a.hash = pwHash_(a.salt, String(o.pw)); a.pendPw = false; a.mustChange = false; a.lkPend = false; }
     else if (!isNew) a.lkPend = true;   // حساب قديم دُمج: تتوحّد كلمتاه عند أول دخول
     writeJson_('accounts.json', accs);
     audit_(null, isNew ? 'أنشأ حسابًا من منصة الأنشطة' : 'ربط حسابًا بمنصة الأنشطة', a.username);
-    return { atar: a.uid, username: a.username, isNew: isNew, pend: !!(a.pendPw || a.lkPend), disabled: !!a.disabled };
+    return { atar: a.uid, username: a.username, isNew: isNew, pend: !!(a.pendPw || a.lkPend), disabled: !!a.disabled, tg: tgNote };
   });
   if (res.disabled) withLock_(function () { dropSessions_(res.atar); });
   return res;
+}
+// معرّف تليجرام لحساب أثر (طلب ٨، ١٣ نوفمبر): من منصة الأنشطة عند الربط والمزامنة، أو من محادثة الربط (set_tg).
+// لا يُعطى معرّف مستعمل في حساب آخر. force: يستبدل معرّفًا مختلفًا موجودًا (للتصحيح من محادثة الربط)
+function linkTgApply_(accs, a, tg, force) {
+  tg = String(tg == null ? '' : tg).trim();
+  if (!/^\d{5,20}$/.test(tg)) return 'bad';
+  if (String(a.tg || '') === tg) return 'same';
+  var other = tgAcc_(accs, tg); if (other && other.uid !== a.uid) return 'used:' + other.username;
+  if (a.tg && !force) return 'has';
+  a.tg = tg; a.tgAt = now_(); a.tgPre = true;
+  return 'set';
+}
+function linkTgSet_(uid, tg, force) {
+  return withLock_(function () {
+    var accs = readJson_('accounts.json', {}), a = accs[uid];
+    if (!a) throw new Error('حساب أثر غير موجود');
+    var r = linkTgApply_(accs, a, tg, force);
+    if (r === 'set') { writeJson_('accounts.json', accs); audit_(null, 'ربط حسابًا ببوت أثر بمعرّف تليجرام', a.username); }
+    return { status: r, username: a.username };
+  });
 }
 function linkSetPass_(uid, pw) {
   pw = String(pw || '');
@@ -613,6 +635,7 @@ function linkPeek_(ids) {
      resend   كلمة مرور جديدة لحساب أُنشئ هنا، إلى المحادثة المعطاة أو المحفوظة.
      inbox    تصميم أرسله مشرف إلى البوت: يُحفظ في مجلد «تصاميم واردة من المشرفين» في درايف، ويُسجَّل في inbox.json.
      inbox_list / inbox_get / inbox_done   لمراجعة الوارد أسبوعيًا وتحويله إلى قوالب.
+     set_tg   {user, tg}: معرّف تليجرام لحساب واحد (احتياط؛ يستبدل الخطأ). وtg_map قائمة لا تستبدل.
      stats    إحصاء أثر للقراءة فقط: الحسابات لكل مسار، ومن دخل في ٧ و٣٠ يومًا، والتصاميم لكل حساب ومسار، وآخر دخول.
               بلا كلمات مرور ولا بريد ولا معرّفات داخلية. */
 var BRIDGE_PROG = 'academy';
@@ -656,6 +679,7 @@ function bridge_op(key, json) {
   if (o.op === 'inbox_done') return JSON.stringify(inboxDone_(o));
   if (o.op === 'stats') return JSON.stringify(bridgeStats_(o));
   if (o.op === 'tg_map') return JSON.stringify(bridgeTgMap_(o));
+  if (o.op === 'set_tg') { var acc0 = findAcc_(readJson_('accounts.json', {}), o.user || ''); if (!acc0) throw new Error('لا حساب بهذا الاسم في أثر'); return JSON.stringify(linkTgSet_(acc0.uid, o.tg, true)); }
   throw new Error('عملية غير معروفة');
 }
 function bridgeChat_(c, privateOnly) {
@@ -2640,7 +2664,7 @@ function hasGemini_() { return geminiKeys_().length > 0; }
 function aiAny_(s) { var h = aiHave_(); return !!(h.gemini || h.groq || h.cf || (s.ai && s.ai.pollFallback !== false)); }
 function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: aiAny_(s), vision: hasGemini_(), capPrompt: (s.ai && s.ai.capPrompt) || '' }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN'), pexels: true, imgKeys: { pixabay: !!props_().getProperty('PIXABAY_KEY'), pexels: !!props_().getProperty('PEXELS_KEY') }, tgKnown: (s.tgKnown || []).length }; }
 // بصمة نسخة الخادم: يضعها البناء، ويقارنها الموقع ليخبر المدير إن كان الخادم المنشور أقدم
-var SRV_VER = 'a15a294c';
+var SRV_VER = 'bd1d38b7';
 function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.srvVer = SRV_VER; s.aiKey = hasGemini_(); s.aiKeys = geminiKeys_().length; s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); s.pixabayOn = !!props_().getProperty('PIXABAY_KEY'); s.groqOn = !!props_().getProperty('GROQ_KEY'); s.cfOn = !!(props_().getProperty('CF_ACCOUNT') && props_().getProperty('CF_TOKEN')); s.routeDefault = AI_ROUTE_DEFAULT; return JSON.stringify(s); }
 function set_save(token, json) {
   var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');

@@ -406,7 +406,7 @@ function linkSync_(uid, pw, merge) {
   var r = null, err = '';
   try {
     r = linkSend_({ op: 'upsert', atar: merge || x.atarUid || '', pw: pw || '',
-      ans: { uid: x.uid, user: x.user, name: x.name, role: x.role, track: x.role === 'team' ? ATAR_TRACK[x.track] || '' : '', sup: x.role === 'team' && !!x.atarSup, disabled: !!x.disabled } });
+      ans: { uid: x.uid, user: x.user, name: x.name, role: x.role, track: x.role === 'team' ? ATAR_TRACK[x.track] || '' : '', sup: x.role === 'team' && !!x.atarSup, disabled: !!x.disabled, tg: tgOfAcc_(x) } });
   } catch (e) { err = String(e.message || e); }
   withLock_(function () {
     var all = accs_(), y = all[uid]; if (!y) return;
@@ -414,6 +414,29 @@ function linkSync_(uid, pw, merge) {
     writeJson_('accounts.json', all);
   });
   return r ? { username: r.username, isNew: !!r.isNew } : { err: err };
+}
+// معرّف تليجرام لصاحب الحساب: المحفوظ في حسابه، وإلا من «الفريق» في مساره (tgs) باسمه. يُرسل إلى أثر فيدخل بوت أثر به (طلب ٨)
+function tgOfAcc_(x) {
+  if (!x) return '';
+  if (x.tg) return String(x.tg);
+  if (x.role !== 'team' || !x.track) return '';
+  try { var t = trackOf_(x.track), v = t && t.tgs ? t.tgs[x.name] : ''; return v ? String(v) : ''; } catch (e) { return ''; }
+}
+// يرسل معرّف تليجرام وحده إلى حساب أثر المربوط (بلا مسّ كلمة المرور)
+function linkTgOut_(uid) {
+  var x = accs_()[uid]; if (!x || !x.atarUid) return null;
+  var tg = tgOfAcc_(x); if (!tg) return null;
+  try { return linkSend_({ op: 'tg', atar: x.atarUid, tg: tg }); } catch (e) { return { status: 'err', err: String(e.message || e) }; }
+}
+// تُشغَّل من المحرر مرة واحدة: ترسل معرّفات تليجرام لكل الحسابات المربوطة بأثر الآن
+function linkTgAll() {
+  var all = accs_(), out = { set: 0, same: 0, none: 0, other: [] };
+  Object.keys(all).forEach(function (k) {
+    var x = all[k]; if (!x.atarUid || x.disabled) return;
+    var r = linkTgOut_(x.uid); if (!r) { out.none++; return; }
+    if (r.status === 'set') out.set++; else if (r.status === 'same') out.same++; else out.other.push(x.user + ': ' + (r.status || '') + (r.err ? ' ' + r.err : ''));
+  });
+  Logger.log(JSON.stringify(out)); return out;
 }
 // تغيّرت كلمة المرور هنا: تسري على أثر، وإن تعذّر الاتصال تتوحّد عند الدخول التالي
 function linkPassOut_(uid, pw) {
@@ -1231,11 +1254,14 @@ function track_save(token, tid, json) {
     var what = ('canEdit' in o && a.role === 'admin') ? (o.canEdit ? 'فتح تعديل الخطة للفريق' : 'أغلق تعديل الخطة للفريق') : teamOnly ? 'حدّث أعضاء الفريق' : 'عدّل بيانات المسار';
     log_(a, tid, what, t.name);
     var fresh = (t.members || []).filter(function (m) { return (t.emails || {})[m] && ((t.emails[m] !== was.em[m]) || ((t.tgs || {})[m] && t.tgs[m] !== was.tg[m])); });
-    return { track: pubTrack_(t, a.role === 'admin'), t: t, fresh: fresh };
+    var tgNew = (t.members || []).filter(function (m) { return (t.tgs || {})[m] && t.tgs[m] !== was.tg[m]; });
+    return { track: pubTrack_(t, a.role === 'admin'), t: t, fresh: fresh, tgNew: tgNew };
   });
   if ('emails' in o || 'members' in o) { try { meetResyncTrack_(res.t); } catch (e) {} }
   if (res.fresh && res.fresh.length) { try { res.auto = autoAccounts_(tid, res.fresh); } catch (e) { res.auto = { err: e.message }; } }
-  delete res.fresh;
+  // معرّف تليجرام جديد لعضو له حساب مربوط بأثر: يصل حسابه في أثر (بوت أثر)
+  if (res.tgNew && res.tgNew.length) { try { var all0 = accs_(); Object.keys(all0).forEach(function (k) { var y = all0[k]; if (y.atarUid && y.role === 'team' && y.track === tid && res.tgNew.indexOf(y.name) >= 0) linkTgOut_(y.uid); }); } catch (e) {} }
+  delete res.fresh; delete res.tgNew;
   delete res.t;
   return JSON.stringify(res);
 }
