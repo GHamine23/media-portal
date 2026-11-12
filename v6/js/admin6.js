@@ -124,7 +124,7 @@ async function aAccounts(body) {
       const pn = a.programs.map(function (id) { const p = V6.bundle.programs.find(function (x) { return x.id === id; }); return p ? p.name : id; }).join('، ');
       tbl.appendChild(el('div', { class: 'arow' + (a.disabled ? ' off' : '') }, [
         el('span', { class: 'avatar sm', text: String(a.name).replace(/^(أ\.|د\.)\s*/, '').slice(0, 1) }),
-        el('div', { class: 'acol' }, [el('b', { text: a.name }), el('span', { class: 'tiny', dir: 'auto', text: a.username + (a.email ? ' · ' + a.email : '') })]),
+        el('div', { class: 'acol' }, [el('b', { text: a.name }), el('span', { class: 'tiny', dir: 'auto', text: a.username + (a.email ? ' · ' + a.email : '') }), a.tg ? el('span', { class: 'tiny', title: 'يدخل من بوت أثر في تيليجرام' + (a.noPw ? '، بلا كلمة سر للموقع' : '') }, [ico('send'), ' تيليجرام' + (a.tgUser ? ' @' + a.tgUser : '') + (a.noPw ? ' · بلا كلمة سر' : '')]) : null]),
         el('div', { class: 'acol' }, [el('span', { class: 'pill ' + (a.role === 'super' ? 'pu' : a.role === 'sup' ? 'bl' : ''), text: ({ super: 'المدير العام', sup: 'مشرف برنامج', user: 'مستخدم' })[a.role] }), el('span', { class: 'tiny', text: pn || '—' })]),
         el('div', { class: 'acol hide-s' }, [el('span', { class: 'tiny', text: a.disabled ? 'موقوف' : a.mustChange ? 'لم يدخل بعد' : (a.last ? 'آخر دخول ' + ago(a.last) : '—') }), el('span', { class: 'tiny', text: a.role === 'user' ? Object.keys(a.perms).filter(function (k) { return a.perms[k]; }).map(function (k) { return PERM_N[k]; }).join('، ') : '' })]),
         el('div', { class: 'row' }, [
