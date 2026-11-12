@@ -122,5 +122,23 @@ ok(gs.atar && gs.atar.isNew && a('auth_login', 'gen2', gs.pass).me.role === 'sup
 n('acc_save', AD, JSON.stringify({ uid: gs.acc.uid, user: 'gen2', name: 'مشرف ثان', role: 'team', track: 'ishraq' }));
 ok(a('auth_login', 'gen2', gs.pass).me.tracks.join() === 'ishraq', 'وإن صار فريقًا فله مساره وحده');
 
+// ١٢) طلب ٨: معرّف تليجرام من المنصة يصل حساب أثر المربوط (بوت أثر)
+{
+  const tgOf = u => a('acc_list', at).find(x => x.username === u);
+  // عضو في «الفريق» بمعرّفه: حسابه يُنشأ مربوطًا ومعه معرّفه
+  n('track_save', AD, 'ishraq', JSON.stringify({ members: ['ماجد الحربي'], tgs: { 'ماجد الحربي': '700100200' } }));
+  const mj = n('acc_save', AD, JSON.stringify({ user: 'majed.h', name: 'ماجد الحربي', role: 'team', track: 'ishraq' }));
+  ok(mj.atar && tgOf('majed.h').tg, 'عند الربط: معرّفه في المسار (tgs) يصل حسابه في أثر');
+  // حساب مربوط بلا معرّف، ثم يُكتب معرّفه في «الفريق»: يصل أثر فورًا
+  ok(!tgOf('m.almahmoud').tg, 'قبل: بلا معرّف');
+  n('track_save', AD, 'judhoor', JSON.stringify({ members: ['محمد محمود', 'سعد'], tgs: { 'محمد محمود': '700100201', 'سعد': '700100200' } }));
+  ok(tgOf('m.almahmoud').tg, 'معرّف جديد في «الفريق» يصل حسابه المربوط في أثر');
+  // لا يُعطى معرّف مستعمل لحساب آخر
+  const sd = n('acc_save', AD, JSON.stringify({ user: 'saad', name: 'سعد', role: 'team', track: 'judhoor' }));
+  ok(sd.atar && !tgOf('saad').tg, 'معرّف مستعمل في حساب آخر لا يُكرَّر');
+  // الدفعة الواحدة لكل الحسابات المربوطة
+  const all = N.linkTgAll();
+  ok(all.same >= 2 && all.other.some(x => /saad: used:majed\.h/.test(x)), 'linkTgAll: يرسل معرّفات كل الحسابات المربوطة ويبلّغ ما تعذّر ← ' + JSON.stringify(all));
+}
 console.log((fail ? '✗' : '✓') + ' ' + pass + ' فحصًا ناجحًا في الربط' + (fail ? '، و' + fail + ' فاشلة' : '') + ' (' + ctl.calls + ' طلبًا بين الخادمين)');
 process.exit(fail ? 1 : 0);

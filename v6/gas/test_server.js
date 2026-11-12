@@ -842,6 +842,12 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   GAS._tg = []; const nk = J('tg_login', mkInit({ id: 8800, first_name: 'ن' }));
   ok(nk.token && sentTo(AMIN.id, 'sendMessage').some(function (x) { return /لأول مرة/.test(x.opt.payload.text); }), 'pre-linked user enters directly; admin gets a line');
 
+  // طلب ٨: set_tg من محادثة الربط (يستبدل الخطأ، ولا يكرّر معرّفًا مستعملًا)
+  fails('bridge_op', /لا حساب/, BK, JSON.stringify({ op: 'set_tg', user: 'nobody', tg: '123456' }));
+  ok(J('bridge_op', BK, JSON.stringify({ op: 'set_tg', user: 'nokey1', tg: '88001' })).status === 'set', 'set_tg replaces a wrong id');
+  ok(J('bridge_op', BK, JSON.stringify({ op: 'set_tg', user: 'nokey1', tg: '42' })).status === 'bad', 'set_tg refuses a malformed id');
+  ok(/^used:/.test(J('bridge_op', BK, JSON.stringify({ op: 'set_tg', user: 'nokey1', tg: '674650224' })).status), 'set_tg refuses an id used by another account');
+  J('bridge_op', BK, JSON.stringify({ op: 'set_tg', user: 'nokey1', tg: '8800' }));
   // إعلان في البوت على دفعات، ولا شيء لمن أوقف الإشعارات
   GAS._tg = [];
   J('bc_save', adm, JSON.stringify({ title: 'لقاء المشرفين', body: 'الأحد القادم', kind: 'banner', bot: true, aud: { kind: 'all' } }));
