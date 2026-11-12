@@ -398,7 +398,9 @@ async function exportImg6(fmt, share) {
   if (fmt === 'jpg') { const g = c.getContext('2d'); g.globalCompositeOperation = 'destination-over'; g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); }
   const name = fileName6(fmt === 'png' ? 'png' : 'jpg');
   c.toBlob(function (blob) {
-    track('export', { tpl: S.tpl.id }); archive6(share ? 'share' : fmt);
+    const tgOn = typeof TG6 !== 'undefined' && TG6.on();
+    track('export', { tpl: S.tpl.id }); archive6(tgOn ? 'tg' : share ? 'share' : fmt);
+    if (tgOn) { TG6.deliver(blob, name, { tplName: S.tpl.name || '', trackName: S.track ? S.track.full.replace('ـ', '') : '' }); return; }   // من بوت أثر: يصل في المحادثة
     if (share && navigator.canShare) { const f = new File([blob], name, { type: blob.type }); if (navigator.canShare({ files: [f] })) { navigator.share({ files: [f], title: ED.doc.name }).catch(function () {}); return; } }
     const url = URL.createObjectURL(blob), a = el('a', { href: url, download: name }); document.body.appendChild(a); a.click(); a.remove();
     const sz = SIZES[S.size];
@@ -422,9 +424,10 @@ async function exportPdf6() {
     await new Promise(function (r) { setTimeout(r, 0); });
   }
   const pt = PRINT_PT[ED.doc.pages[0].size] || [960, 540];
-  const blob = buildPdf(pages, pt[0], pt[1]), url = URL.createObjectURL(blob);
+  const blob = buildPdf(pages, pt[0], pt[1]), deck = ED.doc.kind === 'deck';
+  if (typeof TG6 !== 'undefined' && TG6.on()) { track('export', { tpl: deck ? 'deck' : ED.doc.kind === 'book' ? 'book' : 'pdf' }); archive6('tg'); TG6.deliver(blob, fileName6('pdf'), { tplName: ED.doc.name || '', trackName: S.track ? S.track.full.replace('ـ', '') : '' }); return true; }
+  const url = URL.createObjectURL(blob);
   const a = el('a', { href: url, download: fileName6('pdf') }); document.body.appendChild(a); a.click(); a.remove();
-  const deck = ED.doc.kind === 'deck';
   track('export', { tpl: deck ? 'deck' : ED.doc.kind === 'book' ? 'book' : 'pdf' }); archive6('pdf'); toast(deck ? 'بدأ تنزيل العرض (' + pages.length + ' شرائح)' : 'بدأ تنزيل ملف PDF (' + pages.length + (pages.length > 2 ? ' صفحات)' : ' صفحة)'));
   return true;
 }

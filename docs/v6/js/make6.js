@@ -23,6 +23,7 @@ function showMake6() {
   if (!tracks.length) { view(el('div', { class: 'wrap page' }, [H('h1', 'المصمّم الذكي'), el('p', { class: 'muted', text: 'أضف هوية البرنامج أولاً.' })])); return; }
   const qs = qs0, qTid = /tid=([a-z0-9_\-]+)/.exec(qs); if (qTid && TRACKS[qTid[1]]) MK.tid = qTid[1];
   if (/creative=1/.test(qs)) MK.creative = true;
+  const qIdea = /(?:^|&)idea=([^&]+)/.exec(qs); if (qIdea) { try { MK.text = decodeURIComponent(qIdea[1]).slice(0, 500); } catch (e) {} MK_LAST = null; }   // من «صمّم بفكرة» في بوت أثر
   if (!TRACKS[MK.tid]) MK.tid = ls('lastTrack') && TRACKS[ls('lastTrack')] ? ls('lastTrack') : tracks[0].id;
   if (!canSocial() && MK.type === 'social') MK.type = '';
   // الاقتراحات الأخيرة تبقى ٤٠ دقيقة: الرجوع بزر المتصفح أو من المحرر يعيدها كاملة

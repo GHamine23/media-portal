@@ -1,11 +1,11 @@
 /* ================= لوحة الإدارة: للمدير العام كل شيء، ولمشرف البرنامج ما يخص برنامجه ================= */
 const ADMIN_TABS = [
   ['overview', 'نظرة عامة', 'chart', 0], ['pstats', 'البرنامج بالأرقام', 'flag', 0], ['archive', 'أرشيف التصاميم', 'archive', 0], ['accounts', 'الحسابات', 'users', 0], ['programs', 'البرامج والهويات', 'prog', 0],
-  ['assets', 'الشعارات والصور', 'image', 0], ['fonts', 'الخطوط', 'font', 0], ['models', 'النماذج والقوالب', 'model', 0], ['reviews', 'مراجعة التصاميم', 'review', 0], ['week', 'أسبوع الفريق', 'chart', 0], ['ai', 'الذكاء الاصطناعي', 'sparkles', 0], ['tg', 'منشورات القناة', 'send', 0], ['feedback', 'البلاغات', 'flag', 0], ['broadcasts', 'رسائل للمستخدمين', 'megaphone', 0],
+  ['assets', 'الشعارات والصور', 'image', 0], ['fonts', 'الخطوط', 'font', 0], ['models', 'النماذج والقوالب', 'model', 0], ['reviews', 'مراجعة التصاميم', 'review', 0], ['week', 'أسبوع الفريق', 'chart', 0], ['ai', 'الذكاء الاصطناعي', 'sparkles', 0], ['tg', 'منشورات القناة', 'send', 0], ['feedback', 'البلاغات', 'flag', 0], ['tgreq', 'طلبات الدخول من تيليجرام', 'send', 1], ['broadcasts', 'رسائل للمستخدمين', 'megaphone', 0],
   ['changelog', 'سجل التحديثات', 'history', 1], ['settings', 'الإعدادات', 'gear', 1], ['audit', 'سجل النشاط', 'shield', 1]
 ];
 // الأقسام نفسها مجمّعة بحسب الغرض، فيجد المشرف ما يريد دون أن يقرأ القائمة كلها. الروابط (#/admin/…) لم تتغير
-const ADMIN_GROUPS = [['المتابعة', ['overview', 'pstats', 'week', 'archive', 'audit']], ['الفريق', ['accounts', 'reviews', 'feedback']], ['الهوية والمحتوى', ['programs', 'assets', 'fonts', 'models']], ['النشر والتواصل', ['tg', 'broadcasts', 'changelog']], ['النظام', ['ai', 'settings']]];
+const ADMIN_GROUPS = [['المتابعة', ['overview', 'pstats', 'week', 'archive', 'audit']], ['الفريق', ['accounts', 'tgreq', 'reviews', 'feedback']], ['الهوية والمحتوى', ['programs', 'assets', 'fonts', 'models']], ['النشر والتواصل', ['tg', 'broadcasts', 'changelog']], ['النظام', ['ai', 'settings']]];
 function adminNav(tabs, tab) {
   const byId = {}; tabs.forEach(function (t) { byId[t[0]] = t; });
   const seen = {}, kids = [];
@@ -43,7 +43,7 @@ function showAdmin(tab) {
   // على الشاشة الضيقة يصير التنقل شريطاً أفقياً: نُظهر القسم الحالي فيه
   const an0 = $('.anav'), on0 = an0 && $('a.on', an0); if (on0 && an0.scrollHeight > an0.clientHeight + 4) { const r = on0.getBoundingClientRect(), rr = an0.getBoundingClientRect(); if (r.bottom > rr.bottom || r.top < rr.top) an0.scrollTop += r.top - rr.top - an0.clientHeight / 2; }   // القسم الحالي ظاهر في القائمة الطويلة
   const an = $('.anav'), on = an && $('a.on', an); if (on && an.scrollWidth > an.clientWidth + 4) an.scrollLeft += on.getBoundingClientRect().left - an.getBoundingClientRect().left - (an.clientWidth - on.offsetWidth) / 2;
-  ({ reviews: aReviews, week: aWeek, overview: aOverview, pstats: aProgStats, archive: aArchive, models: aModels, ai: aAI, tg: aTg, accounts: aAccounts, programs: aPrograms, assets: aAssets, fonts: aFonts, feedback: aFeedback, broadcasts: aBroadcasts, changelog: aChangelog, settings: aSettings, audit: aAudit }[tab])(body);
+  ({ reviews: aReviews, week: aWeek, overview: aOverview, pstats: aProgStats, archive: aArchive, models: aModels, ai: aAI, tg: aTg, accounts: aAccounts, programs: aPrograms, assets: aAssets, fonts: aFonts, feedback: aFeedback, tgreq: aTgReq, broadcasts: aBroadcasts, changelog: aChangelog, settings: aSettings, audit: aAudit }[tab])(body);
 }
 function aHead(body, title, note, acts) { body.appendChild(el('div', { class: 'ahead' }, [el('div', {}, [el('h2', { text: title }), note ? el('p', { class: 'muted small', text: note }) : null]), el('div', { class: 'row wrapr' }, acts || [])])); }
 function loading(body) { const s = el('div', { class: 'skel ldbox', style: 'height:180px' }, [loader6('', true)]); body.appendChild(s); return s; }
@@ -489,12 +489,13 @@ function bcForm(b) {
   b = b || { title: '', body: '', kind: 'banner', programs: isSuper() ? [] : V6.me.programs.slice(0, 1), active: true };
   const tI = el('input', { type: 'text', class: 'inp', value: b.title, 'aria-label': 'العنوان', placeholder: 'العنوان' }), bI = el('textarea', { class: 'inp', rows: '3', 'aria-label': 'النص', placeholder: 'النص', text: b.body }), lI = el('input', { type: 'url', class: 'inp', dir: 'ltr', value: b.link || '', placeholder: 'رابط اختياري', 'aria-label': 'رابط' });
   const untilI = el('input', { type: 'date', class: 'inp', value: b.until ? new Date(b.until).toISOString().slice(0, 10) : '', 'aria-label': 'تنتهي في' });
-  let kind = b.kind, active = b.active !== false;
+  let kind = b.kind, active = b.active !== false, botOn = false, aud = { kind: 'all' };
+  const botBox = b.botSent ? el('p', { class: 'tiny', text: 'أُرسلت في بوت أثر إلى ' + (b.botN || 0) + ' مستخدماً.' }) : bcBotBox(function (on, a) { botOn = on; aud = a; });
   const progs = el('div', { class: 'checks' }, myAdminProgs().map(function (p) { return el('label', { class: 'tog' }, [el('input', { type: 'checkbox', value: p.id, checked: (b.programs || []).indexOf(p.id) >= 0 }), el('span', { text: p.name })]); }));
   modal({ title: b.id ? 'تعديل الرسالة' : 'رسالة جديدة', body: [withEmoji(tI), withEmoji(bI), el('div', { class: 'fld' }, [el('label', { text: 'الشكل' }), segOf([['banner', 'شريط أعلى الصفحة'], ['modal', 'نافذة مرة واحدة'], ['tip', 'نصيحة في «ما الجديد»']], kind, function (v) { kind = v; })]),
     el('div', { class: 'fld' }, [el('label', { text: isSuper() ? 'البرامج (لا شيء = الجميع)' : 'البرامج' }), progs]), lI, el('div', { class: 'fld' }, [el('label', { text: 'تختفي بعد (اختياري)' }), untilI]),
-    el('label', { class: 'tog' }, [el('input', { type: 'checkbox', checked: active, onchange: function (e) { active = e.target.checked; } }), el('span', { text: 'ظاهرة' })])],
-  acts: [{ t: 'نشر', cls: 'dark', fn: async function () { try { await API6.me('bc_save', JSON.stringify({ id: b.id, title: tI.value, body: bI.value, kind: kind, link: lI.value, programs: $$('input:checked', progs).map(function (i) { return i.value; }), until: untilI.value ? new Date(untilI.value + 'T23:59:59').getTime() : 0, active: active })); toast('نُشرت'); loadNews(); showAdmin('broadcasts'); } catch (e) { toast(e.message); } } }, { t: 'إلغاء' }] });
+    el('label', { class: 'tog' }, [el('input', { type: 'checkbox', checked: active, onchange: function (e) { active = e.target.checked; } }), el('span', { text: 'ظاهرة' })]), botBox],
+  acts: [{ t: 'نشر', cls: 'dark', fn: async function () { try { await API6.me('bc_save', JSON.stringify({ id: b.id, title: tI.value, body: bI.value, kind: kind, link: lI.value, programs: $$('input:checked', progs).map(function (i) { return i.value; }), until: untilI.value ? new Date(untilI.value + 'T23:59:59').getTime() : 0, active: active, bot: botOn, aud: aud })); toast(botOn ? 'نُشرت، وتُرسل في البوت على دفعات' : 'نُشرت'); loadNews(); showAdmin('broadcasts'); } catch (e) { toast(e.message); } } }, { t: 'إلغاء' }] });
 }
 
 /* ---------- سجل التحديثات ---------- */
@@ -543,6 +544,59 @@ function bridgeCard() {
     el('div', { class: 'row wrapr' }, [el('button', { type: 'button', class: 'btn sm line', text: 'أظهر المفتاح', onclick: function () { show(false); } }),
       el('button', { type: 'button', class: 'btn sm line', text: 'جدّد المفتاح', onclick: async function () { if (await ask('تجديد المفتاح', 'يتوقف المفتاح القديم فورًا، فتحتاج محادثة الربط المفتاح الجديد.', 'جدّد')) show(true); } })]),
     box, sendBox]);
+}
+
+/* ---------- بوت أثر: إرسال الرسالة في البوت، وطلبات الدخول، والإعداد ---------- */
+function bcBotBox(on) {
+  if (!isSuper()) return null;
+  const progs = V6.bundle.programs || [];
+  const cb = el('input', { type: 'checkbox' });
+  const opts = [el('option', { value: 'all', text: 'الكل' })];
+  progs.forEach(function (p) { opts.push(el('option', { value: 'program:' + p.id, text: 'برنامج: ' + p.name })); (p.identities || []).forEach(function (t) { opts.push(el('option', { value: 'track:' + p.id + ':' + t.id, text: '— مسار: ' + (t.name || t.id) })); }); });
+  const sel = el('select', { class: 'inp sm', 'aria-label': 'الجمهور', disabled: true }, opts);
+  const emit = function () { sel.disabled = !cb.checked; const v = sel.value.split(':'); on(cb.checked, v[0] === 'all' ? { kind: 'all' } : v[0] === 'program' ? { kind: 'program', id: v[1] } : { kind: 'track', program: v[1], id: v[2] }); };
+  cb.addEventListener('change', emit); sel.addEventListener('change', emit);
+  return el('div', { class: 'fld' }, [el('label', { class: 'tog' }, [cb, el('span', { text: 'أرسلها في بوت أثر أيضاً' })]), sel,
+    el('small', { class: 'tiny', text: 'تصل في الخاص لمن ربط تيليجرام ولم يوقف الإشعارات، على دفعات. لا تُرسل في أي مجموعة.' })]);
+}
+async function aTgReq(body) {
+  aHead(body, 'طلبات الدخول من تيليجرام', 'من طلب الدخول من بوت أثر وليس له حساب. القبول ينشئ حسابه، أو يربطه بحساب قائم. وتصلك الطلبات نفسها في البوت بأزرار.', []);
+  const box = el('div'); body.appendChild(box); const sk = loading(box);
+  let list; try { list = await API6.me('tg_req_list'); } catch (e) { sk.remove(); box.appendChild(el('p', { class: 'err', text: e.message })); return; }
+  sk.remove();
+  if (!list.length) { box.appendChild(el('p', { class: 'empty', text: 'لا طلبات بعد.' })); return; }
+  const act = function (r, a, arg) { return function (e) { return withBusy(e.currentTarget, async function () { await API6.me('tg_req_act', r.id, a, arg || ''); showAdmin('tgreq'); }, { busy: '…', done: 'تم' }); }; };
+  list.forEach(function (r) {
+    const st = { new: ['ينتظر', 'or'], ok: ['قُبل', 'gr'], no: ['رُفض', ''] }[r.status] || ['', ''];
+    box.appendChild(el('div', { class: 'card flat arow2 tgreq' }, [el('div', {}, [
+      el('div', { class: 'row wrapr' }, [el('b', { text: r.name }), el('span', { class: 'pill ' + st[1], text: st[0] }), el('span', { class: 'tiny', text: new Date(r.at).toLocaleString('ar') })]),
+      el('p', { class: 'small muted' }, ['في تيليجرام: ' + (r.tgName || '') + ' ', r.tgUser ? el('bdi', { dir: 'ltr', text: '@' + r.tgUser }) : '', ' · ' + r.where]),
+      el('p', { class: 'small' }, ['اسم الدخول: ', el('bdi', { dir: 'ltr', text: r.username }), r.acc && r.acc !== r.username ? ' · رُبط بـ ' + r.acc : '', r.by ? ' · ' + r.by : '']),
+      r.status === 'new' ? el('div', { class: 'row wrapr' }, [el('button', { type: 'button', class: 'btn sm dark', onclick: act(r, 'n') }, ['قبول بحساب جديد'])]
+        .concat((r.sugg || []).map(function (x) { return el('button', { type: 'button', class: 'btn sm line', onclick: act(r, 'l', x.uid) }, ['ربطه بـ ' + x.name + ' (' + x.username + ')']); }))
+        .concat([el('button', { type: 'button', class: 'btn sm ghost', onclick: act(r, 'x') }, ['رفض'])])) : null])]));
+  });
+}
+function abotCard() {
+  const box = el('div', { class: 'fld' }, [el('p', { class: 'small muted', text: 'نتحقق من حال البوت…' })]);
+  const tokI = el('input', { type: 'password', class: 'inp', dir: 'ltr', autocomplete: 'off', placeholder: '123456789:AAF…', 'aria-label': 'رمز بوت أثر' });
+  async function load() {
+    let r; try { r = await API6.me('abot_info'); } catch (e) { box.replaceChildren(el('p', { class: 'small err', text: e.message })); return; }
+    const hk = r.hook || {};
+    box.replaceChildren.apply(box, [
+      el('p', { class: 'small ' + (r.on ? 'ok' : 'err'), text: r.on ? 'البوت مضبوط' + (r.user ? ': @' + r.user : '') + ' · ' + r.users + ' مستخدماً ربطوا تيليجرام · طلبات تنتظر: ' + r.reqs : 'لم يُضبط بوت أثر بعد. الصق رمزه من BotFather.' }),
+      r.on ? el('p', { class: 'small ' + (hk.set && !hk.err ? 'ok' : 'err'), text: hk.set ? (hk.err ? 'الويبهوك مضبوط، وآخر خطأ: ' + hk.err : 'الويبهوك يعمل' + (hk.pending ? ' (ينتظر ' + hk.pending + ')' : '')) : 'الويبهوك غير مضبوط: اضغط «أعدّ البوت».' }) : null,
+      r.on && !r.linked ? el('p', { class: 'small err', text: 'لم تربط حسابك بتيليجرام بعد، فلن تصلك طلبات الدخول في البوت: من «حسابي» اضغط «اربط تيليجرام».' }) : null].filter(Boolean));
+  }
+  load();
+  return el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-bl' }, [ico('send')]), el('h3', { text: 'بوت أثر' }),
+    el('p', { class: 'small muted', text: 'باب أثر في تيليجرام لمستخدميه وحدهم: دخول بلا كلمة سر بعد موافقتك، وتصميم يصل في المحادثة، واسأل أثر، ودليل أثر، وتعلّم التصميم. لا ينشر في أي قناة أو مجموعة.' }),
+    box,
+    el('div', { class: 'fld' }, [el('label', { text: 'رمز البوت (يُحفظ في الخادم ولا يُعرض)' }), tokI]),
+    el('div', { class: 'row wrapr' }, [
+      el('button', { type: 'button', class: 'btn sm line', text: 'احفظ الرمز', onclick: function (e) { if (!tokI.value.trim()) { toast('الصق الرمز أولاً'); return; } return withBusy(e.currentTarget, async function () { await API6.me('abot_set', tokI.value.trim()); tokI.value = ''; load(); }, { busy: 'نحفظ…', done: 'حُفظ' }); } }),
+      el('button', { type: 'button', class: 'btn sm dark', text: 'أعدّ البوت', onclick: function (e) { return withBusy(e.currentTarget, async function () { const r = await API6.me('abot_setup', API_URL); toast('ضُبط: ' + r.done.join('، ') + (r.errs.length ? ' · لم يُضبط: ' + r.errs.join('، ') : '')); load(); }, { busy: 'نضبط…', done: 'أُعدّ البوت' }); } })]),
+    el('p', { class: 'tiny', text: '«أعدّ البوت» يضبط الويبهوك واسم البوت ووصفه وأوامره وزر القائمة. أعده بعد كل نشر جديد للخادم.' })]);
 }
 
 /* ---------- الإعدادات ---------- */
@@ -614,6 +668,7 @@ async function aSettings(body) {
       el('div', { class: 'fld' }, [el('label', { text: 'رمز البوت (يُحفظ في الخادم ولا يُعرض)' }), tgTok]),
       el('div', { class: 'row' }, [el('button', { type: 'button', class: 'btn sm line', text: 'اختبر البوت', onclick: async function () { try { const r = await API6.me('tg_test'); toast('البوت يعمل: @' + r.username); } catch (e) { toast(e.message); } } })])]),
     isSuper() ? bridgeCard() : null,
+    isSuper() ? abotCard() : null,
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-bl' }, [ico('upload')]), el('h3', { text: 'الرفع' }),
       el('label', { class: 'tog' }, [upPerm, el('span', { text: 'رفع الصور يحتاج صلاحية' })]),
       el('div', { class: 'fld' }, [el('label', { text: 'أقصى حجم للملف (ميغابايت)' }), maxMb])]),
