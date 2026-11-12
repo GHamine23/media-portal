@@ -8,16 +8,22 @@ const TG6 = {
   init: '',
   wa: function () { try { return window.Telegram && Telegram.WebApp && Telegram.WebApp.initData ? Telegram.WebApp : null; } catch (e) { return null; } },
   on: function () { return !!TG6.init; },
+  // بيانات تيليجرام من الرابط نفسه (#tgWebAppData=…) إن لم يحمّل سكربت تيليجرام بعد
+  fromHash: function () { const m = /[#&]tgWebAppData=([^&]*)/.exec(location.hash); try { return m ? decodeURIComponent(m[1]) : ''; } catch (e) { return ''; } },
   start: function () {
-    const wa = TG6.wa(); if (!wa) return;
-    TG6.init = wa.initData;
+    const wa = TG6.wa(), raw = wa ? '' : TG6.fromHash();
+    if (!wa && !raw) { TG6.lost = /[?&]tg=1/.test(location.search); return; }
+    TG6.init = wa ? wa.initData : raw;
     document.documentElement.classList.add('tgapp');
-    try { wa.ready(); wa.expand(); } catch (e) {}
-    try { document.documentElement.dataset.theme = wa.colorScheme === 'dark' ? 'dark' : 'light'; wa.onEvent('themeChanged', function () { document.documentElement.dataset.theme = wa.colorScheme === 'dark' ? 'dark' : 'light'; }); } catch (e) {}
+    if (wa) {
+      try { wa.ready(); wa.expand(); } catch (e) {}
+      try { document.documentElement.dataset.theme = wa.colorScheme === 'dark' ? 'dark' : 'light'; wa.onEvent('themeChanged', function () { document.documentElement.dataset.theme = wa.colorScheme === 'dark' ? 'dark' : 'light'; }); } catch (e) {}
+    }
     // الوجهة من الزر (r)، وتيليجرام يضع بياناته في الرابط بعد #: نعيده إلى مسار أثر
     const m = /[?&]r=([^&#]+)/.exec(location.search), r = m ? decodeURIComponent(m[1]) : '';
     const dest = r && /^\/[\w\-\/?=&.%]*$/.test(r) ? r : (/^#\//.test(location.hash) ? location.hash.slice(1) : '/');
     try { history.replaceState(null, '', location.pathname + '?tg=1#' + dest); } catch (e) {}
+    if (!wa) return;
     try { wa.BackButton.onClick(function () { if (history.length > 1) history.back(); else location.hash = '#/'; }); } catch (e) {}
     window.addEventListener('hashchange', TG6.back); TG6.back();
   },
@@ -26,7 +32,7 @@ const TG6 = {
   login: async function () {
     let r;
     try { r = await API6.json('tg_login', TG6.init); } catch (e) { TG6.screen('تعذّر الدخول', e.message, null); return null; }
-    if (r && r.token) { TG6.tgOnly = !!(r.me && r.me.tgOnly); return r.token + '#tg#' + TG6.init; }
+    if (r && r.token) { TG6.tgOnly = !!(r.me && r.me.tgOnly); TG6.me = r.me || null; return r.token + '#tg#' + TG6.init; }
     if (r && r.pending) { TG6.screen('أهلاً بك في أثر 🌿', 'يتم مراجعة حسابك قبل قبول الدخول، وتصلك رسالة في البوت حين يُقبل.', null); return null; }
     TG6.request(r || {}); return null;
   },

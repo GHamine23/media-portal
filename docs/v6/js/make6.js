@@ -24,12 +24,42 @@ function showMake6() {
   const qs = qs0, qTid = /tid=([a-z0-9_\-]+)/.exec(qs); if (qTid && TRACKS[qTid[1]]) MK.tid = qTid[1];
   if (/creative=1/.test(qs)) MK.creative = true;
   const qIdea = /(?:^|&)idea=([^&]+)/.exec(qs); if (qIdea) { try { MK.text = decodeURIComponent(qIdea[1]).slice(0, 500); } catch (e) {} MK_LAST = null; }   // من «صمّم بفكرة» في بوت أثر
+  // التصميم السريع من بوت أثر: المسار والنوع والمقاس والتفاصيل جاءت من المحادثة، فلا أسئلة: الاقتراحات مباشرة
+  if (/(?:^|&)quick=1/.test(qs)) return mkQuick(qs);
   if (!TRACKS[MK.tid]) MK.tid = ls('lastTrack') && TRACKS[ls('lastTrack')] ? ls('lastTrack') : tracks[0].id;
   if (!canSocial() && MK.type === 'social') MK.type = '';
   // الاقتراحات الأخيرة تبقى ٤٠ دقيقة: الرجوع بزر المتصفح أو من المحرر يعيدها كاملة
   if (MK_LAST && MK_LAST.results && Date.now() - (MK_LAST.keptAt || 0) < 40 * 60000 && !/new=1|creative=1/.test(qs) && (!qTid || qTid[1] === MK_LAST.tid)) { Object.assign(MK, MK_LAST); MK.step = 'results'; }
   else { MK.step = 'idea'; MK.results = null; }
   renderMake();
+}
+function mkQuick(qs) {
+  const g = function (k) { const m = new RegExp('(?:^|&)' + k + '=([^&]*)').exec(qs); try { return m ? decodeURIComponent(m[1]) : ''; } catch (e) { return ''; } };
+  const prog = g('prog');
+  if (prog && V6.prog && V6.prog.id !== prog && !mkQuick.switched && V6.bundle.programs.some(function (p) { return p.id === prog; })) { mkQuick.switched = true; useProgram(prog, true).then(function () { mkQuick(qs); }); return; }
+  // الرجوع من المحرر: الاقتراحات نفسها ولا تُعاد
+  if (MK_LAST && MK_LAST.results && MK_LAST.quickKey === qs && Date.now() - (MK_LAST.keptAt || 0) < 40 * 60000) { Object.assign(MK, MK_LAST); MK.step = 'results'; renderMake(); return; }
+  const tid = g('tid'); MK.tid = TRACKS[tid] ? tid : (tracksOf()[0] || {}).id; MK.text = g('idea').slice(0, 500); MK.creative = /(?:^|&)creative=1/.test(qs) || !MK.text;
+  MK.results = null; MK_LAST = null; MK.quickKey = qs;
+  const body = el('div', { id: 'mkbody' });
+  view(el('div', { class: 'wrap page mk' }, [el('div', { class: 'phead' }, [el('span', { class: 'eyebrow rv', text: 'التصميم السريع من بوت أثر ⚡' }), H('h1', 'اقتراحاتك بهوية ' + (TRACKS[MK.tid] ? TRACKS[MK.tid].name : 'مسارك'))]), body]));
+  body.appendChild(el('div', { class: 'boot' }, [loader6(MK.text ? 'يقرأ المساعد تفاصيلك…' : 'يجهّز المساعد أفكاره…')]));
+  (async function () {
+    try { if (MK.text) await mkIntake(); } catch (e) {}
+    MK.type = g('type') || MK.type || 'ann'; if (g('size')) MK.size = g('size'); MK.tone = MK.tone || 'calm'; mkSave();
+    mkGenerate(body);
+  })();
+}
+// «أرسله لي» في التطبيق المصغّر: يُرسم الاقتراح بجودته الكاملة ويصل المحادثة، بلا فتح المحرر
+async function mkSendTg(T, tpl, dz) {
+  const st = JSON.parse(JSON.stringify(dz.page)); await ensureFonts(fontsOfState(st));
+  const c = document.createElement('canvas'); renderTo(c, tpl, st.size || sizeFor(tpl), st, T, 2);
+  const blob = await new Promise(function (ok) { c.toBlob(ok, 'image/png'); });
+  if (!blob) throw new Error('تعذّر رسم التصميم');
+  const name = ((T.name || '') + ' - ' + (tpl.name || 'تصميم')).replace(/[\\\/:?"<>|*\n]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) + '.png';
+  const ok = await TG6.deliver(blob, name, { tplName: tpl.name || '', trackName: (T.full || T.name || '').replace('ـ', '') });
+  if (!ok) throw new Error('تعذّر الإرسال');
+  track('export', { tpl: tpl.id, via: 'quick' });
 }
 function renderMake() {
   const ai = aiReady();
@@ -303,8 +333,9 @@ function mkCard(T, dz, i, r) {
   const open = function () { mkKeep(); ls('makePick', { tid: T.id, page: dz.page, back: true }); go('#/e/' + T.id + '/' + tpl.id + '?make'); };
   const thumb = el('div', { class: 'tthumb' }, [tplThumb(tpl, T, dz.page.size, 300, dz.page), dz.free ? el('span', { class: 'pill pu tnew', text: 'تصميم جديد' }) : null, i === 0 && dz.score ? el('span', { class: 'pill mkbest', text: 'الأنسب' }) : null]);
   const fix = aiReady() ? el('button', { type: 'button', class: 'btn sm line mkfix', 'aria-label': 'عدّل هذا الاقتراح', onclick: function (e) { e.stopPropagation(); mkFixMenu(e.currentTarget, T, dz, card); } }, [ico('wand'), 'عدّل']) : null;
+  const send = typeof TG6 !== 'undefined' && TG6.on() ? el('button', { type: 'button', class: 'btn sm dark mksend', 'aria-label': 'أرسل هذا التصميم إلى المحادثة', onclick: function (e) { e.stopPropagation(); return withBusy(e.currentTarget, function () { return mkSendTg(T, tpl, dz); }, { busy: 'نرسله…', done: 'وصلك ✓' }); } }, [ico('send'), 'أرسله لي']) : null;
   const card = el('div', { class: 'tcard6 mkcard hover-lift rv', role: 'button', tabindex: '0', style: '--d:' + (i % 8), onclick: open, onkeydown: function (e) { if (e.key === 'Enter' && e.target === card) open(); } },
-    [thumb, el('div', { class: 'tmeta6 row' }, [el('div', { class: 'mkm' }, [el('b', { text: dz.free ? 'تصميم من هوية ' + T.name : tpl.name }), el('span', { class: 'tiny', text: dz.note || '' })]), fix])]);
+    [thumb, el('div', { class: 'tmeta6 row' }, [el('div', { class: 'mkm' }, [el('b', { text: dz.free ? 'تصميم من هوية ' + T.name : tpl.name }), el('span', { class: 'tiny', text: dz.note || '' })]), send, fix])]);
   return card;
 }
 const MK_FIX = [['أقصر', 'اختصر كل النصوص قدر الإمكان مع بقاء المعنى'], ['أكثر رسمية', 'اجعل الصياغة رسمية وقورة'], ['أدفأ وأقرب', 'اجعل الصياغة دافئة قريبة من القلب'], ['أكثر حماسة', 'اجعل الصياغة حماسية محفّزة'], ['عنوان آخر', '']];

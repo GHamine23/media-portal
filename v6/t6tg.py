@@ -60,7 +60,7 @@ async def main():
         await pg.click('#abody button:has-text("قبول بحساب جديد")'); await pg.wait_for_timeout(2500)
         ok('قُبل' in await pg.inner_text('#abody'), 'approved from the admin panel')
         sent = await pg.evaluate("(window.DEMO_TG||[]).filter(x => String(x.payload && x.payload.chat_id) === '4242').map(x => x.url.split('/').pop())")
-        ok(sent.count('sendMessage') >= 4, 'welcome + tour sent in the bot: ' + str(sent))
+        ok(sent.count('sendWidget') == 1 and len(sent) == 1, 'welcome + tour in ONE card: ' + str(sent))
         await pg.close()
         # الدخول بعد القبول
         m = await mini('?tg=1&r=%2Fsections')
@@ -75,6 +75,18 @@ async def main():
         ok(docs == 1, 'download → design sent to the chat as a document')
         ok('وصلك في المحادثة' in await m.inner_text('body'), 'confirmation shown')
         await m.screenshot(path=OUT + 'tg_delivered.png'); await m.close()
+        # التصميم السريع: الاقتراحات مباشرة، و«أرسله لي» يصل المحادثة بلا فتح المحرر
+        import urllib.parse as up
+        qr = '/make?quick=1&prog=academy&tid=ishraq&type=ann&size=post&idea=' + up.quote('لقاء بيوت مطمئنة مع د. محمد الخميس ٨:٣٠ مساء')
+        m = await mini('?tg=1&r=' + up.quote(qr, safe=''))
+        await m.wait_for_selector('.mkcard .mksend', timeout=60000)
+        ok(await m.locator('.mkcard').count() >= 2 and not await m.query_selector('.gx-intro'), 'quick design opens the suggestions directly, no intro popup')
+        await m.screenshot(path=OUT + 'tg_quick.png')
+        n0 = await m.evaluate("(window.DEMO_TG||[]).filter(x => /sendDocument$/.test(x.url)).length")
+        await m.locator('.mkcard .mksend').first.click(); await m.wait_for_timeout(5000)
+        n1 = await m.evaluate("(window.DEMO_TG||[]).filter(x => /sendDocument$/.test(x.url) && String(x.payload.chat_id) === '4242').length")
+        ok(n1 == n0 + 1 or n1 >= 2, 'quick «send it to me» delivers the design to the chat: %s→%s' % (n0, n1))
+        await m.close()
         # كلمة سر للموقع
         m = await mini('?tg=1&r=%2Ftgpw')
         t = await m.inner_text('body'); ok('كلمة سر للموقع' in t and 'salem.k' in t, 'site-password page explains why')

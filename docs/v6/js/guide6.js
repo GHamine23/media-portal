@@ -197,6 +197,7 @@ function gOnRoute() {
   gHidePrompt();
   GUIDE.visit++; GUIDE.shown = false;
   if (Date.now() < GUIDE.quietUntil) return;
+  if (/[?&]quick=1/.test(location.hash)) return;   // التصميم السريع من بوت أثر: بلا مقدمات تعترضه
   const id = gClipForHash(location.hash); if (!id) return;
   gIntroLater(id, /^#\/(e|d)\//.test(location.hash) ? 4500 : 1600, 6);
 }

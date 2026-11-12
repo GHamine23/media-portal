@@ -710,6 +710,8 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   };
   const nt0 = function () { return J('auth_login', 'nokey1', 'NoKey12345').token; };
   const sent = function () { return (GAS._tg || []).filter(function (x) { return x.url.indexOf('bot' + ABOT + '/') >= 0; }); };
+  // رسائل البوت لشخص: نصية أو بطاقة (ودجت)، ونصها = النص أو التعليق أو HTML البطاقة
+  const msgs = function (id) { return sent().filter(function (x) { return /\/(sendMessage|sendWidget)$/.test(x.url) && String(x.opt.payload.chat_id) === String(id); }).map(function (x) { const p = x.opt.payload; return { m: x.url.split('/').pop(), txt: [p.text, p.caption, p.html].filter(Boolean).join(' '), mk: p.reply_markup || '' }; }); };
   const sentTo = function (id, m) { return sent().filter(function (x) { return (!m || x.url.endsWith('/' + m)) && String(x.opt.payload.chat_id) === String(id); }); };
   const keep = GAS._fetch.handler;
   GAS._fetch.handler = function (url, opt) {
@@ -745,8 +747,8 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   const lc = J('tg_link_code', adm); ok(/^https:\/\/t\.me\/mediaManarMuslihen_ai\?start=L[a-z0-9]+$/.test(lc.url), 'link code deep link');
   GAS._tg = [];
   hook(msg(AMIN, '/start ' + lc.url.split('start=')[1]));
-  ok(J('acc_list', adm).filter(function (x) { return x.role === 'super'; })[0].tg && /رُبط حسابك/.test(sentTo(AMIN.id, 'sendMessage')[0].opt.payload.text), 'admin linked by code');
-  ok(hook(msg(AMIN, '/start ' + lc.url.split('start=')[1])) === 'ok' && /انتهت صلاحية رابط/.test(sentTo(AMIN.id, 'sendMessage').pop().opt.payload.text), 'code works once');
+  ok(J('acc_list', adm).filter(function (x) { return x.role === 'super'; })[0].tg && msgs(AMIN.id).length === 1 && /رُبط حسابك/.test(msgs(AMIN.id)[0].txt) && /is_persistent/.test(msgs(AMIN.id)[0].mk), 'admin linked by code: one welcome card with the keyboard');
+  ok(hook(msg(AMIN, '/start ' + lc.url.split('start=')[1])) === 'ok' && /انتهت صلاحية رابط/.test(msgs(AMIN.id).pop().txt), 'code works once');
 
   // طلب دخول ثم الموافقة بالأزرار
   const SALEM = { id: 42, first_name: 'سالم', last_name: 'الكردي', username: 'salem_k' };
@@ -759,14 +761,14 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   const kb = JSON.parse(ask.opt.payload.reply_markup).inline_keyboard, newBtn = kb[0][0].callback_data;
   ok(/^ap:[a-z0-9]+:n$/.test(newBtn) && kb.some(function (r) { return r.some(function (b) { return /:x$/.test(b.callback_data); }); }), 'buttons: accept, link, change, reject');
   ok(J('tg_login', mkInit(SALEM)).pending, 'pending until approved');
-  ok(hook(msg(SALEM, 'السلام عليكم')) === 'ok' && /يتم مراجعة طلبك/.test(sentTo(42, 'sendMessage').pop().opt.payload.text) && /#\/account/.test(sentTo(42, 'sendMessage').pop().opt.payload.reply_markup), 'waiting message in the bot, with a link-my-account button');
+  ok(hook(msg(SALEM, 'السلام عليكم')) === 'ok' && /وتتم مراجعته/.test(msgs(42).pop().txt) && /سالم/.test(msgs(42).pop().txt) && /#\/account/.test(msgs(42).pop().mk), 'waiting message in the bot, with a link-my-account button');
   const cb = function (from, data) { return { update_id: ++UID, callback_query: { id: 'cq' + UID, from: from, data: data, message: { message_id: 900, chat: { id: from.id, type: 'private' } } } }; };
   GAS._tg = [];
   hook(cb(SALEM, newBtn)); ok(J('tg_login', mkInit(SALEM)).pending, 'only the super admin can approve');
   GAS._tg = [];
   const upd = cb(AMIN, newBtn);
   ok(hook(upd) === 'ok' && hook(upd) === 'dup', 'the same update is processed once (302 retries)');
-  ok(sentTo(42, 'sendMessage').length === 5 && /قُبل حسابك/.test(sentTo(42, 'sendMessage')[0].opt.payload.text), 'approved: one welcome + 3-step tour + menu, no duplicate');
+  ok(msgs(42).length === 1 && msgs(42)[0].m === 'sendWidget' && /قُبل حسابك/.test(msgs(42)[0].txt) && /حيّاك الله يا سالم/.test(msgs(42)[0].txt), 'approved: one welcome card (greeting by name + tour), no duplicate');
   ok(sent().some(function (x) { return /editMessageText$/.test(x.url) && /قُبل/.test(x.opt.payload.text); }), 'approval message updated');
   const s1 = J('tg_login', mkInit(SALEM)); ok(s1.token && s1.me.username === 'salem.k' && s1.me.tgOnly && s1.me.perms.ai && !s1.me.perms.send, 'login by Telegram after approval');
   const T1 = s1.token + '#tg#' + mkInit(SALEM);
@@ -793,13 +795,33 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   ok(inf.hook.urlOk === false, 'webhook registered elsewhere is flagged');
   // لوحة المفاتيح الدائمة: قائمة المهام تحت خانة الكتابة
   GAS._tg = []; hook(msg(SALEM, '/start'));
-  const st0 = sentTo(42, 'sendMessage'); const rk = JSON.parse(st0[0].opt.payload.reply_markup);
-  ok(rk.is_persistent && rk.keyboard.length === 3 && /القائمة/.test(JSON.stringify(rk)) && /inline_keyboard/.test(st0[1].opt.payload.reply_markup), '/start: persistent keyboard + inline menu');
+  const st0 = msgs(42);
+  ok(st0.length === 1 && /inline_keyboard/.test(st0[0].mk) && /تصميم سريع/.test(st0[0].mk), '/start after the welcome: one card with the menu (quick design first)');
   GAS._tg = []; hook(msg(SALEM, '🎨 افتح أثر'));
-  ok(/web_app/.test(sentTo(42, 'sendMessage')[0].opt.payload.reply_markup), 'keyboard «افتح أثر» answers with the mini-app button');
+  ok(/web_app/.test(msgs(42)[0].mk), 'keyboard «افتح أثر» answers with the mini-app button');
   GAS._tg = []; hook(msg(SALEM, '💡 صمّم بفكرة'));
-  ok(/صمّم بفكرة/.test(sentTo(42, 'sendMessage')[0].opt.payload.text) && ctx.abotState_('42') === 'idea', 'keyboard button → command');
+  ok(/صمّم بفكرة/.test(msgs(42)[0].txt) && ctx.abotState_('42') === 'idea', 'keyboard button → command');
   ctx.abotState_('42', '');
+  // التصميم السريع في المحادثة: المسار ← النوع ← المقاس ← التفاصيل ← بطاقة تفتح الاقتراحات
+  const lastKb = function () { const m = msgs(42).pop(); return m ? JSON.parse(m.mk || '{}') : {}; };
+  const edits = function () { return sent().filter(function (x) { return /editMessageText$/.test(x.url); }); };
+  GAS._tg = []; hook(msg(SALEM, '⚡ تصميم سريع'));
+  let qk = lastKb().inline_keyboard, first = qk[0][0].callback_data;
+  ok(/^q[ty]:/.test(first) && /التصميم السريع/.test(msgs(42).pop().txt), 'quick design: starts with the track (or the type when only one)');
+  if (/^qt:/.test(first)) { GAS._tg = []; hook(cb(SALEM, first)); qk = JSON.parse(edits().pop().opt.payload.reply_markup).inline_keyboard; }
+  ok(/^qy:ann$/.test(qk[0][0].callback_data), 'quick design: type buttons');
+  GAS._tg = []; hook(cb(SALEM, 'qy:ann')); qk = JSON.parse(edits().pop().opt.payload.reply_markup).inline_keyboard;
+  ok(qk[0].some(function (b) { return b.callback_data === 'qs:story'; }), 'quick design: size buttons');
+  GAS._tg = []; hook(cb(SALEM, 'qs:story'));
+  ok(/اكتب التفاصيل/.test(edits().pop().opt.payload.text) && ctx.abotState_('42') === 'quick', 'quick design: asks for the details in one message');
+  GAS._tg = []; hook(msg(SALEM, 'لقاء بيوت مطمئنة مع د. محمد الخميس ٨:٣٠ مساءً'));
+  const qd = msgs(42).pop(), qurl = JSON.parse(qd.mk).inline_keyboard[0][0].web_app.url;
+  ok(qd.m === 'sendWidget' && /quick%3D1/.test(qurl) && /type%3Dann/.test(qurl) && /size%3Dstory/.test(qurl) && /idea%3D/.test(qurl) && ctx.abotState_('42') === '', 'quick design: card opens the suggestions ready (no questions)');
+  // بطاقة لا يعرضها تيليجرام: نص بديل كامل
+  const keepH = GAS._fetch.handler; GAS._fetch.handler = function (url, opt) { if (/sendWidget$/.test(url)) return { code: 400, body: JSON.stringify({ ok: false, description: 'Bad Request: method not supported' }) }; return keepH(url, opt); };
+  GAS._tg = []; hook(msg(SALEM, '/menu'));
+  ok(/sendMessage$/.test(sent().pop().url) && /ماذا تريد الآن/.test(sent().pop().opt.payload.text), 'card falls back to a text message');
+  GAS._fetch.handler = keepH;
   // من طلب الدخول ثم ربط حسابه القائم برمز: يُغلق طلبه
   const ZED = { id: 77, first_name: 'زيد' };
   J('tg_request', mkInit(ZED), JSON.stringify({ program: 'academy', track: '', name: 'زيد', username: 'zaid.new' }));
@@ -822,9 +844,9 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   // تعلّم التصميم بالودجت، والإشعارات، والدليل، والفكرة
   GAS._tg = []; hook(msg(SALEM, '/learn'));
   const w = sentTo(42, 'sendWidget')[0]; ok(w && w.opt.payload.html.length < 32768 && require('zlib').deflateSync(Buffer.from(w.opt.payload.html), { level: 9 }).length <= 4096 && w.opt.payload.caption, 'design rule as a widget within limits, with caption fallback');
-  GAS._tg = []; hook(msg(SALEM, '/guide')); ok(JSON.parse(sentTo(42, 'sendMessage')[0].opt.payload.reply_markup).inline_keyboard[0][0].web_app.url.indexOf('app/?tg=1&r=%2Fguide%2F') > 0, 'guide buttons open the clip in the mini app');
+  GAS._tg = []; hook(msg(SALEM, '/guide')); ok(JSON.parse(msgs(42)[0].mk).inline_keyboard[0][0].web_app.url.indexOf('app/?tg=1&r=%2Fguide%2F') > 0, 'guide buttons open the clip in the mini app');
   GAS._tg = []; hook(msg(SALEM, '/idea')); hook(msg(SALEM, 'لقاء الأحد مع د. محمد'));
-  ok(/make%3Fidea%3D/.test(JSON.parse(sentTo(42, 'sendMessage').pop().opt.payload.reply_markup).inline_keyboard[0][0].web_app.url), 'idea opens the smart designer prefilled');
+  ok(/make%3Fidea%3D/.test(JSON.parse(msgs(42).pop().mk).inline_keyboard[0][0].web_app.url), 'idea opens the smart designer prefilled');
   GAS._tg = []; hook(cb(SALEM, 'nt:w')); ok(J('auth_me', T1).prefs.tgOff.w === true, 'weekly report can be turned off');
   // اقتراح بالصورة يصل صندوق الاقتراحات
   GAS._tg = []; hook(msg(SALEM, '/feedback')); hook(msg(SALEM, '', { text: undefined, caption: 'زر التنزيل بطيء', photo: [{ file_id: 'p1', file_size: 10 }] }));
@@ -851,8 +873,9 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   // إعلان في البوت على دفعات، ولا شيء لمن أوقف الإشعارات
   GAS._tg = [];
   J('bc_save', adm, JSON.stringify({ title: 'لقاء المشرفين', body: 'الأحد القادم', kind: 'banner', bot: true, aud: { kind: 'all' } }));
-  ok(!sent().some(function (x) { return /sendMessage$/.test(x.url) && /لقاء المشرفين/.test(x.opt.payload.text); }), 'broadcast queued, not sent inline');
-  ctx.tgTick(); ok(sent().filter(function (x) { return /sendMessage$/.test(x.url) && /لقاء المشرفين/.test(x.opt.payload.text); }).length === 6, 'queue drained by the timer');
+  const bcs = function () { return sent().filter(function (x) { return /send(Message|Widget)$/.test(x.url) && /لقاء المشرفين/.test([x.opt.payload.text, x.opt.payload.html].join(' ')); }); };
+  ok(!bcs().length, 'broadcast queued, not sent inline');
+  ctx.tgTick(); ok(bcs().length === 6 && bcs().every(function (x) { return /sendWidget$/.test(x.url); }), 'queue drained by the timer, as cards');
 
   // بيانات محادثة الربط تصل من بوت أثر
   GAS._tg = []; J('bridge_send', adm, true);
@@ -862,8 +885,8 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
 
   // التقرير الأسبوعي الخاص: أرقام، ورسالة، وتعلّم التصميم، ولا يصل من أوقفه
   GAS._tg = []; try { ctx.weeklyUserStats(); } catch (e) {}
-  const nW = ctx.botWeekly(), wk = sent().filter(function (x) { return /sendMessage$/.test(x.url) && /أسبوعك في أثر/.test(x.opt.payload.text); });
-  ok(nW >= 2 && wk.length === nW && wk.every(function (x) { return /تعلّم التصميم/.test(x.opt.payload.text) && /التنزيلات/.test(x.opt.payload.text); }) && !wk.some(function (x) { return String(x.opt.payload.chat_id) === '42'; }), 'weekly bot report with numbers and design rules, respecting the off switch');
+  const nW = ctx.botWeekly(), wk = sent().filter(function (x) { return /sendWidget$/.test(x.url) && /أسبوعك في أثر/.test(x.opt.payload.html); });
+  ok(nW >= 2 && wk.length === nW && wk.every(function (x) { return /تعلّم التصميم/.test(x.opt.payload.html) && /تنزيلًا/.test(x.opt.payload.html); }) && !wk.some(function (x) { return String(x.opt.payload.chat_id) === '42'; }), 'weekly bot report with numbers and design rules, respecting the off switch');
   // لا شيء خارج المحادثات الخاصة
   GAS._tg = []; hook({ update_id: ++UID, message: { message_id: 1, chat: { id: -100123, type: 'supergroup' }, from: SALEM, text: '/start' } });
   ok(!sent().length, 'the bot never answers in groups');

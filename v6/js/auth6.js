@@ -101,7 +101,10 @@ async function afterLogin() {
 async function restore() {
   if (typeof TG6 !== 'undefined' && TG6.on()) {   // من بوت أثر: الدخول بحساب تيليجرام، والجلسة لا تُحفظ في المتصفح
     V6.token = await TG6.login(); if (!V6.token) return 'must';
-    try { V6.me = await API6.me('auth_me'); } catch (e) { TG6.expired(); return 'must'; }
+    if (TG6.me && TG6.me.uid) V6.me = TG6.me;   // الدخول يعيد الحساب نفسه: طلب أقل وفتح أسرع
+    else { try { V6.me = await API6.me('auth_me'); } catch (e) { TG6.expired(); return 'must'; } }
+  } else if (typeof TG6 !== 'undefined' && TG6.lost) {   // فُتح رابط التطبيق المصغّر بلا بيانات تيليجرام
+    TG6.screen('افتح أثر من البوت', 'لم تصل بيانات حسابك من تيليجرام. أغلق هذه الصفحة، واضغط زر «افتح أثر» بجانب خانة الكتابة في بوت أثر.', null); return 'must';
   } else {
   V6.token = ls('token') || '' || await ssoFromAnshita();
   if (!V6.token) return false;
