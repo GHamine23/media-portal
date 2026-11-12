@@ -528,11 +528,21 @@ function bridgeCard() {
       box.appendChild(el('div', { class: 'row wrapr' }, [el('button', { type: 'button', class: 'btn sm dark', onclick: function () { copyText(r.key); } }, [ico('copy'), 'انسخ المفتاح']), el('small', { class: 'tiny', text: renew ? 'جُدّد: المفتاح القديم توقف الآن.' : 'الصقه بنفسك في محادثة الربط.' })]));
     } catch (e) { toast(e.message); }
   }
+  const sendBox = el('div', { class: 'fld' }, [el('p', { class: 'small muted', text: 'نتحقق من حال الإرسال…' })]);
+  async function sendState(on) {
+    try {
+      const r = await API6.me('bridge_send', on == null ? '' : on);
+      sendBox.innerHTML = '';
+      sendBox.appendChild(el('p', { class: 'small ' + (r.on ? 'ok' : 'err'), text: r.on ? 'إرسال بيانات الحسابات من البوت: يعمل. محادثة الربط تستطيع إنشاء الحسابات وإرسال بياناتها.' : 'إرسال بيانات الحسابات من البوت: موقوف. لا يُنشأ حساب ولا تصل أحدًا رسالة. (التصاميم الواردة والإحصاء يعملان لأنهما لا يرسلان شيئًا.)' }));
+      sendBox.appendChild(el('button', { type: 'button', class: 'btn sm ' + (r.on ? 'line' : 'dark'), text: r.on ? 'أوقف الإرسال' : 'شغّل الإرسال', onclick: async function () { if (r.on || await ask('تشغيل الإرسال', 'ستستطيع محادثة الربط إنشاء حسابات وإرسال بيانات الدخول من البوت إلى أصحابها ومحادثة الإدارة.', 'شغّل')) sendState(!r.on); } }));
+    } catch (e) { sendBox.innerHTML = ''; sendBox.appendChild(el('p', { class: 'small err', text: e.message })); }
+  }
+  sendState();
   return el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-pu' }, [ico('send')]), el('h3', { text: 'محادثة الربط' }),
     el('p', { class: 'small muted', text: 'مفتاح تستعمله محادثة الربط مع بوت الأكاديمية لثلاثة أشياء: إنشاء حسابات أثر لمن ليس في منصة الأنشطة (وتصل بياناتهم من البوت إلى أصحابها)، وحفظ التصاميم التي يرسلها المشرفون للبوت في مجلد «تصاميم واردة من المشرفين»، وقراءة إحصاء أثر بلا كلمات مرور ولا بريد.' }),
     el('div', { class: 'row wrapr' }, [el('button', { type: 'button', class: 'btn sm line', text: 'أظهر المفتاح', onclick: function () { show(false); } }),
       el('button', { type: 'button', class: 'btn sm line', text: 'جدّد المفتاح', onclick: async function () { if (await ask('تجديد المفتاح', 'يتوقف المفتاح القديم فورًا، فتحتاج محادثة الربط المفتاح الجديد.', 'جدّد')) show(true); } })]),
-    box]);
+    box, sendBox]);
 }
 
 /* ---------- الإعدادات ---------- */

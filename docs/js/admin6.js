@@ -528,11 +528,21 @@ function bridgeCard() {
       box.appendChild(el('div', { class: 'row wrapr' }, [el('button', { type: 'button', class: 'btn sm dark', onclick: function () { copyText(r.key); } }, [ico('copy'), 'انسخ المفتاح']), el('small', { class: 'tiny', text: renew ? 'جُدّد: المفتاح القديم توقف الآن.' : 'الصقه بنفسك في محادثة الربط.' })]));
     } catch (e) { toast(e.message); }
   }
+  const sendBox = el('div', { class: 'fld' }, [el('p', { class: 'small muted', text: 'نتحقق من حال الإرسال…' })]);
+  async function sendState(on) {
+    try {
+      const r = await API6.me('bridge_send', on == null ? '' : on);
+      sendBox.innerHTML = '';
+      sendBox.appendChild(el('p', { class: 'small ' + (r.on ? 'ok' : 'err'), text: r.on ? 'إرسال بيانات الحسابات من البوت: يعمل. محادثة الربط تستطيع إنشاء الحسابات وإرسال بياناتها.' : 'إرسال بيانات الحسابات من البوت: موقوف. لا يُنشأ حساب ولا تصل أحدًا رسالة. (التصاميم الواردة والإحصاء يعملان لأنهما لا يرسلان شيئًا.)' }));
+      sendBox.appendChild(el('button', { type: 'button', class: 'btn sm ' + (r.on ? 'line' : 'dark'), text: r.on ? 'أوقف الإرسال' : 'شغّل الإرسال', onclick: async function () { if (r.on || await ask('تشغيل الإرسال', 'ستستطيع محادثة الربط إنشاء حسابات وإرسال بيانات الدخول من البوت إلى أصحابها ومحادثة الإدارة.', 'شغّل')) sendState(!r.on); } }));
+    } catch (e) { sendBox.innerHTML = ''; sendBox.appendChild(el('p', { class: 'small err', text: e.message })); }
+  }
+  sendState();
   return el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-pu' }, [ico('send')]), el('h3', { text: 'محادثة الربط' }),
     el('p', { class: 'small muted', text: 'مفتاح تستعمله محادثة الربط مع بوت الأكاديمية لثلاثة أشياء: إنشاء حسابات أثر لمن ليس في منصة الأنشطة (وتصل بياناتهم من البوت إلى أصحابها)، وحفظ التصاميم التي يرسلها المشرفون للبوت في مجلد «تصاميم واردة من المشرفين»، وقراءة إحصاء أثر بلا كلمات مرور ولا بريد.' }),
     el('div', { class: 'row wrapr' }, [el('button', { type: 'button', class: 'btn sm line', text: 'أظهر المفتاح', onclick: function () { show(false); } }),
       el('button', { type: 'button', class: 'btn sm line', text: 'جدّد المفتاح', onclick: async function () { if (await ask('تجديد المفتاح', 'يتوقف المفتاح القديم فورًا، فتحتاج محادثة الربط المفتاح الجديد.', 'جدّد')) show(true); } })]),
-    box]);
+    box, sendBox]);
 }
 
 /* ---------- الإعدادات ---------- */
@@ -569,7 +579,7 @@ async function aSettings(body) {
   const pollOn = el('input', { type: 'checkbox', checked: s.ai.pollFallback !== false });
   const capPrompt = el('textarea', { class: 'inp', rows: '4', dir: 'auto', placeholder: 'مثال: ابدأ كل رسالة بسطر ترحيبي قصير، واختم بالوسم ورابط القناة. لا تستعمل أكثر من رمزين تعبيريين. نبرة هادئة محفّزة.', 'aria-label': 'تعليمات النص المصاحب' }); capPrompt.value = s.ai.capPrompt || '';
   // هل الخادم المنشور هو نفسه نسخة الموقع؟ (يمنع حيرة «حفظتُ ولم يتغير شيء»)
-  const SRV_EXPECT = 'b846e30a', srvOk = !!s.srvVer && s.srvVer === SRV_EXPECT;
+  const SRV_EXPECT = 'adab582b', srvOk = !!s.srvVer && s.srvVer === SRV_EXPECT;
   body.appendChild(el('div', { class: 'srvver ' + (srvOk ? 'ok' : 'old') }, [ico(srvOk ? 'check' : 'info'), el('span', { text: srvOk ? 'الخادم محدَّث ويطابق نسخة الموقع.' : 'الخادم المنشور أقدم من الموقع: بعض الإعدادات لن تُحفظ أو لن تعمل. الصق server/Code.gs في Apps Script، ثم «إدارة عمليات النشر» ← تعديل النشر الحالي ← «إصدار جديد» ← نشر.' }), el('small', { dir: 'ltr', text: (s.srvVer || '—') + ' / ' + SRV_EXPECT })]));
   body.appendChild(el('div', { class: 'grid two' }, [
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-pu' }, [ico('ai')]), el('h3', { text: 'اصنع إعلانك بالذكاء' }),

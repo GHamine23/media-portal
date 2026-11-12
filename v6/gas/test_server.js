@@ -626,6 +626,13 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   const K = J('bridge_key', adm).key; ok(K.length === 48 && J('bridge_key', adm).key === K, 'key created once and kept');
   fails('bridge_op', /غير صحيح/, K.slice(0, -1) + 'x', JSON.stringify({ op: 'stats' }));
   const B = function (o) { return J('bridge_op', K, JSON.stringify(o)); };
+  // الإرسال موقوف افتراضيًا: لا حساب ولا رسالة
+  GAS._tg = [];
+  ok(!J('bridge_send', adm).on, 'sending is off by default');
+  fails('bridge_op', /موقوف/, K, JSON.stringify({ op: 'make', kind: 'shared', chat: '-1009876543210' }));
+  ok(!GAS._tg.length && !J('acc_list', adm).some(function (x) { return x.username === 'academy1'; }), 'nothing created or sent while off');
+  fails('bridge_send', /للمدير العام/, nt, true);
+  ok(J('bridge_send', adm, true).on, 'switched on');
   fails('bridge_op', /معرّف محادثة/, K, JSON.stringify({ op: 'make', kind: 'shared' }));
   GAS._tg = [];
   // ١) الحساب العام للأكاديمية: كل المسارات، بلا إدارة ولا بريد ولا ربط، وبياناته إلى محادثة الإدارة وحدها
@@ -677,6 +684,10 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   ok(rA.in7 && rA.in30 && rA.allTracks && rA.kind === 'حساب عام' && rA.last, 'last login and 7/30 day activity');
   ok(st.tracks.filter(function (x) { return x.id === 'ishraq'; })[0].accounts >= 1, 'ishraq counts its supervisor');
   ok(!/salt|hash|"uid"|email|@/.test(raw) && raw.indexOf(pw) < 0 && raw.indexOf(K) < 0, 'no secrets, emails or internal ids in stats');
+  // الإيقاف يمنع resend أيضًا، ولا يمنع الوارد والإحصاء
+  ok(!J('bridge_send', adm, false).on, 'switched off again'); GAS._tg = [];
+  fails('bridge_op', /موقوف/, K, JSON.stringify({ op: 'resend', user: 'ac.1' }));
+  ok(!GAS._tg.length && B({ op: 'stats' }).totals && B({ op: 'inbox', from: '5550001', msg: '900', file: png }).saved, 'off: no message, inbox and stats still work');
   // تجديد المفتاح يوقف القديم
   const K2 = J('bridge_key', adm, true).key; ok(K2 !== K, 'renewed'); fails('bridge_op', /غير صحيح/, K, JSON.stringify({ op: 'stats' }));
 })();

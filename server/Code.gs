@@ -121,7 +121,7 @@ function apiFns_() {
     rv_request: rv_request, rv_list: rv_list, rv_mine: rv_mine, rv_img: rv_img, rv_reply: rv_reply,
     me_week: me_week, wk_admin: wk_admin, ai_skills: ai_skills, ai_skill_save: ai_skill_save, ai_skill_reset: ai_skill_reset, img_requests: img_requests, img_decide: img_decide, quran_find: quran_find, hadith_find: hadith_find,
     quiz_form: quiz_form, quiz_results: quiz_results, quiz_accept: quiz_accept,
-    link_op: link_op, link_check: link_check, bridge_op: bridge_op, bridge_key: bridge_key
+    link_op: link_op, link_check: link_check, bridge_op: bridge_op, bridge_key: bridge_key, bridge_send: bridge_send
   };
 }
 function doPost(e) {
@@ -620,6 +620,15 @@ function needBridge_(key) {
   var d = 0; for (var i = 0; i < k.length; i++) d |= k.charCodeAt(i) ^ g.charCodeAt(i);
   if (d) throw new Error('مفتاح محادثة الربط غير صحيح');
 }
+// مفتاح إرسال بيانات الحسابات: موقوف ما لم يشغّله المدير العام (طلب أمين، ١٢ نوفمبر: «ما أبغى شيء يوصلهم حاليًا»).
+// وهو موقوف لا يُنشأ حساب ولا تُرسل رسالة؛ والتصاميم الواردة والإحصاء لا يرسلان شيئًا فيعملان دائمًا.
+function bridgeSendOn_() { return props_().getProperty('BRIDGE_SEND') === 'on'; }
+function needBridgeSend_() { if (!bridgeSendOn_()) throw new Error('إرسال بيانات الحسابات موقوف من إعدادات أثر، فلم يُنشأ حساب ولم تُرسل رسالة'); }
+function bridge_send(token, on) {
+  var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
+  if (on != null && on !== '') { props_().setProperty('BRIDGE_SEND', on === true || on === 'true' || on === 1 ? 'on' : 'off'); audit_(a, bridgeSendOn_() ? 'شغّل إرسال بيانات الحسابات من محادثة الربط' : 'أوقف إرسال بيانات الحسابات من محادثة الربط', ''); }
+  return JSON.stringify({ on: bridgeSendOn_(), key: !!bridgeKey_() });
+}
 // يُظهره المدير العام وحده، ويجدّده متى شاء (فيتوقف القديم فورًا)
 function bridge_key(token, renew) {
   var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
@@ -672,6 +681,7 @@ function bridgeIssue_(uid, chat, renew) {
     x.salt = Utilities.getUuid(); x.hash = pwHash_(x.salt, pw); x.mustChange = x.bridge !== 'shared'; x.noPw = false; x.fails = 0; x.lockUntil = 0;
     writeJson_('accounts.json', accs); return x;
   });
+  needBridgeSend_();
   try { tgCall_('sendMessage', { chat_id: chat, text: bridgeMsg_(a, pw, renew), parse_mode: 'HTML', disable_web_page_preview: 'true' }, BRIDGE_PROG); }
   catch (e) {
     withLock_(function () { var accs = readJson_('accounts.json', {}), x = accs[uid]; if (x) { x.salt = Utilities.getUuid(); x.hash = pwHash_(x.salt, Utilities.getUuid()); x.noPw = true; writeJson_('accounts.json', accs); } dropSessions_(uid); });
@@ -682,6 +692,7 @@ function bridgeIssue_(uid, chat, renew) {
 }
 // o = {kind: 'shared'|'sup', name, user?, tracks?, chat, tg?, note?}
 function bridgeMake_(o) {
+  needBridgeSend_();
   var kind = o.kind === 'shared' ? 'shared' : o.kind === 'sup' ? 'sup' : '';
   if (!kind) throw new Error('نوع الحساب: shared أو sup');
   var chat = bridgeChat_(o.chat, kind === 'sup'), tracks = kind === 'shared' ? [] : bridgeTracks_(o.tracks);
@@ -711,6 +722,7 @@ function bridgeMake_(o) {
 }
 // o = {user, chat?}
 function bridgeResend_(o) {
+  needBridgeSend_();
   var accs = readJson_('accounts.json', {}), a = findAcc_(accs, o.user || '');
   if (!a || !a.bridge) throw new Error('لا حساب بهذا الاسم أُنشئ من محادثة الربط');
   if (a.disabled) throw new Error('هذا الحساب موقوف');
@@ -1379,7 +1391,7 @@ function hasGemini_() { return geminiKeys_().length > 0; }
 function aiAny_(s) { var h = aiHave_(); return !!(h.gemini || h.groq || h.cf || (s.ai && s.ai.pollFallback !== false)); }
 function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: aiAny_(s), vision: hasGemini_(), capPrompt: (s.ai && s.ai.capPrompt) || '' }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN'), pexels: true, imgKeys: { pixabay: !!props_().getProperty('PIXABAY_KEY'), pexels: !!props_().getProperty('PEXELS_KEY') }, tgKnown: (s.tgKnown || []).length }; }
 // بصمة نسخة الخادم: يضعها البناء، ويقارنها الموقع ليخبر المدير إن كان الخادم المنشور أقدم
-var SRV_VER = 'b846e30a';
+var SRV_VER = 'adab582b';
 function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.srvVer = SRV_VER; s.aiKey = hasGemini_(); s.aiKeys = geminiKeys_().length; s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); s.pixabayOn = !!props_().getProperty('PIXABAY_KEY'); s.groqOn = !!props_().getProperty('GROQ_KEY'); s.cfOn = !!(props_().getProperty('CF_ACCOUNT') && props_().getProperty('CF_TOKEN')); s.routeDefault = AI_ROUTE_DEFAULT; return JSON.stringify(s); }
 function set_save(token, json) {
   var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');
