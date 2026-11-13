@@ -38,6 +38,17 @@ async def main():
         ok(len(r[2]) == 2 and 'ـ' in r[2][1] and 'ـ' not in r[2][0], 'long title: kashida added to balance the shorter line only')
         ok(r[4] == ['الصبر'], 'body text untouched')
         ok(r[5] == ['لقاء الأسـرة'], 'a title with a hand-written tatweel is left as written')
+        # هوية الأكاديمية: كل القوالب بخطها، حتى ما له خطه الخاص؛ وهويات المسارات تبقى بخطوط قوالبها
+        r3 = await pg.evaluate("""(function(){ const tpl = TEMPLATES.find(function (t) { return t.fonts && t.fonts.title && FONTS[t.fonts.title] && t.fonts.title !== 'handicrafts'; }); if (!tpl || !TRACKS.academy) return null;
+          const P = CanvasRenderingContext2D.prototype, d0 = Object.getOwnPropertyDescriptor(P, 'font'); let used = [];
+          Object.defineProperty(P, 'font', { configurable: true, get: d0.get, set: function (v) { used.push(String(v)); d0.set.call(this, v); } });
+          const run = function (T) { used = []; renderTo(document.createElement('canvas'), tpl, tpl.sizes[0], { d: defaults(tpl, T), variant: tpl.variants[0].id, k: 1 }, T, 0.2); return used.join('|'); };
+          const fam = FONTS[tpl.fonts.title].family || tpl.fonts.title;
+          const a = run(TRACKS.academy), other = Object.keys(TRACKS).map(function (k) { return TRACKS[k]; }).find(function (t) { return !t.fonts; }), b = run(other);
+          Object.defineProperty(P, 'font', d0);
+          return [tpl.id, fam, a.indexOf(fam) >= 0, /handicrafts/.test(a), b.indexOf(fam) >= 0]; })()""")
+        print('identity font override', r3)
+        ok(r3 and not r3[2] and r3[3] and r3[4], 'academy identity: template fonts give way to the identity font; tracks keep template fonts')
         # التصميم السريع بالقوالب: كل قوالب النوع مملوءة بالأجوبة
         info = {'title': 'بُيوتٌ *مطمئنّة*', 'kind': 'محاضرة', 'who': 'د. محمد', 'date': '2026-11-20', 'time': '8:30 م', 'place': 'عبر زوم'}
         f = base64.urlsafe_b64encode(json.dumps(info, ensure_ascii=False).encode()).decode().rstrip('=')

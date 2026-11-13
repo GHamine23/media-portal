@@ -328,7 +328,8 @@ function fontChoices() {
   return out;
 }
 // خط القالب نفسه (القوالب التي تحمل خطوطها) ما لم يختر المصمم خطوطاً عامة
-function tplFont(k) { const f = !S.fs && S.tpl && S.tpl.fonts && S.tpl.fonts[k]; return f && FONTS[f] ? f : ''; }
+function tplFont(k) { if (S.track && S.track.fonts && FONTS[S.track.fonts.title]) return '';   // خط الهوية يغلب خطوط القالب
+  const f = !S.fs && S.tpl && S.tpl.fonts && S.tpl.fonts[k]; return f && FONTS[f] ? f : ''; }
 // أول اختيار عام للخط يبدأ من خطوط القالب لا من خط البرنامج
 function keepTplFonts() { if (S.fs) return; const t = tplFont('title'), b = tplFont('body'); if (t) FS.title = t; if (b) FS.body = b; }
 // أهداف الخط في التصميم الحالي: العناوين كلها، والنصوص كلها، ثم كل عنصر نصي
