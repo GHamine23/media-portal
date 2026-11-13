@@ -1376,6 +1376,9 @@ a.chip,.chip{text-decoration:none}
 .srvver svg{width:20px;height:20px;flex:none}.srvver small{margin-inline-start:auto;color:var(--ink3);font-size:12px}
 .srvver.ok{background:var(--gr-t);color:#1f7a44}.srvver.old{background:var(--rd-t);color:#a33232}
 
+/* التصميم السريع بالقوالب: تنبيه المراجعة */
+.mkrev{display:flex;gap:10px;align-items:flex-start;margin:0 0 16px;padding:12px 14px;border-inline-start:4px solid var(--or,#f45907)}.mkrev svg{flex:none;margin-top:3px}.mkrev b{font-weight:700}
+
 /* ===== cal.css ===== */
 /* ================= التقويم والمهام (cal6.js): عرض اليوم، أيقونات الحال بدل المصغّرات، أدوات القائمة ================= */
 .calnav.off{display:none}
@@ -2579,6 +2582,15 @@ textarea.pc-notes-t::placeholder{color:#6e6e80;font-size:15px}
 .vrun{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;border-radius:12px;background:var(--ac-soft)}
 .pm-tl .pmaudio:focus{outline:none}.pm-tl .pmaudio:focus-visible{outline:2px solid #fff;outline-offset:2px;border-radius:999px}
 
+/* «ارفع عرضًا جاهزًا»: زر بارز في الرأس، وبطاقة عريضة أول الصفحة، وشريط التقدّم */
+.btn.or{background:var(--or);color:#fff}.btn.or:hover{filter:brightness(.95)}
+.slready{display:flex;align-items:center;gap:18px;margin:0 0 22px;padding:20px 22px;cursor:pointer;border:1.5px dashed color-mix(in srgb,var(--or) 55%,transparent);background:color-mix(in srgb,var(--or) 6%,var(--bg,#fff))}
+.slready:hover{border-style:solid}.slready:focus-visible{outline:2px solid var(--or);outline-offset:3px}
+.slready .icon-tile{flex:none}.slready-t{flex:1;min-width:0}.slready-t h3{margin:0 0 4px}.slready-t p{margin:0}
+.slready>.btn{flex:none}
+@media (max-width:640px){.slready{flex-direction:column;align-items:stretch;text-align:start}.slready>.btn{justify-content:center}}
+.slprog{height:8px;border-radius:99px;background:var(--bg3,#eee);overflow:hidden;margin:6px 0 10px}.slprog i{display:block;height:100%;width:0;background:var(--or);border-radius:inherit;transition:width .3s var(--ease,ease)}
+
 </style>
 <style>
 /* ================= تطبيق الأثر للجوال — نظام تصميم بروح iOS =================
@@ -2980,8 +2992,9 @@ body.mapp .card > h2.ch{font-size:18px}
 <main id="view"></main>
 <nav class="mtab" id="mtab" hidden aria-label="التنقل"></nav>
 <script src="../v6/js/config.js?v=b79cfa4c64"></script>
+<script>(function(){try{var w=window.Telegram&&Telegram.WebApp,i=w&&w.initData;if(!i){var m=/[#&]tgWebAppData=([^&]*)/.exec(location.hash);i=m?decodeURIComponent(m[1]):'';}if(!i||!/^https:/.test(API_URL))return;window.TG_EARLY={init:i,p:fetch(API_URL,{method:'POST',body:JSON.stringify({fn:'tg_login',args:[i,JSON.stringify({b:1})]}),redirect:'follow',credentials:'omit'}).then(function(r){return r.json();})};}catch(e){}})();</script>
 <script src="../v6/js/konva.min.js?v=65c5c4e432"></script>
-<script src="../v6/js/engine.js?v=4f6176e127"></script>
+<script src="../v6/js/engine.js?v=b823506b7d"></script>
 <script src="../v6/js/identities.js?v=4da9c49488"></script>
 <script src="../v6/js/templates.js?v=463ccfb4d0"></script>
 <script src="../v6/js/templates2.js?v=f2b04685e9"></script>
@@ -2991,13 +3004,13 @@ body.mapp .card > h2.ch{font-size:18px}
 <script src="../v6/js/templates6.js?v=5d74281319"></script>
 <script src="../v6/js/core5.js?v=e1f946cecf"></script>
 <script src="../v6/js/studio.js?v=e52b6c7a1d"></script>
-<script src="../v6/js/slides.js?v=e83fdec583"></script>
+<script src="../v6/js/slides.js?v=61503a0653"></script>
 <script src="../v6/js/qr.js?v=4c79be1679"></script>
 <script src="../v6/js/ticons.js?v=d1041b1786"></script>
 <script src="../v6/js/brand6.js?v=b6adb48303"></script>
 <script src="../v6/js/core6.js?v=a646ca35a8"></script>
 <script src="../v6/js/freetpl6.js?v=f9b7e44ff1"></script>
-<script src="../v6/js/assets6.js?v=cb1a0d2678"></script>
+<script src="../v6/js/assets6.js?v=1b131c3734"></script>
 <script src="../v6/js/auth6.js?v=a47ed83d13"></script>
 <script src="../v6/js/home6.js?v=a7b5f0e7ae"></script>
 <script src="../v6/js/sections6.js?v=798f2452b2"></script>
@@ -3009,7 +3022,7 @@ body.mapp .card > h2.ch{font-size:18px}
 <script src="../v6/js/editor6.js?v=002d51fc20"></script>
 <script src="../v6/js/panels6.js?v=bbc6f5b1fa"></script>
 <script src="../v6/js/docs6.js?v=131761d5b4"></script>
-<script src="../v6/js/make6.js?v=104fcea3ec"></script>
+<script src="../v6/js/make6.js?v=d66eee08e0"></script>
 <script src="../v6/js/caption6.js?v=ee66ba7087"></script>
 <script src="../v6/js/cal6.js?v=5d32d6c604"></script>
 <script src="../v6/js/slides6.js?v=5899b490d5"></script>
@@ -3019,10 +3032,10 @@ body.mapp .card > h2.ch{font-size:18px}
 <script src="../v6/js/extras6.js?v=1fd6891d43"></script>
 <script src="../v6/js/tips6.js?v=86b4f361a7"></script>
 <script src="../v6/js/social6.js?v=05c796e7ed"></script>
-<script src="../v6/js/mine6.js?v=bca6971598"></script>
-<script src="../v6/js/admin6.js?v=4960371a83"></script>
+<script src="../v6/js/mine6.js?v=beaf3e64d7"></script>
+<script src="../v6/js/admin6.js?v=4289b3e71f"></script>
 <script src="../v6/js/pstats6.js?v=6e18786688"></script>
-<script src="../v6/js/tg6.js?v=876e8daea0"></script>
+<script src="../v6/js/tg6.js?v=f1b4d28dff"></script>
 <script src="js/ios6.js?v=ecfe87f0a7"></script>
 <script src="js/mscreens.js?v=e54e479cbe"></script>
 <script src="js/meditor.js?v=3523971460"></script>

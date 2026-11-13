@@ -777,6 +777,11 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   fails('auth_me', /انتهت الجلسة/, s1.token + '#tg#' + mkInit({ id: 43, first_name: 'آخر' }));
   fails('auth_me', /انتهت الجلسة/, J('auth_login', 'admin', 'StrongPass#1').token + '#tg#' + mkInit(SALEM));
   fails('auth_login', /غير صحيحة/, 'salem.k', 'anything');
+  // الفتح الثاني خلال الساعة: الجلسة نفسها بلا كتابة، والحزمة مع الدخول
+  const s2 = J('tg_login', mkInit(SALEM), '{"b":1}');
+  ok(s2.token === s1.token && s2.bundle && Array.isArray(s2.bundle.programs) && Array.isArray(s2.bundle.assets), 'reopen reuses the live session and returns the bundle with the login');
+  ok(!J('tg_login', mkInit(SALEM)).bundle, 'no bundle unless asked');
+  ok(J('auth_me', s2.token + '#tg#' + mkInit(SALEM)).username === 'salem.k', 'reused session still verified with initData');
 
   // كلمة سر للموقع، والتسليم في المحادثة
   fails('tg_site_pw', /تيليجرام فقط/, J('auth_login', 'admin', 'StrongPass#1').token, 'Pass12345678');
@@ -796,27 +801,78 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   // لوحة المفاتيح الدائمة: قائمة المهام تحت خانة الكتابة
   GAS._tg = []; hook(msg(SALEM, '/start'));
   const st0 = msgs(42);
-  ok(st0.length === 1 && /inline_keyboard/.test(st0[0].mk) && /تصميم سريع/.test(st0[0].mk), '/start after the welcome: one card with the menu (quick design first)');
-  GAS._tg = []; hook(msg(SALEM, '🎨 افتح أثر'));
+  ok(st0.length === 1 && /inline_keyboard/.test(st0[0].mk) && JSON.parse(st0[0].mk).inline_keyboard[0][0].callback_data === 'm:des', '/start after the welcome: one card with the menu, «🎨 تصميم» first');
+  // من عنده لوحة المفاتيح القديمة: تصله الجديدة مرة واحدة
+  (function () { const A = ctx.readJson_('accounts.json', {}); Object.keys(A).forEach(function (k) { if (A[k].tg === '42') { A[k].prefs.tgKb2 = 1; delete A[k].prefs.tgKb3; } }); ctx.writeJson_('accounts.json', A); })();
+  GAS._tg = []; hook(msg(SALEM, '⚡ تصميم سريع'));
+  ok(msgs(42).length === 2 && /"keyboard"/.test(msgs(42)[0].mk) && /🎨 تصميم/.test(msgs(42)[0].mk) && /m:qf/.test(msgs(42)[1].mk), 'old keyboard user: the new keyboard once, then the two ways');
+  GAS._tg = []; hook(msg(SALEM, '🎨 تصميم'));
+  ok(msgs(42).length === 1, 'the keyboard is not resent');
+  GAS._tg = []; hook(msg(SALEM, '🖼️ افتح أثر'));
   ok(/web_app/.test(msgs(42)[0].mk), 'keyboard «افتح أثر» answers with the mini-app button');
+  GAS._tg = []; hook(msg(SALEM, '🎨 افتح أثر'));
+  ok(/web_app/.test(msgs(42)[0].mk), 'the old keyboard label still works');
   GAS._tg = []; hook(msg(SALEM, '💡 صمّم بفكرة'));
   ok(/صمّم بفكرة/.test(msgs(42)[0].txt) && ctx.abotState_('42') === 'idea', 'keyboard button → command');
   ctx.abotState_('42', '');
-  // التصميم السريع في المحادثة: المسار ← النوع ← المقاس ← التفاصيل ← بطاقة تفتح الاقتراحات
   const lastKb = function () { const m = msgs(42).pop(); return m ? JSON.parse(m.mk || '{}') : {}; };
   const edits = function () { return sent().filter(function (x) { return /editMessageText$/.test(x.url); }); };
+  const ekb = function () { return JSON.parse(edits().pop().opt.payload.reply_markup).inline_keyboard; };
+  // زر «🎨 تصميم» واحد بطريقتين
+  GAS._tg = []; hook(msg(SALEM, '🎨 تصميم'));
+  const dk = lastKb().inline_keyboard;
+  ok(dk[0][0].callback_data === 'm:qf' && dk[1][0].callback_data === 'm:quick' && /قد لا تكون الأفضل/.test(msgs(42).pop().txt), 'one design button: quick templates first, AI with its warning');
   GAS._tg = []; hook(msg(SALEM, '⚡ تصميم سريع'));
+  ok(lastKb().inline_keyboard[0][0].callback_data === 'm:qf', 'the old «تصميم سريع» key opens the two ways');
+  // التصميم بالذكاء الاصطناعي: المسار ← النوع ← المقاس ← الجمهور ← النبرة ← التفاصيل
+  GAS._tg = []; hook(cb(SALEM, 'm:quick'));
   let qk = lastKb().inline_keyboard, first = qk[0][0].callback_data;
-  ok(/^q[ty]:/.test(first) && /التصميم السريع/.test(msgs(42).pop().txt), 'quick design: starts with the track (or the type when only one)');
-  if (/^qt:/.test(first)) { GAS._tg = []; hook(cb(SALEM, first)); qk = JSON.parse(edits().pop().opt.payload.reply_markup).inline_keyboard; }
-  ok(/^qy:ann$/.test(qk[0][0].callback_data), 'quick design: type buttons');
-  GAS._tg = []; hook(cb(SALEM, 'qy:ann')); qk = JSON.parse(edits().pop().opt.payload.reply_markup).inline_keyboard;
-  ok(qk[0].some(function (b) { return b.callback_data === 'qs:story'; }), 'quick design: size buttons');
-  GAS._tg = []; hook(cb(SALEM, 'qs:story'));
-  ok(/اكتب التفاصيل/.test(edits().pop().opt.payload.text) && ctx.abotState_('42') === 'quick', 'quick design: asks for the details in one message');
+  ok(/^q[ty]:/.test(first) && /الذكاء الاصطناعي/.test(msgs(42).pop().txt), 'AI design: starts with the track (or the type when only one)');
+  if (/^qt:/.test(first)) { GAS._tg = []; hook(cb(SALEM, first)); qk = ekb(); }
+  ok(/^qy:ann$/.test(qk[0][0].callback_data), 'AI design: type buttons');
+  GAS._tg = []; hook(cb(SALEM, 'qy:ann')); qk = ekb();
+  ok(qk[0].some(function (b) { return b.callback_data === 'qs:story'; }), 'AI design: size buttons');
+  GAS._tg = []; hook(cb(SALEM, 'qs:story')); qk = ekb();
+  ok(qk[0][0].callback_data === 'qa:students', 'AI design: audience buttons');
+  GAS._tg = []; hook(cb(SALEM, 'qa:parents')); qk = ekb();
+  ok(qk[0][0].callback_data === 'qn:calm', 'AI design: tone buttons');
+  GAS._tg = []; hook(cb(SALEM, 'qn:warm'));
+  const dt = edits().pop().opt.payload.text;
+  ok(/اكتب فكرتك وتفاصيلها/.test(dt) && /أولياء الأمور/.test(dt) && /دافئة/.test(dt) && /قد لا تكون الأفضل/.test(dt) && ctx.abotState_('42') === 'quick', 'AI design: asks for the details with the warning');
   GAS._tg = []; hook(msg(SALEM, 'لقاء بيوت مطمئنة مع د. محمد الخميس ٨:٣٠ مساءً'));
   const qd = msgs(42).pop(), qurl = JSON.parse(qd.mk).inline_keyboard[0][0].web_app.url;
-  ok(qd.m === 'sendWidget' && /quick%3D1/.test(qurl) && /type%3Dann/.test(qurl) && /size%3Dstory/.test(qurl) && /idea%3D/.test(qurl) && ctx.abotState_('42') === '', 'quick design: card opens the suggestions ready (no questions)');
+  ok(qd.m === 'sendWidget' && /quick%3D1/.test(qurl) && /type%3Dann/.test(qurl) && /size%3Dstory/.test(qurl) && /aud%3Dparents/.test(qurl) && /tone%3Dwarm/.test(qurl) && /idea%3D/.test(qurl) && ctx.abotState_('42') === '', 'AI design: card opens the suggestions with audience and tone');
+  // التصميم السريع بالقوالب: أسئلة القالب واحدًا بعد واحد
+  GAS._tg = []; hook(cb(SALEM, 'm:qf'));
+  qk = lastKb().inline_keyboard; first = qk[0][0].callback_data;
+  ok(/^g[ty]:/.test(first), 'template design: starts with the track (or the type)');
+  if (/^gt:/.test(first)) { GAS._tg = []; hook(cb(SALEM, first)); qk = ekb(); }
+  ok(qk[0][0].callback_data === 'gy:ann', 'template design: type buttons');
+  GAS._tg = []; hook(cb(SALEM, 'gy:ann')); qk = ekb();
+  ok(qk[0].some(function (b) { return b.callback_data === 'gb:post'; }), 'template design: size buttons');
+  GAS._tg = []; hook(cb(SALEM, 'gb:post'));
+  let tq = edits().pop().opt.payload.text;
+  ok(/1\/7/.test(tq) && /عنوان/.test(tq) && /الحد الأدنى من الحركات/.test(tq) && ctx.abotState_('42') === 'tq', 'template design: first question is the title, with the identity hint');
+  GAS._tg = []; hook(msg(SALEM, 'بُيوتٌ *مطمئنّة*'));
+  qk = lastKb().inline_keyboard;
+  ok(/2\/7/.test(msgs(42).pop().txt) && qk[0][0].callback_data === 'gm:لقاء', 'answer → next question as its own message, with ready choices');
+  GAS._tg = []; hook(cb(SALEM, 'gm:محاضرة'));
+  ok(/3\/7/.test(edits().pop().opt.payload.text), 'a choice button answers the question');
+  GAS._tg = []; hook(msg(SALEM, 'د. محمد'));
+  qk = lastKb().inline_keyboard;
+  ok(/^gd:\d{4}-\d{2}-\d{2}$/.test(qk[0][0].callback_data) && qk[0][0].text === 'اليوم', 'date question: day buttons');
+  GAS._tg = []; hook(msg(SALEM, 'غدًا مساءً'));
+  ok(/٢٠\/١١/.test(msgs(42).pop().txt), 'an unreadable date asks again');
+  GAS._tg = []; hook(msg(SALEM, '٢٠/١١'));
+  qk = lastKb().inline_keyboard;
+  ok(qk[0][0].callback_data === 'gm:4:00 م', 'typed date accepted → time buttons');
+  GAS._tg = []; hook(cb(SALEM, 'gm:8:30 م'));
+  GAS._tg = []; hook(cb(SALEM, 'gk:'));
+  ok(/7\/7/.test(edits().pop().opt.payload.text), 'skip moves on');
+  GAS._tg = []; hook(cb(SALEM, 'gk:'));
+  const td = msgs(42).pop(), turl = decodeURIComponent(JSON.parse(td.mk).inline_keyboard[0][0].web_app.url.split('r=')[1]);
+  const fb = /[?&]f=([\w\-]+)/.exec(turl)[1], info = JSON.parse(Buffer.from(fb.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
+  ok(td.m === 'sendWidget' && /tq=1/.test(turl) && /type=ann/.test(turl) && /size=post/.test(turl) && info.title === 'بُيوتٌ *مطمئنّة*' && info.kind === 'محاضرة' && info.who === 'د. محمد' && /^\d{4}-11-20$/.test(info.date) && info.time === '8:30 م' && !info.place && /قد لا تناسب/.test(td.txt) && ctx.abotState_('42') === '', 'template design: the card opens all the templates filled with the answers');
   // بطاقة لا يعرضها تيليجرام: نص بديل كامل
   const keepH = GAS._fetch.handler; GAS._fetch.handler = function (url, opt) { if (/sendWidget$/.test(url)) return { code: 400, body: JSON.stringify({ ok: false, description: 'Bad Request: method not supported' }) }; return keepH(url, opt); };
   GAS._tg = []; hook(msg(SALEM, '/menu'));

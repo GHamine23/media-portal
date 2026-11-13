@@ -251,6 +251,17 @@ const SLIDE_TPLS = [
 }
 ];
 SLIDE_TPLS.forEach(function (t) { TEMPLATES.push(t); });
+// خارج قائمة التخطيطات (لا تُضاف يدويًا): صفحات «ارفع عرضًا جاهزًا»
+const SL_PDF = {
+  // شريحة من عرض جاهز مرفوع (صفحة PDF أو صورة): الصفحة كاملة بلا قصّ، وما حولها داكن كشاشة العرض
+  id: 'sl_pdf', type: 'slide', hidden: true, name: 'صفحة من عرض جاهز', sizes: ['slide'], variants: SL_VARS,
+  fields: [{ k: 'photo', label: 'الصفحة', kind: 'image', def: '' }],
+  draw: function (ctx, W, H, d, T, v, k, P) {
+    ctx.fillStyle = '#0d0f12'; ctx.fillRect(0, 0, W, H);
+    G(ctx, 'photo'); if (P.photo && P.photo.im) drawPhoto(ctx, P.photo.im, 0, 0, W, H, { fit: 'contain', z: P.photo.z, ox: P.photo.ox, oy: P.photo.oy });
+  }
+};
+TEMPLATES.push(SL_PDF);
 function slideTpl(id) { return TEMPLATES.find(function (t) { return t.id === id; }) || TEMPLATES.find(function (t) { return t.id === 'sl_points'; }); }
 
 /* ---------- نماذج عروض جاهزة ---------- */

@@ -17,6 +17,10 @@ const BUILTIN_FONTS = {
   zain: { family: 'zain', label: 'زين', scope: 'builtin', soft: true, files: [{ id: 'builtin_zain7', weight: 700, local: FONT_BASE + 'fonts/zain-bold.woff2' }, { id: 'builtin_zain9', weight: 900, local: FONT_BASE + 'fonts/zain-black.woff2' }] }
 };
 const FONT_LOADED = {};   // العائلة|الوزن ← وعد التحميل
+const SW_FAMS = ['handicrafts'];   // خطوط فيها حروف مطوّلة (المجموعة الأسلوبية ss01)
+// خط الأكاديمية «عام الحرف اليدوية» هو الخط الافتراضي لتصاميم برنامج الأكاديمية، ومعه معايير العنوان (قرار أمين ١٣ نوفمبر ٢٠٢٦)،
+// ما لم يختر مشرف البرنامج خطًا آخر في إعداداته، وما لم يكن للقالب خطه. ويسري إذا رُفع الخط إلى المنصة.
+const PROG_FONT = { academy: 'handicrafts' };
 
 async function assetBlob(meta, pub) {
   const key = 'a:' + meta.id + ':' + (meta.ver || 1);
@@ -75,7 +79,7 @@ async function loadUiFonts() {
 
 /* ---------- بعد الدخول: البرامج وأصولها ---------- */
 async function loadBundle() {
-  const b = await API6.me('bundle');
+  const b = V6.preBundle || await API6.me('bundle'); V6.preBundle = null;   // من دخول تيليجرام: جاءت مع الدخول نفسه
   V6.bundle = b; V6.settings = b.settings || {}; V6.mine = b.mine || [];
   V6.assets = {}; b.assets.forEach(function (a) { V6.assets[a.id] = a; });
   b.mine.forEach(function (a) { V6.assets[a.id] = a; });
@@ -116,7 +120,9 @@ async function useProgram(id, silent) {
   Object.keys(TINT).forEach(function (k) { delete TINT[k]; });
   registerFonts();
   // خط القوالب الافتراضي لهذا البرنامج
-  const pref = (p.fonts && p.fonts.title) || (FONT_REG.tajarib ? 'tajarib' : (FONT_REG.tajawal ? 'tajawal' : Object.keys(FONT_REG)[0]));
+  const pf = PROG_FONT[p.id] && FONT_REG[PROG_FONT[p.id]] ? PROG_FONT[p.id] : '';
+  const pref = (p.fonts && p.fonts.title) || pf || (FONT_REG.tajarib ? 'tajarib' : (FONT_REG.tajawal ? 'tajawal' : Object.keys(FONT_REG)[0]));
+  TITLE_RULES.sw = TITLE_RULES.ksh = !!PROG_FONT[p.id];   // معايير عنوان الهوية: الحرف المطوّل حيث يملكه الخط، والكشيدة للموازنة
   FS.title = pref; FS.body = (p.fonts && p.fonts.body) || pref; FS.tw = '';
   FS_PROG = { title: FS.title, body: FS.body, tw: '' };   // خط البرنامج؛ والتصميم الذي اختار خطاً لكل عناوينه يحمله في صفحته (fs)
   await ensureFonts([FS.title, FS.body]);
@@ -173,6 +179,8 @@ async function ensureFonts(fams) {
         const url = f.local || await assetURL(f, !!f.ui);
         const ff = new FontFace(parts[0], 'url(' + url + ')', { weight: f.wrange || String(f.weight || 400), style: f.style || 'normal' });
         await ff.load(); document.fonts.add(ff);
+        // خط له حروف مطوّلة (ss01): نسخة منه بها مفعّلة، لمعيار «الحرف المطوّل» في العنوان (engine: TITLE_RULES)
+        if (SW_FAMS.indexOf(parts[0]) >= 0) { try { const sw = new FontFace(parts[0] + '_sw', 'url(' + url + ')', { weight: f.wrange || String(f.weight || 400), style: f.style || 'normal', featureSettings: '"ss01" 1' }); await sw.load(); document.fonts.add(sw); SWF[parts[0]] = 1; } catch (e) {} }
         if (f.local2) { const f2 = new FontFace(f.w2 ? parts[0] + '-lat' : parts[0], 'url(' + f.local2 + ')', { weight: f.w2 || '400', unicodeRange: 'U+0000-00FF, U+2000-206F' }); await f2.load().catch(function () {}); if (f2.status === 'loaded') { document.fonts.add(f2); if (f.w2) LATF[parts[0]] = 1; } }
       })().catch(function (e) { console.warn('font', fam, e); delete FONT_LOADED[key]; });
       jobs.push(FONT_LOADED[key]);

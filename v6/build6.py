@@ -43,6 +43,7 @@ tags = '\n'.join('<script src="js/%s?v=%s"></script>' % (n, ver(parts[n])) for n
 (OUT / '.nojekyll').write_text('') if '--root' in sys.argv else None
 # خطوط مدمجة مفتوحة الترخيص (خط المصحف «أميري قرآن» برخصة OFL) — لا خطوط مرخّصة هنا
 if (V6 / 'fonts').exists(): shutil.copytree(V6 / 'fonts', OUT / 'fonts', dirs_exist_ok=True)
+if (V6 / 'vendor').exists(): shutil.copytree(V6 / 'vendor', OUT / 'vendor', dirs_exist_ok=True)   # مكتبات تُحمَّل عند الحاجة (pdf.js)
 # صفحة الاستماع العامة (رمز QR في المطبوعات): q.html#السورة.من-إلى.القارئ.التكرار
 (OUT / 'q.html').write_text((V6 / 'q.html').read_text().replace('/*TLV*/', ver(parts['tilawa6.js'])))
 # أيقونات التطبيق ومعاينة الرابط
@@ -71,7 +72,9 @@ app_css = (V6 / 'app' / 'app.css').read_text()
 app_css += ''.join('\n/* ===== ' + f.name + ' ===== */\n' + f.read_text() for f in sorted((V6 / 'app' / 'css').glob('*.css'))) if (V6 / 'app' / 'css').exists() else ''
 app_shell = (V6 / 'app' / 'shell.html').read_text().replace('/*SITE*/', site.replace('v6/', 'app/')).replace('<!--STYLE-->', '<style>\n' + css + '\n</style>').replace('<!--APPSTYLE-->', '<style>\n' + app_css + '\n</style>').replace('<!--MARK-->', brand['mark'])
 shared = [n for n in ORDER if n != 'app6.js']
-app_tags = '\n'.join('<script src="../v6/js/%s?v=%s"></script>' % (n, ver(parts[n])) for n in shared) + '\n' + '\n'.join('<script src="js/%s?v=%s"></script>' % (n, ver(app_parts[n])) for n in APP_ORDER)
+# دخول تيليجرام يبدأ من رأس الصفحة، بعد config.js مباشرة، فيسير طلب الخادم مع تنزيل الملفات لا بعدها
+TG_EARLY = "<script>(function(){try{var w=window.Telegram&&Telegram.WebApp,i=w&&w.initData;if(!i){var m=/[#&]tgWebAppData=([^&]*)/.exec(location.hash);i=m?decodeURIComponent(m[1]):'';}if(!i||!/^https:/.test(API_URL))return;window.TG_EARLY={init:i,p:fetch(API_URL,{method:'POST',body:JSON.stringify({fn:'tg_login',args:[i,JSON.stringify({b:1})]}),redirect:'follow',credentials:'omit'}).then(function(r){return r.json();})};}catch(e){}})();</script>"
+app_tags = '\n'.join('<script src="../v6/js/%s?v=%s"></script>' % (n, ver(parts[n])) + (('\n' + TG_EARLY) if n == 'config.js' else '') for n in shared) + '\n' + '\n'.join('<script src="js/%s?v=%s"></script>' % (n, ver(app_parts[n])) for n in APP_ORDER)
 (APP / 'index.html').write_text(app_shell.replace('<!--SCRIPTS-->', app_tags))
 for n in ['icon-192.png', 'icon-512.png', 'apple-touch-icon.png']:
     if (ICONS / n).exists(): shutil.copy(ICONS / n, APP / 'icons' / n)

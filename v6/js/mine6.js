@@ -68,6 +68,7 @@ function showSlides6(tid) {
         el('p', { class: 'muted rv', style: '--d:1', text: 'عروض للقاءات والمحاضرات، من نقاطك أو من درس، تُعرض حيّة أو تُنزَّل PDF.' }),
         el('div', { class: 'row wrapr rv', style: '--d:2' }, [
           el('button', { type: 'button', class: 'btn dark', onclick: function () { openDeckNew(T.id, [{ tpl: 'sl_cover', d: {} }, { tpl: 'sl_points', d: {} }], 'عرض جديد'); } }, [ico('plus'), 'عرض جديد']),
+          el('button', { type: 'button', class: 'btn or slup', onclick: function () { pickReadyDeck(T); } }, [ico('upload'), 'ارفع عرضًا جاهزًا']),
           el('a', { class: 'btn line', href: '#/mine', onclick: function () { ls('mineTab', 'mine'); }, text: 'عروضي المحفوظة' })]),
         idSel]),
       heroPv
@@ -79,6 +80,10 @@ function showSlides6(tid) {
           return el('div', { class: 'sldeck hover-lift rv', style: '--d:' + i }, [tplThumb(tpl, T, 'slide', 320, st), el('div', { class: 'sldeck-m' }, [el('b', { text: s.name }), el('small', { class: 'tiny', text: s.slides.length + ' شرائح' })]),
             el('div', { class: 'sldeck-a' }, [el('button', { type: 'button', class: 'btn sm dark', onclick: function () { openDeckNew(T.id, s.slides, s.name); } }, [ico('pencil'), 'افتح']), el('button', { type: 'button', class: 'btn sm line', onclick: function () { openDeckNew(T.id, s.slides, s.name); setTimeout(function () { present6(false, 0); }, 900); } }, [ico('play'), 'اعرض'])])]);
         })))]),
+      el('div', { class: 'card slready rv', role: 'button', tabindex: '0', onclick: function () { pickReadyDeck(T); }, onkeydown: function (e) { if (e.key === 'Enter') pickReadyDeck(T); } }, [
+        el('span', { class: 'icon-tile t-or' }, [ico('upload')]),
+        el('div', { class: 'slready-t' }, [el('h3', { text: 'عندك عرض جاهز؟ ارفعه واعرضه هنا' }), el('p', { class: 'muted small', text: 'ملف PDF (من باوربوينت أو كانفا أو قوقل) أو صور الشرائح: تصير كل صفحة شريحة، وتعرضه بأداة العرض المعتادة: ملء الشاشة، وعرض المقدّم، والقلم والقرعة ونقاط الفرق.' })]),
+        el('span', { class: 'btn dark' }, [ico('upload'), 'اختر الملف'])]),
       el('div', { class: 'grid two slways' }, [
         lessonCard(T),
         el('div', { class: 'card rv', style: '--d:1' }, [el('span', { class: 'icon-tile t-bl' }, [ico('content')]), el('h3', { text: 'من نقاطك' }), el('p', { class: 'muted small', text: 'السطر الأول عنوان العرض، و## تبدأ قسماً، والشرطة نقطة، و> عبارة، و«رقم: وصف» شريحة أرقام.' }),
@@ -107,4 +112,78 @@ function showSlides6(tid) {
 function showAllNow(root, soft) {
   const on = function () { $$('.rv,.bwrap', root).forEach(function (x) { x.classList.add('in-view'); }); };
   if (soft) requestAnimationFrame(function () { requestAnimationFrame(on); }); else on();
+}
+
+
+/* ---------- «ارفع عرضًا جاهزًا»: ملف PDF أو صور الشرائح يصير عرضًا يُعرض بأداة العرض المعتادة ----------
+   كل صفحة تُرسم صورة بدقة 1920 بكسل في المتصفح (pdf.js، يُحمَّل عند الحاجة وحدها من vendor/pdfjs)، وتُحفظ في مكتبة صاحبها،
+   وتصير شريحة sl_pdf. ثم يُفتح العرض في المحرر: «اعرض» أو «عرض المقدّم» وكل أدوات الدرس تعمل عليه. */
+const READY_MAX = 120, READY_W = 1920;
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  return new Promise(function (ok, bad) {
+    const sc = document.createElement('script'); sc.src = FONT_BASE + 'vendor/pdfjs/pdf.min.js';
+    sc.onload = function () { try { pdfjsLib.GlobalWorkerOptions.workerSrc = FONT_BASE + 'vendor/pdfjs/pdf.worker.min.js'; ok(pdfjsLib); } catch (e) { bad(e); } };
+    sc.onerror = function () { bad(new Error('تعذّر تحميل قارئ PDF، تحقق من الاتصال وجرّب مرة أخرى')); };
+    document.head.appendChild(sc);
+  });
+}
+function pickReadyDeck(T) {
+  const fi = el('input', { type: 'file', accept: 'application/pdf,.pdf,image/png,image/jpeg,image/webp', multiple: true, hidden: true });
+  fi.onchange = function () { const fs = Array.from(fi.files || []); fi.remove(); if (fs.length) importReadyDeck(T, fs); };
+  document.body.appendChild(fi); fi.click();
+}
+async function importReadyDeck(T, files) {
+  const pdf = files.find(function (f) { return /pdf$/i.test(f.name) || f.type === 'application/pdf'; });
+  const imgs = files.filter(function (f) { return /^image\//.test(f.type); }).sort(function (a, b) { return a.name.localeCompare(b.name, 'ar', { numeric: true }); });
+  if (!pdf && !imgs.length) { toast('اختر ملف PDF أو صور الشرائح'); return; }
+  const maxMb = (V6.settings.maxUploadMb || 20) * 3;
+  if (pdf && pdf.size > maxMb * 1048576) { toast('الملف أكبر من ' + maxMb + ' ميغابايت'); return; }
+  const name = String((pdf || imgs[0]).name).replace(/\.[^.]+$/, '').replace(/[_\-]+/g, ' ').trim().slice(0, 60) || 'عرض جاهز';
+  const bar = el('i'), msg = el('p', { class: 'muted', 'aria-live': 'polite', text: 'نقرأ الملف…' });
+  let stop = false;
+  const dlg = modal({ title: 'نجهّز «' + name + '»', sticky: true, body: [msg, el('div', { class: 'slprog' }, [bar]), el('p', { class: 'tiny muted', text: 'تُحفظ الصفحات في مكتبتك على المنصة، فيعمل العرض من أي جهاز. أبقِ الصفحة مفتوحة حتى ينتهي.' })],
+    acts: [{ t: 'إلغاء', fn: function () { stop = true; } }] });
+  const step = function (i, n, t) { msg.textContent = t; bar.style.width = Math.round(i / Math.max(1, n) * 100) + '%'; };
+  try {
+    // ١) الصفحات صورًا
+    const blobs = [];
+    if (pdf) {
+      const lib = await loadPdfJs();
+      const doc = await lib.getDocument({ data: new Uint8Array(await pdf.arrayBuffer()) }).promise;
+      const n = Math.min(doc.numPages, READY_MAX);
+      if (doc.numPages > READY_MAX) toast('في الملف ' + doc.numPages + ' صفحة، فتؤخذ أول ' + READY_MAX);
+      for (let i = 1; i <= n; i++) {
+        if (stop) return;
+        step(i - 1, n * 2, 'نرسم الصفحة ' + i + ' من ' + n + '…');
+        const pg = await doc.getPage(i), v0 = pg.getViewport({ scale: 1 }), sc = READY_W / Math.max(v0.width, v0.height * 16 / 9), vp = pg.getViewport({ scale: Math.min(4, sc) });
+        const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+        const cx = c.getContext('2d'); cx.fillStyle = '#ffffff'; cx.fillRect(0, 0, c.width, c.height);
+        await pg.render({ canvasContext: cx, viewport: vp }).promise;
+        blobs.push(await new Promise(function (ok) { c.toBlob(ok, 'image/jpeg', 0.92); }));
+        pg.cleanup();
+      }
+      doc.destroy();
+    } else imgs.slice(0, READY_MAX).forEach(function (f) { blobs.push(f); });
+    if (!blobs.length) throw new Error('لم نجد صفحات في الملف');
+    // ٢) الحفظ في مكتبة صاحبها (ثلاث معًا)
+    const n = blobs.length, ids = new Array(n); let done = 0;
+    await pool(blobs.map(function (b, i) { return i; }), 3, async function (i) {
+      if (stop) return;
+      const b = blobs[i], fl = new File([b], name + ' - ' + (i + 1) + (b.type === 'image/png' ? '.png' : '.jpg'), { type: b.type || 'image/jpeg' });
+      const thumb = await thumbFromFile(fl, 320);
+      const res = await uploadAsset(fl, { kind: 'image', thumb: thumb });
+      ASSET_IMG[res.id] = await loadImg(URL.createObjectURL(fl)); V6.mine.unshift(res); V6.assets[res.id] = res;
+      ids[i] = res.id; done++; step(n + done, n * 2, 'نحفظ الشرائح: ' + done + ' من ' + n + '…');
+    });
+    if (stop) return;
+    const lost = ids.filter(function (x) { return !x; }).length;
+    if (lost === n) throw new Error('تعذّر حفظ الشرائح، جرّب مرة أخرى');
+    // ٣) العرض: شريحة لكل صفحة، ثم يُفتح في المحرر
+    const slides = ids.filter(Boolean).map(function (id) { return { tpl: 'sl_pdf', d: { photo: { src: 'asset:' + id, z: 1, ox: 0, oy: 0 } } }; });
+    dlg.close();
+    openDeckNew(T.id, slides, name);
+    track('tool', { tool: 'ready_deck', n: slides.length });
+    setTimeout(function () { toast(lost ? 'جاهز، وتعذّرت ' + lost + ' صفحة. اضغط «اعرض» أو «عرض المقدّم»، واحفظه ليبقى في «عروضي».' : 'جاهز ✓ اضغط «اعرض» أو «عرض المقدّم»، واحفظه ليبقى في «عروضي».'); }, 900);
+  } catch (e) { dlg.close(); toast(e.message || 'تعذّر تجهيز العرض'); }
 }

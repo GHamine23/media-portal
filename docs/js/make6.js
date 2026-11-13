@@ -26,6 +26,8 @@ function showMake6() {
   const qIdea = /(?:^|&)idea=([^&]+)/.exec(qs); if (qIdea) { try { MK.text = decodeURIComponent(qIdea[1]).slice(0, 500); } catch (e) {} MK_LAST = null; }   // من «صمّم بفكرة» في بوت أثر
   // التصميم السريع من بوت أثر: المسار والنوع والمقاس والتفاصيل جاءت من المحادثة، فلا أسئلة: الاقتراحات مباشرة
   if (/(?:^|&)quick=1/.test(qs)) return mkQuick(qs);
+  // التصميم السريع بالقوالب من بوت أثر: الأسئلة أُجيبت في المحادثة، فتُعرض كل قوالب النوع مملوءة بالأجوبة
+  if (/(?:^|&)tq=1/.test(qs)) return mkTpl(qs);
   if (!TRACKS[MK.tid]) MK.tid = ls('lastTrack') && TRACKS[ls('lastTrack')] ? ls('lastTrack') : tracks[0].id;
   if (!canSocial() && MK.type === 'social') MK.type = '';
   // الاقتراحات الأخيرة تبقى ٤٠ دقيقة: الرجوع بزر المتصفح أو من المحرر يعيدها كاملة
@@ -46,9 +48,44 @@ function mkQuick(qs) {
   body.appendChild(el('div', { class: 'boot' }, [loader6(MK.text ? 'يقرأ المساعد تفاصيلك…' : 'يجهّز المساعد أفكاره…')]));
   (async function () {
     try { if (MK.text) await mkIntake(); } catch (e) {}
-    MK.type = g('type') || MK.type || 'ann'; if (g('size')) MK.size = g('size'); MK.tone = MK.tone || 'calm'; mkSave();
+    // اختيار المستخدم في البوت (الجمهور والنبرة) يتقدّم على ما يستنتجه المساعد من النص
+    MK.type = g('type') || MK.type || 'ann'; if (g('size')) MK.size = g('size'); if (g('aud')) MK.aud = g('aud'); if (g('tone')) MK.tone = g('tone'); MK.tone = MK.tone || 'calm'; mkSave();
     mkGenerate(body);
   })();
+}
+// base64url (UTF-8) ← نص
+function b64uText(s) { try { s = String(s || '').replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; const b = atob(s), a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return new TextDecoder().decode(a); } catch (e) { return ''; } }
+function mkTpl(qs) {
+  const g = function (k) { const m = new RegExp('(?:^|&)' + k + '=([^&]*)').exec(qs); try { return m ? decodeURIComponent(m[1]) : ''; } catch (e) { return ''; } };
+  const prog = g('prog');
+  if (prog && V6.prog && V6.prog.id !== prog && !mkTpl.switched && V6.bundle.programs.some(function (p) { return p.id === prog; })) { mkTpl.switched = true; useProgram(prog, true).then(function () { mkTpl(qs); }); return; }
+  let info = {}; try { info = JSON.parse(b64uText(g('f')) || '{}') || {}; } catch (e) { info = {}; }
+  Object.keys(info).forEach(function (k) { info[k] = String(info[k] == null ? '' : info[k]).slice(0, 600); });
+  const tid = g('tid'), T = trackOf(TRACKS[tid] ? tid : (tracksOf()[0] || {}).id); if (!T) return go('#/');
+  const type = g('type') || 'ann', size = g('size') || '';
+  if (typeof idTitleInfo === 'function') info = idTitleInfo(info, T);   // معايير الهوية في العنوان (الكشيدة للعنوان الطويل)
+  MK.tid = T.id; MK.size = size; MK.creative = false; MK.text = ''; MK_LAST = null;
+  const list = tplsForType(type).filter(function (t) { return !size || sizesFor(t).indexOf(size) >= 0; });
+  const all = list.length ? list : tplsForType(type);
+  const designs = all.map(function (tpl) {
+    const pg = pageFromInfo(tpl, T, info); const sz = sizesFor(tpl); pg.size = size && sz.indexOf(size) >= 0 ? size : sz[0];
+    // ما لم يُجب عنه: الخانات الاختيارية وتواريخ القالب المثالية تُخفى، ونص صاحبه يبقى كما كتبه
+    pg.hide = pg.hide || {};
+    if (!info.date) { const def = defaults(tpl, T); mkDateKeys(tpl).forEach(function (k) { if (typeof pg.d[k] === 'string' && pg.d[k].trim() && pg.d[k] === def[k]) pg.hide['f_' + k] = true; }); }
+    tpl.fields.forEach(function (f) { if (f.k && pg.ph && typeof pg.d[f.k] === 'string' && pg.ph[f.k] === pg.d[f.k] && MK_OPTIONAL.indexOf(f.k) >= 0) pg.hide['f_' + f.k] = true; });
+    return { tpl: tpl.id, page: pg, note: (TYPES.find(function (x) { return x.id === tpl.type; }) || {}).name || '' };
+  });
+  document.title = 'قوالبك مملوءة';
+  const grid = el('div', { class: 'tgrid' });
+  view(el('div', { class: 'wrap page mk' }, [
+    el('div', { class: 'phead' }, [el('span', { class: 'eyebrow rv', text: 'التصميم السريع بالقوالب ⚡' }), H('h1', 'قوالب ' + T.name + ' مملوءة ببياناتك')]),
+    el('div', { class: 'card flat mkrev rv', role: 'note' }, [ico('info'), el('div', {}, [el('b', { text: 'راجع قبل أن تنشر' }), el('span', { text: ' القوالب مملوءة تلقائيًا، وقد لا يناسب كل قالب نصك تمامًا (طول العنوان، والتاريخ، والسطور). افتح ما يعجبك وعدّله في المحرر، ثم أرسله أو انشره.' })])]),
+    designs.length ? null : el('p', { class: 'empty', text: 'لا قالب من هذا النوع لهويتك بعد.' }),
+    grid
+  ]));
+  designs.forEach(function (dz, i) { const c = mkCard(T, dz, i, { designs: designs }); if (c) grid.appendChild(c); });
+  revealAll(grid);
+  track('open', { tool: 'tq', n: designs.length });
 }
 // «أرسله لي» في التطبيق المصغّر: يُرسم الاقتراح بجودته الكاملة ويصل المحادثة، بلا فتح المحرر
 async function mkSendTg(T, tpl, dz) {

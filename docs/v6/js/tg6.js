@@ -31,8 +31,13 @@ const TG6 = {
   // يعيد رمز الجلسة، أو null بعد أن يعرض نموذج الطلب أو شاشة الانتظار
   login: async function () {
     let r;
-    try { r = await API6.json('tg_login', TG6.init); } catch (e) { TG6.screen('تعذّر الدخول', e.message, null); return null; }
-    if (r && r.token) { TG6.tgOnly = !!(r.me && r.me.tgOnly); TG6.me = r.me || null; return r.token + '#tg#' + TG6.init; }
+    // الطلب بدأ مبكرًا من رأس الصفحة (TG_EARLY) مع تحميل الملفات، فلا يُنتظر بعدها؛ ومعه حزمة الحساب
+    const early = window.TG_EARLY && TG_EARLY.init === TG6.init ? TG_EARLY.p : null; window.TG_EARLY = null;
+    try {
+      if (early) { const j = await early.catch(function () { return null; }); if (j && j.error) throw new Error(j.error); r = j && j.result != null ? (typeof j.result === 'string' ? JSON.parse(j.result) : j.result) : null; }
+      if (!r) r = await API6.json('tg_login', TG6.init, '{"b":1}');
+    } catch (e) { TG6.screen('تعذّر الدخول', e.message, null); return null; }
+    if (r && r.token) { TG6.tgOnly = !!(r.me && r.me.tgOnly); TG6.me = r.me || null; if (r.bundle && r.bundle.programs) V6.preBundle = r.bundle; return r.token + '#tg#' + TG6.init; }
     if (r && r.pending) { TG6.screen('أهلاً بك في أثر 🌿', 'يتم مراجعة حسابك قبل قبول الدخول، وتصلك رسالة في البوت حين يُقبل.', null); return null; }
     TG6.request(r || {}); return null;
   },

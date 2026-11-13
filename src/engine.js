@@ -247,7 +247,66 @@ function academy(ctx, color, x, y, w, anchor) { if (HIDE.academy) return { w: 0,
 function social(ctx, color, x, y, w, anchor) { if (HIDE.social) return { w: 0, h: 0 }; return placeImg(ctx, tinted('social', color), x, y, w, anchor, 'social'); }
 
 /* ---------- النصوص ---------- */
-function setF(ctx, size, fam) { ctx.font = F(size, fam); ctx.direction = 'rtl'; ctx.textBaseline = 'middle'; }
+function setF(ctx, size, fam) { ctx.font = F(size, fam); ctx.direction = 'rtl'; ctx.textBaseline = 'middle'; ctx._f0 = ctx.font; ctx._swf = swFam(fam) ? F(size, swFam(fam)) : ''; }
+
+/* ---------- معايير عنوان الهوية (خط الأكاديمية، نوفمبر ٢٠٢٦) ----------
+   sw: الحرف المطوّل في آخر كلمة مناسبة من كل سطر (المجموعة الأسلوبية ss01 في «عام الحرف اليدوية»: ت ف ش س ن ب ق ص ض ك ي ى…)،
+       بنسخة من الخط نفسه مسجّلة باسم «العائلة_sw» وفيها ss01 مفعّلة (SWF). سطر لا يتسع للحرف المطوّل يبقى بلا تطويل.
+   ksh: الكشيدة لموازنة العنوان الطويل: السطر الأقصر يُمدّ بالتطويل (ـ) في كلماته حتى يقارب أطول سطر.
+   يفعّلهما البرنامج (useProgram)، ولا يمسّان عنوانًا كتب صاحبه التطويل بيده. */
+const TITLE_RULES = { sw: false, ksh: false };
+const SWF = {};   // عائلة ← 1 إن سُجّلت نسختها المطوّلة
+function swFam(fam) { if (!fam || !TITLE_RULES.sw) return ''; const i = fam.indexOf('|'), nm = i > 0 ? fam.slice(0, i) : fam; return SWF[nm] ? nm + '_sw' + (i > 0 ? fam.slice(i) : '') : ''; }
+const SW_END = /[بتثسشصضفقكنيىئ][\u064B-\u0652\u0670]*$/;   // كلمة تنتهي بحرف له شكل مطوّل
+const NOJOIN = 'اأإآٱدذرزوؤءة';   // حروف لا تتصل بما بعدها، فلا كشيدة بعدها
+function kashidaAt(t) {   // موضع التطويل في كلمة: بعد حرف يتصل بما بعده وقبل حرف عربي، أقرب ما يكون إلى آخرها
+  const L = []; for (let i = 0; i < t.length; i++) if (/[\u0621-\u064A]/.test(t[i])) L.push(i);
+  for (let k = L.length - 2; k >= 0; k--) {
+    const a = t[L[k]], b = t[L[k + 1]];
+    if (NOJOIN.indexOf(a) >= 0 || a === 'ـ' || b === 'ـ' || (a === 'ل' && /[اأإآ]/.test(b))) continue;   // لام ألف رباط واحد
+    let j = L[k] + 1; while (j < t.length && /[\u064B-\u0652\u0670]/.test(t[j])) j++;   // بعد حركات الحرف
+    if (t[j] === 'ـ') continue;
+    return j;
+  }
+  return -1;
+}
+function titleRules(ctx, lines, size, fam, maxW) {
+  const plain = lines.every(function (l) { return l.words.every(function (w) { return w.every(function (g) { return g.t.indexOf('ـ') < 0; }); }); });
+  if (!plain) return;
+  setF(ctx, size, fam);
+  // حرف مطوّل واحد في العنوان كله: آخر كلمة من آخر سطر يصلح لها (من الأسفل إلى الأعلى)، فيمتد في نهاية السطر.
+  // يملأ فراغ سطر أقصر ولا يوسّع العنوان: عرض أطول سطر يبقى كما هو، فلا يزاحم ما حوله في القالب
+  const w0 = Math.max.apply(null, lines.map(function (l) { return l.w; }).concat([0]));
+  if (ctx._swf) for (let i = lines.length - 1; i >= 0; i--) {
+    const l = lines[i], w = l.words[l.words.length - 1]; if (!w || !SW_END.test(w[w.length - 1].t)) continue;
+    w.forEach(function (g) { g.sw = true; });
+    const nw = lineWidth(ctx, l.words);
+    if (nw <= Math.min(maxW, w0) + 0.5) { l.w = nw; break; }
+    w.forEach(function (g) { delete g.sw; });   // لا يتسع: بلا تطويل، ونجرّب السطر الذي فوقه
+  }
+  if (!TITLE_RULES.ksh || lines.length < 2) return;
+  // الكشيدة: موضع واحد في الكلمة يُمدّ بتطويلة إلى ثلاث، في الكلمات الأطول أولًا. لا تُمدّ كلمة مطوّلة الحرف،
+  // ولا سطر من كلمة واحدة، ولا سطر يقصر كثيرًا (أقل من ٦٠٪ من الأطول): الكشيدة توازن ولا تملأ فراغًا
+  const widest = Math.max.apply(null, lines.map(function (l) { return l.w; }));
+  lines.forEach(function (l) {
+    if (l.w >= widest * 0.92 || l.w < widest * 0.6 || l.words.length < 2) return;
+    const cand = [];
+    l.words.forEach(function (w) { w.forEach(function (g) { const nl = (g.t.match(/[\u0621-\u064A]/g) || []).length; if (!g.sw && nl >= 3) { const j = kashidaAt(g.t); if (j > 0) cand.push({ g: g, j: j, n: 0, max: Math.min(3, Math.floor(nl / 2)) }); } }); });
+    cand.sort(function (a, b) { return b.g.t.length - a.g.t.length; });
+    if (!cand.length) return;
+    for (let round = 0; round < 3; round++) {
+      for (let c = 0; c < cand.length; c++) {
+        if (l.w >= widest * 0.92) return;
+        const q = cand[c]; if (q.n >= q.max) continue;
+        const old = q.g.t; q.g.t = old.slice(0, q.j) + 'ـ' + old.slice(q.j);
+        const nw = lineWidth(ctx, l.words);
+        if (nw > widest) { q.g.t = old; return; }
+        l.w = nw; q.n++;
+      }
+    }
+  });
+}
+
 
 // يقسم النص إلى كلمات، وما بين *نجمتين* يُلوَّن بلون التمييز. الكلمة قد تكون قطعاً ملتصقة مختلفة اللون
 function tokens(str) {
@@ -273,16 +332,18 @@ function runsOf(words) {
   words.forEach(function (w) {
     w.forEach(function (seg, j) {
       const last = runs[runs.length - 1];
-      if (last && last.hl === seg.hl) last.t += (j ? '' : ' ') + seg.t;
-      else runs.push({ t: seg.t, hl: seg.hl, sp: runs.length > 0 && j === 0 });
+      if (last && last.hl === seg.hl && !last.sw === !seg.sw) last.t += (j ? '' : ' ') + seg.t;
+      else runs.push({ t: seg.t, hl: seg.hl, sw: !!seg.sw, sp: runs.length > 0 && j === 0 });
     });
   });
   return runs;
 }
+// عرض قطعة نص، بالنسخة المطوّلة من الخط إن كانت قطعتها مطوّلة
+function mW(ctx, r) { if (!r.sw || !ctx._swf) return ctx.measureText(r.t).width; const f0 = ctx.font; ctx.font = ctx._swf; const w = ctx.measureText(r.t).width; ctx.font = f0; return w; }
 function lineWidth(ctx, words) {
   const sp = ctx.measureText(' ').width;
   let w = 0;
-  runsOf(words).forEach(function (r) { w += ctx.measureText(r.t).width + (r.sp ? sp : 0); });
+  runsOf(words).forEach(function (r) { w += mW(ctx, r) + (r.sp ? sp : 0); });
   return w;
 }
 
@@ -341,6 +402,7 @@ function fit(ctx, str, o) {
     size *= 0.95;
   }
   const empty = !String(str || '').trim();
+  if (!empty && (TITLE_RULES.sw || TITLE_RULES.ksh) && (o.role === 'title' || (o.title && o.role !== 'body'))) titleRules(ctx, lines, size, fo.fam, o.maxW);
   const widest = Math.max.apply(null, lines.map(function (l) { return l.w; }).concat([0]));
   // ما يتجاوز صندوق السطر من رؤوس الحروف وذيولها، فيُحسب في الارتفاع ولا يلامس ما حوله
   let pt = 0, pb = 0;
@@ -379,10 +441,12 @@ function drawFit(ctx, f, x, y, o) {
       if (r.sp) xr -= sp;
       const col = r.hl ? ((gs && gs.h) || o.hl || hlFor(o.color)) : ((gs && gs.c) || o.color);
       ctx.fillStyle = col;
+      const f0 = ctx.font; if (r.sw && ctx._swf) ctx.font = ctx._swf;
       if (o.ol) { ctx.save(); ctx.shadowColor = 'transparent'; ctx.strokeStyle = o.ol; ctx.lineWidth = f.size * (o.olw || 0.08); ctx.lineJoin = 'round'; ctx.miterLimit = 2; ctx.strokeText(r.t, xr, yc); ctx.restore(); }   // حدّ حول الحروف (نص مضاف)
       if (f.stroke) { ctx.strokeStyle = col; ctx.lineWidth = f.size * 0.045 * f.stroke; ctx.lineJoin = 'round'; ctx.strokeText(r.t, xr, yc); }
       ctx.fillText(r.t, xr, yc);
       xr -= ctx.measureText(r.t).width;
+      ctx.font = f0;
     });
     if (dim) ctx.restore();
   });
