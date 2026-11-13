@@ -1,6 +1,6 @@
 import os; _R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 """خط الأكاديمية ومعايير العنوان (الحرف المطوّل والكشيدة)، والتصميم السريع بالقوالب من بوت أثر (#/make?tq=1).
-يحتاج ملفات «عام الحرف اليدوية» في /home/claude/fonts_hc/ (لا تُرفع إلى المستودع: حقوقها محفوظة)."""
+ملفات «عام الحرف اليدوية» في المستودع: assets/fonts/handicrafts/."""
 import asyncio, sys, json, base64
 sys.path.insert(0, _R + '/v6')
 from t6 import setup, URL, OUT
@@ -14,7 +14,7 @@ async def main():
         errs = await setup(pg)
         # رفع خط الأكاديمية كما يرفعه المدير من «الخطوط»
         for f in HC:
-            data = base64.b64encode(open('/home/claude/fonts_hc/' + f, 'rb').read()).decode()
+            data = base64.b64encode(open(_R + '/assets/fonts/handicrafts/' + f, 'rb').read()).decode()
             await pg.evaluate("""([f, d]) => { const fm = familyOf(f); return API6.me('asset_put', JSON.stringify({ kind: 'font', name: f, family: fm.family, label: fm.label, weight: weightOf(f), mime: 'font/otf', scope: 'program', program: 'academy' }), d); }""", [f, data])
         await pg.evaluate("refreshBundle()"); await pg.wait_for_timeout(2500)
         await pg.evaluate("useProgram('academy')"); await pg.wait_for_timeout(3000)
