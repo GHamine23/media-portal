@@ -997,12 +997,17 @@ function tgAcc_(accs, tg) { tg = String(tg || ''); if (!tg) return null; for (va
 function tgName_(u) { return clip_([u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || 'مستخدم', 80); }
 
 /* ---------- الدخول من التطبيق المصغّر ---------- */
-function tg_login(init) {
+// opt «{"b":1}»: يعيد معه حزمة الحساب (bundle) فلا يُطلب بعده طلب ثانٍ. وجلسة تيليجرام الصالحة تُعاد كما هي بلا كتابة،
+// لأن كل طلب يتحقق من بيانات تيليجرام الموقّعة نفسها (auth_)، والكتابة في ملفات درايف هي أبطأ ما في فتح أثر
+function tg_login(init, opt) {
   var v = abotInit_(init), accs = readJson_('accounts.json', {}), a = tgAcc_(accs, v.id);
+  var wantB = /"b"\s*:\s*1/.test(String(opt || ''));
   if (a) {
     if (a.disabled) throw new Error('هذا الحساب موقوف');
     var first = !a.tgSeen, fresh = a.tgSeen && now_() - (a.tgLast || 0) < 3600000 && (a.tgUser || !v.user.username);
-    var res = withLock_(function () {
+    var reuse = '';
+    if (fresh) { var ss0 = readJson_('sessions.json', {}), t0 = now_(); for (var k0 in ss0) { var s0 = ss0[k0]; if (s0 && s0.u === a.uid && s0.tg === v.id && s0.e > t0 + 3600000) { reuse = k0; break; } } }
+    var res = reuse ? { token: reuse, me: meOf_(a) } : withLock_(function () {
       var all = readJson_('accounts.json', {}), x = all[a.uid];
       if (!fresh) {   // تسجيل آخر دخول مرة في الساعة: كتابة ملف الحسابات تبطئ فتح أثر
         x.last = now_(); x.tgLast = now_(); if (!x.tgSeen) x.tgSeen = now_();
@@ -1017,7 +1022,8 @@ function tg_login(init) {
     });
     if (first && a.tgPre) abotAdminLine_('دخل ' + h0_(a.name) + ' (' + h0_(a.username) + ') إلى أثر من تيليجرام لأول مرة');
     res.me.tgOnly = !!a.noPw; res.me.via = 'tg';
-    abotLog_({ r: 'ok', k: 'دخول التطبيق' });
+    if (wantB) { try { res.bundle = JSON.parse(bundleOf_(readJson_('accounts.json', {})[a.uid] || a)); } catch (e) {} }
+    abotLog_({ r: 'ok', k: reuse ? 'دخول التطبيق (جلسة قائمة)' : 'دخول التطبيق' });
     return JSON.stringify(res);
   }
   var q = readJson_('tgreq.json', []).filter(function (r) { return r.tg === v.id && r.status === 'new'; })[0];
@@ -1252,7 +1258,8 @@ function abotUpdate_(u) {
   var st = abotState_(from);
   if (!c && ABOT_KEYMAP[text]) { c = ABOT_KEYMAP[text]; abotState_(from, ''); st = ''; }   // أزرار لوحة المفاتيح الدائمة
   switch (c) {
-    case 'start': abotState_(from, ''); if (!(a.prefs || {}).tgKb2) return abotWelcome_(a, 'back'); return abotMenu_(a, true);
+    case 'start': abotState_(from, ''); if (!(a.prefs || {})[ABOT_KB]) return abotWelcome_(a, 'back'); return abotMenu_(a, true);
+    case 'des': abotState_(from, ''); abotKbOnce_(a); return abotDes_(a);
     case 'menu': abotState_(from, ''); return abotMenu_(a);
     case 'quick': abotState_(from, ''); return abotQuick_(a, null, null);
     case 'design': return abotDesign_(a);
@@ -1269,6 +1276,7 @@ function abotUpdate_(u) {
   if (st === 'fb') { abotState_(from, ''); return abotFeedback_(a, text, null); }
   if (st === 'idea') { abotState_(from, ''); return abotIdea_(a, text); }
   if (st === 'quick') { abotState_(from, ''); return abotQuickDone_(a, text); }
+  if (st === 'tq') return abotTqText_(a, text);
   return abotAsk_(a, text);
 }
 function abotPw_(a) {
@@ -1289,15 +1297,17 @@ function abotAskAsk_(a) { return abotCard_(a.tg, { k: 'اسأل أثر ❓', h: 
 function abotFbAsk_(a) { return abotCard_(a.tg, { k: 'اقتراح أو ملاحظة 💬', h: 'رأيك يصنع أثرًا', p: 'اكتب رسالتك، ولك أن ترفق صورة معها. تصل إلى صندوق الاقتراحات في المنصة باسمك، ويقرؤها فريق أثر.', note: 'اكتب رسالتك الآن 👇' }); }
 // لوحة مفاتيح دائمة تحت خانة الكتابة: قائمة المهام ظاهرة دائمًا (أزرار نصية؛ زر «افتح أثر» فيها يرد بزر التطبيق المصغّر،
 // لأن التطبيق إذا فُتح من زر لوحة المفاتيح لا تصله بيانات الدخول)
-var ABOT_KEYS = [['⚡ تصميم سريع'], ['🎨 افتح أثر', '💡 صمّم بفكرة'], ['❓ اسأل أثر', '🎬 دليل أثر'], ['✏️ تعلّم التصميم', '📋 القائمة']];
-var ABOT_KEYMAP = { '⚡ تصميم سريع': 'quick', '🎨 افتح أثر': 'design', '💡 صمّم بفكرة': 'idea', '❓ اسأل أثر': 'ask', '🎬 دليل أثر': 'guide', '✏️ تعلّم التصميم': 'learn', '📋 القائمة': 'menu' };
+// زر «🎨 تصميم» واحد يعرض الطريقتين: السريع بالقوالب، والذكاء الاصطناعي. والأزرار القديمة تبقى مفهومة لمن عنده اللوحة السابقة
+var ABOT_KEYS = [['🎨 تصميم'], ['🖼️ افتح أثر', '❓ اسأل أثر'], ['🎬 دليل أثر', '✏️ تعلّم التصميم'], ['📋 القائمة']];
+var ABOT_KEYMAP = { '🎨 تصميم': 'des', '🖼️ افتح أثر': 'design', '⚡ تصميم سريع': 'des', '🎨 افتح أثر': 'design', '💡 صمّم بفكرة': 'idea', '❓ اسأل أثر': 'ask', '🎬 دليل أثر': 'guide', '✏️ تعلّم التصميم': 'learn', '📋 القائمة': 'menu' };
+var ABOT_KB = 'tgKb3';   // إصدار لوحة المفاتيح الدائمة: تُرسل الجديدة مرة لكل حساب
 function abotKeys_() {
   return JSON.stringify({ keyboard: ABOT_KEYS.map(function (r) { return r.map(function (t) { return { text: t }; }); }), is_persistent: true, resize_keyboard: true, input_field_placeholder: 'اكتب سؤالك عن أثر، أو اختر من الأزرار' });
 }
 function abotMenuRows_() {
-  return [[{ text: '⚡ تصميم سريع: طق طق وخلصنا', callback_data: 'm:quick' }], [abotWeb_('🎨 افتح أثر', '')],
-    [{ text: '💡 صمّم بفكرة', callback_data: 'm:idea' }, { text: '❓ اسأل أثر', callback_data: 'm:ask' }],
-    [{ text: '🎬 دليل أثر', callback_data: 'm:guide' }, { text: '✏️ تعلّم التصميم', callback_data: 'm:learn' }],
+  return [[{ text: '🎨 تصميم', callback_data: 'm:des' }], [abotWeb_('🖼️ افتح أثر', '')],
+    [{ text: '❓ اسأل أثر', callback_data: 'm:ask' }, { text: '🎬 دليل أثر', callback_data: 'm:guide' }],
+    [{ text: '✏️ تعلّم التصميم', callback_data: 'm:learn' }],
     [{ text: '💬 اقتراح أو ملاحظة', callback_data: 'm:fb' }, { text: '🔔 الإشعارات', callback_data: 'm:notify' }],
     [{ text: '🔑 كلمة سر للموقع', callback_data: 'm:pw' }]];
 }
@@ -1311,18 +1321,21 @@ function abotWelcome_(a, kind) {
   var p = kind === 'back' ? 'هنا تصمّم إعلانات مسارك وتستلمها بجودتها الكاملة، وتسأل عن أي شيء في المنصة.'
     : 'حسابك في أثر «' + a.username + '» صار معك هنا: تدخل أثر من تيليجرام بلا كلمة سر.';
   abotCard_(a.tg, { k: k, h: abotHi_(a.name), p: p, items: [
-    ['⚡', 'تصميم سريع', 'اختر المسار والنوع، واكتب التفاصيل، فتصلك اقتراحات بهوية مسارك وترسل ما يعجبك إلى هنا.'],
+    ['🎨', 'تصميم', 'سريع بالقوالب: أسئلة قصيرة ثم تراه في كل قوالب مسارك مملوءة ببياناتك. أو بالذكاء الاصطناعي من فكرتك.'],
     ['🎨', 'صمّم واستلم هنا', 'اضغط «افتح أثر» بجانب خانة الكتابة، واختر قالبًا، ثم «تنزيل»: يصلك التصميم هنا بجودته الكاملة.'],
     ['❓', 'اسأل أثر', 'اكتب لي أي سؤال عن المنصة فأجيبك، وفي «دليل أثر» مقطع قصير لكل قسم.'],
     ['✏️', 'تعلّم التصميم', 'قاعدة بعد قاعدة، وتقرير أسبوعي بأرقامك كل سبت.']],
     note: 'الأزرار تحت خانة الكتابة دائمًا 👇' }, abotKeys_());
-  abotPref_(a.uid, 'tgKb2', 1);
+  abotPref_(a.uid, ABOT_KB, 1);
 }
 
 /* ---------- التصميم السريع في المحادثة: المسار ← النوع ← المقاس ← التفاصيل ← الاقتراحات ----------
    الخطوات رسالة واحدة تتبدّل بالأزرار؛ والرسم في التطبيق المصغّر (المصمّم الذكي بلا أسئلة)، ومنه «أرسله لي» فيصل التصميم هنا. */
 var QUICK_TYPES = [['ann', '📣 إعلان لقاء أو نشاط'], ['comp', '🏆 مسابقة'], ['thanks', '🎉 تهنئة أو شكر'], ['quote', '💬 عبارة أو تذكير'], ['daily', '📖 المقرر اليومي'], ['cover', '🗂️ غلاف أو جدول']];
 var QUICK_SIZES = [['post', '🖼️ منشور'], ['square', '⬛ مربع'], ['story', '📱 قصة'], ['', '✨ اختر لي']];
+// أسئلة تخصّص طلب الذكاء الاصطناعي فتأتي نتائجه أدق: لمن الإعلان، وبأي نبرة (قيمها نفسها في المصمّم الذكي MK_AUD وMK_TONE)
+var QUICK_AUD = [['students', '🎓 الطلاب'], ['parents', '👨‍👩‍👧 أولياء الأمور'], ['staff', '🧑‍🏫 المربون والفريق'], ['all', '🌍 الجميع']];
+var QUICK_TONE = [['calm', '🌿 هادئة'], ['bold', '🔥 حماسية'], ['formal', '🎩 رسمية'], ['warm', '🤍 دافئة وقريبة'], ['spirit', '🕊️ روحانية']];
 function abotQuickTracks_(a) {
   var out = [], mine = a.tracks || [];
   progsFor_(a).forEach(function (p) { (p.identities || []).forEach(function (i) { if (!mine.length || mine.indexOf(i.id) >= 0) out.push({ p: p.id, id: i.id, name: i.name || i.id, prog: p.name }); }); });
@@ -1330,29 +1343,36 @@ function abotQuickTracks_(a) {
 }
 function abotQs_(tg, v) { var c = CacheService.getScriptCache(), k = 'tgqd:' + tg; if (v === undefined) { try { return JSON.parse(c.get(k) || '{}'); } catch (e) { return {}; } } c.put(k, JSON.stringify(v), 3600); }
 function abotQuickText_(o, step) {
-  var L = ['<b>⚡ التصميم السريع</b>'], tr = o.tname ? '🎯 المسار: <b>' + h0_(o.tname) + '</b>' : '';
+  var L = ['<b>🤖 التصميم بالذكاء الاصطناعي</b>'], tr = o.tname ? '🎯 المسار: <b>' + h0_(o.tname) + '</b>' : '';
+  var nm = function (arr, v) { return h0_((arr.filter(function (x) { return x[0] === v; })[0] || ['', v])[1].replace(/^\S+\s/, '')); };
   if (tr) L.push(tr);
   if (o.type) L.push('🧩 النوع: <b>' + h0_((QUICK_TYPES.filter(function (x) { return x[0] === o.type; })[0] || ['', o.type])[1].replace(/^\S+\s/, '')) + '</b>');
-  if (o.size != null && step === 'd') L.push('📐 المقاس: <b>' + h0_((QUICK_SIZES.filter(function (x) { return x[0] === o.size; })[0] || ['', 'اختر لي'])[1].replace(/^\S+\s/, '')) + '</b>');
+  if (o.size != null && /[and]/.test(step)) L.push('📐 المقاس: <b>' + h0_((QUICK_SIZES.filter(function (x) { return x[0] === o.size; })[0] || ['', 'اختر لي'])[1].replace(/^\S+\s/, '')) + '</b>');
+  if (o.aud) L.push('👥 الجمهور: <b>' + nm(QUICK_AUD, o.aud) + '</b>');
+  if (o.tone) L.push('🎨 النبرة: <b>' + nm(QUICK_TONE, o.tone) + '</b>');
   L.push('');
-  L.push(step === 't' ? 'لأي مسار التصميم؟ 👇' : step === 'y' ? 'ما نوع التصميم؟ 👇' : step === 's' ? 'أين ستنشره؟ 👇' :
-    '✍️ <b>اكتب التفاصيل في رسالة واحدة</b>: العنوان، والمقدّم، والموعد، والمكان… وما لا تذكره يُترك خانة تكملها.\nمثال: <i>لقاء «بيوت مطمئنة» مع د. محمد، الخميس ٨:٣٠ مساءً على زوم</i>');
+  L.push(step === 't' ? 'لأي مسار التصميم؟ 👇' : step === 'y' ? 'ما نوع التصميم؟ 👇' : step === 's' ? 'أين ستنشره؟ 👇' : step === 'a' ? 'لمن الإعلان؟ 👇' : step === 'n' ? 'بأي نبرة تريد الصياغة؟ 👇' :
+    '✍️ <b>اكتب فكرتك وتفاصيلها</b>: الموضوع أو العنوان، والمقدّم، والموعد، والمكان، وما تريد أن يركّز عليه الإعلان. كلما زادت التفاصيل كانت النتيجة أدق.\nمثال: <i>لقاء «بيوت مطمئنة» مع د. محمد، الخميس ٨:٣٠ مساءً على زوم، عن السكينة في البيت، ونريد أن يشعر الطالب أنه مدعوّ شخصيًا</i>\n\n⚠️ نتائج الذكاء الاصطناعي قد لا تكون الأفضل، وتتأخر دقيقة أو أكثر. فإن أردت الأسرع فاختر «⚡ تصميم سريع بالقوالب».');
   return L.join('\n');
 }
 function abotQuick_(a, data, mid) {
   var tg = a.tg, o = data ? abotQs_(tg) : {}, step, rows = [];
   var tracks = abotQuickTracks_(a);
-  if (!tracks.length) return abotCard_(tg, { k: 'التصميم السريع ⚡', h: 'لا مسار لحسابك بعد', p: 'اطلب من مشرف برنامجك إضافة مسارك، ثم جرّب من جديد.' });
-  if (data && /^qx:/.test(data)) { abotState_(tg, ''); abotQs_(tg, {}); return abot_('editMessageText', { chat_id: tg, message_id: String(mid), text: 'أُلغي التصميم السريع. متى شئت اضغط «⚡ تصميم سريع» 🌿', parse_mode: 'HTML' }); }
+  if (!tracks.length) return abotCard_(tg, { k: 'التصميم 🎨', h: 'لا مسار لحسابك بعد', p: 'اطلب من مشرف برنامجك إضافة مسارك، ثم جرّب من جديد.' });
+  if (data && /^qx:/.test(data)) { abotState_(tg, ''); abotQs_(tg, {}); return abot_('editMessageText', { chat_id: tg, message_id: String(mid), text: 'أُلغي التصميم. متى شئت اضغط «🎨 تصميم» 🌿', parse_mode: 'HTML' }); }
   if (data && /^qt:/.test(data)) { var t = tracks.filter(function (x) { return x.p + '.' + x.id === data.slice(3); })[0]; if (t) { o = { p: t.p, tid: t.id, tname: t.name }; } }
   if (data && /^qy:/.test(data)) o.type = data.slice(3);
-  if (data && /^qs:/.test(data)) o.size = data.slice(3);
+  if (data && /^qs:/.test(data)) o.size = data.slice(3).split(':')[0];
+  if (data && /^qa:/.test(data)) o.aud = data.slice(3);
+  if (data && /^qn:/.test(data)) o.tone = data.slice(3);
   if (!data && tracks.length === 1) o = { p: tracks[0].p, tid: tracks[0].id, tname: tracks[0].name };
   if (!o.tid) { step = 't'; tracks.slice(0, 24).forEach(function (t, i) { if (i % 2 === 0) rows.push([]); rows[rows.length - 1].push({ text: '🎯 ' + clip_(t.name, 26), callback_data: 'qt:' + t.p + '.' + t.id }); }); }
   else if (!o.type) { step = 'y'; QUICK_TYPES.forEach(function (x, i) { if (i % 2 === 0) rows.push([]); rows[rows.length - 1].push({ text: x[1], callback_data: 'qy:' + x[0] }); }); }
   else if (o.size == null) { step = 's'; rows.push(QUICK_SIZES.slice(0, 3).map(function (x) { return { text: x[1], callback_data: 'qs:' + x[0] }; })); rows.push([{ text: QUICK_SIZES[3][1], callback_data: 'qs:' }]); }
+  else if (!o.aud) { step = 'a'; QUICK_AUD.forEach(function (x, i) { if (i % 2 === 0) rows.push([]); rows[rows.length - 1].push({ text: x[1], callback_data: 'qa:' + x[0] }); }); }
+  else if (!o.tone) { step = 'n'; QUICK_TONE.forEach(function (x, i) { if (i % 2 === 0) rows.push([]); rows[rows.length - 1].push({ text: x[1], callback_data: 'qn:' + x[0] }); }); }
   else { step = 'd'; abotState_(tg, 'quick'); rows.push([{ text: '🎲 بلا تفاصيل: دعه يبدع', callback_data: 'qs:' + o.size + ':c' }]); }
-  if (data && /^qs:[a-z]*:c$/.test(data)) { o.size = data.split(':')[1]; abotQs_(tg, o); abotState_(tg, ''); return abotQuickDone_(a, '', mid); }
+  if (data && /^qs:[a-z]*:c$/.test(data)) { abotQs_(tg, o); abotState_(tg, ''); return abotQuickDone_(a, '', mid); }
   rows.push([{ text: '✖️ إلغاء', callback_data: 'qx:' }]);
   abotQs_(tg, o);
   var p = { chat_id: tg, text: abotQuickText_(o, step), parse_mode: 'HTML', reply_markup: abotKb_(rows) };
@@ -1363,13 +1383,136 @@ function abotQuick_(a, data, mid) {
 function abotQuickDone_(a, text, mid) {
   var o = abotQs_(a.tg); if (!o.tid) return abotQuick_(a, null, null);
   var idea = clip_(String(text || '').trim(), 350), creative = !idea;
-  var q = '/make?quick=1&prog=' + encodeURIComponent(o.p) + '&tid=' + encodeURIComponent(o.tid) + '&type=' + encodeURIComponent(o.type || 'ann') + '&size=' + encodeURIComponent(o.size || '') + (creative ? '&creative=1' : '&idea=' + encodeURIComponent(idea));
+  var q = '/make?quick=1&prog=' + encodeURIComponent(o.p) + '&tid=' + encodeURIComponent(o.tid) + '&type=' + encodeURIComponent(o.type || 'ann') + '&size=' + encodeURIComponent(o.size || '') + '&aud=' + encodeURIComponent(o.aud || '') + '&tone=' + encodeURIComponent(o.tone || '') + (creative ? '&creative=1' : '&idea=' + encodeURIComponent(idea));
   if (mid) { try { abot_('editMessageReplyMarkup', { chat_id: a.tg, message_id: String(mid), reply_markup: abotKb_([]) }); } catch (e) {} }
   var ty = (QUICK_TYPES.filter(function (x) { return x[0] === o.type; })[0] || ['', ''])[1];
   abotQs_(a.tg, {});
-  return abotCard_(a.tg, { k: 'التصميم السريع ⚡', h: 'جاهز! اقتراحاتك تنتظرك ✨', items: [['🎯', 'المسار', o.tname], ['🧩', 'النوع', ty.replace(/^\S+\s/, '')]].concat(idea ? [['✍️', 'التفاصيل', idea]] : [['🎲', 'بلا تفاصيل', 'يبدع المصمّم الذكي من عنده']]),
-    note: 'اضغط الزر: تُفتح الاقتراحات بهوية مسارك، واضغط «📩 أرسله لي» تحت ما يعجبك فيصلك هنا.' },
-    abotKb_([[abotWeb_('✨ اعرض اقتراحاتي', q)], [{ text: '⚡ تصميم سريع آخر', callback_data: 'm:quick' }]]));
+  var nm = function (arr, v) { return (arr.filter(function (x) { return x[0] === v; })[0] || ['', ''])[1].replace(/^\S+\s/, ''); };
+  return abotCard_(a.tg, { k: 'التصميم بالذكاء الاصطناعي 🤖', h: 'جاهز! اقتراحاتك تنتظرك ✨', items: [['🎯', 'المسار', o.tname], ['🧩', 'النوع', ty.replace(/^\S+\s/, '')]].concat(o.aud ? [['👥', 'الجمهور', nm(QUICK_AUD, o.aud)]] : [], o.tone ? [['🎨', 'النبرة', nm(QUICK_TONE, o.tone)]] : [], idea ? [['✍️', 'التفاصيل', idea]] : [['🎲', 'بلا تفاصيل', 'يبدع المصمّم الذكي من عنده']]),
+    note: 'اضغط الزر: تُفتح الاقتراحات بهوية مسارك بعد دقيقة أو أكثر، واضغط «📩 أرسله لي» تحت ما يعجبك فيصلك هنا. راجع النصوص والمواعيد قبل النشر، فالذكاء قد يخطئ.' },
+    abotKb_([[abotWeb_('✨ اعرض اقتراحاتي', q)], [{ text: '🎨 تصميم آخر', callback_data: 'm:des' }]]));
+}
+
+// لوحة المفاتيح الجديدة لمن عنده القديمة: مرة واحدة
+function abotKbOnce_(a) {
+  if ((a.prefs || {})[ABOT_KB]) return;
+  try { abot_('sendMessage', { chat_id: a.tg, text: 'حُدّثت الأزرار تحت خانة الكتابة: صار «🎨 تصميم» زرًا واحدًا فيه الطريقتان 👇', reply_markup: abotKeys_() }); } catch (e) {}
+  abotPref_(a.uid, ABOT_KB, 1);
+}
+// «🎨 تصميم»: الطريقتان
+function abotDes_(a) {
+  return abotCard_(a.tg, { k: 'التصميم 🎨', h: 'كيف تحب أن تصمّم؟', items: [
+    ['⚡', 'تصميم سريع بالقوالب', 'أسئلة قصيرة واحدًا بعد واحد (العنوان، والمقدّم، والموعد…)، ثم تراه في كل قوالب مسارك مملوءة ببياناتك، وترسل ما يعجبك إلى هنا.'],
+    ['🤖', 'تصميم بالذكاء الاصطناعي', 'يقترح المصمّم الذكي نصوصًا وتصاميم من فكرتك. نتائجه قد لا تكون الأفضل، ويتأخر دقيقة أو أكثر.']],
+    note: 'الأسرع والأضمن: «⚡ تصميم سريع بالقوالب».' },
+    abotKb_([[{ text: '⚡ تصميم سريع بالقوالب', callback_data: 'm:qf' }], [{ text: '🤖 تصميم بالذكاء الاصطناعي', callback_data: 'm:quick' }]]));
+}
+
+/* ---------- التصميم السريع بالقوالب: المسار ← النوع ← المقاس ← أسئلة القالب واحدًا بعد واحد ← كل القوالب مملوءة ----------
+   الحقول نفسها التي تفهمها القوالب (WIZ_FIELDS في src/studio.js): kind title sub who date time place name body.
+   كل سؤال رسالة، وله أزرار جاهزة حيث تنفع، و«تخطَّ». والحالة في الذاكرة المؤقتة tgtq:<المستخدم> ساعة. */
+var TQ_FIELDS = {
+  ann: [['title', 'ما عنوان اللقاء أو النشاط؟', 'بيوتٌ مطمئنّة', 1], ['kind', 'ما نوعه؟', '', 0, ['لقاء', 'محاضرة', 'ورشة عمل', 'مجلس', 'دورة', 'استضافة']], ['who', 'من المقدّم؟ (مع اللقب)', 'أ. محمد'], ['date', 'في أي يوم؟'], ['time', 'في أي ساعة؟'], ['place', 'أين يُقام؟', '', 0, ['عبر زوم', 'عبر ميت', 'في تيليجرام', 'في المسجد']], ['sub', 'سطر إضافي تحت العنوان؟ (اختياري)', 'لماذا وكيف؟']],
+  comp: [['title', 'ما اسم المسابقة؟', 'لله من أسمائه تسعونا', 1], ['kind', 'ما نوعها؟', 'مسابقة حفظ منظومة:', 0, ['مسابقة حفظ', 'مسابقة ثقافية', 'مسابقة تصميم', 'تحدٍّ']], ['sub', 'المدة أو الجائزة؟ (اختياري)', 'المدة: ٥ أيام'], ['date', 'موعد التسميع أو آخر موعد؟']],
+  thanks: [['name', 'اسم المكرَّم أو المهنَّأ؟', 'عبدالله محمد', 1], ['sub', 'سطر التمهيد؟ (اختياري)', 'تتقدم إدارة المسار بخالص التهنئة للطالب:'], ['body', 'نص التهنئة أو الشكر؟', 'وذلك تقديرًا لتميّزه في *مسابقة الحفظ*.']],
+  quote: [['title', 'العنوان؟', 'اليوم يُغلق الاختبار', 1], ['body', 'العبارة أو الآية أو الحديث؟', 'إنما مسراك هذا ساعةٌ لزمانِ'], ['sub', 'المصدر أو سطر إضافي؟ (اختياري)', '']],
+  daily: [['title', 'ما المقرر؟', 'أبجديات الثقافة: العهد المدني', 1], ['kind', 'نوعه؟', '', 0, ['محاضرة:', 'قراءة:', 'مشاهدة:', 'حفظ:']], ['sub', 'ملاحظة؟ (اختياري)', 'مشاهدة درس وفاة الرسول ﷺ'], ['date', 'لأي يوم؟']],
+  cover: [['title', 'العنوان؟', 'لقاءات الأسبوع', 1], ['sub', 'تحت العنوان؟ (اختياري)', 'جدول الأسبوع الأول'], ['body', 'اللقاءات: كل لقاء في سطر (اليوم | العنوان | الوصف | الوقت)', 'الأربعاء | ديوانية الأربعاء | مجلس ودي | 6:00 م']]
+};
+var TQ_TIMES = ['4:00 م', '5:00 م', '7:30 م', '8:00 م', '8:30 م', '9:00 م', '9:30 م', '10:00 م'];
+var TQ_DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+function abotTqs_(tg, v) { var c = CacheService.getScriptCache(), k = 'tgtq:' + tg; if (v === undefined) { try { return JSON.parse(c.get(k) || '{}'); } catch (e) { return {}; } } c.put(k, JSON.stringify(v), 3600); }
+function abotTqDays_() {   // اليوم والأيام العشرة بعده (توقيت الرياض/إسطنبول)
+  var out = [], t = new Date();
+  for (var i = 0; i < 11; i++) {
+    var d = new Date(t.getTime() + i * 864e5), iso = Utilities.formatDate(d, 'Asia/Riyadh', 'yyyy-MM-dd'), p = iso.split('-');
+    var wd = TQ_DAYS[new Date(+p[0], +p[1] - 1, +p[2], 12).getDay()];
+    out.push([iso, i === 0 ? 'اليوم' : i === 1 ? 'غدًا ' + wd : wd + ' ' + (+p[2]) + '/' + (+p[1])]);
+  }
+  return out;
+}
+function abotTqVal_(f, v) {
+  if (f === 'date') { var p = String(v || '').split('-'); if (p.length !== 3) return v; return TQ_DAYS[new Date(+p[0], +p[1] - 1, +p[2], 12).getDay()] + ' ' + (+p[2]) + '/' + (+p[1]); }
+  return v;
+}
+function abotTqText0_(o, q) {   // نص رسالة السؤال: ما جُمع حتى الآن، ثم السؤال
+  var L = ['<b>⚡ التصميم السريع بالقوالب</b>'];
+  if (o.tname) L.push('🎯 المسار: <b>' + h0_(o.tname) + '</b>');
+  if (o.type) L.push('🧩 النوع: <b>' + h0_((QUICK_TYPES.filter(function (x) { return x[0] === o.type; })[0] || ['', o.type])[1].replace(/^\S+\s/, '')) + '</b>');
+  var fl = TQ_FIELDS[o.type] || [];
+  fl.forEach(function (f) { if (o.i && o.i[f[0]]) L.push('✔️ ' + h0_(f[1].replace(/\s*\(.*\)\s*|؟/g, '')) + ': <b>' + h0_(clip_(abotTqVal_(f[0], o.i[f[0]]), 80)) + '</b>'); });
+  L.push('');
+  if (q === 't') L.push('لأي مسار التصميم؟ 👇');
+  else if (q === 'y') L.push('ما نوع التصميم؟ 👇');
+  else if (q === 's') L.push('أين ستنشره؟ 👇');
+  else if (q && q.f) {
+    var f = q.f, n = (o.k || 0) + 1;
+    L.push('<b>' + n + '/' + fl.length + ' · ' + h0_(f[1]) + '</b>');
+    if (f[0] === 'title') L.push('💡 من هوية الأكاديمية: شكّل العنوان بالحد الأدنى من الحركات (مثل: <i>بُيوتٌ مطمئنّة</i>). وما تكتبه بين *نجمتين* يظهر بلون مميز.');
+    else if (f[2]) L.push('مثال: <i>' + h0_(f[2]) + '</i>');
+    L.push(f[0] === 'date' || f[0] === 'time' || f[4] ? 'اختر من الأزرار أو اكتب جوابك 👇' : 'اكتب جوابك 👇');
+  }
+  return L.join('\n');
+}
+function abotTqAsk_(a, o, mid) {   // يرسل السؤال الحالي (أو يبدّل الرسالة إن جاء من زر)
+  var tg = a.tg, rows = [], fl = TQ_FIELDS[o.type] || [], q;
+  if (!o.tid) { q = 't'; abotQuickTracks_(a).slice(0, 24).forEach(function (t, i) { if (i % 2 === 0) rows.push([]); rows[rows.length - 1].push({ text: '🎯 ' + clip_(t.name, 26), callback_data: 'gt:' + t.p + '.' + t.id }); }); }
+  else if (!o.type) { q = 'y'; QUICK_TYPES.forEach(function (x, i) { if (i % 2 === 0) rows.push([]); rows[rows.length - 1].push({ text: x[1], callback_data: 'gy:' + x[0] }); }); }
+  else if (o.size == null) { q = 's'; rows.push(QUICK_SIZES.slice(0, 3).map(function (x) { return { text: x[1], callback_data: 'gb:' + x[0] }; })); rows.push([{ text: '✨ كل المقاسات', callback_data: 'gb:' }]); }
+  else if ((o.k || 0) < fl.length) {
+    var f = fl[o.k || 0]; q = { f: f };
+    if (f[0] === 'date') { abotTqDays_().forEach(function (d, i) { if (i % 3 === 0) rows.push([]); rows[rows.length - 1].push({ text: d[1], callback_data: 'gd:' + d[0] }); }); }
+    else if (f[0] === 'time') { TQ_TIMES.forEach(function (t, i) { if (i % 4 === 0) rows.push([]); rows[rows.length - 1].push({ text: t, callback_data: 'gm:' + t }); }); }
+    else if (f[4]) { f[4].forEach(function (t, i) { if (i % 3 === 0) rows.push([]); rows[rows.length - 1].push({ text: t, callback_data: 'gm:' + t }); }); }
+    abotState_(tg, 'tq');
+    rows.push([{ text: f[3] ? '⏭️ تخطَّ (أكتبه في التصميم)' : '⏭️ تخطَّ', callback_data: 'gk:' }]);
+  }
+  else return abotTqDone_(a, o, mid);
+  rows.push([{ text: '✖️ إلغاء', callback_data: 'gx:' }]);
+  abotTqs_(tg, o);
+  var p = { chat_id: tg, text: abotTqText0_(o, q), parse_mode: 'HTML', reply_markup: abotKb_(rows) };
+  if (mid) { p.message_id = String(mid); try { return abot_('editMessageText', p); } catch (e) { delete p.message_id; } }
+  return abot_('sendMessage', p);
+}
+function abotTq_(a, data, mid) {
+  var tg = a.tg, tracks = abotQuickTracks_(a), o = data ? abotTqs_(tg) : {};
+  if (!tracks.length) return abotCard_(tg, { k: 'التصميم 🎨', h: 'لا مسار لحسابك بعد', p: 'اطلب من مشرف برنامجك إضافة مسارك، ثم جرّب من جديد.' });
+  if (data && /^gx:/.test(data)) { abotState_(tg, ''); abotTqs_(tg, {}); return abot_('editMessageText', { chat_id: tg, message_id: String(mid), text: 'أُلغي التصميم. متى شئت اضغط «🎨 تصميم» 🌿', parse_mode: 'HTML' }); }
+  if (!data) { o = { i: {}, k: 0 }; if (tracks.length === 1) { o.p = tracks[0].p; o.tid = tracks[0].id; o.tname = tracks[0].name; } }
+  o.i = o.i || {};
+  var fl = TQ_FIELDS[o.type] || [], cur = fl[o.k || 0];
+  if (data && /^gt:/.test(data)) { var t = tracks.filter(function (x) { return x.p + '.' + x.id === data.slice(3); })[0]; if (t) { o.p = t.p; o.tid = t.id; o.tname = t.name; } }
+  else if (data && /^gy:/.test(data)) { if (TQ_FIELDS[data.slice(3)]) { o.type = data.slice(3); o.k = 0; o.i = {}; } }
+  else if (data && /^gb:/.test(data)) o.size = data.slice(3);
+  else if (data && /^gk:/.test(data)) { if (cur) o.k = (o.k || 0) + 1; }
+  else if (data && /^g[dm]:/.test(data)) { if (cur) { o.i[cur[0]] = clip_(data.slice(3), 200); o.k = (o.k || 0) + 1; } }
+  return abotTqAsk_(a, o, data ? mid : null);
+}
+function abotTqText_(a, text) {   // جواب مكتوب للسؤال الحالي
+  var o = abotTqs_(a.tg), fl = TQ_FIELDS[o.type] || [], cur = fl[o.k || 0];
+  if (!o.tid || !cur) { abotState_(a.tg, ''); return abotTq_(a, null, null); }
+  var v = String(text || '').trim();
+  if (cur[0] === 'date') {   // تاريخ مكتوب: ٢٠/١١ أو 2026-11-20؛ وإلا يبقى نصًا (مثل «بعد العشاء»)
+    var ar = v.replace(/[٠-٩]/g, function (c) { return '٠١٢٣٤٥٦٧٨٩'.indexOf(c); }), m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(ar) || null, m2 = /^(\d{1,2})\s*[\/\-.]\s*(\d{1,2})(?:\s*[\/\-.]\s*(\d{2,4}))?$/.exec(ar);
+    if (m) v = m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
+    else if (m2) { var y = m2[3] ? (+m2[3] < 100 ? 2000 + +m2[3] : +m2[3]) : +Utilities.formatDate(new Date(), 'Asia/Riyadh', 'yyyy'); var cand = y + '-' + ('0' + m2[2]).slice(-2) + '-' + ('0' + m2[1]).slice(-2); if (!m2[3] && cand < Utilities.formatDate(new Date(), 'Asia/Riyadh', 'yyyy-MM-dd')) cand = (y + 1) + cand.slice(4); v = cand; }
+    else { abotSend_(a.tg, 'اكتب التاريخ هكذا: <b>٢٠/١١</b>، أو اختر من الأزرار.'); return; }
+  }
+  o.i[cur[0]] = clip_(v, cur[0] === 'body' ? 600 : 200); o.k = (o.k || 0) + 1;
+  return abotTqAsk_(a, o, null);
+}
+// كل الأسئلة أُجيبت: الخلاصة وزر يفتح كل القوالب مملوءة
+function abotTqDone_(a, o, mid) {
+  abotState_(a.tg, '');
+  var info = JSON.stringify(o.i || {}), f = Utilities.base64EncodeWebSafe(info, Utilities.Charset.UTF_8).replace(/=+$/, '');
+  var q = '/make?tq=1&prog=' + encodeURIComponent(o.p) + '&tid=' + encodeURIComponent(o.tid) + '&type=' + encodeURIComponent(o.type) + '&size=' + encodeURIComponent(o.size || '') + '&f=' + f;
+  if (mid) { try { abot_('editMessageReplyMarkup', { chat_id: a.tg, message_id: String(mid), reply_markup: abotKb_([]) }); } catch (e) {} }
+  var items = [['🎯', 'المسار', o.tname]], fl = TQ_FIELDS[o.type] || [];
+  fl.forEach(function (x) { if (o.i[x[0]]) items.push(['✔️', x[1].replace(/\s*\(.*\)\s*|؟/g, ''), clip_(abotTqVal_(x[0], o.i[x[0]]), 120)]); });
+  abotTqs_(a.tg, {});
+  return abotCard_(a.tg, { k: 'التصميم السريع بالقوالب ⚡', h: 'جاهز! قوالب مسارك مملوءة ببياناتك ✨', items: items.slice(0, 8),
+    note: 'اضغط الزر فترى كل القوالب. القوالب قد لا تناسب نصك تمامًا، فراجع ما يعجبك وعدّله قبل النشر، ثم «📩 أرسله لي» فيصلك هنا.' },
+    abotKb_([[abotWeb_('✨ اعرض القوالب مملوءة', q)], [{ text: '🎨 تصميم آخر', callback_data: 'm:des' }]]));
 }
 
 /* ---------- الأزرار ---------- */
@@ -1399,7 +1542,10 @@ function abotCallback_(q) {
   if (!a) return ack('ادخل أثر أولًا', true);
   if (data === 'm:idea') { ack(); abotState_(from, 'idea'); return abotIdeaAsk_(a); }
   if (data === 'm:quick') { ack(); abotState_(from, ''); return abotQuick_(a, null, null); }
-  if (/^q[tysx]:/.test(data)) { ack(); return abotQuick_(a, data, msg.message_id); }
+  if (/^q[tysxan]:/.test(data)) { ack(); return abotQuick_(a, data, msg.message_id); }
+  if (data === 'm:des') { ack(); abotState_(from, ''); return abotDes_(a); }
+  if (data === 'm:qf') { ack(); abotState_(from, ''); return abotTq_(a, null, null); }
+  if (/^g[tydmkbx]:/.test(data)) { ack(); return abotTq_(a, data, msg.message_id); }
   if (data === 'm:ask') { ack(); abotState_(from, 'ask'); return abotAskAsk_(a); }
   if (data === 'm:guide') { ack(); return abotGuide_(a); }
   if (data === 'm:learn') { ack(); return abotTip_(a, 1); }
@@ -1624,7 +1770,7 @@ function abotSetup_() {
     ['setMyName', { name: 'أثر | المنصة الإعلامية' }, 'الاسم'],
     ['setMyShortDescription', { short_description: 'صمّم إعلانات مسارك بهوية الأكاديمية، واستلمها هنا.' }, 'الوصف القصير'],
     ['setMyDescription', { description: 'باب منصة الأثر الإعلامي للعاملين في الأكاديمية. ادخل بحسابك في تيليجرام بلا كلمة سر، وصمّم من قوالب مسارك، فيصلك تصميمك هنا بجودته الكاملة. واسأل أثر عن أي شيء في المنصة.' }, 'الوصف'],
-    ['setMyCommands', { commands: JSON.stringify([['start', 'البداية'], ['quick', 'تصميم سريع ⚡'], ['design', 'افتح أثر'], ['idea', 'صمّم بفكرة'], ['guide', 'دليل أثر'], ['ask', 'اسأل أثر'], ['learn', 'تعلّم التصميم'], ['feedback', 'اقتراح أو ملاحظة'], ['notify', 'الإشعارات'], ['password', 'كلمة سر للموقع']].map(function (c) { return { command: c[0], description: c[1] }; })) }, 'الأوامر'],
+    ['setMyCommands', { commands: JSON.stringify([['start', 'البداية'], ['des', 'تصميم 🎨'], ['design', 'افتح أثر'], ['idea', 'صمّم بفكرة'], ['guide', 'دليل أثر'], ['ask', 'اسأل أثر'], ['learn', 'تعلّم التصميم'], ['feedback', 'اقتراح أو ملاحظة'], ['notify', 'الإشعارات'], ['password', 'كلمة سر للموقع']].map(function (c) { return { command: c[0], description: c[1] }; })) }, 'الأوامر'],
     // علامة الاتجاه (LRM) قبل النص العربي: بدونها يرسم تيليجرام في أندرويد اسم الزر خارجه فوق خانة الكتابة
     ['setChatMenuButton', { menu_button: JSON.stringify({ type: 'web_app', text: '\u200Eافتح أثر', web_app: { url: abotApp_('') } }) }, 'زر القائمة']
   ];
@@ -1700,8 +1846,9 @@ function prog_del(token, id) {
   });
 }
 // كل ما يحتاجه المستخدم بعد الدخول: برامجه وهوياتها وفهرس أصولها (بلا محتوى الملفات)
-function bundle(token) {
-  var a = auth_(token), progs = progsFor_(a), ids = {};
+function bundle(token) { return bundleOf_(auth_(token)); }
+function bundleOf_(a) {
+  var progs = progsFor_(a), ids = {};
   progs.forEach(function (p) { ids[p.id] = 1; });
   var assets = readJson_('assets.json', []).filter(function (x) { return x.scope === 'global' || (x.scope === 'program' && ids[x.program]); })
     .map(assetPub_);
