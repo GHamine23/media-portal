@@ -159,7 +159,7 @@ function showTemp(name, username, temp) {
     acts: [{ t: 'نسخ الرسالة', cls: 'dark', keep: true, fn: function () { copyText(txt); } }, { t: 'تم' }] });
 }
 function accForm(a, done) {
-  const isNew = !a; a = a || { name: '', username: '', email: '', role: 'user', programs: V6.me.role === 'sup' ? V6.me.programs.slice(0, 1) : [V6.prog.id], perms: { slides: true } };
+  const isNew = !a; a = a || { name: '', username: '', email: '', role: 'user', programs: V6.me.role === 'sup' ? V6.me.programs.slice(0, 1) : [V6.prog.id], perms: { social: true, ai: true, upload: true, slides: true } };   // الصلاحيات الأساسية لكل حساب جديد
   const nameI = el('input', { type: 'text', id: 'ac_name', value: a.name }), userI = el('input', { type: 'text', id: 'ac_user', dir: 'auto', value: a.username, placeholder: 'مثل: ahmad أو أحمد.الشهري' }), mailI = el('input', { type: 'email', id: 'ac_mail', dir: 'ltr', value: a.email });
   let role = a.role;
   const progs = el('div', { class: 'checks' }, myAdminProgs().map(function (p) { return el('label', { class: 'tog' }, [el('input', { type: 'checkbox', value: p.id, checked: a.programs.indexOf(p.id) >= 0 }), el('span', { text: p.name })]); }));
@@ -644,7 +644,7 @@ async function aSettings(body) {
   const pollOn = el('input', { type: 'checkbox', checked: s.ai.pollFallback !== false });
   const capPrompt = el('textarea', { class: 'inp', rows: '4', dir: 'auto', placeholder: 'مثال: ابدأ كل رسالة بسطر ترحيبي قصير، واختم بالوسم ورابط القناة. لا تستعمل أكثر من رمزين تعبيريين. نبرة هادئة محفّزة.', 'aria-label': 'تعليمات النص المصاحب' }); capPrompt.value = s.ai.capPrompt || '';
   // هل الخادم المنشور هو نفسه نسخة الموقع؟ (يمنع حيرة «حفظتُ ولم يتغير شيء»)
-  const SRV_EXPECT = 'cb3f9d90', srvOk = !!s.srvVer && s.srvVer === SRV_EXPECT;
+  const SRV_EXPECT = '28c13c7c', srvOk = !!s.srvVer && s.srvVer === SRV_EXPECT;
   body.appendChild(el('div', { class: 'srvver ' + (srvOk ? 'ok' : 'old') }, [ico(srvOk ? 'check' : 'info'), el('span', { text: srvOk ? 'الخادم محدَّث ويطابق نسخة الموقع.' : 'الخادم المنشور أقدم من الموقع: بعض الإعدادات لن تُحفظ أو لن تعمل. الصق server/Code.gs في Apps Script، ثم «إدارة عمليات النشر» ← تعديل النشر الحالي ← «إصدار جديد» ← نشر.' }), el('small', { dir: 'ltr', text: (s.srvVer || '—') + ' / ' + SRV_EXPECT })]));
   body.appendChild(el('div', { class: 'grid two' }, [
     el('div', { class: 'card' }, [el('span', { class: 'icon-tile t-pu' }, [ico('ai')]), el('h3', { text: 'اصنع إعلانك بالذكاء' }),

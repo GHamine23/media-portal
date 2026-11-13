@@ -159,7 +159,7 @@ function showTemp(name, username, temp) {
     acts: [{ t: 'نسخ الرسالة', cls: 'dark', keep: true, fn: function () { copyText(txt); } }, { t: 'تم' }] });
 }
 function accForm(a, done) {
-  const isNew = !a; a = a || { name: '', username: '', email: '', role: 'user', programs: V6.me.role === 'sup' ? V6.me.programs.slice(0, 1) : [V6.prog.id], perms: { slides: true } };
+  const isNew = !a; a = a || { name: '', username: '', email: '', role: 'user', programs: V6.me.role === 'sup' ? V6.me.programs.slice(0, 1) : [V6.prog.id], perms: { social: true, ai: true, upload: true, slides: true } };   // الصلاحيات الأساسية لكل حساب جديد
   const nameI = el('input', { type: 'text', id: 'ac_name', value: a.name }), userI = el('input', { type: 'text', id: 'ac_user', dir: 'auto', value: a.username, placeholder: 'مثل: ahmad أو أحمد.الشهري' }), mailI = el('input', { type: 'email', id: 'ac_mail', dir: 'ltr', value: a.email });
   let role = a.role;
   const progs = el('div', { class: 'checks' }, myAdminProgs().map(function (p) { return el('label', { class: 'tog' }, [el('input', { type: 'checkbox', value: p.id, checked: a.programs.indexOf(p.id) >= 0 }), el('span', { text: p.name })]); }));

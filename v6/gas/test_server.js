@@ -5,6 +5,7 @@ const ROOT = path.resolve(__dirname, '../..');
 const ctx = Object.assign({ console: { log: function () {}, warn: function () { if (process.env.DBG) console.error.apply(console, arguments); } }, JSON, Date, Math, Object, Array, String, Number, Error, RegExp, encodeURIComponent }, GAS);
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'server/Code.gs'), 'utf8'), ctx, { filename: 'Code.gs' });
+GAS._props.MIG_PERMS_DEF1 = '1';   // منح الصلاحيات الأساسية يُختبر وحده في آخر الملف
 GAS._fetch.handler = function (url, opt) {
   if (url.indexOf('raw.githubusercontent.com/GHamine23/media-portal/main/assets/') >= 0) {
     const f = path.join(ROOT, 'assets', url.split('/main/assets/')[1]);
@@ -952,6 +953,20 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   const rq = J('tg_req_list', adm).filter(function (r) { return r.tg === '77'; })[0];
   ok(J('tg_req_act', adm, rq.id, 'x').status === 'no' && J('tg_login', mkInit(RAMI)).need, 'rejected from the admin panel');
   GAS._fetch.handler = keep;
+})();
+// الصلاحيات الأساسية لكل الحسابات (قرار ١٣ نوفمبر): تُضاف لمن ينقصه، مرة واحدة من المؤقت، وللمدير أن يعيدها
+(function () {
+  const adm = J('auth_login', 'admin', 'StrongPass#1').token;
+  const A = ctx.readJson_('accounts.json', {}); let one = null;
+  Object.keys(A).forEach(function (k) { if (A[k].role === 'user' && !one) { one = k; A[k].perms = { send: true }; } }); ctx.writeJson_('accounts.json', A);
+  delete GAS._props.MIG_PERMS_DEF1; ctx.tgTick();
+  const B = ctx.readJson_('accounts.json', {});
+  ok(B[one].perms.ai && B[one].perms.social && B[one].perms.upload && B[one].perms.slides && B[one].perms.send && GAS._props.MIG_PERMS_DEF1 === '1', 'default perms granted to every account once, keeping extra ones');
+  ok(Object.keys(B).every(function (k) { return B[k].role === 'super' || ctx.DEFAULT_PERMS.every(function (p) { return B[k].perms && B[k].perms[p]; }); }), 'no account left without the default perms');
+  B[one].perms.ai = false; ctx.writeJson_('accounts.json', B); ctx.tgTick();
+  ok(ctx.readJson_('accounts.json', {})[one].perms.ai === false, 'the timer migration runs once: an admin can still revoke later');
+  fails('acc_grant_defaults', /للمدير العام/, J('auth_login', 'nokey1', 'NoKey12345').token);
+  ok(J('acc_grant_defaults', adm).updated >= 1 && ctx.readJson_('accounts.json', {})[one].perms.ai === true, 'super admin can re-grant the defaults');
 })();
 // server/Code.gs مبني من src/Code.gs: كل تعديل للخادم يكون في المصدر ثم «python3 v6/build_gs.py».
 // (عُدّل الملف المبني مرة مباشرة فمحا إعادة البناء كود الحساب الموحّد؛ هذا الفحص يمنع تكرارها)

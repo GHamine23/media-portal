@@ -103,7 +103,7 @@ function apiFns_() {
     api_tpl_save: api_tpl_save, api_tpl_del: api_tpl_del, api_packs: api_packs, api_feedback: api_feedback,
     // الإصدار السادس
     info: info, auth_login: auth_login, auth_me: auth_me, auth_logout: auth_logout, auth_password: auth_password, prefs_save: prefs_save,
-    acc_list: acc_list, acc_save: acc_save, acc_reset: acc_reset, acc_import: acc_import,
+    acc_list: acc_list, acc_save: acc_save, acc_grant_defaults: acc_grant_defaults, acc_reset: acc_reset, acc_import: acc_import,
     prog_list: prog_list, prog_save: prog_save, prog_del: prog_del, bundle: bundle,
     asset_put: asset_put, asset_get: asset_get, asset_batch: asset_batch, asset_list: asset_list, asset_meta: asset_meta, asset_del: asset_del,
     ui_fonts: ui_fonts, ui_font_get: ui_font_get,
@@ -191,6 +191,20 @@ function clip_(s, n) { return String(s == null ? '' : s).slice(0, n); }
    sessions.json: { token: {u, e: انتهاء, l: آخر استخدام} } */
 var ROLES = { super: 'المدير العام', sup: 'مشرف برنامج', user: 'مستخدم' };
 var PERMS = ['social', 'ai', 'upload', 'fonts', 'slides', 'send'];
+// صلاحيات التصميم الأساسية لكل حساب (قرار أمين ١٣ نوفمبر): مواقع التواصل، والذكاء الاصطناعي والمصمّم الذكي، ورفع الصور، والعروض.
+// تُعطى لكل حساب جديد، وتُضاف مرة واحدة لكل حساب قائم ينقصه شيء منها (permsDefaults_). ويبقى للمدير أن يسحبها من حساب بعينه.
+var DEFAULT_PERMS = ['social', 'ai', 'upload', 'slides'];
+function withDefPerms_(pp) { var o = Object.assign({}, pp || {}); DEFAULT_PERMS.forEach(function (k) { o[k] = true; }); return o; }
+function permsDefaults_() {
+  return withLock_(function () {
+    var accs = readJson_('accounts.json', {}), n = 0;
+    Object.keys(accs).forEach(function (k) { var a = accs[k]; if (a.role === 'super') return; var miss = DEFAULT_PERMS.some(function (p) { return !(a.perms && a.perms[p]); }); if (miss) { a.perms = withDefPerms_(a.perms); n++; } });
+    if (n) writeJson_('accounts.json', accs);
+    return n;
+  });
+}
+// للمدير العام: يعيد منح الصلاحيات الأساسية لكل الحسابات (مثل ما جرى مرة عند النشر)
+function acc_grant_defaults(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var n = permsDefaults_(); audit_(a, 'منح الصلاحيات الأساسية لكل الحسابات', n + ' حسابًا'); return JSON.stringify({ updated: n }); }
 // درجة التعديل في القوالب: content المحتوى فقط، style المحتوى والمظهر، full كامل. الفارغة = درجة البرنامج
 var EDIT_LEVELS = { content: 1, style: 1, full: 1 };   // صلاحيات قابلة للمنح لكل حساب
 var SESSION_DAYS = 30;
@@ -439,7 +453,7 @@ function acc_import(token, program) {
       var u = old[key], base = normUser_(u.name).replace(/[^؀-ۿa-z0-9._\- ]/g, '').slice(0, 36) || 'user', name = base, n = 2;
       while (findAcc_(accs, name)) name = base + ' ' + (n++);
       var temp = tempPass_(), salt = Utilities.getUuid();
-      var a = { uid: uid_(), username: name, email: '', name: clip_(u.name, 80), role: 'user', programs: [program], perms: {}, salt: salt, hash: pwHash_(salt, temp),
+      var a = { uid: uid_(), username: name, email: '', name: clip_(u.name, 80), role: 'user', programs: [program], perms: withDefPerms_({}), salt: salt, hash: pwHash_(salt, temp),
         mustChange: true, created: now_(), last: u.last || 0, fails: 0, prefs: u.prefs || {}, legacyKey: key };
       accs[a.uid] = a; out.push({ username: name, name: a.name, temp: temp });
     });
@@ -505,6 +519,7 @@ function linkPeerPerms_(accs, track) {
   };
   var users = Object.keys(accs).map(function (k) { return accs[k]; }).filter(function (x) { return x.role === 'user' && !x.disabled && !x.linkSup && (x.programs || []).indexOf(LINK_PROG) >= 0; });
   var r = pick(users.filter(function (x) { return (x.tracks || []).indexOf(track) >= 0; })) || pick(users) || { p: {}, e: '' };
+  r.p = withDefPerms_(r.p);
   return r;
 }
 function linkSup_(a, on) {
@@ -2812,6 +2827,7 @@ function tg_requeue(token, id, when) {
 // المؤقّت (كل عشر دقائق): يرسل ما حان موعده، ويولّد الموعد التالي للمتكرر، ويُشعر صاحبه، ثم يرسل تذكيرات المهام
 function tgTick() {
   JC = {};
+  try { if (props_().getProperty('MIG_PERMS_DEF1') !== '1') { permsDefaults_(); props_().setProperty('MIG_PERMS_DEF1', '1'); } } catch (e) { console.warn('perms', e); }
   try { tgSendDue_(); } catch (e) { console.warn('tgSendDue_', e); }
   try { taskRemindTick_(); } catch (e) { console.warn('taskRemindTick_', e); }
   try { if (abotOn_()) { var c = CacheService.getScriptCache(); if (!c.get('abpk')) { c.put('abpk', '1', 3500); abotPacks_(); } abotDrain_(); } } catch (e) { console.warn('abot', e); }
