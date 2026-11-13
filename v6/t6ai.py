@@ -24,7 +24,7 @@ async def main():
         # الحرف المطوّل: آخر كلمة مناسبة في السطر
         r = await pg.evaluate("""(function(){ const c=document.createElement('canvas').getContext('2d');
           const f1=fit(c,'لقاء الأسرة المطمئنة',{maxW:2000,size:80,title:true});
-          const f2=fit(c,'البيت',{maxW:2000,size:80,title:true});
+          const f2=fit(c,'بيوت هادئة\\nالبيت',{maxW:2000,size:80,title:true});
           const sw=function(f){ return f.lines.map(function(l){ return l.words.map(function(w){ return w.map(function(g){ return (g.sw?'^':'')+g.t; }).join(''); }).join(' '); }); };
           const f3=fit(c,'الثبات على الطريق في زمن الفتن',{maxW:650,size:80,title:true});
           const f4=fit(c,'الصبر',{maxW:2000,size:80,title:false,role:'body'});
@@ -32,7 +32,9 @@ async def main():
           return [sw(f1),sw(f2),sw(f3),f3.lines.map(function(l){return Math.round(l.w);}),sw(f4),sw(f5)]; })()""")
         print(json.dumps(r, ensure_ascii=False))
         ok(r[0] == ['لقاء الأسرة المطمئنة'], 'no swash letter at the end (ة) → unchanged')
-        ok(r[1] == ['^البيت'], 'word ending in ت gets the swash form')
+        ok(r[1] == ['بيوت هادئة', '^البيت'], 'last word of a shorter line ending in ت gets the swash form')
+        r2 = await pg.evaluate("(function(){ const c=document.createElement('canvas').getContext('2d'); const f=fit(c,'لقاء المسابقات',{maxW:2000,size:80,title:true}); return f.lines[0].words.some(w=>w.some(g=>g.sw)); })()")
+        ok(not r2, 'a one-line title is not widened by the swash')
         ok(len(r[2]) == 2 and 'ـ' in r[2][1] and 'ـ' not in r[2][0], 'long title: kashida added to balance the shorter line only')
         ok(r[4] == ['الصبر'], 'body text untouched')
         ok(r[5] == ['لقاء الأسـرة'], 'a title with a hand-written tatweel is left as written')

@@ -274,13 +274,16 @@ function titleRules(ctx, lines, size, fam, maxW) {
   const plain = lines.every(function (l) { return l.words.every(function (w) { return w.every(function (g) { return g.t.indexOf('ـ') < 0; }); }); });
   if (!plain) return;
   setF(ctx, size, fam);
-  if (ctx._swf) lines.forEach(function (l) {
-    const w = l.words[l.words.length - 1]; if (!w) return;   // آخر كلمة في السطر وحدها: الحرف المطوّل يمتد في نهاية السطر
-    if (!SW_END.test(w[w.length - 1].t)) return;
+  // حرف مطوّل واحد في العنوان كله: آخر كلمة من آخر سطر يصلح لها (من الأسفل إلى الأعلى)، فيمتد في نهاية السطر.
+  // يملأ فراغ سطر أقصر ولا يوسّع العنوان: عرض أطول سطر يبقى كما هو، فلا يزاحم ما حوله في القالب
+  const w0 = Math.max.apply(null, lines.map(function (l) { return l.w; }).concat([0]));
+  if (ctx._swf) for (let i = lines.length - 1; i >= 0; i--) {
+    const l = lines[i], w = l.words[l.words.length - 1]; if (!w || !SW_END.test(w[w.length - 1].t)) continue;
     w.forEach(function (g) { g.sw = true; });
     const nw = lineWidth(ctx, l.words);
-    if (nw <= maxW + 0.5) l.w = nw; else w.forEach(function (g) { delete g.sw; });   // لا يتسع: بلا تطويل
-  });
+    if (nw <= Math.min(maxW, w0) + 0.5) { l.w = nw; break; }
+    w.forEach(function (g) { delete g.sw; });   // لا يتسع: بلا تطويل، ونجرّب السطر الذي فوقه
+  }
   if (!TITLE_RULES.ksh || lines.length < 2) return;
   // الكشيدة: موضع واحد في الكلمة يُمدّ بتطويلة إلى ثلاث، في الكلمات الأطول أولًا. لا تُمدّ كلمة مطوّلة الحرف،
   // ولا سطر من كلمة واحدة، ولا سطر يقصر كثيرًا (أقل من ٦٠٪ من الأطول): الكشيدة توازن ولا تملأ فراغًا
