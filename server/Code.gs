@@ -910,6 +910,7 @@ function bridgeStats_(o) {
    - التطبيق المصغّر يرسل initData مع كل طلب (الرمز «جلسة#tg#initData»)، ويُتحقق منه بالطريقة الرسمية في كل طلب.
    - الحساب: a.tg معرّف تيليجرام الثابت. يُربط برمز من الموقع، أو بقائمة من محادثة الربط (bridge tg_map)، أو بموافقة المدير العام.
    - tgreq.json طلبات الدخول: [{id, tg, tgName, tgUser, name, username, program, track, status: new|ok|no, at, by, acc}]
+   - tgedit.json طلبات تعديل البيانات: [{id, uid, tg, username, from: {name, where}, to: {name?, program?, track?}, status: new|ok|no|back, at, by, upd}]
    - a.prefs.tgOff = {n: الإشعارات, w: التقرير الأسبوعي}، a.prefs.tgTip رقم آخر قاعدة تصميم. */
 var ABOT_INIT_MAX = 86400;   // عمر initData المقبول بالثواني
 var ABOT_PERMS = ['social', 'ai', 'upload', 'slides'];
@@ -1778,6 +1779,146 @@ function tg_req_act(token, id, act, arg) {
   return JSON.stringify({ status: r.r.status, acc: r.acc ? r.acc.username : (r.r.acc || '') });
 }
 
+/* ---------- تعديل البيانات (طلب أمين، ٢٤ نوفمبر): صاحب الحساب يصحّح اسمه أو برنامجه ومساره، والمدير العام يعتمد من البوت ----------
+   الخطوات رسالة واحدة تتبدّل بالأزرار (ue:…)، والمسودة في الذاكرة المؤقتة tged:<المستخدم> ساعة. لا يتغير شيء في الحساب قبل الاعتماد.
+   البرنامج والمسار لحسابات المستخدمين وحدها؛ المشرفون تُضبط برامجهم من لوحة الإدارة. */
+function abotEds_(tg, v) { var c = CacheService.getScriptCache(), k = 'tged:' + tg; if (v === undefined) { try { return JSON.parse(c.get(k) || '{}'); } catch (e) { return {}; } } if (v) c.put(k, JSON.stringify(v), 3600); else c.remove(k); }
+function abotWhere_(a) {
+  var ps = a.programs || [], ts = a.tracks || [], all = progs_(), out = [];
+  ps.forEach(function (pid) {
+    var p = all.filter(function (x) { return x.id === pid; })[0], mine = p ? (p.identities || []).filter(function (i) { return ts.indexOf(i.id) >= 0; }) : [];
+    if (!mine.length) out.push(abotProgName_(pid, '')); else mine.forEach(function (i) { out.push(abotProgName_(pid, i.id)); });
+  });
+  return out.join('، ') || 'بلا برنامج';
+}
+function abotEditCan_(a) { return a.role === 'user'; }
+function abotEditPend_(uid) { return readJson_('tgedit.json', []).filter(function (r) { return r.uid === uid && r.status === 'new'; })[0] || null; }
+function abotEditText_(a, d, pend, ask) {
+  var L = ['<b>✏️ تعديل بياناتي</b>', '', '<b>بياناتك الآن</b>', '👤 الاسم: ' + h0_(a.name), '🎯 البرنامج والمسار: ' + h0_(abotWhere_(a))];
+  if (d.name || d.program) {
+    L.push('', '<b>التعديل المطلوب</b>');
+    if (d.name) L.push('👤 الاسم: <b>' + h0_(d.name) + '</b>');
+    if (d.program) L.push('🎯 البرنامج والمسار: <b>' + h0_(abotProgName_(d.program, d.track)) + '</b>');
+  }
+  if (pend) L.push('', '⏳ لك طلب تعديل ينتظر الاعتماد' + (pend.to.name ? ': الاسم «' + h0_(pend.to.name) + '»' : '') + (pend.to.program ? (pend.to.name ? '، و' : ': ') + h0_(abotProgName_(pend.to.program, pend.to.track)) : '') + '. إرسال طلب جديد يحلّ محله.');
+  L.push('', ask || (d.name || d.program ? 'إن كان التعديل صحيحًا فاضغط «📤 أرسل للاعتماد»، ويصلك القرار هنا بعد المراجعة.' : 'ماذا تريد أن تعدّل؟ 👇'));
+  if (!abotEditCan_(a) && !ask) L.push('<i>البرنامج والمسار لحسابك تضبطهما الإدارة؛ راسل مشرف برنامجك لتغييرهما.</i>');
+  return L.join('\n');
+}
+function abotEditRows_(a, d, pend) {
+  var rows = [[{ text: '👤 الاسم', callback_data: 'ue:n' }].concat(abotEditCan_(a) ? [{ text: '🎯 البرنامج والمسار', callback_data: 'ue:p' }] : [])];
+  if (d.name || d.program) rows.push([{ text: '📤 أرسل للاعتماد', callback_data: 'ue:s' }]);
+  if (pend) rows.push([{ text: '↩️ اسحب طلبي السابق', callback_data: 'ue:w' }]);
+  rows.push([{ text: '✖️ إلغاء', callback_data: 'ue:x' }]);
+  return rows;
+}
+// يرسل الخطوة أو يبدّل الرسالة نفسها (mid)
+function abotEditShow_(a, text, rows, mid) {
+  var p = { chat_id: a.tg, text: clip_(text, 4096), parse_mode: 'HTML', reply_markup: abotKb_(rows) };
+  if (mid) { p.message_id = String(mid); try { return abot_('editMessageText', p); } catch (e) { delete p.message_id; } }
+  return abot_('sendMessage', p);
+}
+function abotEdit_(a, data, mid) {
+  var tg = a.tg, d = data ? abotEds_(tg) : {}, pend = abotEditPend_(a.uid), back = [[{ text: '↩️ رجوع', callback_data: 'ue:b' }]];
+  if (!data || data === 'ue:b') abotState_(tg, '');
+  if (!data) abotEds_(tg, null);
+  if (data === 'ue:x') { abotEds_(tg, null); abotState_(tg, ''); return abotEditShow_(a, 'أُلغي التعديل، وبقيت بياناتك كما هي 🌿', [], mid); }
+  if (data === 'ue:n') {
+    abotState_(tg, 'edn');
+    return abotEditShow_(a, abotEditText_(a, d, null, '✍️ <b>اكتب اسمك كما تحب أن يظهر في أثر</b>، مع لقبك إن شئت (مثل: أ. محمد العلي).'), back, mid);
+  }
+  if (data === 'ue:p' || /^ue:p:/.test(data)) {
+    if (!abotEditCan_(a)) return abotEditShow_(a, abotEditText_(a, d, pend), abotEditRows_(a, d, pend), mid);
+    var ps = abotProgs_(), pid = data.slice(5) || (ps.length === 1 ? ps[0].id : ''), pr = ps.filter(function (x) { return x.id === pid; })[0], rows = [];
+    if (!pr) {
+      ps.forEach(function (x) { rows.push([{ text: '📚 ' + clip_(x.name, 40), callback_data: 'ue:p:' + x.id }]); });
+      return abotEditShow_(a, abotEditText_(a, d, null, '📚 <b>اختر برنامجك</b> 👇'), rows.concat(back), mid);
+    }
+    if (!pr.tracks.length) { d.program = pr.id; d.track = ''; abotEds_(tg, d); return abotEditShow_(a, abotEditText_(a, d, pend), abotEditRows_(a, d, pend), mid); }
+    pr.tracks.forEach(function (t, i) { if (i % 2 === 0) rows.push([]); rows[rows.length - 1].push({ text: '🎯 ' + clip_(t.name, 26), callback_data: 'ue:t:' + pr.id + ':' + t.id }); });
+    return abotEditShow_(a, abotEditText_(a, d, null, '🎯 <b>اختر مسارك في ' + h0_(pr.name) + '</b> 👇'), rows.concat(ps.length > 1 ? [[{ text: '↩️ برنامج آخر', callback_data: 'ue:p' }]] : back), mid);
+  }
+  if (/^ue:t:/.test(data)) {
+    var q = data.split(':'), p2 = abotProgs_().filter(function (x) { return x.id === q[2]; })[0];
+    if (p2 && abotEditCan_(a) && p2.tracks.some(function (t) { return t.id === q[3]; })) { d.program = p2.id; d.track = q[3]; abotEds_(tg, d); }
+  }
+  if (data === 'ue:w' && pend) {
+    withLock_(function () { var L = readJson_('tgedit.json', []); L.forEach(function (r) { if (r.uid === a.uid && r.status === 'new') { r.status = 'back'; r.upd = now_(); } }); writeJson_('tgedit.json', L); });
+    pend = null;
+  }
+  if (data === 'ue:s') return abotEditSend_(a, d, mid);
+  return abotEditShow_(a, abotEditText_(a, d, pend), abotEditRows_(a, d, pend), mid);
+}
+// الاسم وصل نصًا
+function abotEditName_(a, text) {
+  var nm = clip_(String(text || '').replace(/\s+/g, ' ').trim(), 80);
+  if (nm.length < 2 || /[<>]/.test(nm)) return abotSend_(a.tg, 'اكتب اسمك حرفين على الأقل، بلا رموز 🙏');
+  abotState_(a.tg, '');
+  var d = abotEds_(a.tg); if (nm !== a.name) d.name = nm; else delete d.name; abotEds_(a.tg, d);
+  var pend = abotEditPend_(a.uid);
+  return abotEditShow_(a, abotEditText_(a, d, pend, nm === a.name ? 'هذا اسمك الحالي نفسه. اختر ما تريد تعديله 👇' : ''), abotEditRows_(a, d, pend), null);
+}
+function abotEditSend_(a, d, mid) {
+  var to = {};
+  if (d.name && d.name !== a.name) to.name = d.name;
+  if (d.program && abotEditCan_(a)) { to.program = d.program; to.track = d.track || ''; }
+  if (!to.name && !to.program) return abotEditShow_(a, abotEditText_(a, {}, abotEditPend_(a.uid)), abotEditRows_(a, {}, abotEditPend_(a.uid)), mid);
+  var r = withLock_(function () {
+    var L = readJson_('tgedit.json', []);
+    if (L.filter(function (x) { return x.uid === a.uid && x.at > now_() - 864e5; }).length >= 5) throw new Error('طلبات تعديل كثيرة اليوم، انتظر قرار طلبك');
+    L.forEach(function (x) { if (x.uid === a.uid && x.status === 'new') { x.status = 'back'; x.upd = now_(); } });
+    var o = { id: uid_(), uid: a.uid, tg: a.tg, username: a.username, from: { name: a.name, where: abotWhere_(a) }, to: to, status: 'new', at: now_() };
+    L.unshift(o); if (L.length > 500) L.length = 500; writeJson_('tgedit.json', L);
+    return o;
+  });
+  abotEds_(a.tg, null); abotState_(a.tg, '');
+  abotEditNotify_(r);
+  return abotEditShow_(a, '<b>📤 أُرسل طلب التعديل</b>\n\n' + (to.name ? '👤 الاسم: <b>' + h0_(to.name) + '</b>\n' : '') + (to.program ? '🎯 البرنامج والمسار: <b>' + h0_(abotProgName_(to.program, to.track)) + '</b>\n' : '') + '\nتبقى بياناتك كما هي حتى يُعتمد التعديل، ويصلك القرار هنا بإذن الله 🌿', [], mid);
+}
+function abotEditAdminText_(r, note) {
+  var L = ['<b>✏️ طلب تعديل بيانات</b>', 'الحساب: <code>' + h0_(r.username) + '</code>', ''];
+  if (r.to.name) L.push('👤 الاسم: ' + h0_(r.from.name) + ' ← <b>' + h0_(r.to.name) + '</b>');
+  else L.push('👤 الاسم: ' + h0_(r.from.name));
+  if (r.to.program) L.push('🎯 البرنامج والمسار: ' + h0_(r.from.where) + ' ← <b>' + h0_(abotProgName_(r.to.program, r.to.track)) + '</b>');
+  if (note) L.push('', note);
+  return L.join('\n');
+}
+function abotEditNotify_(r) {
+  if (!abotOn_()) return;
+  abotApprovers_().forEach(function (a) { try { abotSend_(a.tg, abotEditAdminText_(r), [[{ text: '✅ اعتماد', callback_data: 'ua:' + r.id + ':y' }, { text: '✖️ رفض', callback_data: 'ua:' + r.id + ':x' }]]); } catch (e) {} });
+}
+// قرار المدير العام: y اعتماد، x رفض
+function tgEditDecide_(id, act, by) {
+  var out = withLock_(function () {
+    var L = readJson_('tgedit.json', []), r = L.filter(function (x) { return x.id === id; })[0];
+    if (!r) throw new Error('الطلب غير موجود');
+    if (r.status !== 'new') return { r: r, done: true };
+    if (act === 'x') { r.status = 'no'; r.by = by.name; r.upd = now_(); writeJson_('tgedit.json', L); audit_(by, 'رفض طلب تعديل بيانات من تيليجرام', r.username); return { r: r }; }
+    if (act !== 'y') throw new Error('قرار غير معروف');
+    var accs = readJson_('accounts.json', {}), a = accs[r.uid];
+    if (!a || a.disabled) throw new Error('الحساب غير موجود أو موقوف');
+    if (r.to.program) {
+      var p = abotProgs_().filter(function (x) { return x.id === r.to.program; })[0]; if (!p) throw new Error('البرنامج لم يعد موجودًا');
+      if (r.to.track && !p.tracks.some(function (t) { return t.id === r.to.track; })) throw new Error('المسار لم يعد موجودًا');
+      if (a.role !== 'user') throw new Error('برامج المشرفين تُضبط من لوحة الإدارة');
+      a.programs = [p.id]; a.tracks = r.to.track ? [r.to.track] : [];
+    }
+    if (r.to.name) a.name = r.to.name;
+    r.status = 'ok'; r.by = by.name; r.upd = now_();
+    writeJson_('accounts.json', accs); writeJson_('tgedit.json', L);
+    audit_(by, 'اعتمد تعديل بيانات من تيليجرام', a.username + (r.to.name ? ' · الاسم' : '') + (r.to.program ? ' · المسار' : ''));
+    return { r: r, acc: a };
+  });
+  if (!out.done) {
+    try {
+      if (out.acc) abotCard_(out.r.tg, { k: 'تعديل بياناتي', h: 'اعتُمد تعديل بياناتك ✅', p: 'صارت بياناتك في أثر كما طلبت. أغلق أثر وافتحه من جديد إن كان مفتوحًا.',
+        items: [['👤', 'الاسم', out.acc.name], ['🎯', 'البرنامج والمسار', abotWhere_(out.acc)]] });
+      else abotSend_(out.r.tg, 'لم يُعتمد طلب تعديل بياناتك، وبقيت كما هي. إن كان عندك سؤال فراسل مشرف برنامجك 🌿');
+    } catch (e) {}
+  }
+  return out;
+}
+
 /* ---------- الربط الذاتي برمز من الموقع، وكلمة سر للموقع ---------- */
 function tg_link_code(token) {
   var a = auth_(token); if (!abotOn_()) throw new Error('بوت أثر غير مضبوط بعد');
@@ -1908,6 +2049,7 @@ function abotUpdate_(u) {
     case 'notify': return abotNotifyMenu_(a);
     case 'learn': return abotTip_(a, 1);
     case 'password': return abotPw_(a);
+    case 'edit': return abotEdit_(a, null, null);
   }
   if (c) return abotMenu_(a);
   if (!text) return;
@@ -1915,6 +2057,7 @@ function abotUpdate_(u) {
   if (st === 'idea') { abotState_(from, ''); return abotIdea_(a, text); }
   if (st === 'quick') { abotState_(from, ''); return abotQuickDone_(a, text); }
   if (st === 'tq') return abotTqText_(a, text);
+  if (st === 'edn') return abotEditName_(a, text);
   return abotAsk_(a, text);
 }
 function abotPw_(a) {
@@ -1937,7 +2080,7 @@ function abotFbAsk_(a) { return abotCard_(a.tg, { k: 'اقتراح أو ملاح
 // لأن التطبيق إذا فُتح من زر لوحة المفاتيح لا تصله بيانات الدخول)
 // زر «🎨 تصميم» واحد يعرض الطريقتين: السريع بالقوالب، والذكاء الاصطناعي. والأزرار القديمة تبقى مفهومة لمن عنده اللوحة السابقة
 var ABOT_KEYS = [['🎨 تصميم'], ['🖼️ افتح أثر', '❓ اسأل أثر'], ['🎬 دليل أثر', '✏️ تعلّم التصميم'], ['📋 القائمة']];
-var ABOT_KEYMAP = { '🎨 تصميم': 'des', '🖼️ افتح أثر': 'design', '⚡ تصميم سريع': 'des', '🎨 افتح أثر': 'design', '💡 صمّم بفكرة': 'idea', '❓ اسأل أثر': 'ask', '🎬 دليل أثر': 'guide', '✏️ تعلّم التصميم': 'learn', '📋 القائمة': 'menu' };
+var ABOT_KEYMAP = { '🎨 تصميم': 'des', '🖼️ افتح أثر': 'design', '⚡ تصميم سريع': 'des', '🎨 افتح أثر': 'design', '💡 صمّم بفكرة': 'idea', '❓ اسأل أثر': 'ask', '🎬 دليل أثر': 'guide', '✏️ تعلّم التصميم': 'learn', '📋 القائمة': 'menu', '✏️ تعديل بياناتي': 'edit' };
 var ABOT_KB = 'tgKb3';   // إصدار لوحة المفاتيح الدائمة: تُرسل الجديدة مرة لكل حساب
 function abotKeys_() {
   return JSON.stringify({ keyboard: ABOT_KEYS.map(function (r) { return r.map(function (t) { return { text: t }; }); }), is_persistent: true, resize_keyboard: true, input_field_placeholder: 'اكتب سؤالك عن أثر، أو اختر من الأزرار' });
@@ -1947,7 +2090,7 @@ function abotMenuRows_() {
     [{ text: '❓ اسأل أثر', callback_data: 'm:ask' }, { text: '🎬 دليل أثر', callback_data: 'm:guide' }],
     [{ text: '✏️ تعلّم التصميم', callback_data: 'm:learn' }],
     [{ text: '💬 اقتراح أو ملاحظة', callback_data: 'm:fb' }, { text: '🔔 الإشعارات', callback_data: 'm:notify' }],
-    [{ text: '🔑 كلمة سر للموقع', callback_data: 'm:pw' }]];
+    [{ text: '✏️ تعديل بياناتي', callback_data: 'm:edit' }, { text: '🔑 كلمة سر للموقع', callback_data: 'm:pw' }]];
 }
 function abotMenu_(a, hi) {
   return abotCard_(a.tg, { k: 'أثر · المنصة الإعلامية', h: hi ? abotHi_(a.name) : 'ماذا تريد الآن؟ ✨', p: hi ? 'ماذا تريد اليوم؟ اختر من الأزرار، أو اكتب لي سؤالك مباشرة.' : 'اختر من الأزرار، أو اكتب لي سؤالك مباشرة.' }, abotKb_(abotMenuRows_()));
@@ -2177,7 +2320,19 @@ function abotCallback_(q) {
       return abot_('editMessageText', { chat_id: from, message_id: String(msg.message_id), text: abotReqText_(r, note), parse_mode: 'HTML', reply_markup: abotKb_(r.status === 'new' ? abotReqRows_(r) : []) });
     } catch (e) { return ack(String(e.message || e).slice(0, 190), true); }
   }
+  if (/^ua:/.test(data)) {
+    if (!a || a.role !== 'super') return ack('للمدير العام وحده', true);
+    var u2 = data.split(':');
+    try {
+      var er = tgEditDecide_(u2[1], u2[2], a), rr = er.r;
+      var en = er.done ? '<i>عولج من قبل: ' + ({ ok: 'اعتُمد', no: 'رُفض', back: 'سحبه صاحبه' })[rr.status] + '</i>' : rr.status === 'ok' ? '✅ <b>اعتُمد</b>، ووصله الخبر.' : '✖️ <b>رُفض</b>، ووصله الخبر.';
+      ack(er.done ? '' : rr.status === 'ok' ? 'اعتُمد' : 'رُفض');
+      return abot_('editMessageText', { chat_id: from, message_id: String(msg.message_id), text: abotEditAdminText_(rr, en), parse_mode: 'HTML', reply_markup: abotKb_([]) });
+    } catch (e) { return ack(String(e.message || e).slice(0, 190), true); }
+  }
   if (!a) return ack('ادخل أثر أولًا', true);
+  if (data === 'm:edit') { ack(); return abotEdit_(a, null, null); }
+  if (/^ue:/.test(data)) { ack(); try { return abotEdit_(a, data, msg.message_id); } catch (e) { return abotSend_(from, h0_(String(e.message || e).slice(0, 300))); } }
   if (data === 'm:idea') { ack(); abotState_(from, 'idea'); return abotIdeaAsk_(a); }
   if (data === 'm:quick') { ack(); abotState_(from, ''); return abotQuick_(a, null, null); }
   if (/^q[tysxan]:/.test(data)) { ack(); return abotQuick_(a, data, msg.message_id); }
@@ -2408,7 +2563,7 @@ function abotSetup_() {
     ['setMyName', { name: 'أثر | المنصة الإعلامية' }, 'الاسم'],
     ['setMyShortDescription', { short_description: 'صمّم إعلانات مسارك بهوية الأكاديمية، واستلمها هنا.' }, 'الوصف القصير'],
     ['setMyDescription', { description: 'باب منصة الأثر الإعلامي للعاملين في الأكاديمية. ادخل بحسابك في تيليجرام بلا كلمة سر، وصمّم من قوالب مسارك، فيصلك تصميمك هنا بجودته الكاملة. واسأل أثر عن أي شيء في المنصة.' }, 'الوصف'],
-    ['setMyCommands', { commands: JSON.stringify([['start', 'البداية'], ['des', 'تصميم 🎨'], ['design', 'افتح أثر'], ['idea', 'صمّم بفكرة'], ['guide', 'دليل أثر'], ['ask', 'اسأل أثر'], ['learn', 'تعلّم التصميم'], ['feedback', 'اقتراح أو ملاحظة'], ['notify', 'الإشعارات'], ['password', 'كلمة سر للموقع']].map(function (c) { return { command: c[0], description: c[1] }; })) }, 'الأوامر'],
+    ['setMyCommands', { commands: JSON.stringify([['start', 'البداية'], ['des', 'تصميم 🎨'], ['design', 'افتح أثر'], ['idea', 'صمّم بفكرة'], ['guide', 'دليل أثر'], ['ask', 'اسأل أثر'], ['learn', 'تعلّم التصميم'], ['feedback', 'اقتراح أو ملاحظة'], ['notify', 'الإشعارات'], ['edit', 'تعديل بياناتي'], ['password', 'كلمة سر للموقع']].map(function (c) { return { command: c[0], description: c[1] }; })) }, 'الأوامر'],
     // علامة الاتجاه (LRM) قبل النص العربي: بدونها يرسم تيليجرام في أندرويد اسم الزر خارجه فوق خانة الكتابة
     ['setChatMenuButton', { menu_button: JSON.stringify({ type: 'web_app', text: '\u200Eافتح أثر', web_app: { url: abotApp_('') } }) }, 'زر القائمة']
   ];
@@ -2993,7 +3148,7 @@ function hasGemini_() { return geminiKeys_().length > 0; }
 function aiAny_(s) { var h = aiHave_(); return !!(h.gemini || h.groq || h.cf || (s.ai && s.ai.pollFallback !== false)); }
 function publicSettings_() { var s = settings_(); return { ai: { enabled: !!(s.ai && s.ai.enabled), perDay: s.ai ? s.ai.perDay : 0, ready: aiAny_(s), vision: hasGemini_(), capPrompt: (s.ai && s.ai.capPrompt) || '' }, maxUploadMb: s.maxUploadMb, tg: !!props_().getProperty('TG_TOKEN'), pexels: true, imgKeys: { pixabay: !!props_().getProperty('PIXABAY_KEY'), pexels: !!props_().getProperty('PEXELS_KEY') }, tgKnown: (s.tgKnown || []).length }; }
 // بصمة نسخة الخادم: يضعها البناء، ويقارنها الموقع ليخبر المدير إن كان الخادم المنشور أقدم
-var SRV_VER = '28c13c7c';
+var SRV_VER = 'ccb19266';
 function set_get(token) { var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام'); var s = settings_(); s.srvVer = SRV_VER; s.aiKey = hasGemini_(); s.aiKeys = geminiKeys_().length; s.tgOn = !!props_().getProperty('TG_TOKEN'); s.pexelsOn = !!props_().getProperty('PEXELS_KEY'); s.pixabayOn = !!props_().getProperty('PIXABAY_KEY'); s.groqOn = !!props_().getProperty('GROQ_KEY'); s.cfOn = !!(props_().getProperty('CF_ACCOUNT') && props_().getProperty('CF_TOKEN')); s.routeDefault = AI_ROUTE_DEFAULT; return JSON.stringify(s); }
 function set_save(token, json) {
   var a = auth_(token); if (!isSuper_(a)) throw new Error('للمدير العام');

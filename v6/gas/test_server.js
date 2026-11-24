@@ -952,6 +952,58 @@ ok(!/مساعد المنصة/.test(ctx.skillsFor_('design')), 'help skill not at
   J('tg_request', mkInit(RAMI), JSON.stringify({ program: 'academy', track: '', name: 'رامي', username: 'rami77' }));
   const rq = J('tg_req_list', adm).filter(function (r) { return r.tg === '77'; })[0];
   ok(J('tg_req_act', adm, rq.id, 'x').status === 'no' && J('tg_login', mkInit(RAMI)).need, 'rejected from the admin panel');
+
+  // تعديل البيانات: صاحب الحساب يطلب، والمدير العام يعتمد من البوت، ولا يتغير شيء قبل الاعتماد
+  const acc42 = function () { const A = ctx.readJson_('accounts.json', {}); return A[Object.keys(A).filter(function (k) { return A[k].tg === '42'; })[0]]; };
+  const before = acc42(), oldName = before.name;
+  GAS._tg = []; hook(msg(SALEM, '/menu'));
+  ok(/m:edit/.test(msgs(42).pop().mk), 'menu has «تعديل بياناتي»');
+  GAS._tg = []; hook(msg(SALEM, '/edit'));
+  let em = msgs(42).pop(), ek = JSON.parse(em.mk).inline_keyboard;
+  ok(/بياناتك الآن/.test(em.txt) && em.txt.indexOf(oldName) >= 0 && ek[0][0].callback_data === 'ue:n' && ek[0][1].callback_data === 'ue:p' && !/ue:s/.test(em.mk), 'edit card: current data, name and track buttons, nothing to send yet');
+  GAS._tg = []; hook(cb(SALEM, 'ue:n'));
+  ok(ctx.abotState_('42') === 'edn' && /اكتب اسمك/.test(edits().pop().opt.payload.text), 'name step asks for the name');
+  GAS._tg = []; hook(msg(SALEM, 'x'));
+  ok(/حرفين/.test(msgs(42).pop().txt) && ctx.abotState_('42') === 'edn', 'too short a name is asked again');
+  GAS._tg = []; hook(msg(SALEM, '  أ. سالم   الكردي '));
+  em = msgs(42).pop();
+  ok(/التعديل المطلوب/.test(em.txt) && /أ\. سالم الكردي/.test(em.txt) && /ue:s/.test(em.mk) && ctx.abotState_('42') === '', 'name kept in the draft, send button shown');
+  const academyTracks = ctx.abotProgs_().filter(function (p) { return p.id === 'academy'; })[0].tracks, other = academyTracks.filter(function (t) { return t.id !== 'ishraq'; })[0];
+  GAS._tg = []; hook(cb(SALEM, 'ue:p'));
+  let pk = ekb(); const flat = [].concat.apply([], pk).map(function (b) { return b.callback_data; });
+  ok(flat.some(function (d) { return /^ue:(p|t):/.test(d); }), 'track step lists programs or tracks');
+  if (!flat.some(function (d) { return /^ue:t:/.test(d); })) { GAS._tg = []; hook(cb(SALEM, 'ue:p:academy')); }
+  GAS._tg = []; hook(cb(SALEM, 'ue:t:academy:' + other.id));
+  const et = edits().pop().opt.payload.text;
+  ok(et.indexOf(other.name) >= 0 && /أ\. سالم الكردي/.test(et), 'the draft keeps both the name and the new track');
+  GAS._tg = []; hook(cb(SALEM, 'ue:s'));
+  const er1 = ctx.readJson_('tgedit.json', [])[0], ask2 = sentTo(AMIN.id, 'sendMessage').pop();
+  ok(er1.status === 'new' && er1.to.name === 'أ. سالم الكردي' && er1.to.track === other.id && /أُرسل طلب التعديل/.test(edits().pop().opt.payload.text), 'request stored, the user told it waits for approval');
+  ok(ask2 && /طلب تعديل بيانات/.test(ask2.opt.payload.text) && /salem\.k/.test(ask2.opt.payload.text) && JSON.parse(ask2.opt.payload.reply_markup).inline_keyboard[0][0].callback_data === 'ua:' + er1.id + ':y', 'the super admin gets the request with approve and reject');
+  ok(acc42().name === oldName && acc42().tracks.indexOf('ishraq') >= 0, 'nothing changes before approval');
+  GAS._tg = []; hook(cb(SALEM, 'ua:' + er1.id + ':y'));
+  ok(acc42().name === oldName && ctx.readJson_('tgedit.json', [])[0].status === 'new', 'only the super admin can approve');
+  GAS._tg = []; hook(cb(AMIN, 'ua:' + er1.id + ':y'));
+  ok(acc42().name === 'أ. سالم الكردي' && acc42().programs.join() === 'academy' && acc42().tracks.join() === other.id, 'approved: name and track applied');
+  ok(/اعتُمد تعديل بياناتك/.test(msgs(42).pop().txt) && /اعتُمد/.test(edits().pop().opt.payload.text), 'the user is told, the admin message updated');
+  GAS._tg = []; hook(cb(AMIN, 'ua:' + er1.id + ':x'));
+  ok(/عولج من قبل/.test(edits().pop().opt.payload.text) && acc42().name === 'أ. سالم الكردي', 'a decided request is not decided twice');
+  // الرفض، والسحب
+  GAS._tg = []; hook(msg(SALEM, '/edit')); hook(cb(SALEM, 'ue:n')); hook(msg(SALEM, 'اسم خطأ')); hook(cb(SALEM, 'ue:s'));
+  const er2 = ctx.readJson_('tgedit.json', [])[0]; GAS._tg = []; hook(cb(AMIN, 'ua:' + er2.id + ':x'));
+  ok(ctx.readJson_('tgedit.json', [])[0].status === 'no' && acc42().name === 'أ. سالم الكردي' && /لم يُعتمد/.test(msgs(42).pop().txt), 'rejected: data unchanged, the user told');
+  GAS._tg = []; hook(msg(SALEM, '/edit')); hook(cb(SALEM, 'ue:n')); hook(msg(SALEM, 'سالم')); hook(cb(SALEM, 'ue:s'));
+  GAS._tg = []; hook(msg(SALEM, '/edit'));
+  ok(/ينتظر الاعتماد/.test(msgs(42).pop().txt) && /ue:w/.test(msgs(42).pop().mk), 'a pending request shows, with withdraw');
+  GAS._tg = []; hook(cb(SALEM, 'ue:w'));
+  ok(ctx.readJson_('tgedit.json', [])[0].status === 'back' && !/ينتظر الاعتماد/.test(edits().pop().opt.payload.text), 'withdrawn');
+  // المشرفون: الاسم وحده
+  (function () { const A = ctx.readJson_('accounts.json', {}); Object.keys(A).forEach(function (k) { if (A[k].tg === '42') A[k].role = 'sup'; }); ctx.writeJson_('accounts.json', A); })();
+  GAS._tg = []; hook(msg(SALEM, '/edit'));
+  ok(!/ue:p/.test(msgs(42).pop().mk) && /تضبطهما الإدارة/.test(msgs(42).pop().txt), 'supervisors edit their name only');
+  GAS._tg = []; hook(cb(SALEM, 'ue:t:academy:ishraq')); hook(cb(SALEM, 'ue:s'));
+  ok(ctx.readJson_('tgedit.json', [])[0].status === 'back', 'a forged track button sends nothing for a supervisor');
+  (function () { const A = ctx.readJson_('accounts.json', {}); Object.keys(A).forEach(function (k) { if (A[k].tg === '42') { A[k].role = 'user'; A[k].name = before.name; A[k].tracks = before.tracks; A[k].programs = before.programs; } }); ctx.writeJson_('accounts.json', A); })();
   GAS._fetch.handler = keep;
 })();
 // الصلاحيات الأساسية لكل الحسابات (قرار ١٣ نوفمبر): تُضاف لمن ينقصه، مرة واحدة من المؤقت، وللمدير أن يعيدها
